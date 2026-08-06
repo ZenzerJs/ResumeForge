@@ -14,8 +14,13 @@ import {
   Database,
   Search,
   BookOpen,
+  Loader2,
+  Settings,
+  Wand2,
 } from "lucide-react";
 import { JobRequirements } from "@/lib/jd-parser/types";
+import { PatchDiffReview } from "./patch-diff-review";
+import type { PatchProposal, Gap, RejectedPatch } from "@/lib/ai/patch-schema";
 
 interface RankedMatch {
   id: string;
@@ -85,6 +90,120 @@ export function TailorWorkspace() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Phase 4.2: AI Patch Generation state
+  const [isGeneratingPatches, setIsGeneratingPatches] = useState(false);
+  const [patchVerified, setPatchVerified] = useState<PatchProposal[]>([]);
+  const [patchRejected, setPatchRejected] = useState<RejectedPatch[]>([]);
+  const [patchGaps, setPatchGaps] = useState<Gap[]>([]);
+  const [masterResumeId, setMasterResumeId] = useState<string | null>(null);
+  const [masterTypstSource, setMasterTypstSource] = useState<string>("");
+  const [patchError, setPatchError] = useState<string | null>(null);
+  const [savedJobId, setSavedJobId] = useState<string | null>(null);
+
+  const handleGeneratePatches = async () => {
+    if (!extractedRequirements) {
+      setPatchError("Please extract requirements from a job description first.");
+      return;
+    }
+
+    // Load AI settings from localStorage
+    let aiSettings;
+    try {
+      const stored = localStorage.getItem("resumeforge_ai_settings");
+      aiSettings = stored ? JSON.parse(stored) : null;
+    } catch {
+      aiSettings = null;
+    }
+
+    if (!aiSettings?.provider || !aiSettings?.apiKey) {
+      setPatchError("No AI provider configured. Please configure your API key in Settings.");
+      return;
+    }
+
+    setIsGeneratingPatches(true);
+    setPatchError(null);
+    setPatchVerified([]);
+    setPatchRejected([]);
+    setPatchGaps([]);
+
+    try {
+      // Save job first if not already saved
+      let jobId = savedJobId;
+      if (!jobId) {
+        const saveRes = await fetch("/api/jobs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            company: company.trim() || undefined,
+            roleTitle: roleTitle.trim() || undefined,
+            rawDescription,
+            source: "pasted",
+            extractedRequirements: extractedRequirements,
+          }),
+        });
+        const saveJson = await saveRes.json();
+        if (saveRes.ok && saveJson.success) {
+          jobId = saveJson.data.id;
+          setSavedJobId(jobId);
+        } else {
+          setPatchError("Failed to save job posting before patch generation.");
+          setIsGeneratingPatches(false);
+          return;
+        }
+      }
+
+      const res = await fetch("/api/ai/generate-patches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          providerConfig: {
+            provider: aiSettings.provider,
+            apiKey: aiSettings.apiKey,
+            baseUrl: aiSettings.baseUrl || undefined,
+            model: aiSettings.model || undefined,
+          },
+          jobRequirements: {
+            requiredSkills: extractedRequirements.requiredSkills,
+            preferredSkills: extractedRequirements.preferredSkills,
+            domainTerms: extractedRequirements.domainTerms,
+            roleTitle: roleTitle || undefined,
+            company: company || undefined,
+          },
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        setPatchError(json.error || "Failed to generate patches.");
+        setIsGeneratingPatches(false);
+        return;
+      }
+
+      setPatchVerified(json.data.verified || []);
+      setPatchRejected(json.data.rejected || []);
+      setPatchGaps(json.data.gaps || []);
+      setMasterResumeId(json.data.masterResumeId || null);
+
+      // Fetch master resume content for diff merge computation
+      if (json.data.masterResumeId) {
+        try {
+          const masterRes = await fetch(`/api/resumes/${json.data.masterResumeId}`);
+          const masterJson = await masterRes.json();
+          if (masterRes.ok && masterJson.success) {
+            setMasterTypstSource(masterJson.data.typstSource || "");
+          }
+        } catch {
+          // Non-fatal — user can still review patches
+        }
+      }
+    } catch (err) {
+      setPatchError(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsGeneratingPatches(false);
+    }
+  };
 
   const handleExtract = async () => {
     if (!rawDescription.trim()) {
@@ -692,6 +811,69 @@ export function TailorWorkspace() {
           </div>
         </section>
       </main>
+
+      {/* Phase 4.2: AI Patch Generation Section */}
+      {extractedRequirements && (
+        <div className="max-w-7xl w-full mx-auto px-6 pb-8 space-y-6">
+          <div className="border-t border-slate-800 pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Wand2 className="h-4 w-4 text-indigo-400" />
+                AI Patch Generator
+                <span className="text-xs font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-full">
+                  Phase 4.2 BYOK AI
+                </span>
+              </h2>
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/settings"
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 rounded-md flex items-center gap-1.5 transition"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                  AI Settings
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleGeneratePatches}
+                  disabled={isGeneratingPatches}
+                  data-testid="generate-patches-btn"
+                  className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-xs px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition"
+                >
+                  {isGeneratingPatches ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Generating Patches...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      Generate AI Patches
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {patchError && (
+              <div className="p-3 bg-red-950/50 border border-red-800/50 rounded-lg flex items-center gap-2 text-xs text-red-300 mb-4">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>{patchError}</span>
+              </div>
+            )}
+
+            {(patchVerified.length > 0 || patchRejected.length > 0 || patchGaps.length > 0) && masterResumeId && savedJobId && (
+              <PatchDiffReview
+                verified={patchVerified}
+                rejected={patchRejected}
+                gaps={patchGaps}
+                masterResumeId={masterResumeId}
+                masterTypstSource={masterTypstSource}
+                jobId={savedJobId}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
