@@ -1,14 +1,11 @@
 import { ProviderConfig, ProviderConfigSchema, TestConnectionResult, GeneratePatchesInput, GeneratePatchesResult } from "./types";
-import { testOpenAIConnection } from "./providers/openai";
-import { testAnthropicConnection } from "./providers/anthropic";
-import { testGeminiConnection } from "./providers/gemini";
-import { testCustomConnection } from "./providers/custom";
-import { generateOpenAIPatches } from "./providers/openai";
-import { generateAnthropicPatches } from "./providers/anthropic";
-import { generateGeminiPatches } from "./providers/gemini";
-import { generateCustomPatches } from "./providers/custom";
+import { testOpenAIConnection, generateOpenAIPatches, generateOpenAIQualitativeReview } from "./providers/openai";
+import { testAnthropicConnection, generateAnthropicPatches, generateAnthropicQualitativeReview } from "./providers/anthropic";
+import { testGeminiConnection, generateGeminiPatches, generateGeminiQualitativeReview } from "./providers/gemini";
+import { testCustomConnection, generateCustomPatches, generateCustomQualitativeReview } from "./providers/custom";
 import { sanitizeError } from "./redact";
 import { buildPatchSystemPrompt, buildPatchUserPrompt } from "./prompt-template";
+import { buildQualitativeReviewSystemPrompt, buildQualitativeReviewUserPrompt, QualitativeReviewPromptInput } from "./qualitative-prompt";
 
 /**
  * Unified AI Provider Gateway Connectivity Interface
@@ -93,6 +90,46 @@ export async function generatePatchProposals(input: GeneratePatchesInput): Promi
     return {
       success: false,
       error: sanitizeError(`Patch generation gateway exception: ${err instanceof Error ? err.message : String(err)}`),
+    };
+  }
+}
+
+/**
+ * Phase 4.3b: Generates structured AI qualitative feedback via the configured BYOK AI provider.
+ */
+export async function generateQualitativeReview(input: QualitativeReviewPromptInput): Promise<GeneratePatchesResult> {
+  const parseResult = ProviderConfigSchema.safeParse(input.providerConfig);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: sanitizeError(`Invalid provider configuration: ${parseResult.error.message}`),
+    };
+  }
+
+  const config = parseResult.data;
+  const systemPrompt = buildQualitativeReviewSystemPrompt();
+  const userPrompt = buildQualitativeReviewUserPrompt(input);
+
+  try {
+    switch (config.provider) {
+      case "openai":
+        return await generateOpenAIQualitativeReview(config, systemPrompt, userPrompt);
+      case "anthropic":
+        return await generateAnthropicQualitativeReview(config, systemPrompt, userPrompt);
+      case "gemini":
+        return await generateGeminiQualitativeReview(config, systemPrompt, userPrompt);
+      case "custom":
+        return await generateCustomQualitativeReview(config, systemPrompt, userPrompt);
+      default:
+        return {
+          success: false,
+          error: `Unsupported AI provider for qualitative review: ${config.provider}`,
+        };
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: sanitizeError(`Qualitative review gateway exception: ${err instanceof Error ? err.message : String(err)}`),
     };
   }
 }

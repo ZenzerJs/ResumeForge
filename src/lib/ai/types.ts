@@ -57,3 +57,11 @@ export interface GeneratePatchesResult {
   rawJson?: string;
   error?: string;
 }
+
+// --- Phase 4.3b: Qualitative review types ---
+
+export interface GenerateQualitativeReviewResult {
+  success: boolean;
+  rawJson?: string;
+  error?: string;
+}
