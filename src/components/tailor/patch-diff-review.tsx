@@ -21,7 +21,7 @@ interface PatchDiffReviewProps {
   masterResumeId: string;
   masterTypstSource: string;
   jobId: string;
-  onApplySuccess?: (variantId: string) => void;
+  onApplySuccess?: (variantId: string, mergedContent: string) => void;
 }
 
 type PatchDecision = "pending" | "accepted" | "rejected";
@@ -156,7 +156,7 @@ export function PatchDiffReview({
       setApplySuccess(
         `Tailored variant "${json.data.variantTitle}" created successfully (ID: ${json.data.variantId}).`
       );
-      onApplySuccess?.(json.data.variantId);
+      onApplySuccess?.(json.data.variantId, mergedContent);
     } catch (err) {
       setApplyError(`Error applying patches: ${err instanceof Error ? err.message : String(err)}`);
     } finally {

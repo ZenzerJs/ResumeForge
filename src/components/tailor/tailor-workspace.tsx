@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { JobRequirements } from "@/lib/jd-parser/types";
 import { PatchDiffReview } from "./patch-diff-review";
+import { AtsScorePanel } from "./ats-score-panel";
 import type { PatchProposal, Gap, RejectedPatch } from "@/lib/ai/patch-schema";
 
 interface RankedMatch {
@@ -98,8 +99,45 @@ export function TailorWorkspace() {
   const [patchGaps, setPatchGaps] = useState<Gap[]>([]);
   const [masterResumeId, setMasterResumeId] = useState<string | null>(null);
   const [masterTypstSource, setMasterTypstSource] = useState<string>("");
+  const [activeVariantContent, setActiveVariantContent] = useState<string>("");
   const [patchError, setPatchError] = useState<string | null>(null);
   const [savedJobId, setSavedJobId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadMasterOrStarterResume() {
+      try {
+        const res = await fetch("/api/resumes");
+        const json = await res.json();
+        if (res.ok && json.success && json.data.length > 0) {
+          const master = json.data.find((r: { isMaster: boolean }) => r.isMaster) || json.data[0];
+          setMasterResumeId(master.id);
+          setMasterTypstSource(master.typstSource);
+          setActiveVariantContent(master.typstSource);
+          return;
+        }
+      } catch {
+        // Fallback
+      }
+
+      try {
+        const tRes = await fetch("/templates/starter-resume.typ");
+        if (tRes.ok) {
+          const text = await tRes.text();
+          setMasterTypstSource(text);
+          setActiveVariantContent(text);
+          return;
+        }
+      } catch {
+        // Fallback
+      }
+
+      const defaultSource = `#let resume-section(title) = [ === #title ]\n#resume-section("Skills")\nLanguages: TypeScript, Node.js, Python, PostgreSQL\n#resume-section("Experience")\n*Software Engineer* (2024 - Present)\n- Built REST APIs using Node.js and PostgreSQL.\n`;
+      setMasterTypstSource(defaultSource);
+      setActiveVariantContent(defaultSource);
+    }
+
+    loadMasterOrStarterResume();
+  }, []);
 
   const handleGeneratePatches = async () => {
     if (!extractedRequirements) {
@@ -193,6 +231,7 @@ export function TailorWorkspace() {
           const masterJson = await masterRes.json();
           if (masterRes.ok && masterJson.success) {
             setMasterTypstSource(masterJson.data.typstSource || "");
+            setActiveVariantContent(masterJson.data.typstSource || "");
           }
         } catch {
           // Non-fatal — user can still review patches
@@ -869,7 +908,20 @@ export function TailorWorkspace() {
                 masterResumeId={masterResumeId}
                 masterTypstSource={masterTypstSource}
                 jobId={savedJobId}
+                onApplySuccess={(variantId, mergedContent) => {
+                  setActiveVariantContent(mergedContent);
+                }}
               />
+            )}
+
+            {extractedRequirements && (activeVariantContent || masterTypstSource) && (
+              <div className="pt-6">
+                <AtsScorePanel
+                  typstContent={activeVariantContent || masterTypstSource}
+                  extractedRequirements={extractedRequirements}
+                  roleTitle={roleTitle}
+                />
+              </div>
             )}
           </div>
         </div>
