@@ -157,11 +157,39 @@ This document records completed project milestones, current state, known limitat
 
 ### Known Limitations (Phase 4.3 Scope)
 - Purely deterministic rule-based evaluation (zero LLM calls).
-- Qualitative bullet feedback, subjective nuance evaluation, and AI Reviewer commentary deferred to Phase 4.3b.
 - Cover letter generator and job tracker deferred to subsequent phases.
 
+---
+
+## Current Status: Phase 4.3b Complete — On-Demand AI Qualitative Reviewer
+
+- **Phase Completed**: Phase 4.3b (On-Demand AI Qualitative Reviewer & Bounded JD Context Adjustment)
+- **Completed Date**: 2026-08-06
+- **Status Summary**: Implemented opt-in, user-triggered AI Qualitative Reviewer (`src/lib/ai/qualitative-schema.ts`, `qualitative-prompt.ts`, `src/app/api/ai/qualitative-review/route.ts`), Bounded JD Context Adjustment (-10 to +10 pts max with strict Zod sum & quote validation), `QualitativeReviewPanel` UI component (`src/components/tailor/qualitative-review-panel.tsx`), "Get AI Feedback" opt-in button on `/tailor`, fail-first verified unit tests (`tests/qualitative-schema.test.ts`, `tests/qualitative-trigger.test.ts`), Playwright E2E test (`e2e/phase4-qualitative-review.spec.ts`), and security guardrail audit.
+
+### Completed Work
+- Built `src/lib/ai/qualitative-schema.ts` defining `AtsQualitativeReviewSchema` with Zod refinements rejecting competing score fractions (e.g. 85/100), enforcing `jdContextAdjustment` bounds (-10 to +10 inclusive), verifying reasoning sum equality, and filtering generic `jdSignal` strings.
+- Built `src/lib/ai/qualitative-prompt.ts` with system and user prompt templates instructing models on qualitative commentary, Bounded JD Context Adjustment, and zero replacement bullet generation.
+- Extended BYOK gateway dispatcher (`src/lib/ai/gateway.ts`) and all 4 provider adapters (`openai.ts`, `anthropic.ts`, `gemini.ts`, `custom.ts`) with `generateQualitativeReview`.
+- Created REST API endpoint `POST /api/ai/qualitative-review` (`src/app/api/ai/qualitative-review/route.ts`) with input validation, key redaction via `sanitizeError`, and Zod guardrail response parsing.
+- Built `QualitativeReviewPanel` (`src/components/tailor/qualitative-review-panel.tsx`) featuring cyan-bordered layout, JD-adjusted score banner (`Base Score: 84 / 100 → JD-Adjusted: 87 / 100 (+3)`), expandable reasoning lines with quoted `jdSignal` text, bullet verdict badges (`STRONG_EVIDENCE`, `WEAK_EVIDENCE`, `VAGUE_CLAIM`, `KEYWORD_STUFFING`), and next steps guidance.
+- Updated `AtsScorePanel` (`src/components/tailor/ats-score-panel.tsx`) with "Get AI Feedback" opt-in button. Verified zero auto-triggering on page load, patch apply, or score recalculation.
+- Created unit & anti-auto-trigger test suites (`tests/qualitative-schema.test.ts`, `tests/qualitative-trigger.test.ts`) verified via fail-first protocol.
+- Created Playwright E2E test suite (`e2e/phase4-qualitative-review.spec.ts`).
+- Conducted AI Security Guardrail Audit using Sonnet 4.6.
+
+### Verification Tests Executed
+- `npm run lint` — ESLint passed cleanly with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (68/68 tests passing across 14 test suites).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly.
+- `npx playwright test` — Playwright E2E tests passed cleanly (19/19 tests passing across 7 spec files).
+
+### Known Limitations (Phase 4.3b Scope)
+- Cover letter generator and job application tracker deferred to Phase 5.
+
 ### Suggested Next Task
-- **Phase 4.3b: On-Demand AI Qualitative Reviewer**: Optional BYOK LLM commentary panel alongside the 100-point score without modifying the 100-point deterministic base score.
+- **Phase 5: Cover Letter Generator & Job Application Tracker**: Implement tailored cover letter generation and job application tracking.
 
 ---
 
