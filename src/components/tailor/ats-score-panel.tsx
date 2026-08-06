@@ -11,6 +11,7 @@ import {
   Layers,
   Sparkles,
   Info,
+  Loader2,
 } from "lucide-react";
 import {
   AtsEvaluationResult,
@@ -18,6 +19,8 @@ import {
   ROLE_PROFILES,
   SkillMatchStatus,
 } from "@/lib/ats-evaluator/types";
+import { QualitativeReviewPanel } from "./qualitative-review-panel";
+import { AtsQualitativeReviewResult } from "@/lib/ai/qualitative-schema";
 
 interface AtsScorePanelProps {
   typstContent: string;
@@ -70,6 +73,10 @@ export function AtsScorePanel({
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
 
+  const [qualitativeResult, setQualitativeResult] = useState<AtsQualitativeReviewResult | null>(null);
+  const [isLoadingQualitative, setIsLoadingQualitative] = useState(false);
+  const [qualitativeError, setQualitativeError] = useState<string | null>(null);
+
   const runEvaluation = useCallback(async (profile: RoleProfile) => {
     if (!typstContent.trim()) return;
 
@@ -104,6 +111,61 @@ export function AtsScorePanel({
   useEffect(() => {
     runEvaluation(selectedProfile);
   }, [runEvaluation, selectedProfile]);
+
+  const handleFetchQualitativeReview = async () => {
+    if (!result) return;
+
+    let aiSettings;
+    try {
+      const stored = localStorage.getItem("resumeforge_ai_settings");
+      aiSettings = stored ? JSON.parse(stored) : null;
+    } catch {
+      aiSettings = null;
+    }
+
+    if (!aiSettings?.provider || !aiSettings?.apiKey) {
+      setQualitativeError("No AI provider configured. Please configure your API key in Settings.");
+      return;
+    }
+
+    setIsLoadingQualitative(true);
+    setQualitativeError(null);
+
+    try {
+      const res = await fetch("/api/ai/qualitative-review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          providerConfig: {
+            provider: aiSettings.provider,
+            apiKey: aiSettings.apiKey,
+            baseUrl: aiSettings.baseUrl || undefined,
+            model: aiSettings.model || undefined,
+          },
+          typstContent,
+          jobRequirements: {
+            requiredSkills: extractedRequirements.requiredSkills,
+            preferredSkills: extractedRequirements.preferredSkills,
+            domainTerms: extractedRequirements.domainTerms,
+            roleTitle: roleTitle || undefined,
+          },
+          deterministicResult: result,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        setQualitativeError(json.error || "Failed to generate qualitative review.");
+      } else {
+        setQualitativeResult(json.data);
+      }
+    } catch (err) {
+      setQualitativeError(`Error generating review: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsLoadingQualitative(false);
+    }
+  };
 
   const handleSelectProfile = (profile: RoleProfile) => {
     setSelectedProfile(profile);
@@ -141,9 +203,9 @@ export function AtsScorePanel({
           </p>
         </div>
 
-        {/* Overall Score Meter */}
+        {/* Overall Score Meter & AI Feedback Action */}
         {result && (
-          <div className="flex items-center gap-4 shrink-0">
+          <div className="flex flex-wrap items-center gap-4 shrink-0">
             <div
               data-testid="overall-score-badge"
               className={`px-5 py-3 rounded-2xl border flex flex-col items-center justify-center ${scoreColor}`}
@@ -155,6 +217,26 @@ export function AtsScorePanel({
                 {result.overallScore} <span className="text-sm font-normal text-slate-400">/ 100</span>
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={handleFetchQualitativeReview}
+              disabled={isLoadingQualitative || !result}
+              data-testid="get-ai-feedback-btn"
+              className="px-4 py-3 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-semibold text-xs rounded-xl flex items-center gap-2 shadow-lg shadow-cyan-600/20 transition shrink-0"
+            >
+              {isLoadingQualitative ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Generating Feedback...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 text-cyan-200" />
+                  Get AI Feedback
+                </>
+              )}
+            </button>
           </div>
         )}
       </div>
@@ -365,6 +447,22 @@ export function AtsScorePanel({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {qualitativeError && (
+        <div className="p-3 bg-red-950/50 border border-red-800/50 rounded-lg flex items-center gap-2 text-xs text-red-300" data-testid="qualitative-error-banner">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>{qualitativeError}</span>
+        </div>
+      )}
+
+      {qualitativeResult && result && (
+        <div className="border-t border-slate-800 pt-6">
+          <QualitativeReviewPanel
+            result={qualitativeResult}
+            deterministicScore={result.overallScore}
+          />
         </div>
       )}
     </div>
