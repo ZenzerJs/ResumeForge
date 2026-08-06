@@ -187,7 +187,7 @@ ResumeForge introduces a Bring-Your-Own-Key (BYOK) gateway service to test LLM p
 - **Negative**: Storing keys in `localStorage` requires browser-level security boundaries; native desktop OS keychain storage (`keytar`) is deferred as a future desktop packaging enhancement.
 
 ### E2E Test Suite Scope Note
-The existing test files `e2e/editor-workspace.spec.ts`, `e2e/phase2-persistence.spec.ts`, and `e2e/phase3-jd-matching.spec.ts` were created in prior phases and were strictly preserved without modification during Phase 4.1. The initial 10-vs-12 test count discrepancy in background reporting occurred because the initial subagent was invoked in an isolated subagent workspace snapshot containing an earlier 10-test suite state. When executed directly against the primary workspace root (`c:/Users/jayde/.gemini/config/projects/Resume-Forge`), Playwright discovers all 12 tests across all 4 spec files: `editor-workspace.spec.ts` (4 tests: L12, L27, L53, L79), `phase2-persistence.spec.ts` (3 tests: L4, L28, L82), `phase3-jd-matching.spec.ts` (3 tests: L4, L46, L72), and `settings-byok.spec.ts` (2 tests: L8, L20). All 12 tests execute and pass cleanly.
+The original 10-vs-12 test-count discrepancy could not be root-caused because no version control existed in this repository at the time it occurred, so no historical snapshot exists to compare against. This is now corrected: version control was initialized and the first commit (`a2e2c99`) establishes a verifiable baseline. As of this baseline, the codebase contains 12 e2e tests across 4 spec files (editor-workspace.spec.ts: 4, phase2-persistence.spec.ts: 3, phase3-jd-matching.spec.ts: 3, settings-byok.spec.ts: 2), confirmed passing.
 
 
 
