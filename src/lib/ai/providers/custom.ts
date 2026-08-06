@@ -1,4 +1,4 @@
-import { ProviderConfig, TestConnectionResult } from "../types";
+import { ProviderConfig, TestConnectionResult, GeneratePatchesResult } from "../types";
 import { sanitizeError } from "../redact";
 
 /**
@@ -78,3 +78,66 @@ export async function testCustomConnection(config: ProviderConfig): Promise<Test
     };
   }
 }
+
+/**
+ * Sends a structured chat completion request to a Custom OpenAI-compatible endpoint.
+ */
+export async function generateCustomPatches(
+  config: ProviderConfig,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<GeneratePatchesResult> {
+  const apiKey = config.apiKey?.trim() || process.env.CUSTOM_OPENAI_API_KEY?.trim();
+  const baseUrlRaw = config.baseUrl?.trim() || process.env.CUSTOM_OPENAI_BASE_URL?.trim() || "http://localhost:8000";
+  const baseUrl = baseUrlRaw.replace(/\/+$/, "");
+  const model = config.model?.trim() || "default";
+
+  const completionsUrl = baseUrl.endsWith("/v1")
+    ? `${baseUrl}/chat/completions`
+    : `${baseUrl}/v1/chat/completions`;
+
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (apiKey) {
+      headers["Authorization"] = `Bearer ${apiKey}`;
+    }
+
+    const res = await fetch(completionsUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.3,
+      }),
+    });
+
+    if (!res.ok) {
+      let errBody = "";
+      try {
+        const json = await res.json();
+        errBody = json.error?.message || JSON.stringify(json);
+      } catch {
+        errBody = res.statusText;
+      }
+      return { success: false, error: sanitizeError(`Custom endpoint returned status ${res.status}: ${errBody}`) };
+    }
+
+    const data = await res.json();
+    const rawJson = data.choices?.[0]?.message?.content;
+
+    if (!rawJson) {
+      return { success: false, error: "Custom endpoint returned empty content in response." };
+    }
+
+    return { success: true, rawJson };
+  } catch (err) {
+    return { success: false, error: sanitizeError(`Custom endpoint patch generation failed: ${err instanceof Error ? err.message : String(err)}`) };
+  }
+}
+

@@ -19,3 +19,41 @@ export interface TestConnectionResult {
   modelCount?: number;
   latencyMs?: number;
 }
+
+// --- Phase 4.2: Patch generation types ---
+
+export interface EvidenceItemForPrompt {
+  id: string;
+  type: string;
+  title: string;
+  organization: string | null;
+  dates: string | null;
+  verifiedSummary: string;
+  tags: string[];
+  status: string;
+  bullets: {
+    id: string;
+    text: string;
+    technologies: string[];
+    verified: boolean;
+  }[];
+}
+
+export interface GeneratePatchesInput {
+  providerConfig: ProviderConfig;
+  masterTypst: string;
+  jobRequirements: {
+    requiredSkills: string[];
+    preferredSkills: string[];
+    domainTerms: string[];
+    roleTitle?: string;
+    company?: string;
+  };
+  evidenceItems: EvidenceItemForPrompt[];
+}
+
+export interface GeneratePatchesResult {
+  success: boolean;
+  rawJson?: string;
+  error?: string;
+}

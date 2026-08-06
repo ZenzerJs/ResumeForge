@@ -1,4 +1,4 @@
-import { ProviderConfig, TestConnectionResult } from "../types";
+import { ProviderConfig, TestConnectionResult, GeneratePatchesResult } from "../types";
 import { sanitizeError } from "../redact";
 
 export async function testAnthropicConnection(config: ProviderConfig): Promise<TestConnectionResult> {
@@ -62,3 +62,62 @@ export async function testAnthropicConnection(config: ProviderConfig): Promise<T
     };
   }
 }
+
+/**
+ * Sends a structured message request to Anthropic for patch generation.
+ */
+export async function generateAnthropicPatches(
+  config: ProviderConfig,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<GeneratePatchesResult> {
+  const apiKey = config.apiKey?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
+  const baseUrl = (config.baseUrl?.trim() || process.env.ANTHROPIC_BASE_URL?.trim() || "https://api.anthropic.com").replace(/\/+$/, "");
+  const model = config.model?.trim() || "claude-sonnet-4-20250514";
+
+  if (!apiKey) {
+    return { success: false, error: "Anthropic API key is missing." };
+  }
+
+  try {
+    const res = await fetch(`${baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+        temperature: 0.3,
+      }),
+    });
+
+    if (!res.ok) {
+      let errBody = "";
+      try {
+        const json = await res.json();
+        errBody = json.error?.message || JSON.stringify(json);
+      } catch {
+        errBody = res.statusText;
+      }
+      return { success: false, error: sanitizeError(`Anthropic API returned status ${res.status}: ${errBody}`) };
+    }
+
+    const data = await res.json();
+    const textBlock = data.content?.find((c: { type: string }) => c.type === "text");
+    const rawJson = textBlock?.text;
+
+    if (!rawJson) {
+      return { success: false, error: "Anthropic returned empty content in response." };
+    }
+
+    return { success: true, rawJson };
+  } catch (err) {
+    return { success: false, error: sanitizeError(`Anthropic patch generation failed: ${err instanceof Error ? err.message : String(err)}`) };
+  }
+}
+

@@ -25,6 +25,8 @@ model Resume {
   isProtected Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  variants    ResumeVariant[]
 }
 
 model EvidenceItem {
@@ -63,5 +65,40 @@ model Job {
   source                String   @default("pasted") // pasted | manual
   extractedRequirements String   @default("{}") // JSON string of JobRequirements
   createdAt             DateTime @default(now())
+
+  variants              ResumeVariant[]
+}
+
+// Phase 4.2: Job-specific tailored resume variant
+model ResumeVariant {
+  id              String   @id @default(uuid())
+  masterResumeId  String
+  masterResume    Resume   @relation(fields: [masterResumeId], references: [id])
+  jobId           String
+  job             Job      @relation(fields: [jobId], references: [id])
+  variantTitle    String
+  typstContent    String
+  status          String   @default("DRAFT") // DRAFT | REVIEWED | EXPORTED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  patches         Patch[]
+}
+
+// Phase 4.2: Individual AI-proposed structured diff
+model Patch {
+  id                String        @id @default(uuid())
+  variantId         String
+  variant           ResumeVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  operation         String        // MODIFY_BULLET | ADD_SKILL | REORDER_BULLETS | TWEAK_SUMMARY | REPORT_GAP
+  targetSection     String
+  targetId          String?
+  beforeContent     String
+  afterContent      String
+  evidenceCitations String        @default("[]") // JSON array of evidence IDs
+  rationale         String
+  confidence        Float         @default(0)
+  status            String        @default("PENDING") // PENDING | ACCEPTED | REJECTED | REJECTED_CITATION
+  createdAt         DateTime      @default(now())
 }
 
