@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { EditorWorkspace } from "@/components/editor/editor-workspace";
 
 export const metadata = {
@@ -6,5 +7,15 @@ export const metadata = {
 };
 
 export default function EditorPage() {
-  return <EditorWorkspace />;
+  return (
+    <Suspense
+      fallback={
+        <div className="dark flex h-dvh w-screen items-center justify-center bg-background text-muted-foreground text-xs font-mono">
+          Loading editor workspace...
+        </div>
+      }
+    >
+      <EditorWorkspace />
+    </Suspense>
+  );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   CheckCircle2,
   XCircle,
@@ -11,6 +12,7 @@ import {
   X,
   Loader2,
   Info,
+  Edit3,
 } from "lucide-react";
 import type { PatchProposal, Gap, RejectedPatch } from "@/lib/ai/patch-schema";
 
@@ -68,6 +70,7 @@ export function PatchDiffReview({
   const [isApplying, setIsApplying] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [applySuccess, setApplySuccess] = useState<string | null>(null);
+  const [createdVariantId, setCreatedVariantId] = useState<string | null>(null);
 
   const acceptedPatches = verified.filter((p) => decisions[p.id] === "accepted");
   const rejectedByUser = verified.filter((p) => decisions[p.id] === "rejected");
@@ -153,8 +156,9 @@ export function PatchDiffReview({
         return;
       }
 
+      setCreatedVariantId(json.data.variantId);
       setApplySuccess(
-        `Tailored variant "${json.data.variantTitle}" created successfully (ID: ${json.data.variantId}).`
+        `Tailored variant "${json.data.variantTitle}" created successfully.`
       );
       onApplySuccess?.(json.data.variantId, mergedContent);
     } catch (err) {
@@ -407,11 +411,29 @@ export function PatchDiffReview({
 
           {applySuccess && (
             <div
-              className="p-3 bg-emerald-950/50 border border-emerald-800/50 rounded-lg flex items-center gap-2 text-xs text-emerald-300"
+              className="p-4 bg-emerald-950/60 border border-emerald-800/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-emerald-300 shadow-md"
               data-testid="apply-success"
             >
-              <CheckCircle2 className="h-4 w-4 shrink-0" />
-              <span>{applySuccess}</span>
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
+                <div>
+                  <span className="font-semibold block text-white">{applySuccess}</span>
+                  <span className="text-[11px] text-slate-300">
+                    Your tailored variant is saved to the database. Edit and compile it live in the editor.
+                  </span>
+                </div>
+              </div>
+
+              {createdVariantId && (
+                <Link
+                  href={`/editor?variantId=${createdVariantId}`}
+                  data-testid="open-variant-in-editor-btn"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg flex items-center gap-1.5 shadow-md transition shrink-0 self-start sm:self-center"
+                >
+                  <Edit3 className="h-4 w-4" />
+                  Open Variant in Editor
+                </Link>
+              )}
             </div>
           )}
 

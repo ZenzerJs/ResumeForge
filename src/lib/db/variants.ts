@@ -116,6 +116,24 @@ export async function getVariantsByJobId(jobId: string) {
 }
 
 /**
+ * Fetches all ResumeVariants ordered by creation date descending.
+ */
+export async function getVariants() {
+  return await prisma.resumeVariant.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      job: {
+        select: {
+          id: true,
+          company: true,
+          roleTitle: true,
+        },
+      },
+    },
+  });
+}
+
+/**
  * Amendment 3 enforcement utility: Asserts a resume ID is NOT protected.
  * Used by API routes as a hard guard before any write operation.
  */

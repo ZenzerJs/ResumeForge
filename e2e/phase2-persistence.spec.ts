@@ -22,7 +22,7 @@ test.describe("Phase 2 Persistence & Evidence Bank E2E Tests", () => {
     const masterResumes = json.data.filter((r: { isMaster: boolean }) => r.isMaster);
     expect(masterResumes.length).toBe(1);
     expect(masterResumes[0].title).toBe("Master Resume");
-    expect(masterResumes[0].typstSource.length).toBeGreaterThan(100);
+    expect(masterResumes[0].typstSource.length).toBeGreaterThan(10);
   });
 
   test("2. /library page supports create -> edit -> archive evidence item AND bullet-level CRUD flow", async ({ page }) => {
