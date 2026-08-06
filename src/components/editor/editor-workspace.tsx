@@ -7,6 +7,8 @@ import { PreviewPanel } from "./preview-panel";
 import { AiSidebar } from "./ai-sidebar";
 import { compileTypstToSvg } from "@/lib/typst/compiler";
 import { Code2, Eye, Bot, Save, BookOpen, Check, Loader2, Settings } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "resumeforge_typst_source";
 
@@ -110,46 +112,54 @@ export function EditorWorkspace() {
   };
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-900 text-slate-100">
+    <div className="dark flex h-dvh w-screen flex-col overflow-hidden bg-background text-foreground">
       {/* Top Navbar */}
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-4">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-600 font-bold text-white shadow-sm">
+      <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-card px-4">
+        <nav className="flex items-center gap-1 sm:gap-2" aria-label="Primary">
+          <Link
+            href="/"
+            className="mr-1 flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground shadow-sm">
               R
             </div>
-            <span className="text-sm font-semibold tracking-tight text-white">
+            <span className="text-sm font-semibold tracking-tight">
               ResumeForge
             </span>
           </Link>
 
-          <span className="text-xs text-slate-600">|</span>
+          <span className="mx-1 hidden h-4 w-px bg-border sm:block" aria-hidden />
 
           <Link
             href="/library"
-            className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+            className={cn(
+              buttonVariants({ variant: "ghost", size: "sm" }),
+              "text-muted-foreground hover:text-foreground",
+            )}
           >
-            <BookOpen className="h-3.5 w-3.5 text-indigo-400" />
+            <BookOpen className="h-3.5 w-3.5 text-primary" />
             Evidence Library
           </Link>
 
-          <span className="text-xs text-slate-600">|</span>
-
           <Link
             href="/settings"
-            className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+            className={cn(
+              buttonVariants({ variant: "ghost", size: "sm" }),
+              "text-muted-foreground hover:text-foreground",
+            )}
           >
-            <Settings className="h-3.5 w-3.5 text-indigo-400" />
+            <Settings className="h-3.5 w-3.5 text-primary" />
             AI Settings
           </Link>
-        </div>
+        </nav>
 
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            size="sm"
             onClick={handleSaveAsMaster}
             disabled={isSavingMaster}
-            className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+            className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-700"
           >
             {isSavingMaster ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -159,52 +169,53 @@ export function EditorWorkspace() {
               <Save className="h-3.5 w-3.5" />
             )}
             {saveSuccess ? "Saved as Master!" : "Save as Master Resume"}
-          </button>
+          </Button>
 
           {/* Mobile Tab Selectors (< lg screens) */}
-          <div className="flex items-center gap-1 rounded-lg bg-slate-900 p-1 border border-slate-800 lg:hidden">
-            <button
+          <div
+            className="flex items-center gap-1 rounded-lg border border-border bg-background p-1 lg:hidden"
+            role="tablist"
+            aria-label="Workspace panels"
+          >
+            <Button
               type="button"
+              size="sm"
+              variant={activeTab === "editor" ? "default" : "ghost"}
               onClick={() => setActiveTab("editor")}
-              className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                activeTab === "editor"
-                  ? "bg-indigo-600 text-white"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
+              className="h-8 px-2 text-xs"
+              aria-selected={activeTab === "editor"}
             >
               <Code2 className="h-3.5 w-3.5" />
               Editor
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              size="sm"
+              variant={activeTab === "preview" ? "default" : "ghost"}
               onClick={() => setActiveTab("preview")}
-              className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                activeTab === "preview"
-                  ? "bg-indigo-600 text-white"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
+              className="h-8 px-2 text-xs"
+              aria-selected={activeTab === "preview"}
             >
               <Eye className="h-3.5 w-3.5" />
               Preview
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              size="sm"
+              variant={activeTab === "ai" ? "default" : "ghost"}
               onClick={() => setActiveTab("ai")}
-              className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                activeTab === "ai"
-                  ? "bg-indigo-600 text-white"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
+              className="h-8 px-2 text-xs"
+              aria-selected={activeTab === "ai"}
             >
               <Bot className="h-3.5 w-3.5" />
               AI
-            </button>
+            </Button>
           </div>
         </div>
       </header>
 
       {/* Main Workspace Body */}
-      <main className="flex flex-1 overflow-hidden p-2 md:p-3 bg-slate-950">
+      <main className="flex flex-1 overflow-hidden bg-background p-2 md:p-3">
         {/* Desktop 3-Panel Grid (>= lg screens) */}
         <div className="hidden lg:grid h-full w-full grid-cols-12 gap-3">
           {/* Panel 1: CodeMirror Editor (5 cols) */}
