@@ -1,0 +1,67 @@
+// Prisma schema for ResumeForge
+// Phase 2: Master Resume & Evidence Bank Persistence
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model SystemInfo {
+  id            String   @id @default(uuid())
+  version       String   @default("0.1.0")
+  initializedAt DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Resume {
+  id          String   @id @default(uuid())
+  title       String
+  typstSource String
+  isMaster    Boolean  @default(false)
+  isProtected Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model EvidenceItem {
+  id              String   @id @default(uuid())
+  type            String   // experience | project | skill | education | award | metric
+  title           String
+  organization    String?
+  dates           String?
+  verifiedSummary String
+  tags            String   @default("[]") // JSON array string
+  status          String   @default("verified") // verified | draft | archived
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  bullets         Bullet[]
+}
+
+model Bullet {
+  id           String       @id @default(uuid())
+  evidenceId   String
+  evidenceItem EvidenceItem @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  text         String
+  technologies String       @default("[]") // JSON array string
+  roleAffinity String       @default("[]") // JSON array string
+  verified     Boolean      @default(true)
+  orderIndex   Int          @default(0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Job {
+  id                    String   @id @default(uuid())
+  company               String?
+  roleTitle             String?
+  rawDescription        String
+  source                String   @default("pasted") // pasted | manual
+  extractedRequirements String   @default("{}") // JSON string of JobRequirements
+  createdAt             DateTime @default(now())
+}
+
