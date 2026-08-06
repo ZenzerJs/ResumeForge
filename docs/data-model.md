@@ -72,27 +72,28 @@ This document specifies the domain data model for ResumeForge. Phase 2 implement
 - **`extractedRequirements`** (String, JSON): Extracted requirements JSON matching `JobRequirementsSchema` (`requiredSkills`, `preferredSkills`, `domainTerms`).
 - **`createdAt`** (DateTime): Creation timestamp.
 
-### 5. `ResumeVariant` (Job-Specific Tailored Resume — Future Phase)
+### 5. `ResumeVariant` (Job-Specific Tailored Resume — Phase 4.2 Implementation)
 - **`id`** (String, PK): Unique identifier.
 - **`masterResumeId`** (String, FK): Parent master resume.
 - **`jobId`** (String, FK): Target job posting.
 - **`variantTitle`** (String): Custom name.
 - **`typstContent`** (String): Generated Typst markup document.
-- **`atsScore`** (Float, Optional): Calculated rubric score (0–100).
-- **`status`** (Enum): `DRAFT`, `REVIEWED`, `EXPORTED`.
+- **`status`** (String): `DRAFT`, `REVIEWED`, `EXPORTED`.
 - **`createdAt`** (DateTime): Creation timestamp.
 - **`updatedAt`** (DateTime): Timestamp of last update.
 
-### 6. `Patch` (AI-Proposed Structured Diff — Future Phase)
+### 6. `Patch` (AI-Proposed Structured Diff — Phase 4.2 Implementation)
 - **`id`** (String, PK): Unique identifier.
 - **`variantId`** (String, FK): Target resume variant draft.
-- **`operation`** (Enum): `MODIFY_BULLET`, `ADD_SKILL`, `REORDER_BULLETS`, `TWEAK_SUMMARY`, `REPORT_GAP`.
+- **`operation`** (String): `MODIFY_BULLET`, `ADD_SKILL`, `REORDER_BULLETS`, `TWEAK_SUMMARY`, `REPORT_GAP`.
 - **`targetSection`** (String): Affected resume section.
+- **`targetId`** (String, Optional): Target bullet or item ID.
 - **`beforeContent`** (String): Original text.
 - **`afterContent`** (String): Proposed text.
-- **`evidenceCitations`** (JSON): Array of cited `evidenceIds`.
+- **`evidenceCitations`** (String, JSON): Array of cited `evidenceIds`.
 - **`rationale`** (String): Explanation of why this patch improves job match.
-- **`status`** (Enum): `PENDING`, `ACCEPTED`, `REJECTED`, `EDITED`.
+- **`confidence`** (Float): AI confidence score 0.0–1.0.
+- **`status`** (String): `PENDING`, `ACCEPTED`, `REJECTED`, `REJECTED_CITATION`.
 
 ### 7. `CoverLetter` (Optional Tailored Artifact — Future Phase)
 - **`id`** (String, PK): Unique identifier.

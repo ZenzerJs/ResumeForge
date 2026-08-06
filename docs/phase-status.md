@@ -98,6 +98,39 @@ This document records completed project milestones, current state, known limitat
 
 ---
 
+## Current Status: Phase 4.2 Complete — AI Patch Generator & Evidence Citation Verifier
+
+- **Phase Completed**: Phase 4.2 (Structured AI Patch Generator, Gap Reporter & Diff Review UI)
+- **Completed Date**: 2026-08-06
+- **Status Summary**: Implemented `PatchProposal` & `Gap` Zod schemas matching `docs/ai-guardrails.md`, strict whole-patch citation verifier (`verifyEvidenceCitations`, Amendment 1), `ResumeVariant` and `Patch` Prisma models (`20260806181118_phase4_2_patches`), `variants.ts` data layer with hard `isProtected` master resume isolation (Amendment 3), system prompt builder (`src/lib/ai/prompt-template.ts`), provider `generatePatches` adapters for OpenAI/Anthropic/Gemini/Custom, BYOK gateway dispatch (`src/lib/ai/gateway.ts`), API routes (`/api/ai/generate-patches`, `/api/ai/apply-patches`), `PatchDiffReview` side-by-side review UI with per-patch accept/reject and Typst WASM compilation validation gate (Amendment 2), unit tests (`tests/patch-schema.test.ts`, `tests/variant-isolation.test.ts`), Playwright E2E spec (`e2e/phase4-patch-generator.spec.ts`), and git commits.
+
+### Completed Work
+- Defined Prisma models `ResumeVariant` and `Patch` in `prisma/schema.prisma` and generated SQLite migration `20260806181118_phase4_2_patches`.
+- Built Zod schemas (`PatchProposalSchema`, `GapSchema`, `PatchResponseSchema`) in `src/lib/ai/patch-schema.ts`.
+- Implemented `verifyEvidenceCitations()` enforcing Amendment 1: zero-tolerance citation check — any patch citing an invalid/non-existent evidence ID is rejected in its entirety, preventing AI hallucination from reaching resume drafts.
+- Built `src/lib/db/variants.ts` data access layer enforcing Amendment 3: hard security guard (`assertNotProtectedResume`) refusing AI write operations on `Resume` records where `isProtected = true`.
+- Built system and user prompt templates in `src/lib/ai/prompt-template.ts` enforcing zero-hallucination rules, mandatory evidence citations, explicit gap reporting, and Typst compatibility.
+- Extended all four provider adapters (`openai.ts`, `anthropic.ts`, `gemini.ts`, `custom.ts`) with `generatePatches` methods for structured JSON completion.
+- Extended `src/lib/ai/gateway.ts` with `generatePatchProposals` dispatcher.
+- Built REST API routes `POST /api/ai/generate-patches` and `POST /api/ai/apply-patches`.
+- Built `PatchDiffReview` UI component (`src/components/tailor/patch-diff-review.tsx`) featuring: gaps panel with severity badges, rejected patches panel displaying invalid citation warnings, side-by-side "Before" vs "After" diff view, evidence citation badges, individual per-patch Accept/Reject controls, and Amendment 2 Typst compile validation gate before creating variants.
+- Integrated `PatchDiffReview` into `/tailor` workspace (`src/components/tailor/tailor-workspace.tsx`).
+- Created Vitest unit test suites (`tests/patch-schema.test.ts`, `tests/variant-isolation.test.ts`) verified via fail-first protocol (proving tests fail when guards are disabled).
+- Created Playwright E2E test suite (`e2e/phase4-patch-generator.spec.ts`).
+
+### Verification Tests Executed
+- `npm run lint` — ESLint passed cleanly with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (50/50 tests passing across 10 test suites).
+- `npx playwright test` — Playwright E2E tests passed cleanly across all spec files.
+- `npm run build` — Next.js & Prisma production build succeeded cleanly.
+
+### Known Limitations (Phase 4.2 Scope)
+- 100-point ATS quality evaluator panel deferred to Phase 4.3.
+- Cover letter generator and job tracker deferred to subsequent phases.
+
+---
+
 ## Mandatory Update Template for Future Agents
 
 All AI agents completing subsequent phases MUST update this file using the following markdown format:
