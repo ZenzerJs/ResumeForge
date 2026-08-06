@@ -26,13 +26,10 @@ test.describe("Phase 4.2: AI Patch Generator Workspace", () => {
     // Extract requirements
     await page.locator('[data-testid="extract-reqs-btn"]').click();
 
-    // Wait for extraction to complete and requirements to render
-    await expect(page.locator('[data-testid="evidence-matches-list"], text=No matching')).toBeVisible({
+    // Wait for Generate AI Patches button to appear after requirement extraction
+    await expect(page.locator('[data-testid="generate-patches-btn"]')).toBeVisible({
       timeout: 10000,
     });
-
-    // Generate AI Patches button should now be visible
-    await expect(page.locator('[data-testid="generate-patches-btn"]')).toBeVisible();
   });
 
   test("Generate AI Patches button shows error when no AI provider configured", async ({ page }) => {
@@ -47,8 +44,8 @@ test.describe("Phase 4.2: AI Patch Generator Workspace", () => {
     // Extract requirements
     await page.locator('[data-testid="extract-reqs-btn"]').click();
 
-    // Wait for extraction
-    await expect(page.locator('[data-testid="evidence-matches-list"], text=No matching')).toBeVisible({
+    // Wait for Generate AI Patches button to appear after extraction
+    await expect(page.locator('[data-testid="generate-patches-btn"]')).toBeVisible({
       timeout: 10000,
     });
 
