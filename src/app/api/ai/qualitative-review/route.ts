@@ -65,10 +65,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Parse and validate AI output JSON strictly against AtsQualitativeReviewSchema
+    // Parse JSON — strip markdown fences if model wrapped output (e.g. ```json ... ```)
     let parsedJson: unknown;
     try {
-      parsedJson = JSON.parse(gatewayResult.rawJson);
+      const stripped = gatewayResult.rawJson
+        .trim()
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+      parsedJson = JSON.parse(stripped);
     } catch {
       return NextResponse.json(
         {

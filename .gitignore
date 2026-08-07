@@ -46,3 +46,6 @@ yarn-error.log*
 # System & OS metadata
 .DS_Store
 Thumbs.db
+
+# TypeScript build cache
+tsconfig.tsbuildinfo

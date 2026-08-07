@@ -21,9 +21,13 @@ import {
   FileText,
   AlertTriangle,
   Briefcase,
+  RotateCcw,
+  Undo2,
+  X,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { TopNav } from "@/components/navigation/top-nav";
 
 const STORAGE_KEY = "resumeforge_typst_source";
 
@@ -48,6 +52,12 @@ export function EditorWorkspace() {
 
   const [isSavingMaster, setIsSavingMaster] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+
+  // Task 7.9: Save as Master + Revert & Undo safety state
+  const [showSaveConfirm, setShowSaveConfirm] = useState<boolean>(false);
+  const [lastSnapshotId, setLastSnapshotId] = useState<string | null>(null);
+  const [isUndoing, setIsUndoing] = useState<boolean>(false);
+  const [undoSuccess, setUndoSuccess] = useState<boolean>(false);
 
   // Task B1: Canonical Document Loading & Metadata State
   const [isLoadingDocument, setIsLoadingDocument] = useState<boolean>(true);
@@ -205,28 +215,39 @@ export function EditorWorkspace() {
   };
 
   const handleSaveAsMaster = async () => {
+    setShowSaveConfirm(true);
+  };
+
+  const handleConfirmSaveAsMaster = async () => {
     if (!source || source.trim().length === 0) return;
     try {
       setIsSavingMaster(true);
       setSaveSuccess(false);
 
-      const res = await fetch("/api/resumes", {
+      const res = await fetch("/api/resumes/save-master", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id: docMetadata.id,
           title: "Master Resume",
           typstSource: source,
-          isMaster: true,
+          confirmOverwrite: true,
         }),
       });
 
-      if (res.ok) {
+      const json = await res.json();
+
+      if (res.ok && json.success) {
         setSaveSuccess(true);
-        // Refresh canonical metadata
+        if (json.snapshotId) {
+          setLastSnapshotId(json.snapshotId);
+        }
         setDocMetadata({
           type: "MASTER_RESUME",
           title: "Master Resume",
+          id: json.data?.id,
         });
+        setShowSaveConfirm(false);
         setTimeout(() => setSaveSuccess(false), 3000);
       }
     } catch (err) {
@@ -236,118 +257,125 @@ export function EditorWorkspace() {
     }
   };
 
+  const handleRevertToMaster = async () => {
+    if (!confirm("Revert live editor buffer to the persisted Master Resume? Any unsaved edits in this buffer will be discarded.")) {
+      return;
+    }
+    await loadCanonicalDocument();
+    setLastSnapshotId(null);
+  };
+
+  const handleUndoOverwrite = async () => {
+    if (!lastSnapshotId) return;
+    try {
+      setIsUndoing(true);
+      const res = await fetch("/api/resumes/undo-master", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snapshotId: lastSnapshotId }),
+      });
+
+      const json = await res.json();
+
+      if (res.ok && json.success) {
+        const restoredSource = json.data.typstSource;
+        setSource(restoredSource);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(STORAGE_KEY, restoredSource);
+        }
+        setLastSnapshotId(null);
+        setUndoSuccess(true);
+        setTimeout(() => setUndoSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error("Failed to undo master overwrite:", err);
+    } finally {
+      setIsUndoing(false);
+    }
+  };
+
   return (
-    <div className="dark flex h-dvh w-screen flex-col overflow-hidden bg-background text-foreground">
-      {/* Top Navbar */}
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-card px-4">
-        <nav className="flex items-center gap-1 sm:gap-2" aria-label="Primary">
-          <Link
-            href="/"
-            className="mr-1 flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground shadow-sm">
-              R
-            </div>
-            <span className="text-sm font-semibold tracking-tight">
-              ResumeForge
-            </span>
-          </Link>
-
-          <span className="mx-1 hidden h-4 w-px bg-border sm:block" aria-hidden />
-
-          {/* Task B1: Explicit Document Type Indicator Badge */}
+    <div className="dark flex h-dvh w-screen flex-col overflow-hidden text-foreground" style={{ backgroundColor: "#0A0E17" }}>
+      {/* Top Navbar — shared TopNav with badge + action slot */}
+      <TopNav
+        badge={
           <div className="hidden sm:flex items-center gap-2" data-testid="document-type-badge">
             {docMetadata.type === "MASTER_RESUME" && (
               <span
                 data-testid="doc-badge-master"
-                className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-800 flex items-center gap-1.5 shadow-sm"
+                className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-950/60 text-amber-300 border border-amber-800/60 flex items-center gap-1.5 shadow-sm"
               >
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                <ShieldCheck className="h-3.5 w-3.5 text-amber-400" />
                 Master Resume ({docMetadata.title})
               </span>
             )}
-
             {docMetadata.type === "RESUME_VARIANT" && (
               <span
                 data-testid="doc-badge-variant"
-                className="text-xs font-semibold px-2.5 py-1 rounded-full bg-cyan-950/80 text-cyan-300 border border-cyan-800 flex items-center gap-1.5 shadow-sm"
+                className="text-xs font-semibold px-2.5 py-1 rounded-full bg-sky-950/60 text-sky-300 border border-sky-800/60 flex items-center gap-1.5 shadow-sm"
               >
-                <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+                <Sparkles className="h-3.5 w-3.5 text-sky-400" />
                 Tailored Variant ({docMetadata.title})
               </span>
             )}
-
             {docMetadata.type === "LOCAL_FALLBACK" && (
               <span
                 data-testid="doc-badge-fallback"
-                className="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-900 text-slate-300 border border-slate-700 flex items-center gap-1.5"
+                className="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-900 text-slate-300 border border-slate-700/60 flex items-center gap-1.5"
               >
                 <FileText className="h-3.5 w-3.5 text-slate-400" />
                 {docMetadata.title}
               </span>
             )}
           </div>
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleRevertToMaster}
+              data-testid="revert-to-master-btn"
+              className="text-xs border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 gap-1.5"
+              title="Discard unsaved live buffer changes and reload persisted Master Resume"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Revert to Master</span>
+            </Button>
 
-          <span className="mx-1 hidden h-4 w-px bg-border sm:block" aria-hidden />
-
-          <Link
-            href="/library"
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
-              "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <BookOpen className="h-3.5 w-3.5 text-primary" />
-            Evidence Library
-          </Link>
-
-          <Link
-            href="/tracker"
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
-              "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Briefcase className="h-3.5 w-3.5 text-indigo-400" />
-            Tracker
-          </Link>
-
-          <Link
-            href="/settings"
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
-              "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Settings className="h-3.5 w-3.5 text-primary" />
-            AI Settings
-          </Link>
-        </nav>
-
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleSaveAsMaster}
-            disabled={isSavingMaster}
-            className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-700"
-          >
-            {isSavingMaster ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : saveSuccess ? (
-              <Check className="h-3.5 w-3.5" />
-            ) : (
-              <Save className="h-3.5 w-3.5" />
-            )}
-            {saveSuccess ? "Saved as Master!" : "Save as Master Resume"}
-          </Button>
-
-          {/* Mobile Tab Selectors (< lg screens) */}
-          <div
-            className="flex items-center gap-1 rounded-lg border border-border bg-background p-1 lg:hidden"
-            role="tablist"
-            aria-label="Workspace panels"
-          >
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSaveAsMaster}
+              disabled={isSavingMaster}
+              data-testid="save-as-master-btn"
+              className="text-xs font-semibold gap-1.5 transition-all"
+              style={{
+                background: saveSuccess
+                  ? "linear-gradient(135deg, #10B981, #059669)"
+                  : "linear-gradient(135deg, #F59E0B, #D97706)",
+                color: "#0A0E17",
+                boxShadow: saveSuccess
+                  ? "0 0 12px rgba(16,185,129,0.25)"
+                  : "0 0 12px rgba(245,158,11,0.2)",
+              }}
+            >
+              {isSavingMaster ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : saveSuccess ? (
+                <Check className="h-3.5 w-3.5" />
+              ) : (
+                <Save className="h-3.5 w-3.5" />
+              )}
+              {saveSuccess ? "Saved as Master!" : "Save as Master Resume"}
+            </Button>
+            {/* Mobile Tab Selectors (< lg screens) */}
+            <div
+              className="flex items-center gap-1 rounded-lg border border-border bg-background p-1 lg:hidden"
+              role="tablist"
+              aria-label="Workspace panels"
+            >
             <Button
               type="button"
               size="sm"
@@ -381,9 +409,10 @@ export function EditorWorkspace() {
               <Bot className="h-3.5 w-3.5" />
               AI
             </Button>
+            </div>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       {/* Task B1: Explicit Loading & Recoverable Error States */}
       {isLoadingDocument && (
@@ -399,19 +428,106 @@ export function EditorWorkspace() {
       {documentError && (
         <div
           data-testid="editor-error-state"
-          className="flex items-center justify-between px-4 py-2 bg-red-950/80 border-b border-red-800 text-xs text-red-300"
+          className="flex items-center justify-between px-4 py-2 bg-red-950/90 border-b border-red-800 text-xs text-red-200"
         >
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
-            <span>Document error: {documentError}</span>
+            <span>{documentError}</span>
           </div>
           <button
             type="button"
-            onClick={loadCanonicalDocument}
-            className="px-2 py-1 bg-red-900 hover:bg-red-800 text-white rounded text-[11px] font-mono transition"
+            onClick={() => setDocumentError(null)}
+            className="px-2.5 py-1 bg-red-900/60 hover:bg-red-800 text-red-100 rounded text-[11px] font-medium transition"
           >
-            Retry Loading
+            Dismiss Error
           </button>
+        </div>
+      )}
+
+      {/* Task 7.9: Undo Overwrite Notification Banner */}
+      {lastSnapshotId && (
+        <div
+          data-testid="undo-overwrite-banner"
+          className="flex items-center justify-between px-4 py-2 bg-amber-950/90 border-b border-amber-800 text-xs text-amber-200"
+        >
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-amber-400" />
+            <span>Master Resume overwritten. A pre-save snapshot was saved to database history.</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleUndoOverwrite}
+            disabled={isUndoing}
+            data-testid="undo-overwrite-btn"
+            className="flex items-center gap-1.5 px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded text-xs font-semibold transition"
+          >
+            {isUndoing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Undo2 className="h-3.5 w-3.5" />}
+            Undo Overwrite
+          </button>
+        </div>
+      )}
+
+      {undoSuccess && (
+        <div
+          data-testid="undo-success-banner"
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-950/90 border-b border-emerald-800 text-xs text-emerald-300"
+        >
+          <Check className="h-4 w-4 text-emerald-400" />
+          <span>Restored Master Resume to pre-overwrite snapshot!</span>
+        </div>
+      )}
+
+      {/* Task 7.9: Confirmation Modal for Save as Master */}
+      {showSaveConfirm && (
+        <div
+          data-testid="save-master-confirm-modal"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+        >
+          <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2 text-white font-semibold text-base">
+                <AlertTriangle className="h-5 w-5 text-amber-400" />
+                Confirm Overwrite Master Resume
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSaveConfirm(false)}
+                className="text-slate-500 hover:text-slate-300"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Saving will overwrite your persisted <strong className="text-white">Master Resume</strong> with the current editor buffer content.
+            </p>
+            <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg text-[11px] text-amber-300/90 space-y-1">
+              <p className="font-semibold text-amber-300">✓ Automatic Pre-Save Snapshot</p>
+              <p className="text-slate-400">
+                A snapshot of your current Master Resume will be recorded in database history before overwriting, allowing instant Undo.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowSaveConfirm(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSaveAsMaster}
+                disabled={isSavingMaster}
+                data-testid="confirm-save-master-btn"
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-lg shadow-amber-500/20 transition"
+              >
+                {isSavingMaster ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Confirm Overwrite &amp; Save
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -437,7 +553,7 @@ export function EditorWorkspace() {
 
           {/* Panel 3: AI Sidebar (3 cols) */}
           <div className="col-span-3 h-full overflow-hidden">
-            <AiSidebar />
+            <AiSidebar source={source} onApplyToBuffer={setSource} />
           </div>
         </div>
 
@@ -461,7 +577,7 @@ export function EditorWorkspace() {
           )}
           {activeTab === "ai" && (
             <div className="h-full w-full overflow-hidden">
-              <AiSidebar />
+              <AiSidebar source={source} onApplyToBuffer={setSource} />
             </div>
           )}
         </div>

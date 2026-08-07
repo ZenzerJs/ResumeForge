@@ -189,6 +189,55 @@ ResumeForge introduces a Bring-Your-Own-Key (BYOK) gateway service to test LLM p
 ### E2E Test Suite Scope Note
 The original 10-vs-12 test-count discrepancy could not be root-caused because no version control existed in this repository at the time it occurred, so no historical snapshot exists to compare against. This is now corrected: version control was initialized and the first commit (`a2e2c99`) establishes a verifiable baseline. As of this baseline, the codebase contains 12 e2e tests across 4 spec files (editor-workspace.spec.ts: 4, phase2-persistence.spec.ts: 3, phase3-jd-matching.spec.ts: 3, settings-byok.spec.ts: 2), confirmed passing.
 
+---
+
+## ADR-010: Two-Tier Job-Board Ingestion Architecture & Manual Refresh Protocol
+
+- **Date**: 2026-08-07
+- **Status**: Approved / Product Owner Scope Amendment
+- **Supersedes**: Explicitly overrides the Phase 5 handoff exclusion: *"No new job-board scraping or Simplify ingestion."*
+
+### Context
+Initial project guidelines excluded automated job board scraping to focus on core document compilation. However, managing job applications effectively requires importing real postings at scale without manually copy-pasting metadata for hundreds of listings. The product owner (single stakeholder, personal-use tool) explicitly amended product scope to include job-posting ingestion.
+
+### Decision
+We implement a **Two-Tier Job Ingestion Engine**:
+1. **Tier 1 (Bulk Metadata Ingestion)**: Manual, on-demand parsing of structured job listing feeds (e.g. SimplifyJobs-style markdown tables) into `Job` records using `createJob` and `CreateJobSchema` validation. Imports company, role title, location, posting date, and apply URL.
+2. **Tier 2 (On-Demand Best-Effort Extraction)**: When the user opens a specific posting to tailor a resume or cover letter, an on-demand extractor attempts to fetch the full JD text from the apply URL. On failure (paywalls, heavy JS rendering), the app degrades gracefully to a manual paste prompt.
+3. **Manual Refresh Protocol**: Ingestion is strictly triggered manually via user actions ("Refresh from source"). Background scheduled polling and automated scrapers are prohibited.
+5. **Quality Gate Threshold & SSRF Protections**:
+   - Extracted text quality gate enforces a 180-character threshold (lowered from 200 chars to support concise authentic job postings while cleanly rejecting 404/500/SPA error shells under 120 chars).
+   - SSRF & Protocol Safety: `extractFullTextFromUrl` strictly validates `http://` or `https://` schemes, rejecting non-HTTP protocols (`file:`, `gopher:`, `ftp:`) and enforcing an 8-second `AbortController` timeout on all external HTTP requests.
+
+### Consequences
+- **Positive**: Users can browse and track hundreds of real job postings inside the Tracker workspace.
+- **Positive**: Card click-zone separation ensures clicking card headers opens original external URLs while action buttons trigger internal tailoring without accidental navigation.
+- **Negative**: Tier 2 web extraction varies across ATS platforms and paywalls, requiring manual paste fallbacks when web scraping is blocked.
+
+---
+
+## ADR-011: On-Demand Evidence-Grounded Cover Letter Generation & Gap Guardrails
+
+- **Date**: 2026-08-07
+- **Status**: Approved / Product Owner Scope Amendment
+- **Supersedes**: Explicitly overrides the Phase 5 handoff exclusion: *"No cover letters."*
+
+### Context
+Cover letter generation was originally excluded from Phase 5 scope. However, tailored cover letters are a natural paired artifact alongside tailored resumes during job applications. Free-form prose in cover letters carries a higher risk of AI fabrication than structured resume patches, requiring strict evidence citation boundaries.
+
+### Decision
+We implement an **On-Demand Evidence-Grounded Cover Letter Generator**:
+1. **Data Model**: `CoverLetter` Prisma model linked directly to `jobId` and optional `variantId`.
+2. **Strict Citation Guardrail Contract**: Every claim or achievement in the generated cover letter prose MUST map to verified evidence IDs in the user's Evidence Bank (`verifyEvidenceCitations`).
+3. **Gap Handling Policy**: If a job description requirement lacks supporting evidence in the candidate's Evidence Bank, the cover letter MUST omit the claim or explicitly flag the requirement as a gap — papering over missing experience with generic confident filler is strictly forbidden.
+4. **User Review Protocol**: The "AI proposes, user reviews" pattern applies — all generated cover letters are presented as modular, editable markdown cards before being saved or exported.
+
+### Consequences
+- **Positive**: Provides a complete end-to-end candidate workflow: Job Ingestion → Resume Tailoring → Cover Letter Generation.
+- **Positive**: Strict citation rules prevent AI hallucination from polluting cover letter submissions.
+- **Negative**: Unsupported job requirements result in explicit gap notices or omitted paragraphs, requiring candidate review when evidence is missing.
+
+
 
 
 

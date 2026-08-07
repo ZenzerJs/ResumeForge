@@ -22,6 +22,7 @@ export async function testAnthropicConnection(config: ProviderConfig): Promise<T
         "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
+      signal: AbortSignal.timeout(5000),
     });
 
     const latencyMs = Date.now() - startTime;

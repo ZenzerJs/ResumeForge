@@ -100,3 +100,121 @@ export async function getResumeById(id: string) {
     where: { id },
   });
 }
+
+export interface SaveMasterInput {
+  id?: string;
+  title?: string;
+  typstSource: string;
+  confirmOverwrite?: boolean;
+}
+
+export interface SaveMasterResult {
+  success: boolean;
+  data: any;
+  snapshotId?: string;
+}
+
+/**
+ * Task 7.9: Confirmed "Save as Master" with automatic pre-overwrite snapshot.
+ *
+ * 1. Checks if an existing Master resume exists.
+ * 2. Blocks unconfirmed overwrite attempts (returns error / throws).
+ * 3. In a transaction:
+ *    a. Creates a MasterHistory snapshot record of the pre-overwrite state.
+ *    b. Updates or creates the Master resume with new typstSource.
+ * 4. Returns the updated master resume and the snapshotId for instant Undo.
+ */
+export async function saveMasterResume(input: SaveMasterInput): Promise<SaveMasterResult> {
+  const currentMaster = await getMasterResume();
+
+  if (currentMaster && !input.confirmOverwrite) {
+    throw new Error("Unconfirmed Master Resume overwrite blocked. Explicit confirmation required before saving to Master.");
+  }
+
+  return await prisma.$transaction(async (tx) => {
+    const targetId = input.id || currentMaster?.id;
+    let master: any;
+
+    if (targetId && currentMaster) {
+      await tx.resume.updateMany({
+        where: { isMaster: true, NOT: { id: targetId } },
+        data: { isMaster: false },
+      });
+
+      master = await tx.resume.update({
+        where: { id: targetId },
+        data: {
+          title: input.title || "Master Resume",
+          typstSource: input.typstSource,
+          isMaster: true,
+          isProtected: true,
+        },
+      });
+    } else {
+      await tx.resume.updateMany({
+        where: { isMaster: true },
+        data: { isMaster: false },
+      });
+
+      master = await tx.resume.create({
+        data: {
+          title: input.title || "Master Resume",
+          typstSource: input.typstSource,
+          isMaster: true,
+          isProtected: true,
+        },
+      });
+    }
+
+    // Record snapshot of state prior to save (or initial version)
+    const snapshotSource = currentMaster ? currentMaster.typstSource : input.typstSource;
+    const snapshotTitle = currentMaster ? currentMaster.title : (input.title || "Master Resume");
+
+    const snapshot = await (tx as any).masterHistory.create({
+      data: {
+        resumeId: master.id,
+        title: snapshotTitle,
+        typstSource: snapshotSource,
+        reason: currentMaster ? "pre-overwrite-snapshot" : "initial-master-snapshot",
+      },
+    });
+
+    return {
+      success: true,
+      data: master,
+      snapshotId: snapshot.id,
+    };
+  });
+}
+
+export async function getLatestSnapshot(resumeId: string) {
+  return await (prisma as any).masterHistory.findFirst({
+    where: { resumeId },
+    orderBy: { savedAt: "desc" },
+  });
+}
+
+export async function restoreMasterSnapshot(snapshotId: string) {
+  const snapshot = await (prisma as any).masterHistory.findUnique({
+    where: { id: snapshotId },
+  });
+
+  if (!snapshot) {
+    throw new Error(`MasterHistory snapshot record "${snapshotId}" not found.`);
+  }
+
+  return await prisma.$transaction(async (tx) => {
+    // Restore the snapshot typstSource to the master resume
+    const restored = await tx.resume.update({
+      where: { id: snapshot.resumeId },
+      data: {
+        typstSource: snapshot.typstSource,
+        title: snapshot.title,
+        isMaster: true,
+      },
+    });
+
+    return restored;
+  });
+}
+

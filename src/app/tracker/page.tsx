@@ -1,4 +1,4 @@
-import { TrackerWorkspace } from "@/components/tracker/tracker-workspace";
+import { TrackerFeed } from "@/components/tracker/tracker-feed";
 
 export const metadata = {
   title: "Application Tracker — ResumeForge",
@@ -6,5 +6,5 @@ export const metadata = {
 };
 
 export default function TrackerPage() {
-  return <TrackerWorkspace />;
+  return <TrackerFeed />;
 }

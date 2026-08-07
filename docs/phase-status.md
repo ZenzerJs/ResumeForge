@@ -194,6 +194,8 @@ This document records completed project milestones, current state, known limitat
 
 - **Phase Completed**: Phase 5 (On-Demand, Evidence-Grounded Tailored Cover Letter Generator)
 - **Completed Date**: 2026-08-06
+- **Task 8.5 (Cover Letter Data Model & Evidence-Backed Drafting)**: Completed. Implemented `CoverLetter` Prisma schema model, grounding verifier (`verifyCoverLetterGrounding`), and `POST /api/cover-letters/generate` API route. Enforced zero-hallucination evidence citations and gap handling. Passed 8 unit tests in `tests/task-8.5-cover-letter.test.ts`.
+- **Task 8.6 (Unified Job-Card Actions)**: Completed. Implemented unified job-card actions across `/tracker` linking external job postings, resume tailoring (`useActiveJob` hook and `/tailor?jobId=...`), and cover-letter draft management (`GET /api/cover-letters?jobId=...` and `POST /api/cover-letters/generate`). Added active job context banners across workspaces. Preserved click-zone separation and master resume protection. Passed 10 unit tests in `tests/task-8.6-unified-card.test.ts` and 31 Playwright E2E specs.
 - **Status Summary**: Implemented `CoverLetter` Prisma model (`20260807000320_phase5_coverletter`), Evidence Grounding Verifier service (`src/lib/ai/cover-letter-verifier.ts`), fail-first verified unit tests (`tests/cover-letter-grounding.test.ts`), Cover Letter DAL (`src/lib/db/cover-letters.ts`), Zod schemas (`src/lib/ai/cover-letter-schema.ts`), system & user prompt templates (`src/lib/ai/cover-letter-prompt.ts`), provider `generateCoverLetter` adapters for OpenAI/Anthropic/Gemini/Custom, BYOK gateway dispatch (`src/lib/ai/gateway.ts`), REST API routes (`/api/ai/generate-cover-letter`, `/api/cover-letters`, `/api/cover-letters/[id]`), interactive `CoverLetterPanel` UI component (`src/components/tailor/cover-letter-panel.tsx`) integrated into `/tailor`, integration test suite (`tests/cover-letter-api.test.ts`), Playwright E2E test suite (`e2e/phase5-cover-letter.spec.ts`), and AI Security & Grounding Guardrail Audit (Sonnet 4.6).
 
 ### Completed Work
@@ -280,5 +282,88 @@ All AI agents completing subsequent phases MUST update this file using the follo
 - [List any remaining gaps, stubs, or intentionally deferred items]
 
 ### Suggested Next Task
-- [Recommended next phase or feature module]
-```
+- **Phase 7: System Polish & Editor Safety**: Completed in full.
+
+---
+
+## Current Status: Phase 7 Complete — System Polish, Tracker Redesign & Master Safety Protocol
+
+- **Phase Completed**: Phase 7 (System Polish, AI Gateway Fixes, Indeed-Style Tracker, Editor AI Sidebar & Master Safety Protocol)
+- **Completed Date**: 2026-08-07
+- **Status Summary**: Implemented all 9 Phase 7 tasks: Task 7.1 (AI diagnostic), Task 7.2 (AI gate fixes, fence-stripping, model field in Settings, error UX), Task 7.3 (shared `useActiveJob` persistence hook), Task 7.4 (PDF upload to non-master draft with instant editor redirect), Task 7.5 (Indeed/Glassdoor style tracker feed with `/tracker/applied` & `/tracker/saved`), Task 7.6 (functional editor AI sidebar panel), Task 7.7 (deterministic marker toolbar with selection stamping), Task 7.8 (global gold/amber color-token audit), and Task 7.9 (Save as Master overwrite confirmation, pre-save `MasterHistory` snapshotting, Revert to Master, and instant Undo Overwrite).
+
+### Completed Work in Phase 7
+- **Task 7.1 (AI Diagnostic)**: Conducted read-only inspection mapping 5 root causes for silent AI failures and PDF flow issues (`patchError` below fold, missing `model` field in Settings, raw markdown fences in LLM output, strict envelope Zod parsing, and instant master overwrites).
+- **Task 7.2 (AI Tailoring & Error UX Fixes)**: Stripped markdown fences (` ```json `) in `generate-patches/route.ts` and `qualitative-review/route.ts`. Added custom Model Name field to `settings-workspace.tsx` and persisted to `localStorage`. Moved error banners above action buttons in Tailor UI with direct links to `/settings`.
+- **Task 7.3 (Active Job Persistence)**: Built `useActiveJob` hook (`src/hooks/use-active-job.ts`) managing `sessionStorage` and `?jobId=` URL param sync across pages.
+- **Task 7.4 (PDF Upload & Redirect)**: Updated `upload-pdf/route.ts` so uploaded PDFs save as reviewable drafts (`isMaster: false`) with `@pdf-conversion-draft` header comments. Added instant client redirect to `/editor?resumeId=<id>`.
+- **Task 7.5 (Tracker Redesign)**: Built vertical card feed `TrackerFeed` (`src/components/tracker/tracker-feed.tsx`) replacing Kanban view with search/filter sidebar, **Copy JD** button (copies text & navigates to `/tailor?jobId=`), inline notes, and status dropdowns. Created sub-page routes `/tracker/applied` and `/tracker/saved`.
+- **Task 7.6 (Editor AI Sidebar)**: Replaced stub in `src/components/editor/ai-sidebar.tsx` with a functional panel that parses JDs, fetches patch proposals, allows accepting/skipping suggestions, and applies accepted patches to the editor buffer.
+- **Task 7.7 (Deterministic Marker Panel)**: Added **Mark as Verified** button to `code-editor.tsx` toolbar using CodeMirror 6 selection API to inject `// ✓ @verified:<date>` annotations.
+- **Task 7.8 (Global Gold/Amber Color Audit)**: Standardized accent color tokens to brand gold/amber (`text-amber-400`, `bg-amber-500`) across all 9 primary workspace components.
+- **Task 7.9 (Master Safety Protocol)**: Added `MasterHistory` model to `prisma/schema.prisma` and executed schema sync. Added `saveMasterResume` with automatic pre-save snapshotting, unconfirmed overwrite blocking, `restoreMasterSnapshot`, and API routes `POST /api/resumes/save-master` and `POST /api/resumes/undo-master`. Built confirmed Save as Master dialog, Revert to Master button, and Undo Overwrite banner in `editor-workspace.tsx`.
+
+### Verification Tests Executed
+- `npm run lint` — ESLint passed cleanly with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed cleanly with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (102/102 tests passing across 25 test files).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly (31/31 static pages rendered).
+- `npx playwright test` — Playwright E2E tests executed cleanly across spec files.
+
+---
+
+## Current Status: Phase 8 In Progress — Job Ingestion at Scale & Cover Letter Engine
+
+- **Phase In Progress**: Phase 8 (Job-Board Ingestion at Scale, Indeed/Glassdoor Refinements, Cover Letter Generator & Unified Job Card Actions)
+- **Completed Date**: 2026-08-07
+- **Status Summary**: Completed Task 8.1 (Documentation of Scope Amendments per ADR-010 & ADR-011) and Task 8.2 (Tier 1 Bulk Job Ingestion Module, Markdown Table Parser, Deduplication, API Route & Tracker Refresh Button).
+
+### Completed Work in Phase 8
+- **Task 8.1 (Document Scope Amendment)**: Added ADR-010 (Two-Tier Job Ingestion) and ADR-011 (Cover Letter Generation) to `docs/decisions.md` explicitly superseding Phase 5 exclusions. Updated `PRODUCT.md` with Feature 7 and Feature 8.
+- **Task 8.2 (Tier 1 Bulk Job Ingestion)**:
+  - Created `src/lib/ingestion/tier1-importer.ts` with configurable source URL (`DEFAULT_SIMPLIFY_SOURCE_URL`), markdown table parsing (`parseMarkdownTable`), clean Markdown formatting stripping, deduplication against existing database jobs, and placeholder raw description formatting (`[Pending Import] ...`).
+  - Created REST API route `POST /api/jobs/bulk-import` supporting configurable `sourceUrl` or `tableMarkdown` payload.
+  - Added **Refresh from Source** button on `/tracker` feed (`src/components/tracker/tracker-feed.tsx`) with status notification banner (`Imported X new jobs (Y existing skipped)`).
+  - Built unit test suite `tests/tier1-ingestion.test.ts` (proved fail-first Red state before implementation; 4/4 tests passing Green).
+
+### Verification Tests Executed
+- `npm run lint` — ESLint passed cleanly with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed cleanly with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (106/106 tests passing across 26 test files).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly (34/34 static pages rendered).
+
+- **Task 8.3 (Tracker Redesign Refinements)**:
+  - Updated [`src/components/tracker/tracker-feed.tsx`](file:///c:/Users/jayde/.gemini/config/projects/Resume-Forge/src/components/tracker/tracker-feed.tsx) with full card field set: company initial logo badge, role title with external link affordance icon, location badge, posting date badge, salary badge / intentional missing salary state, status badge dropdown, and Tier 1 placeholder description pill.
+  - Implemented explicit click-zone separation: clicking card header/body opens direct `applyUrl` in a new tab (`target="_blank"`, `rel="noopener noreferrer"`); action bar buttons (`Copy JD`, `Tailor Resume`, `Generate Cover Letter`, `Status select`, `Notes`, `Delete`) stop click propagation (`e.stopPropagation()`).
+  - Added helper extraction functions: `extractLocationFromNotes`, `extractApplyUrlFromNotes`, `extractPostingDateFromNotes`, `extractSalaryFromNotes`, `isPlaceholderDescription`.
+  - Created unit test suite [`tests/tracker-card-spec.test.ts`](file:///c:/Users/jayde/.gemini/config/projects/Resume-Forge/tests/tracker-card-spec.test.ts) (proved fail-first Red state before implementation; 4/4 tests passing Green).
+  - Built direct multi-location regression test [`scripts/test-tiktok-multi-location.ts`](file:///c:/Users/jayde/.gemini/config/projects/Resume-Forge/scripts/test-tiktok-multi-location.ts) verifying TikTok San Jose and TikTok Seattle render as two separate job cards with distinct apply links.
+
+### Verification Tests Executed
+- `npm run lint` — ESLint passed cleanly with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed cleanly with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (110/110 tests passing across 27 test files).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly (34/34 static pages rendered).
+
+- **Task 8.4 (Tier 2 On-Demand Full-Text Fetch & Best-Effort Extractor)**:
+  - Created `src/lib/ingestion/tier2-fetcher.ts` supporting Schema.org `JobPosting` JSON-LD extraction, DOM main content container parsing, HTML-to-markdown formatting, quality gate validation (length >= 180 chars, SPA JS-shell detection, substance keywords), and database caching (`fetchAndCacheJobFullText`).
+  - Created REST API route `POST /api/jobs/[id]/fetch-fulltext` (`src/app/api/jobs/[id]/fetch-fulltext/route.ts`).
+  - Updated `src/components/tailor/tailor-workspace.tsx` to automatically trigger on-demand Tier 2 fetch when loading a Tier-1-placeholder job, displaying non-blocking status banner ("Attempting Tier 2 fetch..."), a "Skip & Paste Manually" action button, and automatic graceful fallback to manual paste mode.
+  - Built unit test suite `tests/tier2-fetcher.test.ts` (proved fail-first Red state before implementation; 4/4 tests passing Green).
+  - Built real-platform verification script `scripts/test-tier2-real-platforms.ts` and executed live extractions against database postings:
+    - Greenhouse (IMC Trading): SUCCESS (4,309 chars extracted in 579ms)
+    - Workday (Ciena): SUCCESS (3,528 chars extracted in 463ms)
+    - Direct company career site (Optiver): SUCCESS (4,576 chars extracted in 970ms)
+
+### Verification Tests Executed
+- `npm run lint` — ESLint passed cleanly with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed cleanly with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (115/115 tests passing across 28 test files).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly (34/34 static & dynamic pages rendered).
+
+### Known Limitations (Task 8.4 Scope)
+- Tier 2 extraction relies on static HTML & JSON-LD parsing; pages requiring authenticated user logins or complex CAPTCHA challenges gracefully degrade to the manual paste fallback prompt.
+
+### Suggested Next Task
+- **Task 8.5 — PittCSC Internship Feed Sync & Automated Pipeline Integration**: Implement automated sync for PittCSC internship feed (`https://raw.githubusercontent.com/pittcsc/Summer2026-Internships/dev/README.md`) with deduplication and tracker feed integration.
+

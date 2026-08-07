@@ -21,6 +21,7 @@ export async function testOpenAIConnection(config: ProviderConfig): Promise<Test
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
+      signal: AbortSignal.timeout(5000),
     });
 
     const latencyMs = Date.now() - startTime;

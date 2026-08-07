@@ -86,16 +86,22 @@ export async function POST(request: Request) {
       );
     }
 
-    // Parse and validate AI response against PatchResponseSchema
+    // Parse and validate AI response against PatchResponseSchema.
+    // Strip markdown fences that some models wrap around JSON output (e.g. ```json ... ```)
     let parsedResponse;
     try {
-      const rawParsed = JSON.parse(result.rawJson);
+      const stripped = result.rawJson
+        .trim()
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+      const rawParsed = JSON.parse(stripped);
       parsedResponse = PatchResponseSchema.parse(rawParsed);
     } catch (err) {
       return NextResponse.json(
         {
           success: false,
-          error: `AI response failed schema validation: ${err instanceof Error ? err.message : String(err)}`,
+          error: `AI returned a response that did not match the required patch schema. This can happen if the model doesn't support structured JSON output. Try a different model or provider. Details: ${err instanceof Error ? err.message : String(err)}`,
         },
         { status: 422 }
       );

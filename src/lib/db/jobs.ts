@@ -7,7 +7,7 @@ export interface CreateJobInput {
   company?: string;
   roleTitle?: string;
   rawDescription: string;
-  source?: "pasted" | "manual";
+  source?: "pasted" | "manual" | "simplify-jobs";
   extractedRequirements?: JobRequirements;
   status?: JobStatus;
   appliedAt?: Date | string | null;

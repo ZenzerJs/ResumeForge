@@ -32,20 +32,20 @@ These ten rules govern all design and development decisions across ResumeForge:
 
 ---
 
-## 3. V1 Scope: Six Core Features
+## 3. Core Features (Scope Expanded per ADR-010 & ADR-011)
 
-The V1 Minimum Viable Product consists of exactly six interconnected modules:
+The ResumeForge workspace consists of eight core modules:
 
 ### Feature 1: Master Resume Workspace
 - Single source of truth containing contact info, summary, education, experience bullets, projects, and skills.
-- Read-only master view with lock indicators.
+- Protected master view with version snapshots (`MasterHistory`) and instant Undo/Revert safety controls.
 
 ### Feature 2: Verified Evidence Bank
 - Repository of detailed accomplishment items, project artifacts, measurable metrics, and verified skill usages.
 - Tagged with technologies, metrics, dates, and evidence confidence levels.
 
 ### Feature 3: Job Description Input & Parser
-- Interface to paste job description text or URL.
+- Interface to paste job description text or fetch web posting links.
 - Structured parser output extracting required skills, experience levels, responsibilities, and role profiles (backend, frontend, AI/ML, data).
 
 ### Feature 4: Rule-Based Requirement Matcher
@@ -60,6 +60,16 @@ The V1 Minimum Viable Product consists of exactly six interconnected modules:
 - Real-time 100-point rubric score breakdown.
 - Live Typst WASM preview and one-click PDF export tailored to a single page.
 
+### Feature 7: Two-Tier Job Ingestion & Application Tracker (Added per ADR-010)
+- **Tier 1 Bulk Ingestion**: Manual, on-demand import of structured job listing feeds (SimplifyJobs snapshots) into `Job` records with deduplication.
+- **Tier 2 Best-Effort Fetch**: On-demand extraction of full job text when opening postings, with graceful fallback to manual text paste.
+- **Indeed/Glassdoor Feed UI**: Vertical feed layout with status tracking (`SAVED`, `APPLIED`, `INTERVIEWING`, `OFFER`, `REJECTED`), separate click zones (title → external posting; actions → internal tailor/cover-letter workflows), and `useActiveJob` persistence.
+
+### Feature 8: Evidence-Grounded Cover Letter Generator (Added per ADR-011)
+- On-demand generation of tailored cover letters linked directly to `jobId`.
+- Enforces strict zero-hallucination citation guardrail: every claim MUST cite verified Evidence Bank items.
+- Explicit gap reporting for unsupported job requirements.
+
 ---
 
 ## 4. Out of Scope for V1
@@ -68,7 +78,7 @@ The following features are explicitly deferred to post-V1 phases:
 
 - Multi-user authentication & user accounts
 - Cloud database sync & remote storage
-- Automated web scraping of job boards (beyond text/URL paste)
+- Background automated scheduled scrapers or auto-polling (on-demand manual refresh only per ADR-010)
 - Automated job application submitting bots
 - Analytics, telemetry, or user tracking
 - Collaborative multi-user editing

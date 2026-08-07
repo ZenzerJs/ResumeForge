@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { ProviderType } from "@/lib/ai/types";
 import { ArrowLeft, CheckCircle2, XCircle, Loader2, Key, Server, ShieldCheck, Trash2, Briefcase } from "lucide-react";
+import { TopNav } from "@/components/navigation/top-nav";
 
 const SETTINGS_STORAGE_KEY = "resumeforge_ai_settings";
 
@@ -11,6 +12,7 @@ export function SettingsWorkspace() {
   const [provider, setProvider] = useState<ProviderType>("openai");
   const [apiKey, setApiKey] = useState<string>("");
   const [baseUrl, setBaseUrl] = useState<string>("");
+  const [model, setModel] = useState<string>("");
   const [isTesting, setIsTesting] = useState<boolean>(false);
   const [testResult, setTestResult] = useState<{
     success: boolean;
@@ -27,6 +29,7 @@ export function SettingsWorkspace() {
         if (parsed.provider) setProvider(parsed.provider);
         if (parsed.apiKey) setApiKey(parsed.apiKey);
         if (parsed.baseUrl) setBaseUrl(parsed.baseUrl);
+        if (parsed.model) setModel(parsed.model);
       }
     } catch (err) {
       console.error("Failed to load saved settings:", err);
@@ -34,7 +37,7 @@ export function SettingsWorkspace() {
   }, []);
 
   // Save settings to localStorage on change
-  const saveSettingsToStorage = (newProvider: ProviderType, newKey: string, newUrl: string) => {
+  const saveSettingsToStorage = (newProvider: ProviderType, newKey: string, newUrl: string, newModel: string) => {
     try {
       localStorage.setItem(
         SETTINGS_STORAGE_KEY,
@@ -42,6 +45,7 @@ export function SettingsWorkspace() {
           provider: newProvider,
           apiKey: newKey,
           baseUrl: newUrl,
+          model: newModel,
         })
       );
     } catch (err) {
@@ -53,27 +57,34 @@ export function SettingsWorkspace() {
     const nextProvider = e.target.value as ProviderType;
     setProvider(nextProvider);
     setTestResult(null);
-    saveSettingsToStorage(nextProvider, apiKey, baseUrl);
+    saveSettingsToStorage(nextProvider, apiKey, baseUrl, model);
   };
 
   const handleKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextKey = e.target.value;
     setApiKey(nextKey);
     setTestResult(null);
-    saveSettingsToStorage(provider, nextKey, baseUrl);
+    saveSettingsToStorage(provider, nextKey, baseUrl, model);
   };
 
   const handleBaseUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextUrl = e.target.value;
     setBaseUrl(nextUrl);
     setTestResult(null);
-    saveSettingsToStorage(provider, apiKey, nextUrl);
+    saveSettingsToStorage(provider, apiKey, nextUrl, model);
+  };
+
+  const handleModelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nextModel = e.target.value;
+    setModel(nextModel);
+    setTestResult(null);
+    saveSettingsToStorage(provider, apiKey, baseUrl, nextModel);
   };
 
   const handleClearKey = () => {
     setApiKey("");
     setTestResult(null);
-    saveSettingsToStorage(provider, "", baseUrl);
+    saveSettingsToStorage(provider, "", baseUrl, model);
   };
 
   const handleTestConnection = async () => {
@@ -88,6 +99,7 @@ export function SettingsWorkspace() {
           provider,
           apiKey: apiKey.trim() || undefined,
           baseUrl: baseUrl.trim() || undefined,
+          model: model.trim() || undefined,
         }),
       });
 
@@ -113,40 +125,21 @@ export function SettingsWorkspace() {
   };
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-y-auto bg-slate-900 text-slate-100">
-      {/* Top Navbar */}
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-4">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/editor"
-            className="flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Workspace
-          </Link>
-          <span className="text-xs text-slate-700">|</span>
-          <Link
-            href="/tracker"
-            className="flex items-center gap-1 text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
-          >
-            <Briefcase className="h-4 w-4" />
-            Tracker
-          </Link>
-          <span className="text-xs text-slate-700">|</span>
-          <span className="text-sm font-semibold tracking-tight text-white">
-            AI Provider Gateway Settings
-          </span>
-        </div>
-      </header>
+    <div className="flex h-screen w-screen flex-col overflow-y-auto text-slate-100" style={{ backgroundColor: "#0A0E17" }}>
+      {/* Shared Top Navigation */}
+      <TopNav />
 
       {/* Main Form Content */}
       <main className="mx-auto w-full max-w-3xl flex-1 p-6 md:p-8">
         <div className="space-y-6">
           <div>
             <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-              <Server className="h-6 w-6 text-indigo-400" />
+              <Server className="h-6 w-6 text-amber-400" />
               Bring-Your-Own-Key (BYOK) AI Configuration
             </h1>
+            <p className="mt-1.5 text-xs font-mono" style={{ color: "#4B5A7A" }}>
+              AI Provider Gateway Settings
+            </p>
             <p className="mt-1 text-sm text-slate-400">
               Configure your preferred LLM provider or local OpenAI-compatible endpoint. API keys are stored in browser localStorage for local single-user convenience and never saved in SQLite.
             </p>
@@ -162,7 +155,7 @@ export function SettingsWorkspace() {
                 id="provider-select"
                 value={provider}
                 onChange={handleProviderChange}
-                className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
               >
                 <option value="openai">OpenAI (Direct API)</option>
                 <option value="anthropic">Anthropic (Direct API)</option>
@@ -203,12 +196,12 @@ export function SettingsWorkspace() {
                       ? "AIzaSy..."
                       : "Optional API Key for custom endpoint"
                   }
-                  className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
+                  className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
                 />
               </div>
               {apiKey && (
                 <div className="mt-1.5 flex items-center gap-2 text-xs text-slate-400">
-                  <Key className="h-3.5 w-3.5 text-indigo-400" />
+                  <Key className="h-3.5 w-3.5 text-amber-400" />
                   <span>Configured key: <code className="text-slate-300 font-mono">{maskKey(apiKey)}</code></span>
                 </div>
               )}
@@ -226,10 +219,36 @@ export function SettingsWorkspace() {
                   value={baseUrl}
                   onChange={handleBaseUrlChange}
                   placeholder={provider === "custom" ? "http://localhost:8000" : "https://api.openai.com"}
-                  className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
+                  className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
                 />
               </div>
             )}
+
+            {/* Model Name Input */}
+            <div>
+              <label htmlFor="model-input" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                Model Name <span className="text-slate-500 font-normal normal-case">(optional — leave blank for provider default)</span>
+              </label>
+              <input
+                id="model-input"
+                type="text"
+                value={model}
+                onChange={handleModelChange}
+                placeholder={
+                  provider === "openai"
+                    ? "gpt-4o, gpt-4o-mini, gpt-3.5-turbo…"
+                    : provider === "anthropic"
+                    ? "claude-sonnet-4-5, claude-3-haiku-20240307…"
+                    : provider === "gemini"
+                    ? "gemini-2.5-flash, gemini-1.5-pro…"
+                    : "llama3, mistral, codellama…"
+                }
+                className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+              />
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                For custom/local endpoints (Ollama, LM Studio, FreeLLMAPI): specify the exact model name your server exposes.
+              </p>
+            </div>
 
             {/* Action Buttons & Status */}
             <div className="pt-2 flex items-center justify-between border-t border-slate-800">
@@ -238,7 +257,7 @@ export function SettingsWorkspace() {
                 id="test-connection-btn"
                 onClick={handleTestConnection}
                 disabled={isTesting}
-                className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-2 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50 transition-colors"
               >
                 {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Server className="h-4 w-4" />}
                 {isTesting ? "Testing Connection..." : "Test Connection"}

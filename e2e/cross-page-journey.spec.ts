@@ -12,9 +12,10 @@ test.describe("Cross-Page Multi-Workspace E2E Journey Tests (Task B2)", () => {
     await page.waitForSelector(".typst-preview-svg svg", { timeout: 15000 });
 
     const savePromise = page.waitForResponse(
-      (resp) => resp.url().includes("/api/resumes") && resp.request().method() === "POST" && resp.ok()
+      (resp) => (resp.url().includes("/api/resumes/save-master") || resp.url().includes("/api/resumes")) && resp.request().method() === "POST" && resp.ok()
     );
     await page.click("button:has-text('Save as Master Resume')");
+    await page.click("[data-testid='confirm-save-master-btn']");
     await savePromise;
     await page.waitForSelector("text=Saved as Master!", { timeout: 15000 });
     await expect(page.locator("[data-testid='doc-badge-master']")).toBeVisible();

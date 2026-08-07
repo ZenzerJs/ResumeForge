@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { createResume } from "@/lib/db/resumes";
+import { createResume, getMasterResume } from "@/lib/db/resumes";
 import { createJob } from "@/lib/db/jobs";
 import { createVariant } from "@/lib/db/variants";
 import { GET as getResumesRoute } from "@/app/api/resumes/route";
@@ -14,7 +14,6 @@ describe("EditorWorkspace Canonical Loading Logic Tests (Task B1)", () => {
   const variantContent = "= Tailored Variant Typst Content";
 
   beforeEach(async () => {
-    // Seed DB Master Resume
     const master = await createResume({
       title: "Master Resume DB",
       typstSource: masterContent,

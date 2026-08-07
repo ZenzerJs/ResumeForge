@@ -35,7 +35,7 @@ const SEVERITY_STYLES: Record<string, { bg: string; border: string; text: string
 };
 
 const OPERATION_STYLES: Record<string, { bg: string; text: string }> = {
-  MODIFY_BULLET: { bg: "bg-indigo-950", text: "text-indigo-300" },
+  MODIFY_BULLET: { bg: "bg-amber-950/60", text: "text-amber-300" },
   ADD_SKILL: { bg: "bg-emerald-950", text: "text-emerald-300" },
   REORDER_BULLETS: { bg: "bg-purple-950", text: "text-purple-300" },
   TWEAK_SUMMARY: { bg: "bg-cyan-950", text: "text-cyan-300" },
@@ -374,7 +374,7 @@ export function PatchDiffReview({
 
                 {/* Rationale */}
                 <p className="text-xs text-slate-400 flex items-start gap-2">
-                  <ArrowRight className="h-3.5 w-3.5 shrink-0 mt-0.5 text-indigo-400" />
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-400" />
                   {patch.rationale}
                 </p>
 
@@ -384,7 +384,7 @@ export function PatchDiffReview({
                   {patch.evidenceIds.map((eid) => (
                     <span
                       key={eid}
-                      className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950/60 text-indigo-300 border border-indigo-800/50"
+                      className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/50"
                     >
                       {eid.length > 16 ? `${eid.slice(0, 8)}…${eid.slice(-4)}` : eid}
                     </span>
@@ -442,7 +442,7 @@ export function PatchDiffReview({
             onClick={handleApplyAccepted}
             disabled={isApplying || acceptedPatches.length === 0}
             data-testid="apply-patches-btn"
-            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-sm px-6 py-3 rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 transition"
+            className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-semibold text-sm px-6 py-3 rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition"
           >
             {isApplying ? (
               <>

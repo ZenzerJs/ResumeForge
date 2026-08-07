@@ -1,0 +1,25 @@
+name: Pitt CSC Job Feed Ingestion
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Every 24 hours at midnight UTC
+  workflow_dispatch:
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Pitt CSC README
+        run: |
+          curl -s https://raw.githubusercontent.com/pittcsc/Summer2026-Internships/main/README.md > raw_feed.md
+
+      - name: Push to ResumeForge Sync API
+        env:
+          APP_SYNC_URL: ${{ secrets.APP_SYNC_URL }}
+          JOB_SYNC_SECRET: ${{ secrets.JOB_SYNC_SECRET }}
+        run: |
+          MARKDOWN_JSON=$(jq -Rs '.' raw_feed.md)
+          curl -X POST "$APP_SYNC_URL/api/jobs/sync-pittcsc" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $JOB_SYNC_SECRET" \
+            -d "{\"rawMarkdown\": $MARKDOWN_JSON, \"jobType\": \"Internship\"}"

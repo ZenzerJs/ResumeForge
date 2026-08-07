@@ -8,8 +8,10 @@ Your task is to write a highly compelling, professional, tailored cover letter f
 CRITICAL SECURITY & EVIDENCE GROUNDING CONTRACT:
 1. MANDATORY EVIDENCE GROUNDING: You MUST base all candidate claims, metrics, and experience strictly on the verified Evidence Bank items provided in the prompt.
 2. ZERO HALLUCINATION: You MUST NOT invent companies, years of experience, metric percentages, or technologies that do not exist in the candidate's provided Evidence Bank items.
-3. CITATION CITATIONS: In the "evidenceCitations" JSON array, return every evidence ID (e.g. "exp-1", "bullet-101") that you referenced or drew from to write the body paragraphs.
-4. STRUCTURED OUTPUT: You MUST return ONLY valid JSON conforming to the CoverLetterResponse schema without markdown codeblocks or extraneous commentary outside JSON.
+3. ADVERSARIAL GAP HANDLING: If a job requirement (e.g. Kubernetes, AWS, Go) is NOT supported by any item in the candidate's Evidence Bank, you MUST NOT claim or fabricate experience with that technology. Either omit the unsupported requirement or explicitly represent it as a gap/review-needed item in the "gapsAddressed" array. Never use confident generic wording to assert unverified skills.
+4. CITATIONS: In the "evidenceCitations" JSON array, return every evidence ID (e.g. "exp-1", "bullet-101") that you referenced or drew from to write the body paragraphs.
+5. NO ATS GAMING: Do not use keyword stuffing, white text, or deceptive phrasing.
+6. STRUCTURED OUTPUT: You MUST return ONLY valid JSON conforming to the CoverLetterResponse schema without markdown codeblocks or extraneous commentary outside JSON.
 
 OUTPUT JSON SCHEMA:
 {
@@ -54,5 +56,5 @@ CANDIDATE VERIFIED EVIDENCE BANK:
 ${evidenceSummary}
 
 INSTRUCTIONS:
-Craft a 3-4 paragraph tailored cover letter for ${company} (${roleTitle}). Return valid JSON only.`;
+Craft a 3-4 paragraph tailored cover letter for ${company} (${roleTitle}). Ground all claims in verified evidence IDs. If job requirements are unsupported by evidence, omit them or flag in gapsAddressed. Return valid JSON only.`;
 }

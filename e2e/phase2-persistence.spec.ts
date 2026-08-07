@@ -5,8 +5,9 @@ test.describe("Phase 2 Persistence & Evidence Bank E2E Tests", () => {
     await page.goto("/editor");
     await page.waitForSelector(".typst-preview-svg svg", { timeout: 15000 });
 
-    // Click "Save as Master Resume"
+    // Click "Save as Master Resume" and confirm modal
     await page.click("button:has-text('Save as Master Resume')");
+    await page.click("[data-testid='confirm-save-master-btn']");
 
     // Wait for "Saved as Master!" button state
     await page.waitForSelector("text=Saved as Master!", { timeout: 5000 });

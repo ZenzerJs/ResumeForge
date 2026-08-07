@@ -26,6 +26,8 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { JobStatus } from "@/lib/db/jobs";
+import { TopNav } from "@/components/navigation/top-nav";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export interface JobVariant {
   id: string;
@@ -177,99 +179,54 @@ export function TrackerWorkspace() {
   const metrics = getMetrics();
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-950 text-slate-100 font-sans">
-      {/* Top Navbar */}
-      <header className="flex h-13 shrink-0 items-center justify-between border-b border-slate-800 bg-slate-900/90 px-6 backdrop-blur">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 rounded-md px-1 py-1 transition-opacity hover:opacity-90"
-          >
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-600 text-xs font-bold text-white shadow-sm">
-              R
-            </div>
-            <span className="text-base font-bold tracking-tight text-white">
-              ResumeForge
-            </span>
-          </Link>
-          <span className="h-4 w-px bg-slate-800" />
-          <nav className="flex items-center gap-1.5" aria-label="Primary Workspace Navigation">
-            <Link
-              href="/editor"
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
-            >
-              Master Editor
-            </Link>
-            <Link
-              href="/library"
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-colors flex items-center gap-1.5"
-            >
-              <BookOpen className="h-3.5 w-3.5" />
-              Evidence Bank
-            </Link>
-            <Link
-              href="/tailor"
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-colors flex items-center gap-1.5"
-            >
-              <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
-              Tailor Engine
-            </Link>
-            <Link
-              href="/tracker"
-              className="rounded-md bg-indigo-950 px-3 py-1.5 text-xs font-semibold text-indigo-300 border border-indigo-800/80 flex items-center gap-1.5 shadow-sm"
-            >
-              <Briefcase className="h-3.5 w-3.5 text-indigo-400" />
-              Application Tracker
-            </Link>
-            <Link
-              href="/settings"
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-colors flex items-center gap-1.5"
-            >
-              <Settings className="h-3.5 w-3.5" />
-              Settings
-            </Link>
-          </nav>
-        </div>
-
-        <div className="flex items-center gap-2">
+    <div className="flex h-screen w-screen flex-col overflow-hidden text-slate-100 font-sans" style={{ backgroundColor: "#0A0E17" }}>
+      {/* Shared Top Navigation */}
+      <TopNav
+        actions={
           <Link
             href="/tailor"
-            className="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-indigo-500 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors"
+            style={{ background: "linear-gradient(135deg, #F59E0B, #D97706)", color: "#0A0E17" }}
           >
             <Plus className="h-3.5 w-3.5" />
             Tailor New Job
           </Link>
-        </div>
-      </header>
+        }
+      />
 
       {/* Main Content Area */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Metric Bar & Toolbar */}
-        <div className="border-b border-slate-800 bg-slate-900/60 p-4 md:px-6">
+        <div className="border-b p-4 md:px-6" style={{ borderColor: "#1E2536", backgroundColor: "rgba(17,22,34,0.8)" }}>
+          {/* Page Label */}
+          <h1 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
+            <Briefcase className="h-4 w-4 text-indigo-400" />
+            Application Tracker
+          </h1>
           {/* Top Metrics Cards */}
           <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-3">
-              <span className="text-[11px] font-medium text-slate-400">Total Applications</span>
+            <div className="rounded-lg border p-3" style={{ borderColor: "#1E2536", backgroundColor: "#111622" }}>
+              <span className="text-[11px] font-mono font-medium text-slate-500">Total</span>
               <p className="mt-1 text-2xl font-bold text-white">{metrics.total}</p>
             </div>
-            <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-3">
-              <span className="text-[11px] font-medium text-slate-400">Saved Roles</span>
+            <div className="rounded-lg border p-3" style={{ borderColor: "#1E2536", backgroundColor: "#111622" }}>
+              <span className="text-[11px] font-mono font-medium text-slate-500">Saved</span>
               <p className="mt-1 text-2xl font-bold text-slate-300">{metrics.saved}</p>
             </div>
             <div className="rounded-lg border border-blue-900/40 bg-blue-950/20 p-3">
-              <span className="text-[11px] font-medium text-blue-400">Applied</span>
+              <span className="text-[11px] font-mono font-medium text-blue-400">Applied</span>
               <p className="mt-1 text-2xl font-bold text-blue-300">{metrics.applied}</p>
             </div>
             <div className="rounded-lg border border-amber-900/40 bg-amber-950/20 p-3">
-              <span className="text-[11px] font-medium text-amber-400">Interviewing</span>
+              <span className="text-[11px] font-mono font-medium text-amber-400">Interviewing</span>
               <p className="mt-1 text-2xl font-bold text-amber-300">{metrics.interviewing}</p>
             </div>
             <div className="rounded-lg border border-emerald-900/40 bg-emerald-950/20 p-3">
-              <span className="text-[11px] font-medium text-emerald-400">Offers</span>
+              <span className="text-[11px] font-mono font-medium text-emerald-400">Offers</span>
               <p className="mt-1 text-2xl font-bold text-emerald-300">{metrics.offer}</p>
             </div>
             <div className="rounded-lg border border-rose-900/40 bg-rose-950/20 p-3">
-              <span className="text-[11px] font-medium text-rose-400">Rejected</span>
+              <span className="text-[11px] font-mono font-medium text-rose-400">Rejected</span>
               <p className="mt-1 text-2xl font-bold text-rose-300">{metrics.rejected}</p>
             </div>
           </div>
@@ -291,7 +248,8 @@ export function TrackerWorkspace() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-300 focus:border-indigo-500 focus:outline-none"
+                className="rounded-md border px-3 py-1.5 text-xs font-medium text-slate-300 focus:outline-none focus:border-amber-500/50"
+                style={{ backgroundColor: "#0A0E17", borderColor: "#1E2536" }}
               >
                 <option value="ALL">All Statuses</option>
                 <option value="SAVED">Saved</option>
@@ -335,9 +293,17 @@ export function TrackerWorkspace() {
         {/* Dynamic Display Area */}
         <div className="flex-1 overflow-x-auto overflow-y-auto p-4 md:p-6">
           {isLoading ? (
-            <div className="flex h-64 flex-col items-center justify-center gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
-              <span className="text-xs font-medium text-slate-400">Loading application pipeline...</span>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-6 min-w-[1200px]">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="flex flex-col rounded-xl border p-3 min-h-[300px]" style={{ borderColor: "#1E2536", backgroundColor: "rgba(17,22,34,0.6)" }}>
+                  <Skeleton className="h-3 w-20 mb-4" />
+                  <div className="flex flex-col gap-2">
+                    <Skeleton className="h-20 w-full rounded-lg" />
+                    <Skeleton className="h-16 w-full rounded-lg" />
+                    <Skeleton className="h-14 w-full rounded-lg" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : filteredJobs.length === 0 ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-800 bg-slate-900/30 p-8 text-center">

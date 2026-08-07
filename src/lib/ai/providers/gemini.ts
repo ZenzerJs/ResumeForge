@@ -20,6 +20,7 @@ export async function testGeminiConnection(config: ProviderConfig): Promise<Test
       headers: {
         "Content-Type": "application/json",
       },
+      signal: AbortSignal.timeout(5000),
     });
 
     const latencyMs = Date.now() - startTime;

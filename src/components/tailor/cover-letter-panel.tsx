@@ -36,13 +36,43 @@ export function CoverLetterPanel({
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [coverLetter, setCoverLetter] = useState<CoverLetterResponse | null>(null);
-
   const [activeFormat, setActiveFormat] = useState<"markdown" | "text">("markdown");
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Task 8.6: Load existing cover letter draft for jobId on mount
+  React.useEffect(() => {
+    if (!jobId) return;
+    async function loadExistingDraft() {
+      try {
+        const res = await fetch(`/api/cover-letters?jobId=${jobId}`);
+        const json = await res.json();
+        if (res.ok && json.success && Array.isArray(json.data) && json.data.length > 0) {
+          const draft = json.data[0];
+          setCoverLetter({
+            title: draft.title,
+            salutation: draft.salutation || "Dear Hiring Team,",
+            openingParagraph: draft.openingParagraph,
+            bodyParagraphs: Array.isArray(draft.bodyParagraphs) ? draft.bodyParagraphs : [],
+            closingParagraph: draft.closingParagraph,
+            fullMarkdown: draft.fullMarkdown,
+            evidenceCitations: Array.isArray(draft.evidenceCitations) ? draft.evidenceCitations : [],
+            gapsAddressed: [],
+          });
+        }
+      } catch {
+        // Non-fatal
+      }
+    }
+    loadExistingDraft();
+  }, [jobId]);
+
   const handleGenerateCoverLetter = async () => {
+    if (coverLetter && !confirm("Regenerate cover letter? This will create a new evidence-grounded draft for this job.")) {
+      return;
+    }
+
     setIsGenerating(true);
     setGenerateError(null);
     setCoverLetter(null);
@@ -181,7 +211,7 @@ export function CoverLetterPanel({
           ) : (
             <>
               <Sparkles className="h-4 w-4" />
-              Generate Tailored Cover Letter
+              {coverLetter ? "Regenerate Cover Letter" : "Generate Tailored Cover Letter"}
             </>
           )}
         </button>

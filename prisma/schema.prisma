@@ -27,6 +27,7 @@ model Resume {
   updatedAt   DateTime @updatedAt
 
   variants    ResumeVariant[]
+  history     MasterHistory[]
 }
 
 model EvidenceItem {
@@ -77,7 +78,7 @@ model Job {
 model ResumeVariant {
   id              String        @id @default(uuid())
   masterResumeId  String
-  masterResume    Resume        @relation(fields: [masterResumeId], references: [id])
+  masterResume    Resume        @relation(fields: [masterResumeId], references: [id], onDelete: Cascade)
   jobId           String
   job             Job           @relation(fields: [jobId], references: [id])
   variantTitle    String
@@ -125,3 +126,36 @@ model CoverLetter {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 }
+
+// Pitt CSC / Simplify Summer 2026 Ingestion Feed
+model DiscoveredJob {
+  id                String   @id @default(cuid())
+  externalId        String   @unique // Deterministic hash of (company + roleTitle + applyUrl)
+  company           String
+  roleTitle         String
+  location          String
+  applyUrl          String
+  datePosted        String?
+  jobType           String   @default("Internship") // Internship | Co-op | Full-time
+  extractedKeywords String   @default("[]") // JSON array of extracted stack tags
+  isClosed          Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([company])
+  @@index([isClosed])
+}
+
+// Task 7.9: Master Resume Overwrite Pre-Save Snapshot History
+model MasterHistory {
+  id          String   @id @default(uuid())
+  resumeId    String
+  resume      Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  title       String
+  typstSource String
+  savedAt     DateTime @default(now())
+  reason      String   @default("pre-overwrite-snapshot")
+
+  @@index([resumeId])
+}
+

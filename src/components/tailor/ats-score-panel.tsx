@@ -192,9 +192,9 @@ export function AtsScorePanel({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-800 pb-6">
         <div>
           <h2 className="text-base font-semibold text-white flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-indigo-400" />
-            100-Point ATS Quality Score Panel
-            <span className="text-xs font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2.5 py-0.5 rounded-full">
+            <BarChart3 className="h-5 w-5 text-amber-400" />
+            ATS Quality Score Engine
+            <span className="text-xs font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-0.5 rounded-full">
               Phase 4.3 Deterministic Engine
             </span>
           </h2>
@@ -223,7 +223,7 @@ export function AtsScorePanel({
               onClick={handleFetchQualitativeReview}
               disabled={isLoadingQualitative || !result}
               data-testid="get-ai-feedback-btn"
-              className="px-4 py-3 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-semibold text-xs rounded-xl flex items-center gap-2 shadow-lg shadow-cyan-600/20 transition shrink-0"
+              className="px-4 py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-semibold text-xs rounded-xl flex items-center gap-2 shadow-lg shadow-amber-600/20 transition shrink-0"
             >
               {isLoadingQualitative ? (
                 <>
@@ -232,7 +232,7 @@ export function AtsScorePanel({
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-4 w-4 text-cyan-200" />
+                  <Sparkles className="h-4 w-4 text-amber-200" />
                   Get AI Feedback
                 </>
               )}
@@ -244,8 +244,8 @@ export function AtsScorePanel({
       {/* Interactive Role Profile Selector */}
       <div className="space-y-2">
         <label className="block text-xs font-semibold text-slate-300 flex items-center gap-2">
-          <Layers className="h-3.5 w-3.5 text-indigo-400" />
-          Select Role Profile Overlay (User-Adjustable):
+          <Layers className="h-3.5 w-3.5 text-amber-400" />
+          Target Role Profile Weighting
         </label>
         <div className="flex flex-wrap gap-2" data-testid="role-profile-selector">
           {ROLE_PROFILES.map((profile) => {
@@ -258,11 +258,11 @@ export function AtsScorePanel({
                 data-testid={`profile-btn-${profile}`}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
                   isSelected
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20 border border-indigo-500"
-                    : "bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800"
+                    ? "bg-amber-500 text-slate-950 font-semibold shadow-md shadow-amber-500/20 border border-amber-400"
+                    : "bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800"
                 }`}
               >
-                {isSelected && <Sparkles className="h-3 w-3 text-indigo-200" />}
+                {isSelected && <Sparkles className="h-3 w-3 text-slate-950" />}
                 {profile}
               </button>
             );
@@ -319,7 +319,7 @@ export function AtsScorePanel({
           <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-                <Briefcase className="h-4 w-4 text-indigo-400" />
+                <Briefcase className="h-4 w-4 text-amber-400" />
                 Required Role Match
               </span>
               <span className="text-xs font-mono font-bold text-slate-200">
@@ -328,7 +328,7 @@ export function AtsScorePanel({
             </div>
             <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
               <div
-                className="bg-indigo-500 h-full transition-all"
+                className="bg-amber-500 h-full transition-all"
                 style={{ width: `${result.requiredMatch.percentage}%` }}
               />
             </div>
@@ -393,7 +393,7 @@ export function AtsScorePanel({
       {result && result.skillEvaluations.length > 0 && (
         <div className="space-y-3 border-t border-slate-800 pt-5">
           <h3 className="text-xs font-semibold text-white flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-indigo-400" />
+            <CheckCircle2 className="h-4 w-4 text-amber-400" />
             Skill Demonstration Status Tracing ({result.skillEvaluations.length} skills)
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" data-testid="skill-evaluations-list">

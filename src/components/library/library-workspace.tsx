@@ -1,17 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
   Edit2,
   Archive,
   FileText,
-  ArrowLeft,
   Loader2,
   Tag,
-  Briefcase,
   Upload,
   Search,
   CheckCircle2,
@@ -20,6 +17,8 @@ import {
   FileJson,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TopNav } from "@/components/navigation/top-nav";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export interface Bullet {
   id?: string;
@@ -295,35 +294,10 @@ export function LibraryWorkspace() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Top Header */}
-      <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-4 md:px-8 py-3 sticky top-0 z-40">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/editor"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-white transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Editor
-            </Link>
-            <span className="text-slate-700">|</span>
-            <Link
-              href="/tracker"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors"
-            >
-              <Briefcase className="h-4 w-4" />
-              Tracker
-            </Link>
-            <span className="text-slate-700">|</span>
-            <h1 className="text-base font-bold tracking-tight text-white flex items-center gap-2">
-              <FileJson className="h-4 w-4 text-emerald-400" />
-              Verified Evidence Bank
-            </h1>
-          </div>
-
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#0A0E17" }}>
+      <TopNav
+        actions={
           <div className="flex items-center gap-2">
-            {/* Hidden File Input */}
             <input
               type="file"
               ref={fileInputRef}
@@ -332,14 +306,13 @@ export function LibraryWorkspace() {
               className="hidden"
               data-testid="evidence-import-input"
             />
-
             <Button
               type="button"
               variant="outline"
               size="sm"
               disabled={isImporting}
               onClick={() => fileInputRef.current?.click()}
-              className="border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white gap-1.5 text-xs"
+              className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white gap-1.5 text-xs"
               data-testid="evidence-import-btn"
             >
               {isImporting ? (
@@ -349,23 +322,36 @@ export function LibraryWorkspace() {
               )}
               Import JSON
             </Button>
-
             <Button
               type="button"
               size="sm"
               onClick={openCreateModal}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white gap-1.5 text-xs font-medium shadow-sm"
+              className="gap-1.5 text-xs font-semibold shadow-sm"
+              style={{ background: "linear-gradient(135deg, #F59E0B, #D97706)", color: "#0A0E17" }}
               data-testid="add-evidence-btn"
             >
               <Plus className="h-3.5 w-3.5" />
               Add Evidence Item
             </Button>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       {/* Main Content Area */}
       <main className="mx-auto max-w-6xl w-full p-4 md:p-8 flex-1 flex flex-col gap-6">
+        {/* Page Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-bold text-white flex items-center gap-2">
+              <FileJson className="h-5 w-5 text-emerald-400" />
+              Verified Evidence Bank
+            </h1>
+            <p className="text-xs mt-0.5 font-mono" style={{ color: "#4B5A7A" }}>
+              Career achievements, verified bullets, and skill inventory
+            </p>
+          </div>
+        </div>
+
         {/* Notification Toast Banner */}
         <AnimatePresence>
           {notification && (
@@ -439,8 +425,14 @@ export function LibraryWorkspace() {
 
         {/* List of Evidence Items */}
         {isLoading ? (
-          <div className="flex justify-center p-16 text-slate-500">
-            <Loader2 className="h-6 w-6 animate-spin text-indigo-400" />
+          <div className="grid gap-3">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="rounded-lg border p-5" style={{ borderColor: "#1E2536", backgroundColor: "#111622" }}>
+                <Skeleton className="h-4 w-48 mb-3" />
+                <Skeleton className="h-3 w-full mb-2" />
+                <Skeleton className="h-3 w-3/4" />
+              </div>
+            ))}
           </div>
         ) : filteredItems.length === 0 ? (
           <motion.div
