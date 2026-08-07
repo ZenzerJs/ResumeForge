@@ -8,10 +8,14 @@ test.describe("Cross-Page Multi-Workspace E2E Journey Tests (Task B2)", () => {
     // Step 1: Open /editor, verify canonical master/fallback document loading, save master resume
     await page.goto("/editor");
     await page.waitForSelector("[data-testid='document-type-badge']", { timeout: 10000 });
-    // Wait for document initialization to complete
-    await page.waitForTimeout(1000);
+    // Wait for document initialization and SVG preview rendering to complete
+    await page.waitForSelector(".typst-preview-svg svg", { timeout: 15000 });
 
+    const savePromise = page.waitForResponse(
+      (resp) => resp.url().includes("/api/resumes") && resp.request().method() === "POST" && resp.ok()
+    );
     await page.click("button:has-text('Save as Master Resume')");
+    await savePromise;
     await page.waitForSelector("text=Saved as Master!", { timeout: 15000 });
     await expect(page.locator("[data-testid='doc-badge-master']")).toBeVisible();
 
