@@ -175,3 +175,59 @@ export async function generateGeminiQualitativeReview(
   }
 }
 
+/**
+ * Phase 5: Sends a structured generateContent request to Gemini for cover letter generation.
+ */
+export async function generateGeminiCoverLetter(
+  config: ProviderConfig,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<GeneratePatchesResult> {
+  const apiKey = config.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
+  const baseUrl = (config.baseUrl?.trim() || process.env.GEMINI_BASE_URL?.trim() || "https://generativelanguage.googleapis.com").replace(/\/+$/, "");
+  const model = config.model?.trim() || "gemini-2.5-flash";
+
+  if (!apiKey) {
+    return { success: false, error: "Gemini API key is missing." };
+  }
+
+  try {
+    const res = await fetch(
+      `${baseUrl}/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ parts: [{ text: userPrompt }] }],
+          generationConfig: {
+            temperature: 0.4,
+            responseMimeType: "application/json",
+          },
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      let errBody = "";
+      try {
+        const json = await res.json();
+        errBody = json.error?.message || JSON.stringify(json);
+      } catch {
+        errBody = res.statusText;
+      }
+      return { success: false, error: sanitizeError(`Gemini API returned status ${res.status}: ${errBody}`) };
+    }
+
+    const data = await res.json();
+    const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!rawJson) {
+      return { success: false, error: "Gemini returned empty content in response." };
+    }
+
+    return { success: true, rawJson };
+  } catch (err) {
+    return { success: false, error: sanitizeError(`Gemini cover letter generation failed: ${err instanceof Error ? err.message : String(err)}`) };
+  }
+}

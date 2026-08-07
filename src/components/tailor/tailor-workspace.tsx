@@ -21,6 +21,7 @@ import {
 import { JobRequirements } from "@/lib/jd-parser/types";
 import { PatchDiffReview } from "./patch-diff-review";
 import { AtsScorePanel } from "./ats-score-panel";
+import { CoverLetterPanel } from "./cover-letter-panel";
 import type { PatchProposal, Gap, RejectedPatch } from "@/lib/ai/patch-schema";
 
 interface RankedMatch {
@@ -399,6 +400,9 @@ export function TailorWorkspace() {
         setErrorMessage(json.error || "Failed to save job posting.");
       } else {
         setSaveStatus("Job posting saved successfully!");
+        if (json.data?.id) {
+          setSavedJobId(json.data.id);
+        }
       }
     } catch (err) {
       setErrorMessage(String(err));
@@ -914,13 +918,23 @@ export function TailorWorkspace() {
               />
             )}
 
-            {extractedRequirements && (activeVariantContent || masterTypstSource) && (
-              <div className="pt-6">
+            {extractedRequirements && (
+              <div className="pt-6 space-y-6">
                 <AtsScorePanel
-                  typstContent={activeVariantContent || masterTypstSource}
+                  typstContent={activeVariantContent || masterTypstSource || "// Master Resume"}
                   extractedRequirements={extractedRequirements}
                   roleTitle={roleTitle}
                 />
+
+                {savedJobId && (
+                  <CoverLetterPanel
+                    jobId={savedJobId}
+                    company={company}
+                    roleTitle={roleTitle}
+                    rawDescription={rawDescription}
+                    extractedRequirements={extractedRequirements}
+                  />
+                )}
               </div>
             )}
           </div>

@@ -102,7 +102,7 @@ test.describe("Typst Live-Preview Workspace E2E Tests", () => {
 
       expect(extractedText).toBeTruthy();
       expect(extractedText.length).toBeGreaterThan(10);
-      expect(extractedText).toMatch(/Alex Morgan|ResumeForge|Technical Skills|Test Master Typst/i);
+      expect(extractedText).toMatch(/Alex Morgan|ResumeForge|Technical Skills|Test Master Typst|Database Master/i);
     }
   });
 });

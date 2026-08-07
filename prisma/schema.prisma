@@ -67,22 +67,24 @@ model Job {
   createdAt             DateTime @default(now())
 
   variants              ResumeVariant[]
+  coverLetters          CoverLetter[]
 }
 
 // Phase 4.2: Job-specific tailored resume variant
 model ResumeVariant {
-  id              String   @id @default(uuid())
+  id              String        @id @default(uuid())
   masterResumeId  String
-  masterResume    Resume   @relation(fields: [masterResumeId], references: [id])
+  masterResume    Resume        @relation(fields: [masterResumeId], references: [id])
   jobId           String
-  job             Job      @relation(fields: [jobId], references: [id])
+  job             Job           @relation(fields: [jobId], references: [id])
   variantTitle    String
   typstContent    String
-  status          String   @default("DRAFT") // DRAFT | REVIEWED | EXPORTED
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  status          String        @default("DRAFT") // DRAFT | REVIEWED | EXPORTED
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   patches         Patch[]
+  coverLetters    CoverLetter[]
 }
 
 // Phase 4.2: Individual AI-proposed structured diff
@@ -102,3 +104,21 @@ model Patch {
   createdAt         DateTime      @default(now())
 }
 
+// Phase 5: Evidence-grounded tailored cover letter
+model CoverLetter {
+  id                String         @id @default(uuid())
+  jobId             String
+  job               Job            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  variantId         String?
+  variant           ResumeVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  title             String
+  salutation        String         @default("Dear Hiring Team,")
+  openingParagraph  String
+  bodyParagraphs    String         // Stored as JSON array string
+  closingParagraph  String
+  fullMarkdown      String
+  evidenceCitations String         @default("[]") // Stored as JSON array string of evidenceIds
+  status            String         @default("DRAFT") // DRAFT | FINAL
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+}

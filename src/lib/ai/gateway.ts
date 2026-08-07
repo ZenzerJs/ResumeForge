@@ -1,11 +1,13 @@
-import { ProviderConfig, ProviderConfigSchema, TestConnectionResult, GeneratePatchesInput, GeneratePatchesResult } from "./types";
-import { testOpenAIConnection, generateOpenAIPatches, generateOpenAIQualitativeReview } from "./providers/openai";
-import { testAnthropicConnection, generateAnthropicPatches, generateAnthropicQualitativeReview } from "./providers/anthropic";
-import { testGeminiConnection, generateGeminiPatches, generateGeminiQualitativeReview } from "./providers/gemini";
-import { testCustomConnection, generateCustomPatches, generateCustomQualitativeReview } from "./providers/custom";
+import { ProviderConfig, ProviderConfigSchema, TestConnectionResult, GeneratePatchesInput, GeneratePatchesResult, EvidenceItemForPrompt } from "./types";
+import { testOpenAIConnection, generateOpenAIPatches, generateOpenAIQualitativeReview, generateOpenAICoverLetter } from "./providers/openai";
+import { testAnthropicConnection, generateAnthropicPatches, generateAnthropicQualitativeReview, generateAnthropicCoverLetter } from "./providers/anthropic";
+import { testGeminiConnection, generateGeminiPatches, generateGeminiQualitativeReview, generateGeminiCoverLetter } from "./providers/gemini";
+import { testCustomConnection, generateCustomPatches, generateCustomQualitativeReview, generateCustomCoverLetter } from "./providers/custom";
 import { sanitizeError } from "./redact";
 import { buildPatchSystemPrompt, buildPatchUserPrompt } from "./prompt-template";
 import { buildQualitativeReviewSystemPrompt, buildQualitativeReviewUserPrompt, QualitativeReviewPromptInput } from "./qualitative-prompt";
+import { buildCoverLetterSystemPrompt, buildCoverLetterUserPrompt } from "./cover-letter-prompt";
+import { GenerateCoverLetterInput } from "./cover-letter-schema";
 
 /**
  * Unified AI Provider Gateway Connectivity Interface
@@ -130,6 +132,50 @@ export async function generateQualitativeReview(input: QualitativeReviewPromptIn
     return {
       success: false,
       error: sanitizeError(`Qualitative review gateway exception: ${err instanceof Error ? err.message : String(err)}`),
+    };
+  }
+}
+
+/**
+ * Phase 5: Generates a tailored cover letter via the configured BYOK AI provider.
+ */
+export async function generateCoverLetter(
+  providerConfig: ProviderConfig,
+  input: GenerateCoverLetterInput,
+  evidenceItems: EvidenceItemForPrompt[]
+): Promise<GeneratePatchesResult> {
+  const parseResult = ProviderConfigSchema.safeParse(providerConfig);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: sanitizeError(`Invalid provider configuration: ${parseResult.error.message}`),
+    };
+  }
+
+  const config = parseResult.data;
+  const systemPrompt = buildCoverLetterSystemPrompt();
+  const userPrompt = buildCoverLetterUserPrompt(input, evidenceItems);
+
+  try {
+    switch (config.provider) {
+      case "openai":
+        return await generateOpenAICoverLetter(config, systemPrompt, userPrompt);
+      case "anthropic":
+        return await generateAnthropicCoverLetter(config, systemPrompt, userPrompt);
+      case "gemini":
+        return await generateGeminiCoverLetter(config, systemPrompt, userPrompt);
+      case "custom":
+        return await generateCustomCoverLetter(config, systemPrompt, userPrompt);
+      default:
+        return {
+          success: false,
+          error: `Unsupported AI provider for cover letter generation: ${config.provider}`,
+        };
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: sanitizeError(`Cover letter generation gateway exception: ${err instanceof Error ? err.message : String(err)}`),
     };
   }
 }

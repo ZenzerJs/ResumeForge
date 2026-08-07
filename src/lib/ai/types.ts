@@ -65,3 +65,11 @@ export interface GenerateQualitativeReviewResult {
   rawJson?: string;
   error?: string;
 }
+
+// --- Phase 5: Cover letter generation types ---
+
+export interface GenerateCoverLetterResult {
+  success: boolean;
+  rawJson?: string;
+  error?: string;
+}

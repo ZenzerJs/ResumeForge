@@ -186,10 +186,42 @@ This document records completed project milestones, current state, known limitat
 - `npx playwright test` — Playwright E2E tests passed cleanly (19/19 tests passing across 7 spec files).
 
 ### Known Limitations (Phase 4.3b Scope)
-- Cover letter generator and job application tracker deferred to Phase 5.
+- Cover letter generator implemented in Phase 5; Job Application Tracker deferred to Phase 6.
+
+---
+
+## Current Status: Phase 5 Complete — Tailored Cover Letter Generator
+
+- **Phase Completed**: Phase 5 (On-Demand, Evidence-Grounded Tailored Cover Letter Generator)
+- **Completed Date**: 2026-08-06
+- **Status Summary**: Implemented `CoverLetter` Prisma model (`20260807000320_phase5_coverletter`), Evidence Grounding Verifier service (`src/lib/ai/cover-letter-verifier.ts`), fail-first verified unit tests (`tests/cover-letter-grounding.test.ts`), Cover Letter DAL (`src/lib/db/cover-letters.ts`), Zod schemas (`src/lib/ai/cover-letter-schema.ts`), system & user prompt templates (`src/lib/ai/cover-letter-prompt.ts`), provider `generateCoverLetter` adapters for OpenAI/Anthropic/Gemini/Custom, BYOK gateway dispatch (`src/lib/ai/gateway.ts`), REST API routes (`/api/ai/generate-cover-letter`, `/api/cover-letters`, `/api/cover-letters/[id]`), interactive `CoverLetterPanel` UI component (`src/components/tailor/cover-letter-panel.tsx`) integrated into `/tailor`, integration test suite (`tests/cover-letter-api.test.ts`), Playwright E2E test suite (`e2e/phase5-cover-letter.spec.ts`), and AI Security & Grounding Guardrail Audit (Sonnet 4.6).
+
+### Completed Work
+- Defined `CoverLetter` model in `prisma/schema.prisma` and generated SQLite migration `20260807000320_phase5_coverletter`.
+- Built `src/lib/ai/cover-letter-verifier.ts` enforcing the Evidence Grounding Contract: every `evidenceId` cited in the cover letter MUST exist in the candidate's active Evidence Bank, preventing hallucinated experience from reaching cover letter prose.
+- Built fail-first unit test suite `tests/cover-letter-grounding.test.ts` proving ungrounded/hallucinated citations are rejected with 422 contract error.
+- Built data access layer `src/lib/db/cover-letters.ts` (`createCoverLetter`, `getCoverLettersByJobId`, `getCoverLetterById`, `updateCoverLetter`, `deleteCoverLetter`).
+- Built Zod schemas `CoverLetterResponseSchema` and `GenerateCoverLetterInputSchema` in `src/lib/ai/cover-letter-schema.ts`.
+- Built system and user prompt templates in `src/lib/ai/cover-letter-prompt.ts` enforcing zero hallucination, evidence citations, and modular paragraph structure.
+- Extended all 4 provider adapters (`openai.ts`, `anthropic.ts`, `gemini.ts`, `custom.ts`) and `gateway.ts` dispatcher with `generateCoverLetter()`.
+- Built REST API routes `POST /api/ai/generate-cover-letter`, `GET|POST /api/cover-letters`, and `GET|PUT|DELETE /api/cover-letters/[id]` with API key redaction via `sanitizeError()`.
+- Built `CoverLetterPanel` UI component (`src/components/tailor/cover-letter-panel.tsx`) featuring opt-in trigger button, modular paragraph cards, evidence citation badges, markdown vs plain-text format toggle, copy-to-clipboard, download `.md`/`.txt`, and save to database.
+- Integrated `CoverLetterPanel` into `/tailor` workspace (`src/components/tailor/tailor-workspace.tsx`).
+- Created Vitest integration test suite (`tests/cover-letter-api.test.ts`) and Playwright E2E spec (`e2e/phase5-cover-letter.spec.ts`).
+- Conducted AI Security & Grounding Guardrail Audit using Sonnet 4.6 (100% clean verification across all 5 security guardrails).
+
+### Verification Tests Executed
+- `npm run lint` — ESLint passed cleanly with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (83/83 tests passing across 18 test files).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly.
+- `npx playwright test` — Playwright E2E tests passed cleanly (23/23 tests passing across 9 spec files).
+
+### Known Limitations (Phase 5 Scope)
+- Job Application Tracker (Kanban pipeline, status tracking, notes, `/tracker` page) deferred to Phase 6.
 
 ### Suggested Next Task
-- **Phase 5: Cover Letter Generator & Job Application Tracker**: Implement tailored cover letter generation and job application tracking.
+- **Phase 6: Job Application Tracker Workspace**: Implement job application pipeline tracking (`/tracker`), status updates (`SAVED`, `APPLIED`, `INTERVIEWING`, `OFFER`, `REJECTED`), applied date, and application notes linked to tailored variants and cover letters.
 
 ---
 

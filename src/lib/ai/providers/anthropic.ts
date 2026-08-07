@@ -179,3 +179,60 @@ export async function generateAnthropicQualitativeReview(
   }
 }
 
+/**
+ * Phase 5: Sends a structured message request to Anthropic for cover letter generation.
+ */
+export async function generateAnthropicCoverLetter(
+  config: ProviderConfig,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<GeneratePatchesResult> {
+  const apiKey = config.apiKey?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
+  const baseUrl = (config.baseUrl?.trim() || process.env.ANTHROPIC_BASE_URL?.trim() || "https://api.anthropic.com").replace(/\/+$/, "");
+  const model = config.model?.trim() || "claude-3-5-sonnet-20241022";
+
+  if (!apiKey) {
+    return { success: false, error: "Anthropic API key is missing." };
+  }
+
+  try {
+    const res = await fetch(`${baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+        temperature: 0.4,
+      }),
+    });
+
+    if (!res.ok) {
+      let errBody = "";
+      try {
+        const json = await res.json();
+        errBody = json.error?.message || JSON.stringify(json);
+      } catch {
+        errBody = res.statusText;
+      }
+      return { success: false, error: sanitizeError(`Anthropic API returned status ${res.status}: ${errBody}`) };
+    }
+
+    const data = await res.json();
+    const textBlock = data.content?.find((c: { type: string }) => c.type === "text");
+    const rawJson = textBlock?.text;
+
+    if (!rawJson) {
+      return { success: false, error: "Anthropic returned empty content in response." };
+    }
+
+    return { success: true, rawJson };
+  } catch (err) {
+    return { success: false, error: sanitizeError(`Anthropic cover letter generation failed: ${err instanceof Error ? err.message : String(err)}`) };
+  }
+}
