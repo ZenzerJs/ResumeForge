@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Edit2, Archive, CheckCircle, Clock, FileText, ArrowLeft, Loader2, Tag } from "lucide-react";
+import { Plus, Edit2, Archive, CheckCircle, Clock, FileText, ArrowLeft, Loader2, Tag, Briefcase } from "lucide-react";
 
 export interface Bullet {
   id?: string;
@@ -171,6 +171,14 @@ export function LibraryWorkspace() {
             >
               <ArrowLeft className="h-4 w-4" />
               Back to Editor
+            </Link>
+            <span className="text-slate-300">|</span>
+            <Link
+              href="/tracker"
+              className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+            >
+              <Briefcase className="h-4 w-4 text-indigo-600" />
+              Application Tracker
             </Link>
             <span className="text-slate-300">|</span>
             <h1 className="text-xl font-bold tracking-tight text-slate-900">

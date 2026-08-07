@@ -447,6 +447,13 @@ export function TailorWorkspace() {
             <BookOpen className="h-3.5 w-3.5" />
             Evidence Bank
           </Link>
+          <Link
+            href="/tracker"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-indigo-400 hover:text-indigo-300 hover:bg-slate-800 transition"
+          >
+            <Briefcase className="h-3.5 w-3.5" />
+            Tracker
+          </Link>
         </nav>
       </header>
 

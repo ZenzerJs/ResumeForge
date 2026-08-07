@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { ProviderType } from "@/lib/ai/types";
-import { ArrowLeft, CheckCircle2, XCircle, Loader2, Key, Server, ShieldCheck, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Loader2, Key, Server, ShieldCheck, Trash2, Briefcase } from "lucide-react";
 
 const SETTINGS_STORAGE_KEY = "resumeforge_ai_settings";
 
@@ -123,6 +123,14 @@ export function SettingsWorkspace() {
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Workspace
+          </Link>
+          <span className="text-xs text-slate-700">|</span>
+          <Link
+            href="/tracker"
+            className="flex items-center gap-1 text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
+            <Briefcase className="h-4 w-4" />
+            Tracker
           </Link>
           <span className="text-xs text-slate-700">|</span>
           <span className="text-sm font-semibold tracking-tight text-white">

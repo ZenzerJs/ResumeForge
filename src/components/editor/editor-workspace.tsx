@@ -20,6 +20,7 @@ import {
   Sparkles,
   FileText,
   AlertTriangle,
+  Briefcase,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -298,6 +299,17 @@ export function EditorWorkspace() {
           >
             <BookOpen className="h-3.5 w-3.5 text-primary" />
             Evidence Library
+          </Link>
+
+          <Link
+            href="/tracker"
+            className={cn(
+              buttonVariants({ variant: "ghost", size: "sm" }),
+              "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Briefcase className="h-3.5 w-3.5 text-indigo-400" />
+            Tracker
           </Link>
 
           <Link

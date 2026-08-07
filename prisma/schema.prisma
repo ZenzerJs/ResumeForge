@@ -58,13 +58,16 @@ model Bullet {
 }
 
 model Job {
-  id                    String   @id @default(uuid())
+  id                    String          @id @default(uuid())
   company               String?
   roleTitle             String?
   rawDescription        String
-  source                String   @default("pasted") // pasted | manual
-  extractedRequirements String   @default("{}") // JSON string of JobRequirements
-  createdAt             DateTime @default(now())
+  source                String          @default("pasted") // pasted | manual
+  extractedRequirements String          @default("{}") // JSON string of JobRequirements
+  status                String          @default("SAVED") // SAVED | APPLIED | INTERVIEWING | OFFER | REJECTED | ARCHIVED
+  appliedAt             DateTime?
+  notes                 String?
+  createdAt             DateTime        @default(now())
 
   variants              ResumeVariant[]
   coverLetters          CoverLetter[]

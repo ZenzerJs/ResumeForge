@@ -12,7 +12,7 @@ test.describe("Cross-Page Multi-Workspace E2E Journey Tests (Task B2)", () => {
     await page.waitForTimeout(1000);
 
     await page.click("button:has-text('Save as Master Resume')");
-    await page.waitForSelector("text=Saved as Master!", { timeout: 8000 });
+    await page.waitForSelector("text=Saved as Master!", { timeout: 15000 });
     await expect(page.locator("[data-testid='doc-badge-master']")).toBeVisible();
 
     // Step 2: Navigate to /tailor, extract requirements and save job

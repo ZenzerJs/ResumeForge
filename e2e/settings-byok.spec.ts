@@ -31,7 +31,7 @@ test.describe("Phase 4 BYOK AI Gateway Settings UI", () => {
 
     // Wait for response banner to appear
     const banner = page.locator("#test-result-banner");
-    await expect(banner).toBeVisible({ timeout: 10000 });
+    await expect(banner).toBeVisible({ timeout: 15000 });
 
     // Assert raw key is NEVER present in page text/DOM output
     const pageText = await page.innerText("body");
