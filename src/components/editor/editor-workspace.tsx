@@ -10,6 +10,11 @@ import { compileTypstToSvg } from "@/lib/typst/compiler";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { usePanelRef } from "react-resizable-panels";
 import {
+  parsePersistedLayout,
+  serializeLayoutState,
+  EDITOR_LAYOUT_STORAGE_KEY,
+} from "@/lib/editor/layout-persistence";
+import {
   Code2,
   Eye,
   Bot,
@@ -90,30 +95,13 @@ export function EditorWorkspace() {
 
   // Task 9.2: Resizable 3-pane layout state & imperatively controlled AI collapse
   const aiPanelRef = usePanelRef();
-  const [layout, setLayout] = useState<Record<string, number>>(() => {
-    if (typeof window === "undefined") return { "panel-code": 45, "panel-preview": 35, "panel-ai": 20 };
-    try {
-      const saved = localStorage.getItem("resumeforge_editor_layout");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.sizes && typeof parsed.sizes === "object") return parsed.sizes;
-      }
-    } catch {}
-    return { "panel-code": 45, "panel-preview": 35, "panel-ai": 20 };
+  const [initialLayoutState] = useState(() => {
+    if (typeof window === "undefined") return parsePersistedLayout(null);
+    return parsePersistedLayout(localStorage.getItem(EDITOR_LAYOUT_STORAGE_KEY));
   });
 
-  const [isAiCollapsed, setIsAiCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      const saved = localStorage.getItem("resumeforge_editor_layout");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (typeof parsed.isAiCollapsed === "boolean") return parsed.isAiCollapsed;
-      }
-    } catch {}
-    return false;
-  });
-
+  const [layout, setLayout] = useState<Record<string, number>>(initialLayoutState.sizes);
+  const [isAiCollapsed, setIsAiCollapsed] = useState<boolean>(initialLayoutState.isAiCollapsed);
   const isAiCollapsedRef = useRef<boolean>(isAiCollapsed);
 
   useEffect(() => {
@@ -139,8 +127,8 @@ export function EditorWorkspace() {
     if (typeof window === "undefined") return;
     try {
       localStorage.setItem(
-        "resumeforge_editor_layout",
-        JSON.stringify({ sizes, isAiCollapsed: collapsed })
+        EDITOR_LAYOUT_STORAGE_KEY,
+        serializeLayoutState(sizes, collapsed)
       );
     } catch {
       // ignore write errors
@@ -720,14 +708,15 @@ export function EditorWorkspace() {
           <ResizablePanel
             id="panel-ai"
             panelRef={aiPanelRef}
-            defaultSize={layout["panel-ai"] ?? 20}
+            defaultSize={isAiCollapsed ? 0 : (layout["panel-ai"] ?? 20)}
             minSize={15}
             collapsible={true}
             collapsedSize={0}
             onResize={(size) => {
-              if (size.asPercentage <= 2 && !isAiCollapsedRef.current) {
-                updateAiCollapsedState(true);
-                persistLayoutState(layout, true);
+              const isCurrentlyCollapsed = size.asPercentage <= 2;
+              if (isCurrentlyCollapsed !== isAiCollapsedRef.current) {
+                updateAiCollapsedState(isCurrentlyCollapsed);
+                persistLayoutState(layout, isCurrentlyCollapsed);
               }
             }}
             className="h-full overflow-hidden"
