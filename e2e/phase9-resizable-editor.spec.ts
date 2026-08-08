@@ -43,4 +43,27 @@ test.describe("Task 9.2 — Resizable & Collapsible Editor Panels E2E Tests", ()
     const reloadedParsed = JSON.parse(reloadedSavedLayout || "{}");
     expect(reloadedParsed.isAiCollapsed).toBe(true);
   });
+
+  test("3. Verify AI sidebar input state and JD text remain intact across collapse and expand cycles", async ({ page }) => {
+    const jdTextarea = page.locator('textarea[placeholder*="Paste the job posting here"]');
+    await expect(jdTextarea).toBeVisible();
+
+    const sampleJD = "Senior Full-Stack Engineer role requiring Next.js, TypeScript, and Prisma.";
+    await jdTextarea.fill(sampleJD);
+    expect(await jdTextarea.inputValue()).toBe(sampleJD);
+
+    const toggleBtn = page.locator('[data-testid="toggle-ai-sidebar-btn"]');
+    // Collapse sidebar
+    await toggleBtn.click();
+    await page.waitForTimeout(300);
+
+    // Expand sidebar again
+    const expandBtn = page.locator('[data-testid="expand-ai-sidebar-btn"]');
+    await expandBtn.click();
+    await page.waitForTimeout(300);
+
+    // Assert textarea value remained completely intact without resetting
+    await expect(jdTextarea).toBeVisible();
+    expect(await jdTextarea.inputValue()).toBe(sampleJD);
+  });
 });

@@ -457,6 +457,22 @@ export function EditorWorkspace() {
               )}
               {saveSuccess ? "Saved as Master!" : "Save as Master Resume"}
             </Button>
+
+            {isAiCollapsed && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={toggleAiSidebarCollapse}
+                data-testid="expand-ai-sidebar-btn"
+                className="h-8 gap-1.5 text-xs hidden lg:flex border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                title="Expand AI Sidebar"
+              >
+                <Bot className="h-3.5 w-3.5 text-amber-400" />
+                <span>AI Assistant</span>
+              </Button>
+            )}
+
             {/* Mobile Tab Selectors (< lg screens) */}
             <div
               className="flex items-center gap-1 rounded-lg border border-border bg-background p-1 lg:hidden"
