@@ -59,9 +59,6 @@ export function EditorWorkspace() {
   const [isUndoing, setIsUndoing] = useState<boolean>(false);
   const [undoSuccess, setUndoSuccess] = useState<boolean>(false);
 
-  // Task 9.1: PDF Conversion Path status banner dismissal state
-  const [isConversionBannerDismissed, setIsConversionBannerDismissed] = useState<boolean>(false);
-
   // Task B1: Canonical Document Loading & Metadata State
   const [isLoadingDocument, setIsLoadingDocument] = useState<boolean>(true);
   const [documentError, setDocumentError] = useState<string | null>(null);
@@ -69,6 +66,25 @@ export function EditorWorkspace() {
     type: "LOCAL_FALLBACK",
     title: "Local Workspace",
   });
+
+  // Task 9.1: PDF Conversion Path status banner dismissal state with sessionStorage persistence
+  const [isConversionBannerDismissed, setIsConversionBannerDismissed] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (docMetadata.id && typeof window !== "undefined") {
+      const isDismissed = sessionStorage.getItem(`resumeforge_dismissed_banner_${docMetadata.id}`);
+      if (isDismissed === "true") {
+        setIsConversionBannerDismissed(true);
+      }
+    }
+  }, [docMetadata.id]);
+
+  const handleDismissConversionBanner = () => {
+    setIsConversionBannerDismissed(true);
+    if (docMetadata.id && typeof window !== "undefined") {
+      sessionStorage.setItem(`resumeforge_dismissed_banner_${docMetadata.id}`, "true");
+    }
+  };
 
   // Load initial starter template fallback
   const loadStarterTemplate = useCallback(async () => {
@@ -459,7 +475,7 @@ export function EditorWorkspace() {
           </div>
           <button
             type="button"
-            onClick={() => setIsConversionBannerDismissed(true)}
+            onClick={handleDismissConversionBanner}
             className="p-1 text-amber-300 hover:text-white transition"
             title="Dismiss banner"
             data-testid="dismiss-conversion-banner-btn"
@@ -480,7 +496,7 @@ export function EditorWorkspace() {
           </div>
           <button
             type="button"
-            onClick={() => setIsConversionBannerDismissed(true)}
+            onClick={handleDismissConversionBanner}
             className="p-1 text-emerald-300 hover:text-white transition"
             title="Dismiss banner"
             data-testid="dismiss-conversion-banner-btn"

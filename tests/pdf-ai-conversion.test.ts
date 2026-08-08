@@ -121,4 +121,28 @@ describe("Task 9.1 — AI-Powered PDF to Typst Conversion & Utilities", () => {
     expect(converted).toContain("\\@ Remote");
     expect(converted).toContain("\\\\ Main");
   });
+
+  it("7. AI conversion output verifies section headers and key term preservation against rich mocked AI response", async () => {
+    const mockedAiTypst = `= Jayden Saha\n\n== Education\nWilfrid Laurier University\nBachelor of Science\n\n== Experience\nTrillium Health Partners\n- Maintained data-center asset, rack, and cabinet documentation\n\n== Projects\nAI Stock Analyst Agent\n- Built full-stack AI agent with FastAPI and LangGraph\n\n== Technical Skills\nLanguages: Python, TypeScript`;
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: mockedAiTypst } }],
+      }),
+    } as Response);
+
+    const config: ProviderConfig = { provider: "openai", apiKey: "sk-test-key" };
+    const result = await convertPdfTextToTypst({
+      providerConfig: config,
+      rawText: sampleExtractedText,
+      fileName: "Jayden_Saha_Resume",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.typstSource).toContain("Education");
+    expect(result.typstSource).toContain("Experience");
+    expect(result.typstSource).toContain("Trillium Health");
+    expect(result.typstSource).toContain("FastAPI");
+  });
 });

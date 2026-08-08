@@ -100,12 +100,25 @@ export async function POST(request: Request) {
       );
     }
 
+    // Fallback to server-side environment variables if client did not supply providerConfig
+    if (!providerConfig || (!providerConfig.apiKey && providerConfig.provider !== "custom")) {
+      if (process.env.OPENAI_API_KEY?.trim()) {
+        providerConfig = { provider: "openai" };
+      } else if (process.env.ANTHROPIC_API_KEY?.trim()) {
+        providerConfig = { provider: "anthropic" };
+      } else if (process.env.GEMINI_API_KEY?.trim()) {
+        providerConfig = { provider: "gemini" };
+      } else if (process.env.CUSTOM_OPENAI_API_KEY?.trim()) {
+        providerConfig = { provider: "custom" };
+      }
+    }
+
     const title = fileName.replace(/\.pdf$/i, "") || "Uploaded Resume";
     let conversionPath: "ai" | "fallback" = "fallback";
     let convertedSource: string | null = null;
 
-    // Attempt AI conversion if providerConfig is provided or available
-    if (providerConfig && (providerConfig.apiKey || providerConfig.provider === "custom")) {
+    // Attempt AI conversion if providerConfig is provided or server env key exists
+    if (providerConfig) {
       try {
         const aiResult = await convertPdfTextToTypst({
           providerConfig,
