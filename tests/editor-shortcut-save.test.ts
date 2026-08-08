@@ -22,60 +22,66 @@ describe("Task 9.3 — Ctrl+S Save & Auto-Compile Protocol Unit Tests", () => {
     expect(isSaveShortcutEvent({ ctrlKey: false, metaKey: false, key: "s" })).toBe(false);
   });
 
-  it("4. Intercepts and calls preventDefault() to prevent browser native save dialog", () => {
+  it("4. Intercepts and calls preventDefault() to prevent browser native save dialog", async () => {
     const preventDefaultSpy = vi.fn();
     const onSaveSpy = vi.fn();
     const isLockedRef = { current: false };
 
     const event = { ctrlKey: true, key: "s", preventDefault: preventDefaultSpy };
-    const result = handleSaveShortcut({ event, onSave: onSaveSpy, isLockedRef });
+    const result = await handleSaveShortcut({ event, onSave: onSaveSpy, isLockedRef });
 
     expect(result).toBe(true);
     expect(preventDefaultSpy).toHaveBeenCalledTimes(1);
     expect(onSaveSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("5. Rapid repeated Ctrl+S presses are locked/throttled to prevent duplicate save spamming", () => {
-    const onSaveSpy = vi.fn();
+  it("5. Rapid repeated Ctrl+S presses while locked or compiling are rejected", async () => {
+    let resolveCompile: () => void = () => {};
+    const slowCompileSave = () => new Promise<void>((res) => { resolveCompile = res; });
     const isLockedRef = { current: false };
     const event = { ctrlKey: true, key: "s", preventDefault: vi.fn() };
 
-    // First press succeeds
-    const res1 = handleSaveShortcut({ event, onSave: onSaveSpy, isLockedRef, lockDurationMs: 500 });
-    expect(res1).toBe(true);
-    expect(onSaveSpy).toHaveBeenCalledTimes(1);
+    // Start first async save/compile
+    const promise1 = handleSaveShortcut({ event, onSave: slowCompileSave, isLockedRef });
+    expect(isLockedRef.current).toBe(true);
 
-    // Second rapid press while locked is ignored
-    const res2 = handleSaveShortcut({ event, onSave: onSaveSpy, isLockedRef, lockDurationMs: 500 });
+    // Second press while compile is in-flight is rejected (returns false)
+    const res2 = await handleSaveShortcut({ event, onSave: slowCompileSave, isLockedRef });
     expect(res2).toBe(false);
-    expect(onSaveSpy).toHaveBeenCalledTimes(1);
+
+    // Resolve first compile
+    resolveCompile();
+    await promise1;
   });
 
-  it("6. Failed compile after successful save still executes save callback cleanly", async () => {
-    const saveLogs: string[] = [];
-    const onSave = () => {
-      saveLogs.push("draft_saved");
-      // Simulate compile error thrown during compile step
+  it("6. Async compilation error in onSave releases lock in finally block without swallowing exceptions", async () => {
+    const failingSave = async () => {
+      throw new Error("Typst compilation error");
     };
-
     const isLockedRef = { current: false };
     const event = { ctrlKey: true, key: "s", preventDefault: vi.fn() };
 
-    handleSaveShortcut({ event, onSave, isLockedRef });
-    expect(saveLogs).toEqual(["draft_saved"]);
+    await expect(
+      handleSaveShortcut({ event, onSave: failingSave, isLockedRef, lockDurationMs: 0 })
+    ).rejects.toThrow("Typst compilation error");
+
+    await new Promise((res) => setTimeout(res, 10));
+    // Verify lock is released after error
+    expect(isLockedRef.current).toBe(false);
   });
 
-  it("7. Ctrl+S save handler does not invoke or trigger Save as Master modal", () => {
-    let showSaveAsMasterConfirmModal = false;
-    const onSaveDraft = () => {
-      // Saves local draft buffer only
-    };
-
+  it("7. Shortcut handler executes onSave callback and returns boolean status without side effects", async () => {
     const isLockedRef = { current: false };
     const event = { ctrlKey: true, key: "s", preventDefault: vi.fn() };
 
-    handleSaveShortcut({ event, onSave: onSaveDraft, isLockedRef });
+    let draftSaved = false;
+    const result = await handleSaveShortcut({
+      event,
+      onSave: () => { draftSaved = true; },
+      isLockedRef,
+    });
 
-    expect(showSaveAsMasterConfirmModal).toBe(false);
+    expect(result).toBe(true);
+    expect(draftSaved).toBe(true);
   });
 });

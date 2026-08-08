@@ -18,12 +18,12 @@ export function isSaveShortcutEvent(e: { ctrlKey?: boolean; metaKey?: boolean; k
  * Handles Ctrl+S / Cmd+S save shortcut execution with event.preventDefault() and debounce locking.
  * Returns true if the shortcut was executed, false if ignored or locked.
  */
-export function handleSaveShortcut({
+export async function handleSaveShortcut({
   event,
   onSave,
   isLockedRef,
   lockDurationMs = 300,
-}: SaveShortcutOptions): boolean {
+}: SaveShortcutOptions): Promise<boolean> {
   if (!isSaveShortcutEvent(event)) {
     return false;
   }
@@ -33,7 +33,7 @@ export function handleSaveShortcut({
     event.preventDefault();
   }
 
-  // Guard against rapid key repeat spamming
+  // Guard against rapid key repeat spamming or overlapping save/compile operations
   if (isLockedRef.current) {
     return false;
   }
@@ -41,7 +41,7 @@ export function handleSaveShortcut({
   isLockedRef.current = true;
 
   try {
-    onSave();
+    await onSave();
   } finally {
     setTimeout(() => {
       isLockedRef.current = false;
