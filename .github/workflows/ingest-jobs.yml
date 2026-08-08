@@ -23,8 +23,9 @@ jobs:
           curl --fail-with-body -X POST "${APP_SYNC_URL%/}/api/jobs/sync-pittcsc" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $JOB_SYNC_SECRET" \
-            -d "{"rawMarkdown": $MARKDOWN_JSON, "jobType": "Internship"}"
+            -d "{\"rawMarkdown\": $MARKDOWN_JSON, \"jobType\": \"Internship\"}"
 
       - name: Skip sync when secrets are missing
         if: ${{ secrets.APP_SYNC_URL == '' || secrets.JOB_SYNC_SECRET == '' }}
-        run: echo "Skipping ingest sync: APP_SYNC_URL or JOB_SYNC_SECRET is not configured."
+        run: |
+          echo "Skipping ingest sync: APP_SYNC_URL or JOB_SYNC_SECRET is not configured."
