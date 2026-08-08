@@ -73,3 +73,18 @@ export interface GenerateCoverLetterResult {
   rawJson?: string;
   error?: string;
 }
+
+// --- Task 9.1: PDF-to-Typst conversion types ---
+
+export interface ConvertPdfInput {
+  providerConfig: ProviderConfig;
+  rawText: string;
+  fileName?: string;
+}
+
+export interface ConvertPdfResult {
+  success: boolean;
+  typstSource?: string;
+  error?: string;
+}
+

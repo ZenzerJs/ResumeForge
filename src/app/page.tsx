@@ -160,24 +160,25 @@ export default function Home() {
       const formData = new FormData();
       formData.append("file", file);
 
+      // Pass BYOK AI settings from localStorage if configured
+      try {
+        const savedSettings = localStorage.getItem("resumeforge_ai_settings");
+        if (savedSettings) {
+          formData.append("providerConfig", savedSettings);
+        }
+      } catch {
+        // localStorage unreadable
+      }
+
       const res = await fetch("/api/resumes/upload-pdf", {
         method: "POST",
         body: formData,
       });
 
       const json = await res.json();
-      if (res.ok && json.success) {
-        // Redirect immediately to editor with the converted resume loaded
-        const resumeId = json.data?.id;
-        if (resumeId) {
-          router.push(`/editor?resumeId=${resumeId}`);
-        } else {
-          setNotification({
-            type: "success",
-            message: `PDF converted. Opening editor...`,
-          });
-          fetchStats();
-        }
+      if (res.ok && json.success && json.data?.id) {
+        // Guaranteed redirect to /editor with the newly created draft
+        router.push(`/editor?resumeId=${json.data.id}`);
       } else {
         setNotification({
           type: "error",
@@ -326,7 +327,7 @@ export default function Home() {
               ) : (
                 <Upload className="h-4 w-4" />
               )}
-              {isUploadingPdf ? "Parsing PDF..." : "Upload PDF Resume"}
+              {isUploadingPdf ? "Converting your resume with AI..." : "Upload PDF Resume"}
             </button>
 
             <Link href="/editor">

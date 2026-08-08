@@ -1,5 +1,6 @@
-import { ProviderConfig, TestConnectionResult, GeneratePatchesResult } from "../types";
+import { ProviderConfig, TestConnectionResult, GeneratePatchesResult, ConvertPdfResult } from "../types";
 import { sanitizeError } from "../redact";
+import { stripCodeFences } from "../utils";
 
 export async function testOpenAIConnection(config: ProviderConfig): Promise<TestConnectionResult> {
   const apiKey = config.apiKey?.trim() || process.env.OPENAI_API_KEY?.trim();
@@ -236,3 +237,63 @@ export async function generateOpenAICoverLetter(
     return { success: false, error: sanitizeError(`OpenAI cover letter generation failed: ${err instanceof Error ? err.message : String(err)}`) };
   }
 }
+
+/**
+ * Task 9.1: Sends a chat completion request to OpenAI for PDF-to-Typst conversion.
+ */
+export async function convertOpenAIPdfTextToTypst(
+  config: ProviderConfig,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<ConvertPdfResult> {
+  const apiKey = config.apiKey?.trim() || process.env.OPENAI_API_KEY?.trim();
+  const baseUrl = (config.baseUrl?.trim() || process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com").replace(/\/+$/, "");
+  const model = config.model?.trim() || "gpt-4o";
+
+  if (!apiKey) {
+    return { success: false, error: "OpenAI API key is missing." };
+  }
+
+  try {
+    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.2,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!res.ok) {
+      let errBody = "";
+      try {
+        const json = await res.json();
+        errBody = json.error?.message || JSON.stringify(json);
+      } catch {
+        errBody = res.statusText;
+      }
+      return { success: false, error: sanitizeError(`OpenAI API returned status ${res.status}: ${errBody}`) };
+    }
+
+    const data = await res.json();
+    const rawContent = data.choices?.[0]?.message?.content;
+
+    if (!rawContent) {
+      return { success: false, error: "OpenAI returned empty content in response." };
+    }
+
+    const typstSource = stripCodeFences(rawContent);
+    return { success: true, typstSource };
+  } catch (err) {
+    return { success: false, error: sanitizeError(`OpenAI PDF conversion failed: ${err instanceof Error ? err.message : String(err)}`) };
+  }
+}
+

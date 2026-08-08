@@ -1,5 +1,6 @@
-import { ProviderConfig, TestConnectionResult, GeneratePatchesResult } from "../types";
+import { ProviderConfig, TestConnectionResult, GeneratePatchesResult, ConvertPdfResult } from "../types";
 import { sanitizeError } from "../redact";
+import { stripCodeFences } from "../utils";
 
 /**
  * Custom OpenAI-Compatible Endpoint Adapter
@@ -264,3 +265,68 @@ export async function generateCustomCoverLetter(
     return { success: false, error: sanitizeError(`Custom endpoint cover letter generation failed: ${err instanceof Error ? err.message : String(err)}`) };
   }
 }
+
+/**
+ * Task 9.1: Sends a chat completion request to a Custom OpenAI-compatible endpoint for PDF-to-Typst conversion.
+ */
+export async function convertCustomPdfTextToTypst(
+  config: ProviderConfig,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<ConvertPdfResult> {
+  const apiKey = config.apiKey?.trim() || process.env.CUSTOM_OPENAI_API_KEY?.trim();
+  const baseUrlRaw = config.baseUrl?.trim() || process.env.CUSTOM_OPENAI_BASE_URL?.trim() || "http://localhost:8000";
+  const baseUrl = baseUrlRaw.replace(/\/+$/, "");
+  const model = config.model?.trim() || "default";
+
+  const completionsUrl = baseUrl.endsWith("/v1")
+    ? `${baseUrl}/chat/completions`
+    : `${baseUrl}/v1/chat/completions`;
+
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (apiKey) {
+      headers["Authorization"] = `Bearer ${apiKey}`;
+    }
+
+    const res = await fetch(completionsUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.2,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!res.ok) {
+      let errBody = "";
+      try {
+        const json = await res.json();
+        errBody = json.error?.message || JSON.stringify(json);
+      } catch {
+        errBody = res.statusText;
+      }
+      return { success: false, error: sanitizeError(`Custom endpoint returned status ${res.status}: ${errBody}`) };
+    }
+
+    const data = await res.json();
+    const rawContent = data.choices?.[0]?.message?.content;
+
+    if (!rawContent) {
+      return { success: false, error: "Custom endpoint returned empty content in response." };
+    }
+
+    const typstSource = stripCodeFences(rawContent);
+    return { success: true, typstSource };
+  } catch (err) {
+    return { success: false, error: sanitizeError(`Custom endpoint PDF conversion failed: ${err instanceof Error ? err.message : String(err)}`) };
+  }
+}
+

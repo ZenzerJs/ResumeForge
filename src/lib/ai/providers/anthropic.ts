@@ -1,5 +1,6 @@
-import { ProviderConfig, TestConnectionResult, GeneratePatchesResult } from "../types";
+import { ProviderConfig, TestConnectionResult, GeneratePatchesResult, ConvertPdfResult } from "../types";
 import { sanitizeError } from "../redact";
+import { stripCodeFences } from "../utils";
 
 export async function testAnthropicConnection(config: ProviderConfig): Promise<TestConnectionResult> {
   const apiKey = config.apiKey?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
@@ -237,3 +238,64 @@ export async function generateAnthropicCoverLetter(
     return { success: false, error: sanitizeError(`Anthropic cover letter generation failed: ${err instanceof Error ? err.message : String(err)}`) };
   }
 }
+
+/**
+ * Task 9.1: Sends a message request to Anthropic for PDF-to-Typst conversion.
+ */
+export async function convertAnthropicPdfTextToTypst(
+  config: ProviderConfig,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<ConvertPdfResult> {
+  const apiKey = config.apiKey?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
+  const baseUrl = (config.baseUrl?.trim() || process.env.ANTHROPIC_BASE_URL?.trim() || "https://api.anthropic.com").replace(/\/+$/, "");
+  const model = config.model?.trim() || "claude-3-5-sonnet-20241022";
+
+  if (!apiKey) {
+    return { success: false, error: "Anthropic API key is missing." };
+  }
+
+  try {
+    const res = await fetch(`${baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+        temperature: 0.2,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!res.ok) {
+      let errBody = "";
+      try {
+        const json = await res.json();
+        errBody = json.error?.message || JSON.stringify(json);
+      } catch {
+        errBody = res.statusText;
+      }
+      return { success: false, error: sanitizeError(`Anthropic API returned status ${res.status}: ${errBody}`) };
+    }
+
+    const data = await res.json();
+    const textBlock = data.content?.find((c: { type: string }) => c.type === "text");
+    const rawContent = textBlock?.text;
+
+    if (!rawContent) {
+      return { success: false, error: "Anthropic returned empty content in response." };
+    }
+
+    const typstSource = stripCodeFences(rawContent);
+    return { success: true, typstSource };
+  } catch (err) {
+    return { success: false, error: sanitizeError(`Anthropic PDF conversion failed: ${err instanceof Error ? err.message : String(err)}`) };
+  }
+}
+

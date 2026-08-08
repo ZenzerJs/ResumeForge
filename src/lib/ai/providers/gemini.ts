@@ -1,5 +1,6 @@
-import { ProviderConfig, TestConnectionResult, GeneratePatchesResult } from "../types";
+import { ProviderConfig, TestConnectionResult, GeneratePatchesResult, ConvertPdfResult } from "../types";
 import { sanitizeError } from "../redact";
+import { stripCodeFences } from "../utils";
 
 export async function testGeminiConnection(config: ProviderConfig): Promise<TestConnectionResult> {
   const apiKey = config.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
@@ -232,3 +233,62 @@ export async function generateGeminiCoverLetter(
     return { success: false, error: sanitizeError(`Gemini cover letter generation failed: ${err instanceof Error ? err.message : String(err)}`) };
   }
 }
+
+/**
+ * Task 9.1: Sends a generateContent request to Gemini for PDF-to-Typst conversion.
+ */
+export async function convertGeminiPdfTextToTypst(
+  config: ProviderConfig,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<ConvertPdfResult> {
+  const apiKey = config.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
+  const baseUrl = (config.baseUrl?.trim() || process.env.GEMINI_BASE_URL?.trim() || "https://generativelanguage.googleapis.com").replace(/\/+$/, "");
+  const model = config.model?.trim() || "gemini-2.5-flash";
+
+  if (!apiKey) {
+    return { success: false, error: "Gemini API key is missing." };
+  }
+
+  try {
+    const res = await fetch(
+      `${baseUrl}/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ parts: [{ text: userPrompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+          },
+        }),
+        signal: AbortSignal.timeout(30000),
+      }
+    );
+
+    if (!res.ok) {
+      let errBody = "";
+      try {
+        const json = await res.json();
+        errBody = json.error?.message || JSON.stringify(json);
+      } catch {
+        errBody = res.statusText;
+      }
+      return { success: false, error: sanitizeError(`Gemini API returned status ${res.status}: ${errBody}`) };
+    }
+
+    const data = await res.json();
+    const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!rawContent) {
+      return { success: false, error: "Gemini returned empty content in response." };
+    }
+
+    const typstSource = stripCodeFences(rawContent);
+    return { success: true, typstSource };
+  } catch (err) {
+    return { success: false, error: sanitizeError(`Gemini PDF conversion failed: ${err instanceof Error ? err.message : String(err)}`) };
+  }
+}
+

@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
 import { parsePdfBuffer, convertTextToTypst } from "@/lib/pdf/parser";
 import { createResume } from "@/lib/db/resumes";
+import { convertPdfTextToTypst } from "@/lib/ai/gateway";
+import { ProviderConfig, ProviderConfigSchema } from "@/lib/ai/types";
 
 export async function POST(request: Request) {
   try {
     const contentType = request.headers.get("content-type") || "";
 
-    let buffer: Buffer;
+    let buffer: Buffer | null = null;
     let fileName = "Uploaded Resume";
+    let rawTextFromPayload: string | null = null;
+    let providerConfig: ProviderConfig | null = null;
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
@@ -23,6 +27,19 @@ export async function POST(request: Request) {
       fileName = file.name || fileName;
       const arrayBuffer = await file.arrayBuffer();
       buffer = Buffer.from(arrayBuffer);
+
+      const rawConfigStr = formData.get("providerConfig") as string | null;
+      if (rawConfigStr) {
+        try {
+          const parsed = JSON.parse(rawConfigStr);
+          const safe = ProviderConfigSchema.safeParse(parsed);
+          if (safe.success) {
+            providerConfig = safe.data;
+          }
+        } catch {
+          // invalid json string ignored
+        }
+      }
     } else {
       const body = await request.json();
       if (!body.pdfBase64 && !body.rawText) {
@@ -32,45 +49,89 @@ export async function POST(request: Request) {
         );
       }
 
+      if (body.providerConfig) {
+        const safe = ProviderConfigSchema.safeParse(body.providerConfig);
+        if (safe.success) providerConfig = safe.data;
+      }
+
+      if (body.title) fileName = body.title;
+
       if (body.pdfBase64) {
         const base64Data = body.pdfBase64.replace(/^data:application\/pdf;base64,/, "");
         buffer = Buffer.from(base64Data, "base64");
-      } else {
-        // Direct text upload fallback — not saved as Master; user reviews first
-        const rawTypst = convertTextToTypst(body.rawText, body.title || fileName);
-        const typstSource = `// @pdf-conversion-draft: Review and edit before saving as Master Resume\n// Converted from raw text on ${new Date().toISOString().slice(0, 10)}\n\n${rawTypst}`;
-        const newResume = await createResume({
-          title: body.title || fileName,
-          typstSource,
-          isMaster: false,
-        });
-
-        return NextResponse.json(
-          {
-            success: true,
-            data: newResume,
-            extractedText: body.rawText,
-          },
-          { status: 201 }
-        );
+      } else if (body.rawText) {
+        rawTextFromPayload = body.rawText;
       }
     }
 
-    // Parse PDF text from Buffer
-    const parsedPdf = await parsePdfBuffer(buffer);
-    if (!parsedPdf.text || parsedPdf.text.trim().length === 0) {
+    // Check header fallback for providerConfig if not in body/formData
+    if (!providerConfig) {
+      const headerConfigStr = request.headers.get("x-ai-provider-config");
+      if (headerConfigStr) {
+        try {
+          const parsed = JSON.parse(headerConfigStr);
+          const safe = ProviderConfigSchema.safeParse(parsed);
+          if (safe.success) providerConfig = safe.data;
+        } catch {
+          // ignore invalid header
+        }
+      }
+    }
+
+    let extractedText = "";
+    let pageCount = 1;
+
+    if (buffer) {
+      const parsedPdf = await parsePdfBuffer(buffer);
+      if (!parsedPdf.text || parsedPdf.text.trim().length === 0) {
+        return NextResponse.json(
+          { success: false, error: "Could not extract readable text from PDF" },
+          { status: 422 }
+        );
+      }
+      extractedText = parsedPdf.text;
+      pageCount = parsedPdf.numpages;
+    } else if (rawTextFromPayload) {
+      extractedText = rawTextFromPayload;
+    } else {
       return NextResponse.json(
-        { success: false, error: "Could not extract readable text from PDF" },
-        { status: 422 }
+        { success: false, error: "Invalid request payload or missing PDF data" },
+        { status: 400 }
       );
     }
 
     const title = fileName.replace(/\.pdf$/i, "") || "Uploaded Resume";
-    const rawTypst = convertTextToTypst(parsedPdf.text, title);
-    // Prepend a review-flag comment so users know this is a draft conversion, not a verified master
-    const typstSource = `// @pdf-conversion-draft: Review and edit before saving as Master Resume\n// PDF source: "${fileName}" — converted ${new Date().toISOString().slice(0, 10)}\n// Sections marked with [?] below may need manual verification\n\n${rawTypst}`;
+    let conversionPath: "ai" | "fallback" = "fallback";
+    let convertedSource: string | null = null;
 
-    // Save as a non-master draft — user explicitly saves as Master after review
+    // Attempt AI conversion if providerConfig is provided or available
+    if (providerConfig && (providerConfig.apiKey || providerConfig.provider === "custom")) {
+      try {
+        const aiResult = await convertPdfTextToTypst({
+          providerConfig,
+          rawText: extractedText,
+          fileName: title,
+        });
+
+        if (aiResult.success && aiResult.typstSource && aiResult.typstSource.trim().length > 0) {
+          conversionPath = "ai";
+          convertedSource = aiResult.typstSource;
+        }
+      } catch (aiErr) {
+        console.warn("AI PDF conversion failed, falling back to heuristic parser:", aiErr);
+      }
+    }
+
+    // Deterministic fallback path
+    if (!convertedSource) {
+      conversionPath = "fallback";
+      convertedSource = convertTextToTypst(extractedText, title);
+    }
+
+    // Prepend header comments for status tracking and non-master draft labeling
+    const typstSource = `// @pdf-conversion-draft: Review and edit before saving as Master Resume\n// @conversion-path: ${conversionPath}\n// PDF source: "${fileName}" — converted ${new Date().toISOString().slice(0, 10)}\n\n${convertedSource}`;
+
+    // Always create as non-master draft (isMaster: false)
     const newResume = await createResume({
       title,
       typstSource,
@@ -81,8 +142,9 @@ export async function POST(request: Request) {
       {
         success: true,
         data: newResume,
-        pageCount: parsedPdf.numpages,
-        extractedLength: parsedPdf.text.length,
+        conversionPath,
+        pageCount,
+        extractedLength: extractedText.length,
       },
       { status: 201 }
     );

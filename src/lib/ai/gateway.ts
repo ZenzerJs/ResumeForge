@@ -1,12 +1,13 @@
-import { ProviderConfig, ProviderConfigSchema, TestConnectionResult, GeneratePatchesInput, GeneratePatchesResult, EvidenceItemForPrompt } from "./types";
-import { testOpenAIConnection, generateOpenAIPatches, generateOpenAIQualitativeReview, generateOpenAICoverLetter } from "./providers/openai";
-import { testAnthropicConnection, generateAnthropicPatches, generateAnthropicQualitativeReview, generateAnthropicCoverLetter } from "./providers/anthropic";
-import { testGeminiConnection, generateGeminiPatches, generateGeminiQualitativeReview, generateGeminiCoverLetter } from "./providers/gemini";
-import { testCustomConnection, generateCustomPatches, generateCustomQualitativeReview, generateCustomCoverLetter } from "./providers/custom";
+import { ProviderConfig, ProviderConfigSchema, TestConnectionResult, GeneratePatchesInput, GeneratePatchesResult, EvidenceItemForPrompt, ConvertPdfInput, ConvertPdfResult } from "./types";
+import { testOpenAIConnection, generateOpenAIPatches, generateOpenAIQualitativeReview, generateOpenAICoverLetter, convertOpenAIPdfTextToTypst } from "./providers/openai";
+import { testAnthropicConnection, generateAnthropicPatches, generateAnthropicQualitativeReview, generateAnthropicCoverLetter, convertAnthropicPdfTextToTypst } from "./providers/anthropic";
+import { testGeminiConnection, generateGeminiPatches, generateGeminiQualitativeReview, generateGeminiCoverLetter, convertGeminiPdfTextToTypst } from "./providers/gemini";
+import { testCustomConnection, generateCustomPatches, generateCustomQualitativeReview, generateCustomCoverLetter, convertCustomPdfTextToTypst } from "./providers/custom";
 import { sanitizeError } from "./redact";
 import { buildPatchSystemPrompt, buildPatchUserPrompt } from "./prompt-template";
 import { buildQualitativeReviewSystemPrompt, buildQualitativeReviewUserPrompt, QualitativeReviewPromptInput } from "./qualitative-prompt";
 import { buildCoverLetterSystemPrompt, buildCoverLetterUserPrompt } from "./cover-letter-prompt";
+import { buildPdfToTypstSystemPrompt, buildPdfToTypstUserPrompt } from "./pdf-prompt";
 import { GenerateCoverLetterInput } from "./cover-letter-schema";
 
 /**
@@ -179,3 +180,44 @@ export async function generateCoverLetter(
     };
   }
 }
+
+/**
+ * Task 9.1: Converts raw extracted PDF text to clean Typst markup via the active BYOK AI provider.
+ */
+export async function convertPdfTextToTypst(input: ConvertPdfInput): Promise<ConvertPdfResult> {
+  const parseResult = ProviderConfigSchema.safeParse(input.providerConfig);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: sanitizeError(`Invalid provider configuration: ${parseResult.error.message}`),
+    };
+  }
+
+  const config = parseResult.data;
+  const systemPrompt = buildPdfToTypstSystemPrompt();
+  const userPrompt = buildPdfToTypstUserPrompt(input.rawText, input.fileName);
+
+  try {
+    switch (config.provider) {
+      case "openai":
+        return await convertOpenAIPdfTextToTypst(config, systemPrompt, userPrompt);
+      case "anthropic":
+        return await convertAnthropicPdfTextToTypst(config, systemPrompt, userPrompt);
+      case "gemini":
+        return await convertGeminiPdfTextToTypst(config, systemPrompt, userPrompt);
+      case "custom":
+        return await convertCustomPdfTextToTypst(config, systemPrompt, userPrompt);
+      default:
+        return {
+          success: false,
+          error: `Unsupported AI provider for PDF conversion: ${config.provider}`,
+        };
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: sanitizeError(`PDF conversion gateway exception: ${err instanceof Error ? err.message : String(err)}`),
+    };
+  }
+}
+

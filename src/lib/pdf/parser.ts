@@ -13,20 +13,24 @@ interface PdfPage {
 
 /**
  * Parses raw text from a PDF file buffer across pdf-parse v1 & v2 versions.
+ * Disables worker threads (disableWorker: true) for Next.js bundler compatibility.
  */
 export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedPdfResult> {
   try {
-    // 1. Try pdf-parse v2 PDFParse class interface
-    if (pdfParseModule.PDFParse) {
-      const parser = new pdfParseModule.PDFParse({ data: buffer });
+    // 1. Try pdf-parse v2 PDFParse class interface with disableWorker: true
+    if (pdfParseModule?.PDFParse) {
+      const parser = new pdfParseModule.PDFParse({ data: buffer, disableWorker: true });
       const textResult = await parser.getText();
       const rawText =
         typeof textResult === "string"
           ? textResult
           : textResult?.text || (textResult?.pages ? textResult.pages.map((p: PdfPage) => p.text || "").join("\n") : "");
 
+      // Strip page marker footers like "-- 1 of 1 --" added by pdf-parse v2
+      const cleanText = (rawText || "").replace(/--\s*\d+\s*of\s*\d+\s*--/g, "").trim();
+
       return {
-        text: rawText || "",
+        text: cleanText,
         numpages: textResult?.total || 1,
         info: {},
       };
@@ -42,8 +46,8 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedPdfResult> {
       };
     }
 
-    // 3. Try default property
-    if (typeof pdfParseModule.default === "function") {
+    // 3. Try default property function
+    if (typeof pdfParseModule?.default === "function") {
       const data = await pdfParseModule.default(buffer);
       return {
         text: data.text || "",
@@ -52,7 +56,7 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedPdfResult> {
       };
     }
 
-    throw new Error("Invalid pdf-parse module structure");
+    throw new Error("Could not initialize pdf-parse module");
   } catch (err) {
     console.error("parsePdfBuffer error:", err);
     throw new Error(`Failed to parse PDF document: ${err instanceof Error ? err.message : String(err)}`);

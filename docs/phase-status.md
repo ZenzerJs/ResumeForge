@@ -365,5 +365,33 @@ All AI agents completing subsequent phases MUST update this file using the follo
 - Tier 2 extraction relies on static HTML & JSON-LD parsing; pages requiring authenticated user logins or complex CAPTCHA challenges gracefully degrade to the manual paste fallback prompt.
 
 ### Suggested Next Task
-- **Task 8.5 — PittCSC Internship Feed Sync & Automated Pipeline Integration**: Implement automated sync for PittCSC internship feed (`https://raw.githubusercontent.com/pittcsc/Summer2026-Internships/dev/README.md`) with deduplication and tracker feed integration.
+- **Task 9.1 — AI-Powered PDF-to-Typst Conversion & Guaranteed Editor Redirect**: Completed in full.
+
+---
+
+## Current Status: Task 9.1 Complete — AI PDF-to-Typst Conversion & Guaranteed Editor Redirect
+
+- **Task Completed**: Task 9.1 (AI-Powered PDF-to-Typst Conversion & Guaranteed Editor Redirect)
+- **Completed Date**: 2026-08-08
+- **Status Summary**: Implemented BYOK AI-assisted PDF-to-Typst conversion (`convertPdfTextToTypst`), shared `stripCodeFences()` utility (`src/lib/ai/utils.ts`), deterministic heuristic fallback (`convertTextToTypst`), FormData `providerConfig` transport, guaranteed client redirect to `/editor?resumeId=<id>`, non-master draft isolation (`isMaster: false`), session-dismissible status banners, Vitest unit test suite (`tests/pdf-ai-conversion.test.ts`), and Playwright E2E spec (`e2e/phase9-pdf-conversion.spec.ts`).
+
+### Completed Work in Task 9.1
+- **Shared AI Utilities**: Created `src/lib/ai/utils.ts` with `stripCodeFences()` supporting ` ```typst `, ` ```json `, ` ```markdown `, and bare code fences.
+- **AI Gateway & Adapters**: Added `ConvertPdfInput` / `ConvertPdfResult` to `src/lib/ai/types.ts`, prompt templates in `src/lib/ai/pdf-prompt.ts`, provider adapters in `openai.ts`, `anthropic.ts`, `gemini.ts`, and `custom.ts`, and exported `convertPdfTextToTypst()` from `gateway.ts`.
+- **Upload Route & Transport**: Updated `src/app/api/resumes/upload-pdf/route.ts` to parse `providerConfig` from `formData` or JSON payload, attempt AI conversion first, fall back seamlessly to heuristic formatting, prepend `// @conversion-path: ai|fallback`, and save non-master drafts (`isMaster: false`). Added `serverExternalPackages: ["pdf-parse", "pdfjs-dist"]` to `next.config.ts`.
+- **Guaranteed Editor Redirect & Banner UX**: Updated `src/app/page.tsx` with upload status labels and `router.push('/editor?resumeId=...')`. Added non-blocking, session-dismissible conversion status banners ("AI-Converted Draft" vs "AI conversion unavailable — used basic formatting") in `src/components/editor/editor-workspace.tsx`.
+- **Automated Verification**:
+  - `tests/pdf-ai-conversion.test.ts`: Vitest suite covering fence stripping, AI conversion output, error/timeout fallback, zero-content-drop metrics (>= 90% word preservation & 100% section header preservation), and special character escaping.
+  - `e2e/phase9-pdf-conversion.spec.ts`: Playwright spec verifying PDF upload, editor redirect, banner rendering, dismissal, and master resume isolation.
+
+### Verification Tests Executed
+- `npm run lint` — Passed with 0 errors or warnings.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (139/139 tests passing across 31 test files).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly (35/35 pages rendered).
+- `npx playwright test` — Playwright E2E tests passed cleanly (33/33 tests passing across all spec files).
+
+### Suggested Next Task
+- **Task 9.2 — Resizable/Collapsible Editor Panel Layout**: Implement resizable split-pane layout and collapsible panels for the Typst editor workspace.
+
 
