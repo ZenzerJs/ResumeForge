@@ -392,6 +392,35 @@ All AI agents completing subsequent phases MUST update this file using the follo
 - `npx playwright test` — Playwright E2E tests passed cleanly (33/33 tests passing across all spec files).
 
 ### Suggested Next Task
-- **Task 9.2 — Resizable/Collapsible Editor Panel Layout**: Implement resizable split-pane layout and collapsible panels for the Typst editor workspace.
+- **Task 9.2 — Resizable & Collapsible Editor Panels**: Completed in full.
+
+---
+
+## Current Status: Task 9.2 Complete — Resizable & Collapsible Editor Panels
+
+- **Task Completed**: Task 9.2 (Resizable & Collapsible Editor Panels)
+- **Completed Date**: 2026-08-08
+- **Status Summary**: Implemented a 3-pane resizable desktop workspace (`react-resizable-panels`), brand gold/amber drag handle highlights (`src/components/ui/resizable.tsx`), native imperative collapse/expand controls for the AI sidebar (`panelRef={aiPanelRef}`), `localStorage` layout state persistence (`resumeforge_editor_layout`), complete preservation of mobile tabbed view (`lg:hidden`), Vitest unit test suite (`tests/editor-resizable-panels.test.ts`), and Playwright E2E spec (`e2e/phase9-resizable-editor.spec.ts`).
+
+### Completed Work in Task 9.2
+- **Resizable UI Primitives**: Created `src/components/ui/resizable.tsx` wrapping `Group`, `Panel`, `Separator` from `react-resizable-panels` with brand gold/amber hover & active state highlights.
+- **Desktop Resizable Layout (`hidden lg:flex`)**: Replaced static desktop 12-column grid in `src/components/editor/editor-workspace.tsx` with a resizable 3-pane layout (`id="panel-code"`, `id="panel-preview"`, `id="panel-ai"`) enforcing minimum sizes (Code 20%, Preview 25%, AI Sidebar 15%).
+- **Mobile Viewport Preservation (`lg:hidden`)**: Preserved the mobile tab switcher (`"editor" | "preview" | "ai"`) for viewports below `lg:`.
+- **Collapsible AI Sidebar**: Added header collapse button (`PanelRightClose` / `PanelRightOpen`) to `src/components/editor/ai-sidebar.tsx` linked imperatively via `panelRef={aiPanelRef}` without resetting or unmounting AI chat history.
+- **Layout Persistence**: Saved and restored pane layout and collapse state in `localStorage` (`resumeforge_editor_layout`) with graceful fallback defaults (`[45, 35, 20]`).
+- **Automated Verification**:
+  - `tests/editor-resizable-panels.test.ts`: Vitest unit tests for defaults, size bounds, layout persistence, and chat state preservation.
+  - `e2e/phase9-resizable-editor.spec.ts`: Playwright spec for pane rendering, collapse toggle, and reload persistence.
+
+### Verification Tests Executed
+- `npm run lint` — Passed with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (146/146 tests passing across 32 test files).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly (35/35 static & dynamic pages rendered).
+- `npx playwright test` — Playwright E2E tests passed cleanly (35/35 specs passing).
+
+### Suggested Next Task
+- **Task 9.3 — Ctrl+S Save & Auto-Compile Protocol**: Implement keyboard shortcuts (Ctrl+S / Cmd+S) to save and compile editor buffer.
+
 
 

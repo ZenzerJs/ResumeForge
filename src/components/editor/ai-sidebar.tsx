@@ -14,6 +14,8 @@ import {
   ChevronUp,
   ClipboardCheck,
   Wand2,
+  PanelRightClose,
+  PanelRightOpen,
 } from "lucide-react";
 
 interface AiSidebarProps {
@@ -21,6 +23,10 @@ interface AiSidebarProps {
   source: string;
   /** Setter to apply AI suggestions directly to the buffer */
   onApplyToBuffer: (newSource: string) => void;
+  /** Optional callback to toggle collapse state of AI sidebar */
+  onToggleCollapse?: () => void;
+  /** Collapsed state boolean */
+  isCollapsed?: boolean;
 }
 
 interface ProviderSettings {
@@ -66,7 +72,12 @@ const SEVERITY_COLORS = {
   MINOR: "text-slate-400 bg-slate-800/60 border-slate-700/50",
 };
 
-export function AiSidebar({ source, onApplyToBuffer }: AiSidebarProps) {
+export function AiSidebar({
+  source,
+  onApplyToBuffer,
+  onToggleCollapse,
+  isCollapsed,
+}: AiSidebarProps) {
   const [jdText, setJdText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -220,13 +231,30 @@ export function AiSidebar({ source, onApplyToBuffer }: AiSidebarProps) {
           <Wand2 className="h-4 w-4 text-amber-400" />
           AI Tailoring Assistant
         </span>
-        <Link
-          href="/settings"
-          className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-300 transition"
-        >
-          <Settings className="h-3 w-3" />
-          Settings
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/settings"
+            className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-300 transition"
+          >
+            <Settings className="h-3 w-3" />
+            Settings
+          </Link>
+          {onToggleCollapse && (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              title={isCollapsed ? "Expand AI Sidebar" : "Collapse AI Sidebar"}
+              data-testid="toggle-ai-sidebar-btn"
+            >
+              {isCollapsed ? (
+                <PanelRightOpen className="h-3.5 w-3.5 text-amber-400" />
+              ) : (
+                <PanelRightClose className="h-3.5 w-3.5" />
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-1 flex-col overflow-y-auto p-4 gap-4">

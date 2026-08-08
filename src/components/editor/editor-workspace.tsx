@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CodeEditor } from "./code-editor";
 import { PreviewPanel } from "./preview-panel";
 import { AiSidebar } from "./ai-sidebar";
 import { compileTypstToSvg } from "@/lib/typst/compiler";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { usePanelRef } from "react-resizable-panels";
 import {
   Code2,
   Eye,
@@ -83,6 +85,84 @@ export function EditorWorkspace() {
     setIsConversionBannerDismissed(true);
     if (docMetadata.id && typeof window !== "undefined") {
       sessionStorage.setItem(`resumeforge_dismissed_banner_${docMetadata.id}`, "true");
+    }
+  };
+
+  // Task 9.2: Resizable 3-pane layout state & imperatively controlled AI collapse
+  const aiPanelRef = usePanelRef();
+  const [layout, setLayout] = useState<Record<string, number>>(() => {
+    if (typeof window === "undefined") return { "panel-code": 45, "panel-preview": 35, "panel-ai": 20 };
+    try {
+      const saved = localStorage.getItem("resumeforge_editor_layout");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.sizes && typeof parsed.sizes === "object") return parsed.sizes;
+      }
+    } catch {}
+    return { "panel-code": 45, "panel-preview": 35, "panel-ai": 20 };
+  });
+
+  const [isAiCollapsed, setIsAiCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      const saved = localStorage.getItem("resumeforge_editor_layout");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.isAiCollapsed === "boolean") return parsed.isAiCollapsed;
+      }
+    } catch {}
+    return false;
+  });
+
+  const isAiCollapsedRef = useRef<boolean>(isAiCollapsed);
+
+  useEffect(() => {
+    isAiCollapsedRef.current = isAiCollapsed;
+  }, [isAiCollapsed]);
+
+  const updateAiCollapsedState = useCallback((collapsed: boolean) => {
+    setIsAiCollapsed(collapsed);
+    isAiCollapsedRef.current = collapsed;
+  }, []);
+
+  // Collapse panel on mount if layout was persisted as collapsed
+  useEffect(() => {
+    if (isAiCollapsed) {
+      const timer = setTimeout(() => {
+        aiPanelRef.current?.collapse();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [aiPanelRef, isAiCollapsed]);
+
+  const persistLayoutState = (sizes: Record<string, number>, collapsed: boolean) => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(
+        "resumeforge_editor_layout",
+        JSON.stringify({ sizes, isAiCollapsed: collapsed })
+      );
+    } catch {
+      // ignore write errors
+    }
+  };
+
+  const handleLayoutChange = (layoutMap: Record<string, number>) => {
+    setLayout(layoutMap);
+    persistLayoutState(layoutMap, isAiCollapsedRef.current);
+  };
+
+  const toggleAiSidebarCollapse = () => {
+    const panel = aiPanelRef.current;
+    if (!panel) return;
+    if (panel.isCollapsed()) {
+      panel.expand();
+      updateAiCollapsedState(false);
+      persistLayoutState(layout, false);
+    } else {
+      panel.collapse();
+      updateAiCollapsedState(true);
+      persistLayoutState(layout, true);
     }
   };
 
@@ -596,15 +676,35 @@ export function EditorWorkspace() {
 
       {/* Main Workspace Body */}
       <main className="flex flex-1 overflow-hidden bg-background p-2 md:p-3">
-        {/* Desktop 3-Panel Grid (>= lg screens) */}
-        <div className="hidden lg:grid h-full w-full grid-cols-12 gap-3">
-          {/* Panel 1: CodeMirror Editor (5 cols) */}
-          <div className="col-span-5 h-full overflow-hidden">
+        {/* Desktop 3-Panel Resizable Layout (>= lg screens) */}
+        <ResizablePanelGroup
+          id="editor-resizable-panel-group"
+          orientation="horizontal"
+          onLayoutChange={handleLayoutChange}
+          className="hidden lg:flex h-full w-full gap-1.5"
+          data-testid="editor-resizable-panel-group"
+        >
+          {/* Panel 1: CodeMirror Editor */}
+          <ResizablePanel
+            id="panel-code"
+            defaultSize={layout["panel-code"] ?? 45}
+            minSize={20}
+            className="h-full overflow-hidden"
+            data-testid="editor-code-panel"
+          >
             <CodeEditor value={source} onChange={handleSourceChange} />
-          </div>
+          </ResizablePanel>
 
-          {/* Panel 2: Live Preview (4 cols) */}
-          <div className="col-span-4 h-full overflow-hidden">
+          <ResizableHandle withHandle />
+
+          {/* Panel 2: Live Preview */}
+          <ResizablePanel
+            id="panel-preview"
+            defaultSize={layout["panel-preview"] ?? 35}
+            minSize={25}
+            className="h-full overflow-hidden"
+            data-testid="editor-preview-panel"
+          >
             <PreviewPanel
               svg={svg}
               error={error}
@@ -612,13 +712,35 @@ export function EditorWorkspace() {
               isCompiling={isCompiling}
               onResetTemplate={handleResetTemplate}
             />
-          </div>
+          </ResizablePanel>
 
-          {/* Panel 3: AI Sidebar (3 cols) */}
-          <div className="col-span-3 h-full overflow-hidden">
-            <AiSidebar source={source} onApplyToBuffer={setSource} />
-          </div>
-        </div>
+          <ResizableHandle withHandle />
+
+          {/* Panel 3: AI Sidebar (Collapsible) */}
+          <ResizablePanel
+            id="panel-ai"
+            panelRef={aiPanelRef}
+            defaultSize={layout["panel-ai"] ?? 20}
+            minSize={15}
+            collapsible={true}
+            collapsedSize={0}
+            onResize={(size) => {
+              if (size.asPercentage <= 2 && !isAiCollapsedRef.current) {
+                updateAiCollapsedState(true);
+                persistLayoutState(layout, true);
+              }
+            }}
+            className="h-full overflow-hidden"
+            data-testid="editor-ai-panel"
+          >
+            <AiSidebar
+              source={source}
+              onApplyToBuffer={setSource}
+              isCollapsed={isAiCollapsed}
+              onToggleCollapse={toggleAiSidebarCollapse}
+            />
+          </ResizablePanel>
+        </ResizablePanelGroup>
 
         {/* Mobile Tabbed View (< lg screens) */}
         <div className="flex h-full w-full flex-col lg:hidden">
