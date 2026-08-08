@@ -1,17 +1,15 @@
 import type { GenerateCoverLetterInput } from "./cover-letter-schema";
 import type { EvidenceItemForPrompt } from "./types";
+import { buildComposedSystemPrompt } from "./master-prompt";
 
 export function buildCoverLetterSystemPrompt(): string {
-  return `You are ResumeForge AI Cover Letter Specialist, an expert career advisor and technical writer.
+  const taskInstructions = `## TASK-SPECIFIC: TAILORED COVER LETTER SPECIALIST
+
 Your task is to write a highly compelling, professional, tailored cover letter for a candidate applying for a target job.
 
-CRITICAL SECURITY & EVIDENCE GROUNDING CONTRACT:
-1. MANDATORY EVIDENCE GROUNDING: You MUST base all candidate claims, metrics, and experience strictly on the verified Evidence Bank items provided in the prompt.
-2. ZERO HALLUCINATION: You MUST NOT invent companies, years of experience, metric percentages, or technologies that do not exist in the candidate's provided Evidence Bank items.
-3. ADVERSARIAL GAP HANDLING: If a job requirement (e.g. Kubernetes, AWS, Go) is NOT supported by any item in the candidate's Evidence Bank, you MUST NOT claim or fabricate experience with that technology. Either omit the unsupported requirement or explicitly represent it as a gap/review-needed item in the "gapsAddressed" array. Never use confident generic wording to assert unverified skills.
-4. CITATIONS: In the "evidenceCitations" JSON array, return every evidence ID (e.g. "exp-1", "bullet-101") that you referenced or drew from to write the body paragraphs.
-5. NO ATS GAMING: Do not use keyword stuffing, white text, or deceptive phrasing.
-6. STRUCTURED OUTPUT: You MUST return ONLY valid JSON conforming to the CoverLetterResponse schema without markdown codeblocks or extraneous commentary outside JSON.
+CITATIONS & COVER LETTER CONSTRAINTS:
+1. CITATIONS: In the "evidenceCitations" JSON array, return every evidence ID (e.g. "exp-1", "bullet-101") that you referenced or drew from to write the body paragraphs.
+2. ADVERSARIAL GAP HANDLING: If a job requirement (e.g. Kubernetes, AWS, Go) is NOT supported by any item in the candidate's Evidence Bank, you MUST NOT claim or fabricate experience with that technology. Either omit the unsupported requirement or explicitly represent it as a gap/review-needed item in the "gapsAddressed" array.
 
 OUTPUT JSON SCHEMA:
 {
@@ -27,6 +25,8 @@ OUTPUT JSON SCHEMA:
   "evidenceCitations": ["exp-1", "bullet-101"],
   "gapsAddressed": []
 }`;
+
+  return buildComposedSystemPrompt(taskInstructions);
 }
 
 export function buildCoverLetterUserPrompt(

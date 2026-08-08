@@ -450,7 +450,39 @@ All AI agents completing subsequent phases MUST update this file using the follo
 - `npx playwright test` — Playwright E2E tests passed cleanly (38/38 specs passing).
 
 ### Suggested Next Task
-- **Task 9.4 — Unified Master AI System Prompt**: Standardize AI system prompts across all BYOK provider adapters.
+- **Task 9.4 — Unified Master AI System Prompt**: Completed in full.
+
+---
+
+## Current Status: Task 9.4 Complete — Unified Master AI System Prompt Engine
+
+- **Task Completed**: Task 9.4 (Unified Master AI System Prompt Engine)
+- **Completed Date**: 2026-08-08
+- **Status Summary**: Created `src/lib/ai/master-prompt.ts` consolidating ResumeForge's 5 non-negotiable core AI guardrails (Zero Hallucination, Mandatory Evidence Citation, Explicit Gap Reporting, Anti-ATS Gaming Enforcement, Strict JSON Output Contracts). Refactored `prompt-template.ts` (patch generation), `qualitative-prompt.ts` (ATS review), and `cover-letter-prompt.ts` (cover letter generation) to compose with `buildComposedSystemPrompt()`. Documented decision in ADR-012 (`docs/decisions.md`) and updated `docs/ai-guardrails.md`. Created unit test suite (`tests/master-prompt.test.ts`).
+
+### Completed Work in Task 9.4
+- **Master Prompt Engine (`src/lib/ai/master-prompt.ts`)**: Built single source of truth `RESUMEFORGE_MASTER_SYSTEM_PROMPT` and helper `buildComposedSystemPrompt()`.
+- **System Prompt Composition**:
+  - `src/lib/ai/prompt-template.ts`: Composed `buildPatchSystemPrompt()` prepending master prompt.
+  - `src/lib/ai/qualitative-prompt.ts`: Composed `buildQualitativeReviewSystemPrompt()` prepending master prompt.
+  - `src/lib/ai/cover-letter-prompt.ts`: Composed `buildCoverLetterSystemPrompt()` prepending master prompt.
+- **Documentation & Architecture**:
+  - `docs/decisions.md`: Added ADR-012 (Unified Master AI System Prompt & Composition Pattern).
+  - `docs/ai-guardrails.md`: Added Section 5 detailing the unified prompt engine.
+- **Automated Verification**:
+  - `tests/master-prompt.test.ts`: Vitest suite covering all 5 core guardrails, prompt builder start assertions, and fail-first composition mutation proof (158/158 tests passing across 34 test files).
+  - `e2e/*`: Playwright E2E suite confirming patch generation, ATS qualitative review, and cover letter workflows remain 100% functional with zero schema or citation regressions (38/38 specs passing).
+
+### Verification Tests Executed
+- `npm run lint` — Passed with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (158/158 tests passing across 34 test files).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly (35/35 static & dynamic pages rendered).
+- `npx playwright test` — Playwright E2E tests passed cleanly (38/38 specs passing).
+
+### Suggested Next Task
+- **Task 9.5 — Evidence Tab Removal & ATS Grade Button**: Streamline header actions and relocate ATS grade triggers.
+
 
 
 

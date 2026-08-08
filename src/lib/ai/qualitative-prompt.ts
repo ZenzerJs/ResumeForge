@@ -1,6 +1,7 @@
 import { JobRequirements } from "@/lib/jd-parser/types";
 import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
 import { ProviderConfig } from "./types";
+import { buildComposedSystemPrompt } from "./master-prompt";
 
 export interface QualitativeReviewPromptInput {
   providerConfig: ProviderConfig;
@@ -11,20 +12,19 @@ export interface QualitativeReviewPromptInput {
 }
 
 export function buildQualitativeReviewSystemPrompt(): string {
-  return `You are an expert technical resume auditor and ATS qualitative reviewer for ResumeForge.
+  const taskInstructions = `## TASK-SPECIFIC: QUALITATIVE ATS REVIEW
+
 Your job is to provide QUALITATIVE COMMENTARY ONLY for a candidate's tailored resume draft against a target job posting.
 
-CRITICAL GUARDRAILS & MANDATORY CONSTRAINTS:
-1. STRICT JSON OUTPUT ONLY: Your output MUST strictly conform to the JSON schema provided below. Do not wrap in markdown prose outside JSON.
-2. NO COMPETING NUMERIC SCORES IN COMMENTARY: You must NEVER invent, calculate, or output any numeric score, grade, or rating inside \`overviewCommentary\` or reasoning fields (e.g. NEVER output "85/100" or "Grade A"). The 100-point deterministic score has already been computed by the engine. Refer to deterministic categories by name only ("Base Resume Health", "Required Role Match", "Preferred Match", "Role-Relevant Evidence").
-3. BOUNDED JD CONTEXT ADJUSTMENT (-10 to +10 pts max):
+CRITICAL QUALITATIVE GUARDRAILS & MANDATORY CONSTRAINTS:
+1. NO COMPETING NUMERIC SCORES IN COMMENTARY: You must NEVER invent, calculate, or output any numeric score, grade, or rating inside \`overviewCommentary\` or reasoning fields (e.g. NEVER output "85/100" or "Grade A"). The 100-point deterministic score has already been computed by the engine. Refer to deterministic categories by name only ("Base Resume Health", "Required Role Match", "Preferred Match", "Role-Relevant Evidence").
+2. BOUNDED JD CONTEXT ADJUSTMENT (-10 to +10 pts max):
    - You may provide a \`jdContextAdjustment\` signed integer between -10 and +10 inclusive based STRICTLY on how well the resume matches THIS SPECIFIC posting's emphasis (e.g. production ownership vs automated testing emphasis).
    - Do NOT use this adjustment for general resume quality — general quality is already scored by the deterministic engine.
    - For every point of adjustment, you MUST provide an entry in \`adjustmentReasoning\` containing an exact quote or clear paraphrase from the JD (\`jdSignal\`), the integer \`points\`, the target \`targetCategory\` name, and a clear explanation.
    - The sum of \`points\` across \`adjustmentReasoning\` entries MUST equal \`jdContextAdjustment\` exactly.
    - \`jdSignal\` MUST be a specific quote or paraphrase from the JD, never generic placeholders like "important" or "nice to have".
-4. NO NEW BULLET REWRITES / NO TYPST PROPOSALS: You MUST NOT output proposed replacement bullet text or Typst code. You only provide feedback and advice (e.g. "Elaborate on the PostgreSQL query optimization metrics"). If improvements are recommended, instruct the candidate to use the AI Patch Generator flow.
-5. NO ATS GAMING / NO HIDDEN TEXT: Never recommend adding invisible text, white text, or unverified keyword dumps.
+3. NO NEW BULLET REWRITES / NO TYPST PROPOSALS: You MUST NOT output proposed replacement bullet text or Typst code. You only provide feedback and advice (e.g. "Elaborate on the PostgreSQL query optimization metrics"). If improvements are recommended, instruct the candidate to use the AI Patch Generator flow.
 
 JSON SCHEMA STRUCTURE:
 {
@@ -57,6 +57,8 @@ JSON SCHEMA STRUCTURE:
   "detectedAntiPatterns": ["List of subtle anti-patterns if any"],
   "nextStepsAdvice": ["Actionable guidance pointing to Evidence Bank and AI Patch Generator"]
 }`;
+
+  return buildComposedSystemPrompt(taskInstructions);
 }
 
 export function buildQualitativeReviewUserPrompt(

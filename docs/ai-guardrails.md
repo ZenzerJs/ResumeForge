@@ -101,3 +101,9 @@ If a job requirement cannot be backed by any verified item in the user's Evidenc
   ]
 }
 ```
+
+---
+
+## 5. Unified Master AI System Prompt Engine
+
+All AI system prompt builders (`prompt-template.ts`, `qualitative-prompt.ts`, `cover-letter-prompt.ts`) prepend `RESUMEFORGE_MASTER_SYSTEM_PROMPT` from `src/lib/ai/master-prompt.ts` as their single source of truth for core guardrails before adding task-specific JSON schemas and context.

@@ -237,6 +237,32 @@ We implement an **On-Demand Evidence-Grounded Cover Letter Generator**:
 - **Positive**: Strict citation rules prevent AI hallucination from polluting cover letter submissions.
 - **Negative**: Unsupported job requirements result in explicit gap notices or omitted paragraphs, requiring candidate review when evidence is missing.
 
+---
+
+## ADR-012: Unified Master AI System Prompt & Composition Pattern
+
+- **Date**: 2026-08-08
+- **Status**: Approved
+
+### Context
+Prior to Task 9.4, AI system prompts (`prompt-template.ts`, `qualitative-prompt.ts`, `cover-letter-prompt.ts`) duplicated ResumeForge's core AI guardrails — zero hallucination, mandatory evidence citations, explicit gap reporting, anti-ATS gaming rules, and strict JSON output formatting — independently. This duplication created drift risk across prompt files and made it difficult to guarantee that new AI features followed the same non-negotiable contracts.
+
+### Decision
+We implement a **Unified Master AI System Prompt Engine**:
+1. **Single Source of Truth (`src/lib/ai/master-prompt.ts`)**: Export `RESUMEFORGE_MASTER_SYSTEM_PROMPT` containing all 5 core guardrails:
+   - Zero Hallucination & Strict Evidence Grounding
+   - Mandatory Evidence Citation (`evidenceIds` / `evidenceCitations`)
+   - Explicit Gap Reporting (never fabricate missing experience)
+   - Anti-ATS Gaming Enforcement (no white text or keyword stuffing)
+   - Strict JSON Output Contracts
+2. **Composition Pattern (`buildComposedSystemPrompt`)**: Every task-specific prompt builder (`buildPatchSystemPrompt`, `buildQualitativeReviewSystemPrompt`, `buildCoverLetterSystemPrompt`) prepends `RESUMEFORGE_MASTER_SYSTEM_PROMPT` before appending task-specific instructions and JSON schemas.
+3. **Schema Invariance**: Output schemas (`PatchProposal`, qualitative review JSON, cover letter JSON) remain 100% unchanged.
+
+### Consequences
+- **Positive**: Eliminates prompt drift risk across AI features. Any new AI capability (e.g. editor chat) imports the master prompt module to inherit all core guardrails automatically.
+- **Positive**: Maintains 100% backward compatibility with all existing provider adapters and Zod validation schemas.
+- **Negative**: Adds a small static overhead (~350 tokens) to system prompt payloads, well within all LLM context window limits.
+
 
 
 

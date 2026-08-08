@@ -318,7 +318,7 @@ export function EditorWorkspace() {
         event: e,
         onSave: handleShortcutSave,
         isLockedRef: isSavingShortcutRef,
-      });
+      }).catch(console.error);
     };
 
     window.addEventListener("keydown", handleKeyDown);

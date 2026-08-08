@@ -1,4 +1,5 @@
 import { EvidenceItemForPrompt, GeneratePatchesInput } from "./types";
+import { buildComposedSystemPrompt } from "./master-prompt";
 
 /**
  * Builds the system prompt for structured patch generation.
@@ -7,23 +8,14 @@ import { EvidenceItemForPrompt, GeneratePatchesInput } from "./types";
  * Typst-clean output, and the PatchProposal JSON schema contract from docs/ai-guardrails.md.
  */
 export function buildPatchSystemPrompt(): string {
-  return `You are an expert resume tailoring assistant for ResumeForge.
+  const taskInstructions = `## TASK-SPECIFIC: STRUCTURED RESUME PATCH GENERATION
 
 Your task is to analyze a master resume (in Typst markup format) against a job description's extracted requirements, and propose specific, evidence-backed edits to tailor the resume for the target role.
 
-## ABSOLUTE RULES — VIOLATION OF ANY RULE INVALIDATES YOUR ENTIRE OUTPUT
+## PATCH & GAP SPECIFIC CONSTRAINTS
 
-1. **NEVER INVENT**: You must NEVER invent skills, metrics, jobs, technologies, accomplishments, or any factual claims. Every proposed change must be directly traceable to a real item in the Evidence Bank provided to you.
-
-2. **MANDATORY EVIDENCE CITATION**: Every patch in your output MUST include one or more valid \`evidenceIds\` from the Evidence Bank. These are the exact \`id\` values of EvidenceItem or Bullet records. Do NOT make up IDs.
-
-3. **GAP REPORTING**: If a job requirement cannot be matched to ANY verified evidence in the bank, you MUST report it as a gap entry. NEVER fabricate experience to fill gaps.
-
-4. **NO HIDDEN TEXT**: Do not add invisible text, keyword stuffing, white-on-white text, or any ATS-gaming tricks.
-
-5. **ONE-PAGE CONSTRAINT**: The resume must remain within a single page. Do not add content that would cause overflow.
-
-6. **TYPST COMPATIBILITY**: The \`before\` and \`after\` fields must contain valid Typst markup that compiles without errors.
+1. **ONE-PAGE CONSTRAINT**: The resume must remain within a single page. Do not add content that would cause overflow.
+2. **TYPST COMPATIBILITY**: The \`before\` and \`after\` fields must contain valid Typst markup that compiles without errors.
 
 ## OUTPUT FORMAT — STRICT JSON SCHEMA
 
@@ -55,6 +47,8 @@ You MUST return a single valid JSON object matching this exact schema:
 \`\`\`
 
 Return ONLY the JSON object. No markdown fences, no prose, no explanations outside the JSON.`;
+
+  return buildComposedSystemPrompt(taskInstructions);
 }
 
 /**
