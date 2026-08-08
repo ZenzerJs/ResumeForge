@@ -86,7 +86,10 @@ export function PreviewPanel({
       <div className="relative flex-1 overflow-auto p-4 md:p-6 flex flex-col items-center">
         {/* Error Banner overlay at top if present */}
         {error && (
-          <div className="w-full max-w-[850px] mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800 shadow-sm">
+          <div
+            data-testid="typst-error-banner"
+            className="w-full max-w-[850px] mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800 shadow-sm"
+          >
             <div className="flex items-start gap-2">
               <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
               <div className="flex-1">
@@ -119,6 +122,7 @@ export function PreviewPanel({
         {svg ? (
           <div className="w-full max-w-[850px] rounded-sm bg-white p-4 sm:p-8 shadow-md border border-slate-200 transition-all">
             <div
+              data-testid="typst-preview-svg"
               className="typst-preview-svg w-full overflow-hidden [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-w-full"
               dangerouslySetInnerHTML={{ __html: svg }}
             />

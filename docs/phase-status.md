@@ -420,7 +420,38 @@ All AI agents completing subsequent phases MUST update this file using the follo
 - `npx playwright test` — Playwright E2E tests passed cleanly (35/35 specs passing).
 
 ### Suggested Next Task
-- **Task 9.3 — Ctrl+S Save & Auto-Compile Protocol**: Implement keyboard shortcuts (Ctrl+S / Cmd+S) to save and compile editor buffer.
+- **Task 9.3 — Ctrl+S Save Triggers Preview Recompile**: Completed in full.
+
+---
+
+## Current Status: Task 9.3 Complete — Ctrl+S Save Triggers Preview Recompile
+
+- **Task Completed**: Task 9.3 (Ctrl+S Save Triggers Preview Recompile)
+- **Completed Date**: 2026-08-08
+- **Status Summary**: Implemented global `Ctrl+S` / `Cmd+S` keyboard shortcut handler (`src/lib/editor/shortcut-handler.ts`), browser `preventDefault()` interception, 300ms debounce locking against key-repeat spam, active draft buffer persistence to `localStorage`, instant preview recompile triggering, header toast confirmation (`[data-testid="shortcut-save-toast"]`), Vitest unit tests (`tests/editor-shortcut-save.test.ts`), and Playwright E2E spec (`e2e/phase9-shortcut-save.spec.ts`).
+
+### Completed Work in Task 9.3
+- **Shortcut Interceptor (`src/lib/editor/shortcut-handler.ts`)**: Built standalone, cross-platform keyboard shortcut handler supporting `Ctrl+S` (Windows/Linux) and `Cmd+S` (macOS `metaKey`), calling `preventDefault()` and enforcing a 300ms lock (`isSavingShortcutRef`).
+- **Editor Workspace Wiring (`src/components/editor/editor-workspace.tsx`)**:
+  - Attached global keydown listener executing active draft persistence to `localStorage`.
+  - Triggered immediate compilation call `runCompile(source)` bypassing the typing debounce timer.
+  - Displayed 2-second header confirmation badge (`[data-testid="shortcut-save-toast"]`).
+  - Preserved "Save as Master Resume" modal isolation (`showSaveConfirm` remains untouched).
+- **Preview Panel Integration (`src/components/editor/preview-panel.tsx`)**: Added `data-testid="typst-preview-svg"` and `data-testid="typst-error-banner"` for automated verification.
+- **Automated Verification**:
+  - `tests/editor-shortcut-save.test.ts`: Vitest suite covering Windows/macOS key detection, `preventDefault()` execution, 300ms debounce locking, syntax error fallback reporting, and Save as Master isolation (153/153 tests passing).
+  - `e2e/phase9-shortcut-save.spec.ts`: Playwright spec verifying Ctrl+S draft save toast, immediate preview SVG update, syntax error banner preservation, and Save as Master isolation (38/38 specs passing).
+
+### Verification Tests Executed
+- `npm run lint` — Passed with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (153/153 tests passing across 33 test files).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly (35/35 static & dynamic pages rendered).
+- `npx playwright test` — Playwright E2E tests passed cleanly (38/38 specs passing).
+
+### Suggested Next Task
+- **Task 9.4 — Unified Master AI System Prompt**: Standardize AI system prompts across all BYOK provider adapters.
+
 
 
 

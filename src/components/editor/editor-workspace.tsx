@@ -14,6 +14,7 @@ import {
   serializeLayoutState,
   EDITOR_LAYOUT_STORAGE_KEY,
 } from "@/lib/editor/layout-persistence";
+import { handleSaveShortcut } from "@/lib/editor/shortcut-handler";
 import {
   Code2,
   Eye,
@@ -59,6 +60,9 @@ export function EditorWorkspace() {
 
   const [isSavingMaster, setIsSavingMaster] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+
+  // Task 9.3: Ctrl+S / Cmd+S save & instant recompile shortcut state
+  const [showShortcutSaveToast, setShowShortcutSaveToast] = useState<boolean>(false);
 
   // Task 7.9: Save as Master + Revert & Undo safety state
   const [showSaveConfirm, setShowSaveConfirm] = useState<boolean>(false);
@@ -289,6 +293,38 @@ export function EditorWorkspace() {
     }
   }, [source, runCompile]);
 
+  // Task 9.3: Ctrl+S / Cmd+S save & instant recompile handler
+  const isSavingShortcutRef = useRef<boolean>(false);
+  const sourceRef = useRef<string>(source);
+
+  useEffect(() => {
+    sourceRef.current = source;
+  }, [source]);
+
+  const handleShortcutSave = useCallback(async () => {
+    const currentSource = sourceRef.current;
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, currentSource);
+    }
+    setShowShortcutSaveToast(true);
+    setTimeout(() => setShowShortcutSaveToast(false), 2000);
+
+    await runCompile(currentSource);
+  }, [runCompile]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      handleSaveShortcut({
+        event: e,
+        onSave: handleShortcutSave,
+        isLockedRef: isSavingShortcutRef,
+      });
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleShortcutSave]);
+
   const handleSourceChange = (newVal: string) => {
     setSource(newVal);
     if (typeof window !== "undefined") {
@@ -418,6 +454,15 @@ export function EditorWorkspace() {
         }
         actions={
           <div className="flex items-center gap-2">
+            {showShortcutSaveToast && (
+              <div
+                data-testid="shortcut-save-toast"
+                className="flex items-center gap-1.5 px-3 py-1 bg-emerald-950/90 border border-emerald-700/80 text-emerald-200 text-xs font-medium rounded-md shadow-lg transition-all"
+              >
+                <Check className="h-3.5 w-3.5 text-emerald-400" />
+                <span>Draft Saved &amp; Recompiled</span>
+              </div>
+            )}
             <Button
               type="button"
               size="sm"
