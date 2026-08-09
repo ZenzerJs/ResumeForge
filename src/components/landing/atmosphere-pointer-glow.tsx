@@ -32,6 +32,7 @@ export function AtmospherePointerGlow({ shouldReduceMotion = false }: Atmosphere
       <div
         className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
         aria-hidden="true"
+        data-testid="atmosphere-pointer-glow"
       >
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-amber-500/10 rounded-full blur-[140px]" />
       </div>
@@ -42,6 +43,7 @@ export function AtmospherePointerGlow({ shouldReduceMotion = false }: Atmosphere
     <div
       className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
       aria-hidden="true"
+      data-testid="atmosphere-pointer-glow"
     >
       <motion.div
         className="absolute w-[600px] h-[600px] rounded-full blur-[130px] opacity-75"

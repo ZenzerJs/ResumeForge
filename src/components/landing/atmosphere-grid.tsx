@@ -13,6 +13,7 @@ export function AtmosphereGrid({ shouldReduceMotion = false }: AtmosphereGridPro
       <div
         className="absolute inset-0 pointer-events-none z-0 opacity-40"
         aria-hidden="true"
+        data-testid="atmosphere-grid"
         style={{
           backgroundImage:
             "linear-gradient(rgba(245, 158, 11, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(245, 158, 11, 0.08) 1px, transparent 1px)",
@@ -26,6 +27,7 @@ export function AtmosphereGrid({ shouldReduceMotion = false }: AtmosphereGridPro
     <div
       className="absolute inset-0 pointer-events-none z-0 overflow-hidden"
       aria-hidden="true"
+      data-testid="atmosphere-grid"
     >
       <motion.div
         animate={{ y: [0, 60] }}

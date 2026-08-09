@@ -8,11 +8,11 @@ interface AtmosphereCodeFragmentsProps {
 }
 
 const CODE_FRAGMENTS = [
-  { text: '#set page(paper: "a4", margin: 1.25cm)', top: "12%", left: "6%", duration: 18, delay: 0 },
-  { text: "#let evidence = bank.query(id)", top: "35%", right: "5%", duration: 22, delay: 2 },
-  { text: 'status: "VERIFIED_EVIDENCE"', top: "58%", left: "8%", duration: 20, delay: 4 },
-  { text: "#show: resume(author: name)", top: "78%", right: "8%", duration: 24, delay: 1 },
-  { text: "atsScore: 94 // target matched", top: "90%", left: "15%", duration: 19, delay: 3 },
+  { text: '#set page(paper: "a4")', top: "10%", left: "4%", duration: 18, delay: 0, showOnMobile: true },
+  { text: "#let evidence = bank.query(id)", top: "35%", right: "4%", duration: 22, delay: 2, showOnMobile: false },
+  { text: 'status: "VERIFIED_EVIDENCE"', top: "58%", left: "5%", duration: 20, delay: 4, showOnMobile: true },
+  { text: "#show: resume(author: name)", top: "78%", right: "5%", duration: 24, delay: 1, showOnMobile: false },
+  { text: "atsScore: 94 // target matched", top: "90%", left: "10%", duration: 19, delay: 3, showOnMobile: false },
 ];
 
 export function AtmosphereCodeFragments({ shouldReduceMotion = false }: AtmosphereCodeFragmentsProps) {
@@ -22,6 +22,7 @@ export function AtmosphereCodeFragments({ shouldReduceMotion = false }: Atmosphe
     <div
       className="absolute inset-0 pointer-events-none z-0 overflow-hidden select-none"
       aria-hidden="true"
+      data-testid="atmosphere-code-fragments"
     >
       {CODE_FRAGMENTS.map((frag, idx) => (
         <motion.div
@@ -36,7 +37,9 @@ export function AtmosphereCodeFragments({ shouldReduceMotion = false }: Atmosphe
             ease: "easeInOut",
             delay: frag.delay,
           }}
-          className="absolute font-mono text-[11px] text-amber-300/40 bg-slate-950/60 border border-amber-500/20 px-2.5 py-1 rounded backdrop-blur-[2px] shadow-sm hidden md:block"
+          className={`absolute font-mono text-[10px] sm:text-[11px] text-amber-300/40 bg-slate-950/60 border border-amber-500/20 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded backdrop-blur-[2px] shadow-sm ${
+            frag.showOnMobile ? "block" : "hidden md:block"
+          }`}
           style={{
             top: frag.top,
             left: frag.left,

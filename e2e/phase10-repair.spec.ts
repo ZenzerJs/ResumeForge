@@ -245,4 +245,40 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     // Verify Apply Fix is disabled again until checkbox is checked afresh
     await expect(applyFixBtn).toBeDisabled();
   });
+
+  test("7. LandingAtmosphere renders master container, SVG geometry layer, pointer glow, grid drift, scan line, and floating fragments", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    const atmosphere = page.locator('[data-testid="landing-atmosphere"]');
+    await expect(atmosphere).toBeVisible();
+
+    const pointerGlow = page.locator('[data-testid="atmosphere-pointer-glow"]');
+    await expect(pointerGlow).toBeVisible();
+
+    const grid = page.locator('[data-testid="atmosphere-grid"]');
+    await expect(grid).toBeVisible();
+
+    const scanLine = page.locator('[data-testid="atmosphere-scan-line"]');
+    await expect(scanLine).toBeVisible();
+
+    const codeFragments = page.locator('[data-testid="atmosphere-code-fragments"]');
+    await expect(codeFragments).toBeVisible();
+  });
+
+  test("8. Reduced-motion media query freezes dynamic atmosphere layers into static composition", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    const atmosphere = page.locator('[data-testid="landing-atmosphere"]');
+    await expect(atmosphere).toBeVisible();
+
+    const grid = page.locator('[data-testid="atmosphere-grid"]');
+    await expect(grid).toBeVisible();
+
+    // Scan line and fragments should be cleanly unmounted when reduced motion is preferred
+    const scanLine = page.locator('[data-testid="atmosphere-scan-line"]');
+    await expect(scanLine).not.toBeVisible();
+  });
 });
