@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2, BarChart3 } from "lucide-react";
 import { compileTypstToPdf } from "@/lib/typst/compiler";
+import { AtsScorePanel } from "@/components/tailor/ats-score-panel";
+import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
 
 interface PreviewPanelProps {
   svg: string | null;
@@ -10,6 +12,12 @@ interface PreviewPanelProps {
   source: string;
   isCompiling: boolean;
   onResetTemplate: () => void;
+  extractedRequirements?: {
+    requiredSkills: string[];
+    preferredSkills: string[];
+    domainTerms: string[];
+  };
+  roleTitle?: string;
 }
 
 export function PreviewPanel({
@@ -18,9 +26,61 @@ export function PreviewPanel({
   source,
   isCompiling,
   onResetTemplate,
+  extractedRequirements,
+  roleTitle,
 }: PreviewPanelProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+
+  // Task 9.5: ATS Grade in Editor preview state
+  const [showGrade, setShowGrade] = useState(false);
+  const [isGrading, setIsGrading] = useState(false);
+  const [gradeError, setGradeError] = useState<string | null>(null);
+  const [gradeResult, setGradeResult] = useState<AtsEvaluationResult | null>(null);
+
+  const handleToggleGrade = async () => {
+    if (showGrade) {
+      setShowGrade(false);
+      return;
+    }
+
+    if (!source || !source.trim()) {
+      setGradeError("Cannot grade an empty document. Please enter valid Typst source.");
+      setShowGrade(true);
+      return;
+    }
+
+    setIsGrading(true);
+    setGradeError(null);
+    setShowGrade(true);
+
+    try {
+      const res = await fetch("/api/ats/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          typstContent: source,
+          extractedRequirements: extractedRequirements || {
+            requiredSkills: [],
+            preferredSkills: [],
+            domainTerms: [],
+          },
+          roleTitle,
+        }),
+      });
+
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setGradeResult(json.data);
+      } else {
+        setGradeError(json.error || "Failed to calculate ATS evaluation score.");
+      }
+    } catch (err) {
+      setGradeError(`Evaluation error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsGrading(false);
+    }
+  };
 
   const handleExportPdf = async () => {
     try {
@@ -58,6 +118,17 @@ export function PreviewPanel({
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={handleToggleGrade}
+            data-testid="grade-resume-btn"
+            className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition-colors shadow-sm"
+            title="Grade current draft against ATS evaluation engine"
+          >
+            <BarChart3 className="h-3.5 w-3.5 text-amber-600" />
+            {showGrade ? "Close Grade" : "Grade"}
+          </button>
+
+          <button
+            type="button"
             onClick={onResetTemplate}
             className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
             title="Reset to starter template"
@@ -84,6 +155,51 @@ export function PreviewPanel({
 
       {/* Main Preview Container */}
       <div className="relative flex-1 overflow-auto p-4 md:p-6 flex flex-col items-center">
+        {/* Task 9.5: ATS Grade Overlay Breakdown */}
+        {showGrade && (
+          <div data-testid="editor-ats-score-overlay" className="w-full max-w-[850px] mb-6">
+            {isGrading && (
+              <div className="flex items-center justify-center p-6 bg-slate-900 border border-slate-800 rounded-xl text-amber-400 text-xs gap-2 shadow-lg">
+                <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
+                <span>Evaluating ATS quality score...</span>
+              </div>
+            )}
+
+            {gradeError && (
+              <div
+                data-testid="editor-grade-error"
+                className="p-4 bg-red-950/90 border border-red-800 rounded-xl flex items-center justify-between gap-3 text-xs text-red-200 shadow-lg"
+              >
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
+                  <span>{gradeError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setGradeError(null)}
+                  className="text-red-400 hover:text-red-200 text-xs underline font-medium"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
+            {gradeResult && !isGrading && (
+              <AtsScorePanel
+                typstContent={source}
+                extractedRequirements={
+                  extractedRequirements || {
+                    requiredSkills: [],
+                    preferredSkills: [],
+                    domainTerms: [],
+                  }
+                }
+                roleTitle={roleTitle}
+              />
+            )}
+          </div>
+        )}
+
         {/* Error Banner overlay at top if present */}
         {error && (
           <div

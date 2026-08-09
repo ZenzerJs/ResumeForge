@@ -78,6 +78,16 @@ export function CoverLetterPanel({
     setCoverLetter(null);
 
     try {
+      let providerConfig = undefined;
+      try {
+        const stored = localStorage.getItem("resumeforge_ai_settings");
+        if (stored) {
+          providerConfig = JSON.parse(stored);
+        }
+      } catch {
+        // ignore
+      }
+
       const res = await fetch("/api/ai/generate-cover-letter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -88,6 +98,7 @@ export function CoverLetterPanel({
           roleTitle: roleTitle || "Target Position",
           rawDescription,
           activeRoleProfile,
+          providerConfig,
         }),
       });
 

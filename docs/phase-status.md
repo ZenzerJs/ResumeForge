@@ -481,7 +481,41 @@ All AI agents completing subsequent phases MUST update this file using the follo
 - `npx playwright test` — Playwright E2E tests passed cleanly (38/38 specs passing).
 
 ### Suggested Next Task
-- **Task 9.5 — Evidence Tab Removal & ATS Grade Button**: Streamline header actions and relocate ATS grade triggers.
+- **Task 9.5 — Retire In-Workflow Evidence Tab & Add ATS Grade Button**: Completed in full.
+
+---
+
+## Current Status: Task 9.5 Complete — Retire In-Workflow Evidence Tab & Add ATS Grade Button to Editor Preview
+
+- **Task Completed**: Task 9.5 (Retire In-Workflow Evidence Tab & Add ATS Grade Button to Editor Preview)
+- **Completed Date**: 2026-08-09
+- **Status Summary**: Streamlined the Editor preview toolbar with a header "Grade" action (`data-testid="grade-resume-btn"`) that invokes the ATS evaluation engine (`/api/ats/evaluate`) and renders an inline 100-point rubric breakdown overlay (`data-testid="editor-ats-score-overlay"`), reusing `AtsScorePanel` for 100% visual and numerical consistency with Tailor. Verified BYOK API key propagation for cover letter generation from `localStorage` (`resumeforge_ai_settings`). Retired in-workflow Evidence tabs while keeping `/library` fully functional and evidence citation badges intact. Built Vitest unit tests (`tests/editor-ats-grade.test.ts`) and Playwright E2E spec (`e2e/phase9-ats-grade.spec.ts`).
+
+### Completed Work in Task 9.5
+- **Editor ATS Grade Button & Overlay (`src/components/editor/preview-panel.tsx`)**:
+  - Added header toolbar "Grade" button (`data-testid="grade-resume-btn"`).
+  - Toggles inline ATS score breakdown overlay (`data-testid="editor-ats-score-overlay"`), rendering `AtsScorePanel` directly inside the preview pane container without navigating away.
+  - Implemented loading state (`Loader2` spinner) and recoverable error state (`data-testid="editor-grade-error"`).
+- **Cover Letter BYOK API Key Fix**:
+  - `src/components/tailor/cover-letter-panel.tsx`: Reads `resumeforge_ai_settings` from `localStorage` and includes `providerConfig` in `/api/ai/generate-cover-letter` requests.
+  - `src/app/api/ai/generate-cover-letter/route.ts`: Enforces `providerConfig` presence and returns a clean 400 error if no API key is configured in Settings.
+- **Workflow Streamlining**:
+  - Maintained `/library` as the single dedicated place for Evidence Bank management.
+  - Kept evidence citation transparency badges on AI patches and cover letter cards.
+- **Automated Verification**:
+  - `tests/editor-ats-grade.test.ts`: Vitest suite covering evaluator execution, score determinism between Editor and Tailor, and empty source handling (161/161 tests passing across 35 test files).
+  - `e2e/phase9-ats-grade.spec.ts`: Playwright spec verifying Grade button trigger, inline score breakdown rendering, and `/library` CRUD accessibility (40/40 specs passing).
+
+### Verification Tests Executed
+- `npm run lint` — Passed with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (161/161 tests passing across 35 test files).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly (35/35 static & dynamic pages rendered).
+- `npx playwright test` — Playwright E2E tests passed cleanly (40/40 specs passing).
+
+### Suggested Next Task
+- **Task 9.6 — Tailor-Feedback-to-Editor Handoff**: Connect AI qualitative review recommendations directly to editor cursor jump targets.
+
 
 
 

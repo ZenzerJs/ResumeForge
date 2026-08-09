@@ -23,7 +23,17 @@ export async function POST(request: Request) {
     }
 
     const input = parseResult.data;
-    const providerConfig: ProviderConfig = body.providerConfig || { provider: "openai" };
+    const providerConfig: ProviderConfig = body.providerConfig || {};
+
+    if (!providerConfig.provider || !providerConfig.apiKey) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "No AI provider configured. Please configure your API key in Settings.",
+        },
+        { status: 400 }
+      );
+    }
 
     // Fetch active evidence items from database
     const evidenceItems = await getEvidenceItems();
