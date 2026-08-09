@@ -291,6 +291,15 @@ export function AiSidebar({
   const [repairApplied, setRepairApplied] = useState(false);
   const [confirmLargeRepair, setConfirmLargeRepair] = useState(false);
 
+  useEffect(() => {
+    setRepairProposal(null);
+    setRepairError(null);
+    setPreValidationValid(null);
+    setPreValidationError(null);
+    setRepairApplied(false);
+    setConfirmLargeRepair(false);
+  }, [repairContext]);
+
   const handleGenerateRepair = async () => {
     if (!repairContext) return;
     setIsRepairing(true);
@@ -299,6 +308,7 @@ export function AiSidebar({
     setPreValidationValid(null);
     setPreValidationError(null);
     setRepairApplied(false);
+    setConfirmLargeRepair(false);
 
     try {
       const providerConfig = loadAiSettings();

@@ -189,4 +189,60 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     // Apply Fix should now be enabled
     await expect(applyFixBtn).toBeEnabled();
   });
+
+  test("6. Dismissing repair mode or triggering a new repair resets large repair confirmation state", async ({ page }) => {
+    await page.route("**/api/ai/repair-typst", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          data: {
+            summary: "Replaced entire document",
+            errorAnalysis: "Replaced source with single line.",
+            replacementSource: '#set page(paper: "a4")',
+            confidence: "high",
+            warnings: [],
+            changedLinesCount: 50,
+          },
+        }),
+      });
+    });
+
+    await page.goto("/editor");
+    await page.waitForLoadState("networkidle");
+
+    const editor = page.locator('[data-testid="panel-code"] .cm-content');
+    await expect(editor).toBeVisible();
+
+    await editor.click();
+    await page.keyboard.press("Control+End");
+    await page.keyboard.type("\n\n#invalid_call(");
+    await page.keyboard.press("Control+s");
+
+    const fixWithAiBtn = page.locator('[data-testid="fix-typst-ai-btn"]').first();
+    await expect(fixWithAiBtn).toBeVisible({ timeout: 10000 });
+    await fixWithAiBtn.click();
+
+    const generateRepairBtn = page.locator('[data-testid="generate-repair-btn"]').first();
+    await generateRepairBtn.click();
+
+    const confirmCheckbox = page.locator('[data-testid="confirm-large-repair-checkbox"]').first();
+    await expect(confirmCheckbox).toBeVisible();
+    await confirmCheckbox.check();
+
+    const applyFixBtn = page.locator('[data-testid="apply-typst-fix-btn"]').first();
+    await expect(applyFixBtn).toBeEnabled();
+
+    // Dismiss repair mode
+    const closeRepairBtn = page.locator('[data-testid="close-repair-mode-btn"]').first();
+    await closeRepairBtn.click();
+
+    // Re-trigger repair mode
+    await fixWithAiBtn.click();
+    await generateRepairBtn.click();
+
+    // Verify Apply Fix is disabled again until checkbox is checked afresh
+    await expect(applyFixBtn).toBeDisabled();
+  });
 });

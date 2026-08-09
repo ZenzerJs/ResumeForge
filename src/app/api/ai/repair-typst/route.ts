@@ -95,7 +95,7 @@ export async function POST(req: Request) {
 
     const proposalWithDiff = {
       ...result.data,
-      changedLinesCount: result.data?.changedLinesCount ?? diffCount,
+      changedLinesCount: diffCount,
     };
 
     return NextResponse.json({ success: true, data: proposalWithDiff }, { status: 200 });

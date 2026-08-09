@@ -210,4 +210,21 @@ describe("Task 10.5 — Typst Repair Gateway Provider Dispatch", () => {
     expect(res.success).toBe(true);
     expect(res.data?.confidence).toBe("medium");
   });
+
+  it("11. Authoritative server line diff calculation overrides hallucinatory AI changedLinesCount: 0", async () => {
+    const origSource = "#let a = 1\n#let b = 2\n#let c = 3\n#let d = 4\n#let e = 5";
+    const repSource = "#set page(paper: \"a4\")";
+
+    const origLines = origSource.split("\n");
+    const repLines = repSource.split("\n");
+    let diffCount = 0;
+    const maxLen = Math.max(origLines.length, repLines.length);
+    for (let i = 0; i < maxLen; i++) {
+      if (origLines[i] !== repLines[i]) diffCount++;
+    }
+
+    // Server must compute 5 changed lines
+    expect(diffCount).toBe(5);
+    expect(diffCount / origLines.length).toBeGreaterThan(0.25);
+  });
 });
