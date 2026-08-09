@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   FileText,
   Database,
@@ -120,6 +120,7 @@ const workspaces = [
 
 export default function Home() {
   const router = useRouter();
+  const shouldReduceMotion = useReducedMotion();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -177,7 +178,7 @@ export default function Home() {
 
       const json = await res.json();
       if (res.ok && json.success && json.data?.id) {
-        // Guaranteed redirect to /editor with the newly created draft
+        // Guaranteed redirect to /editor with newly created draft
         router.push(`/editor?resumeId=${json.data.id}`);
       } else {
         setNotification({
@@ -221,14 +222,36 @@ export default function Home() {
     }
   };
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: shouldReduceMotion ? 0 : 0.08,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: shouldReduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: shouldReduceMotion ? 0 : 0.4, ease: "easeOut" as const },
+    },
+  };
+
   return (
     <div
-      className="min-h-screen flex flex-col"
+      className="min-h-screen flex flex-col relative overflow-hidden"
       style={{ backgroundColor: "#0A0E17" }}
     >
+      {/* Background Radial Glow */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-amber-500/10 rounded-full blur-[120px] pointer-events-none" />
+
       <TopNav />
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 md:px-8 py-10 md:py-14 flex flex-col gap-12">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 md:px-8 py-10 md:py-14 flex flex-col gap-12 relative z-10">
         {/* Notification Toast */}
         <AnimatePresence>
           {notification && (
@@ -263,9 +286,9 @@ export default function Home() {
 
         {/* Hero Section */}
         <motion.section
-          initial={{ opacity: 0, y: -16 }}
+          initial={shouldReduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.5, ease: "easeOut" }}
           className="flex flex-col items-center text-center gap-5 max-w-3xl mx-auto"
         >
           <div
@@ -276,7 +299,7 @@ export default function Home() {
               color: "#FCD34D",
             }}
           >
-            <ShieldCheck className="h-3.5 w-3.5" />
+            <ShieldCheck className="h-3.5 w-3.5 text-amber-400" />
             Local-First · Evidence-Grounded · Zero-Hallucination AI
           </div>
 
@@ -314,7 +337,7 @@ export default function Home() {
               type="button"
               disabled={isUploadingPdf}
               onClick={() => pdfInputRef.current?.click()}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 shadow-lg"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 shadow-lg hover:scale-[1.02] active:scale-[0.98]"
               style={{
                 background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
                 color: "#0A0E17",
@@ -332,7 +355,7 @@ export default function Home() {
 
             <Link href="/editor">
               <button
-                className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 border"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 border hover:border-amber-500/40 hover:bg-slate-900"
                 style={{
                   background: "rgba(17, 22, 34, 0.85)",
                   borderColor: "#1E2536",
@@ -367,9 +390,9 @@ export default function Home() {
 
         {/* Live Stats Bar */}
         <motion.section
-          initial={{ opacity: 0, scale: 0.99 }}
+          initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.99 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4, delay: 0.15 }}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.4, delay: 0.15 }}
           className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden border"
           style={{ borderColor: "#1E2536", background: "#1E2536" }}
         >
@@ -415,7 +438,7 @@ export default function Home() {
           ].map(({ label, value }) => (
             <div
               key={label}
-              className="flex flex-col gap-1.5 px-5 py-4"
+              className="flex flex-col gap-1.5 px-5 py-4 transition-colors hover:bg-slate-900/90"
               style={{ backgroundColor: "#111622" }}
             >
               <span
@@ -435,9 +458,9 @@ export default function Home() {
         <section className="flex flex-col gap-5">
           {/* Animated Module Header Row */}
           <motion.div
-            initial={{ opacity: 0, y: 12 }}
+            initial={shouldReduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.2 }}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.4, delay: 0.2 }}
             className="flex items-center justify-between"
           >
             <h2 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
@@ -453,10 +476,7 @@ export default function Home() {
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"
             initial="hidden"
             animate="visible"
-            variants={{
-              hidden: {},
-              visible: { transition: { staggerChildren: 0.07 } },
-            }}
+            variants={containerVariants}
           >
             {workspaces.map((ws) => {
               const Icon = ws.icon;
@@ -465,22 +485,16 @@ export default function Home() {
               const stat = ws.stat(stats);
 
               return (
-                <motion.div
-                  key={ws.href}
-                  variants={{
-                    hidden: { opacity: 0, y: 12 },
-                    visible: { opacity: 1, y: 0, transition: { duration: 0.35 } },
-                  }}
-                >
+                <motion.div key={ws.href} variants={itemVariants}>
                   <Link href={ws.href} className="group block h-full">
                     <div
-                      className={`h-full p-5 rounded-xl border flex flex-col justify-between gap-4 transition-all duration-200 hover-spotlight ${ws.activeBorder} ${ws.activeGlow}`}
+                      className={`h-full p-5 rounded-xl border flex flex-col justify-between gap-4 transition-all duration-200 ${ws.activeBorder} ${ws.activeGlow} hover:-translate-y-1 hover:border-amber-500/30 shadow-md hover:shadow-xl hover:shadow-amber-500/5`}
                       style={{ backgroundColor: "#111622", borderColor: "#1E2536" }}
                     >
                       <div className="flex flex-col gap-3">
                         <div className="flex items-center justify-between">
                           <div
-                            className={`flex h-9 w-9 items-center justify-center rounded-lg border ${ws.iconBg} transition-transform duration-200 group-hover:scale-105`}
+                            className={`flex h-9 w-9 items-center justify-center rounded-lg border ${ws.iconBg} transition-transform duration-200 group-hover:scale-110`}
                           >
                             <Icon className={`h-4.5 w-4.5 ${ws.iconColor}`} />
                           </div>
@@ -509,7 +523,7 @@ export default function Home() {
                           {loading ? <Skeleton className="h-3 w-24" /> : stat}
                         </span>
                         <span
-                          className={`flex items-center gap-1 font-medium transition-transform duration-150 group-hover:translate-x-0.5 ${ws.iconColor}`}
+                          className={`flex items-center gap-1 font-medium transition-transform duration-150 group-hover:translate-x-1 ${ws.iconColor}`}
                         >
                           Open
                           <ArrowRight className="h-3.5 w-3.5" />
@@ -525,7 +539,7 @@ export default function Home() {
       </main>
 
       <footer
-        className="py-5 text-center text-[11px] font-mono border-t"
+        className="py-5 text-center text-[11px] font-mono border-t relative z-10"
         style={{ borderColor: "#1E2536", color: "#3D4F6E" }}
       >
         ResumeForge · Local-First · Confidential Storage Only

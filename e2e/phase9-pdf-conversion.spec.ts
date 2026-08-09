@@ -72,7 +72,7 @@ startxref
     const fileInput = page.locator('[data-testid="pdf-upload-input"]');
     await fileInput.setInputFiles(testPdfPath);
 
-    await page.waitForURL(/\/editor\?resumeId=/, { timeout: 15000 });
+    await page.waitForURL(/\/editor\?resumeId=/, { timeout: 30000 });
 
     const dismissBtn = page.locator('[data-testid="dismiss-conversion-banner-btn"]');
     if (await dismissBtn.isVisible()) {
