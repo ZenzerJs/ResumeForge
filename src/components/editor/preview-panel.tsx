@@ -34,52 +34,9 @@ export function PreviewPanel({
 
   // Task 9.5: ATS Grade in Editor preview state
   const [showGrade, setShowGrade] = useState(false);
-  const [isGrading, setIsGrading] = useState(false);
-  const [gradeError, setGradeError] = useState<string | null>(null);
-  const [gradeResult, setGradeResult] = useState<AtsEvaluationResult | null>(null);
 
-  const handleToggleGrade = async () => {
-    if (showGrade) {
-      setShowGrade(false);
-      return;
-    }
-
-    if (!source || !source.trim()) {
-      setGradeError("Cannot grade an empty document. Please enter valid Typst source.");
-      setShowGrade(true);
-      return;
-    }
-
-    setIsGrading(true);
-    setGradeError(null);
-    setShowGrade(true);
-
-    try {
-      const res = await fetch("/api/ats/evaluate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          typstContent: source,
-          extractedRequirements: extractedRequirements || {
-            requiredSkills: [],
-            preferredSkills: [],
-            domainTerms: [],
-          },
-          roleTitle,
-        }),
-      });
-
-      const json = await res.json();
-      if (res.ok && json.success) {
-        setGradeResult(json.data);
-      } else {
-        setGradeError(json.error || "Failed to calculate ATS evaluation score.");
-      }
-    } catch (err) {
-      setGradeError(`Evaluation error: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setIsGrading(false);
-    }
+  const handleToggleGrade = () => {
+    setShowGrade((prev) => !prev);
   };
 
   const handleExportPdf = async () => {
@@ -158,33 +115,24 @@ export function PreviewPanel({
         {/* Task 9.5: ATS Grade Overlay Breakdown */}
         {showGrade && (
           <div data-testid="editor-ats-score-overlay" className="w-full max-w-[850px] mb-6">
-            {isGrading && (
-              <div className="flex items-center justify-center p-6 bg-slate-900 border border-slate-800 rounded-xl text-amber-400 text-xs gap-2 shadow-lg">
-                <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
-                <span>Evaluating ATS quality score...</span>
-              </div>
-            )}
-
-            {gradeError && (
+            {!source || !source.trim() ? (
               <div
                 data-testid="editor-grade-error"
                 className="p-4 bg-red-950/90 border border-red-800 rounded-xl flex items-center justify-between gap-3 text-xs text-red-200 shadow-lg"
               >
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
-                  <span>{gradeError}</span>
+                  <span>Cannot grade an empty document. Please enter valid Typst source.</span>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setGradeError(null)}
+                  onClick={() => setShowGrade(false)}
                   className="text-red-400 hover:text-red-200 text-xs underline font-medium"
                 >
                   Dismiss
                 </button>
               </div>
-            )}
-
-            {gradeResult && !isGrading && (
+            ) : (
               <AtsScorePanel
                 typstContent={source}
                 extractedRequirements={
