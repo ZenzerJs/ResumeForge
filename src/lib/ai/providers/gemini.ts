@@ -1,6 +1,8 @@
 import { ProviderConfig, TestConnectionResult, GeneratePatchesResult, ConvertPdfResult } from "../types";
 import { sanitizeError } from "../redact";
 import { stripCodeFences } from "../utils";
+import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from "../repair-schema";
+import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
 
 export async function testGeminiConnection(config: ProviderConfig): Promise<TestConnectionResult> {
   const apiKey = config.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
@@ -289,6 +291,77 @@ export async function convertGeminiPdfTextToTypst(
     return { success: true, typstSource };
   } catch (err) {
     return { success: false, error: sanitizeError(`Gemini PDF conversion failed: ${err instanceof Error ? err.message : String(err)}`) };
+  }
+}
+
+export async function repairTypstWithGemini(
+  config: ProviderConfig,
+  input: TypstRepairInput
+): Promise<{ success: boolean; data?: TypstRepairProposal; error?: string }> {
+  const apiKey = config.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
+  const baseUrl = (config.baseUrl?.trim() || process.env.GEMINI_BASE_URL?.trim() || "https://generativelanguage.googleapis.com").replace(/\/+$/, "");
+  const model = config.model?.trim() || "gemini-1.5-pro";
+
+  if (!apiKey) {
+    return { success: false, error: "Gemini API key is missing. Please configure your key in Settings." };
+  }
+
+  const systemPrompt = buildTypstRepairSystemPrompt();
+  const userPrompt = buildTypstRepairUserPrompt(input);
+
+  try {
+    const res = await fetch(
+      `${baseUrl}/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ parts: [{ text: userPrompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: "application/json",
+          },
+        }),
+        signal: AbortSignal.timeout(30000),
+      }
+    );
+
+    if (!res.ok) {
+      let errBody = "";
+      try {
+        const json = await res.json();
+        errBody = json.error?.message || JSON.stringify(json);
+      } catch {
+        errBody = res.statusText;
+      }
+      return { success: false, error: sanitizeError(`Gemini API status ${res.status}: ${errBody}`) };
+    }
+
+    const data = await res.json();
+    const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!rawContent) {
+      return { success: false, error: "Gemini returned empty content." };
+    }
+
+    const cleaned = stripCodeFences(rawContent);
+    const parsedJson = JSON.parse(cleaned);
+    const validated = TypstRepairProposalSchema.safeParse(parsedJson);
+
+    if (!validated.success) {
+      return {
+        success: false,
+        error: `Gemini returned invalid repair proposal JSON: ${validated.error.issues.map((i) => i.message).join(", ")}`,
+      };
+    }
+
+    return { success: true, data: validated.data };
+  } catch (err) {
+    return {
+      success: false,
+      error: sanitizeError(`Gemini repair failed: ${err instanceof Error ? err.message : String(err)}`),
+    };
   }
 }
 

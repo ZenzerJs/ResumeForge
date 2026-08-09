@@ -1,6 +1,8 @@
 import { ProviderConfig, TestConnectionResult, GeneratePatchesResult, ConvertPdfResult } from "../types";
 import { sanitizeError } from "../redact";
 import { stripCodeFences } from "../utils";
+import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from "../repair-schema";
+import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
 
 export async function testAnthropicConnection(config: ProviderConfig): Promise<TestConnectionResult> {
   const apiKey = config.apiKey?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
@@ -21,7 +23,6 @@ export async function testAnthropicConnection(config: ProviderConfig): Promise<T
       headers: {
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
       },
       signal: AbortSignal.timeout(5000),
     });
@@ -39,7 +40,7 @@ export async function testAnthropicConnection(config: ProviderConfig): Promise<T
       return {
         success: false,
         provider: "anthropic",
-        message: sanitizeError(`Anthropic API returned status ${res.status}: ${errBody}`),
+        message: `Anthropic connection test failed (${res.status}): ${errBody}`,
         latencyMs,
       };
     }
@@ -50,17 +51,15 @@ export async function testAnthropicConnection(config: ProviderConfig): Promise<T
     return {
       success: true,
       provider: "anthropic",
-      message: `Successfully connected to Anthropic models API (${modelCount ?? 0} models available).`,
+      message: `Successfully connected to Anthropic API (${modelCount ?? 0} models available).`,
       modelCount,
       latencyMs,
     };
   } catch (err) {
-    const latencyMs = Date.now() - startTime;
     return {
       success: false,
       provider: "anthropic",
       message: sanitizeError(`Connection failed: ${err instanceof Error ? err.message : String(err)}`),
-      latencyMs,
     };
   }
 }
@@ -296,6 +295,78 @@ export async function convertAnthropicPdfTextToTypst(
     return { success: true, typstSource };
   } catch (err) {
     return { success: false, error: sanitizeError(`Anthropic PDF conversion failed: ${err instanceof Error ? err.message : String(err)}`) };
+  }
+}
+
+export async function repairTypstWithAnthropic(
+  config: ProviderConfig,
+  input: TypstRepairInput
+): Promise<{ success: boolean; data?: TypstRepairProposal; error?: string }> {
+  const apiKey = config.apiKey?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
+  const baseUrl = (config.baseUrl?.trim() || process.env.ANTHROPIC_BASE_URL?.trim() || "https://api.anthropic.com").replace(/\/+$/, "");
+  const model = config.model?.trim() || "claude-3-5-sonnet-20241022";
+
+  if (!apiKey) {
+    return { success: false, error: "Anthropic API key is missing. Please configure your key in Settings." };
+  }
+
+  const systemPrompt = buildTypstRepairSystemPrompt();
+  const userPrompt = buildTypstRepairUserPrompt(input);
+
+  try {
+    const res = await fetch(`${baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+        temperature: 0.1,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!res.ok) {
+      let errBody = "";
+      try {
+        const json = await res.json();
+        errBody = json.error?.message || JSON.stringify(json);
+      } catch {
+        errBody = res.statusText;
+      }
+      return { success: false, error: sanitizeError(`Anthropic API status ${res.status}: ${errBody}`) };
+    }
+
+    const data = await res.json();
+    const textBlock = data.content?.find((c: { type: string }) => c.type === "text");
+    const rawContent = textBlock?.text;
+
+    if (!rawContent) {
+      return { success: false, error: "Anthropic returned empty content." };
+    }
+
+    const cleaned = stripCodeFences(rawContent);
+    const parsedJson = JSON.parse(cleaned);
+    const validated = TypstRepairProposalSchema.safeParse(parsedJson);
+
+    if (!validated.success) {
+      return {
+        success: false,
+        error: `Anthropic returned invalid repair proposal JSON: ${validated.error.issues.map((i) => i.message).join(", ")}`,
+      };
+    }
+
+    return { success: true, data: validated.data };
+  } catch (err) {
+    return {
+      success: false,
+      error: sanitizeError(`Anthropic repair failed: ${err instanceof Error ? err.message : String(err)}`),
+    };
   }
 }
 

@@ -570,11 +570,11 @@ All AI agents completing subsequent phases MUST update this file using the follo
 
 ---
 
-## Current Status: Phase 10 Complete — Production Polish, Root Metadata & Landing Motion Redesign
+## Current Status: Phase 10 Complete — Production Polish, Root Metadata & Editorial Fintech Landing Redesign
 
-- **Phase Completed**: Phase 10 (Task 10.1 Production Polish & Task 10.2 Landing Page Motion Redesign)
+- **Phase Completed**: Phase 10 (Task 10.1 Production Polish, Task 10.2 Landing Page Motion & Task 10.3 Editorial Fintech Redesign)
 - **Completed Date**: 2026-08-09
-- **Status Summary**: Implemented brand icon assets (`src/app/icon.tsx`, `src/app/apple-icon.tsx`, `src/app/opengraph-image.tsx`, `src/app/manifest.ts`), complete root layout metadata (`metadataBase`, `openGraph`, `twitter`, `themeColor`), branded App Router error boundaries and loading skeletons (`src/app/not-found.tsx`, `src/app/error.tsx`, `src/app/loading.tsx`), and a full landing page motion redesign (`src/app/page.tsx`) using Framer Motion with staggered reveals, hover micro-interactions, and a `prefers-reduced-motion` fallback.
+- **Status Summary**: Implemented brand icon assets (`src/app/icon.tsx`, `src/app/apple-icon.tsx`, `src/app/opengraph-image.tsx`, `src/app/manifest.ts`), complete root layout metadata (`metadataBase`, `openGraph`, `twitter`, `themeColor`), branded App Router error boundaries and loading skeletons (`src/app/not-found.tsx`, `src/app/error.tsx`, `src/app/loading.tsx`), and a full **Editorial Fintech Landing Page Redesign** (`src/app/page.tsx`, `src/components/landing/*`) based on the Origin/Halo design systems.
 
 ### Completed Work in Phase 10
 - **Brand Icon & Metadata Assets (Task 10.1)**:
@@ -586,19 +586,23 @@ All AI agents completing subsequent phases MUST update this file using the follo
   - Built branded 404 page (`src/app/not-found.tsx`) with gold/amber accent, helpful message, and "Return to Dashboard" action.
   - Built client-side error boundary (`src/app/error.tsx`) with error details, "Try again" reset action, and home link.
   - Added root loading skeleton (`src/app/loading.tsx`) with ambient pulsing glow.
-- **Landing Page Motion & Visual Redesign (Task 10.2)**:
-  - Redesigned `src/app/page.tsx` with Framer Motion staggered reveals, radial ambient glow, and hover micro-animations across Hero, Live Stats Bar, and Workspace Module Cards.
-  - Implemented `useReducedMotion()` fallback to respect user accessibility preferences.
-  - Preserved all functional PDF upload, Clear Master, and navigation endpoints.
+- **Editorial Fintech Landing Page Redesign (Task 10.3)**:
+  - Decoupled landing page UI into modular components under `src/components/landing/`:
+    - `landing-hero.tsx`: Editorial eyebrow (`LOCAL-FIRST RESUME INTELLIGENCE`), headline (`Make every application feel intentional.`), White-on-Black main CTA, outline upload CTA, and proof mockup container.
+    - `product-proof-card.tsx`: Product proof mockup card explicitly labeled `WORKSPACE PREVIEW` — `Illustrative interface — your verified data stays local` with structural placeholder shapes.
+    - `capability-marquee.tsx`: Continuous ticker with pause-on-hover/focus and `prefers-reduced-motion` fallback.
+    - `workflow-timeline.tsx`: Interactive 5-step workflow timeline (`Import → Ground → Tailor → Verify → Apply`) with keyboard accessibility (`Tab`/`Space`/`Enter`) and code artifact previews.
+    - `capability-grid.tsx`: Origin-inspired mixed-surface grid with selective chromatic tiles (`Amber` Master Editor, `Silver Inverted` Evidence Bank, `Iris Violet` Tailor Engine, `Periwinkle` Tracker, `Cyan Signal` AI Settings).
+    - `landing-footer.tsx`: Refined landing footer with local-first security policy and workspace links.
 - **Automated Verification**:
-  - `e2e/phase10-polish.spec.ts`: Created Playwright spec testing 404 route rendering, OpenGraph metadata tags, `/icon` and `/manifest` 200 HTTP responses, landing page element presence, and `prefers-reduced-motion` static rendering (47/47 E2E specs passing).
+  - `e2e/phase10-polish.spec.ts`: Created Playwright spec testing 404 route rendering, OpenGraph metadata tags, `/icon` and `/manifest` 200 HTTP responses, illustrative proof card disclaimer, 5-step workflow step switching, keyboard accessibility, marquee pause/reduced motion, 375px/768px/1200px responsive viewports without horizontal overflow, immediate PDF upload CTA interactivity, and 5 capability module routes (51/51 E2E specs passing).
 
 ### Verification Tests Executed
 - `npm run lint` — Passed with 0 warnings or errors.
 - `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
 - `npm run test` — Vitest unit & integration tests passed cleanly (167/167 tests passing across 36 test files).
 - `npm run build` — Next.js production build succeeded cleanly (36/36 static & dynamic pages rendered).
-- `npx playwright test` — Playwright E2E tests passed cleanly (47/47 specs passing).
+- `npx playwright test` — Playwright E2E tests passed cleanly (51/51 specs passing).
 
 ---
 

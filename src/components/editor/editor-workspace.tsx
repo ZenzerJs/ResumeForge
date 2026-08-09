@@ -54,9 +54,17 @@ export function EditorWorkspace() {
 
   const [source, setSource] = useState<string>("");
   const [svg, setSvg] = useState<string | null>(null);
-  const [error, setError] = useState<{ message: string; line?: number } | null>(null);
+  const [error, setError] = useState<{ message: string; line?: number; column?: number } | null>(null);
   const [isCompiling, setIsCompiling] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"editor" | "preview" | "ai">("editor");
+
+  // Task 10.5: Typst Repair Assist active error context state
+  const [repairContext, setRepairContext] = useState<{
+    compileError: string;
+    line?: number;
+    column?: number;
+    sourceExcerpt?: string;
+  } | null>(null);
 
   const [isSavingMaster, setIsSavingMaster] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
@@ -331,6 +339,26 @@ export function EditorWorkspace() {
       localStorage.setItem(STORAGE_KEY, newVal);
     }
   };
+
+  const handleTriggerRepair = useCallback(
+    (context: { compileError: string; line?: number; column?: number; sourceExcerpt?: string }) => {
+      setRepairContext(context);
+      if (isAiCollapsedRef.current && aiPanelRef.current) {
+        aiPanelRef.current.expand();
+        updateAiCollapsedState(false);
+      }
+      setActiveTab("ai");
+    },
+    [aiPanelRef, updateAiCollapsedState]
+  );
+
+  const handleApplyRepair = useCallback(
+    (newSource: string) => {
+      handleSourceChange(newSource);
+      runCompile(newSource);
+    },
+    [runCompile]
+  );
 
   const handleResetTemplate = async () => {
     const starter = await loadStarterTemplate();
@@ -760,6 +788,7 @@ export function EditorWorkspace() {
               source={source}
               isCompiling={isCompiling}
               onResetTemplate={handleResetTemplate}
+              onTriggerRepair={handleTriggerRepair}
             />
           </ResizablePanel>
 
@@ -785,9 +814,11 @@ export function EditorWorkspace() {
           >
             <AiSidebar
               source={source}
-              onApplyToBuffer={setSource}
+              onApplyToBuffer={handleApplyRepair}
               isCollapsed={isAiCollapsed}
               onToggleCollapse={toggleAiSidebarCollapse}
+              repairContext={repairContext}
+              onDismissRepair={() => setRepairContext(null)}
             />
           </ResizablePanel>
         </ResizablePanelGroup>
@@ -807,12 +838,18 @@ export function EditorWorkspace() {
                 source={source}
                 isCompiling={isCompiling}
                 onResetTemplate={handleResetTemplate}
+                onTriggerRepair={handleTriggerRepair}
               />
             </div>
           )}
           {activeTab === "ai" && (
             <div className="h-full w-full overflow-hidden">
-              <AiSidebar source={source} onApplyToBuffer={setSource} />
+              <AiSidebar
+                source={source}
+                onApplyToBuffer={handleApplyRepair}
+                repairContext={repairContext}
+                onDismissRepair={() => setRepairContext(null)}
+              />
             </div>
           )}
         </div>

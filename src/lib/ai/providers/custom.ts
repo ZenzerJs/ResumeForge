@@ -1,6 +1,8 @@
 import { ProviderConfig, TestConnectionResult, GeneratePatchesResult, ConvertPdfResult } from "../types";
 import { sanitizeError } from "../redact";
 import { stripCodeFences } from "../utils";
+import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from "../repair-schema";
+import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
 
 /**
  * Custom OpenAI-Compatible Endpoint Adapter
@@ -327,6 +329,77 @@ export async function convertCustomPdfTextToTypst(
     return { success: true, typstSource };
   } catch (err) {
     return { success: false, error: sanitizeError(`Custom endpoint PDF conversion failed: ${err instanceof Error ? err.message : String(err)}`) };
+  }
+}
+
+export async function repairTypstWithCustom(
+  config: ProviderConfig,
+  input: TypstRepairInput
+): Promise<{ success: boolean; data?: TypstRepairProposal; error?: string }> {
+  const apiKey = config.apiKey?.trim() || process.env.CUSTOM_OPENAI_API_KEY?.trim();
+  const baseUrlRaw = config.baseUrl?.trim() || process.env.CUSTOM_OPENAI_BASE_URL?.trim() || "http://localhost:8000";
+  const baseUrl = baseUrlRaw.replace(/\/+$/, "");
+  const model = config.model?.trim() || "default";
+
+  const systemPrompt = buildTypstRepairSystemPrompt();
+  const userPrompt = buildTypstRepairUserPrompt(input);
+
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (apiKey) {
+      headers["Authorization"] = `Bearer ${apiKey}`;
+    }
+
+    const completionsUrl = baseUrl.endsWith("/v1") ? `${baseUrl}/chat/completions` : `${baseUrl}/v1/chat/completions`;
+
+    const res = await fetch(completionsUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.1,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!res.ok) {
+      let errBody = "";
+      try {
+        const json = await res.json();
+        errBody = json.error?.message || JSON.stringify(json);
+      } catch {
+        errBody = res.statusText;
+      }
+      return { success: false, error: sanitizeError(`Custom endpoint returned status ${res.status}: ${errBody}`) };
+    }
+
+    const data = await res.json();
+    const rawContent = data.choices?.[0]?.message?.content;
+    if (!rawContent) {
+      return { success: false, error: "Custom endpoint returned empty content." };
+    }
+
+    const cleaned = stripCodeFences(rawContent);
+    const parsedJson = JSON.parse(cleaned);
+    const validated = TypstRepairProposalSchema.safeParse(parsedJson);
+
+    if (!validated.success) {
+      return {
+        success: false,
+        error: `Custom endpoint returned invalid repair proposal JSON: ${validated.error.issues.map((i) => i.message).join(", ")}`,
+      };
+    }
+
+    return { success: true, data: validated.data };
+  } catch (err) {
+    return {
+      success: false,
+      error: sanitizeError(`Custom endpoint repair failed: ${err instanceof Error ? err.message : String(err)}`),
+    };
   }
 }
 

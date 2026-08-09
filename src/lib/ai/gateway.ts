@@ -1,14 +1,15 @@
 import { ProviderConfig, ProviderConfigSchema, TestConnectionResult, GeneratePatchesInput, GeneratePatchesResult, EvidenceItemForPrompt, ConvertPdfInput, ConvertPdfResult } from "./types";
-import { testOpenAIConnection, generateOpenAIPatches, generateOpenAIQualitativeReview, generateOpenAICoverLetter, convertOpenAIPdfTextToTypst } from "./providers/openai";
-import { testAnthropicConnection, generateAnthropicPatches, generateAnthropicQualitativeReview, generateAnthropicCoverLetter, convertAnthropicPdfTextToTypst } from "./providers/anthropic";
-import { testGeminiConnection, generateGeminiPatches, generateGeminiQualitativeReview, generateGeminiCoverLetter, convertGeminiPdfTextToTypst } from "./providers/gemini";
-import { testCustomConnection, generateCustomPatches, generateCustomQualitativeReview, generateCustomCoverLetter, convertCustomPdfTextToTypst } from "./providers/custom";
+import { testOpenAIConnection, generateOpenAIPatches, generateOpenAIQualitativeReview, generateOpenAICoverLetter, convertOpenAIPdfTextToTypst, repairTypstWithOpenAI } from "./providers/openai";
+import { testAnthropicConnection, generateAnthropicPatches, generateAnthropicQualitativeReview, generateAnthropicCoverLetter, convertAnthropicPdfTextToTypst, repairTypstWithAnthropic } from "./providers/anthropic";
+import { testGeminiConnection, generateGeminiPatches, generateGeminiQualitativeReview, generateGeminiCoverLetter, convertGeminiPdfTextToTypst, repairTypstWithGemini } from "./providers/gemini";
+import { testCustomConnection, generateCustomPatches, generateCustomQualitativeReview, generateCustomCoverLetter, convertCustomPdfTextToTypst, repairTypstWithCustom } from "./providers/custom";
 import { sanitizeError } from "./redact";
 import { buildPatchSystemPrompt, buildPatchUserPrompt } from "./prompt-template";
 import { buildQualitativeReviewSystemPrompt, buildQualitativeReviewUserPrompt, QualitativeReviewPromptInput } from "./qualitative-prompt";
 import { buildCoverLetterSystemPrompt, buildCoverLetterUserPrompt } from "./cover-letter-prompt";
 import { buildPdfToTypstSystemPrompt, buildPdfToTypstUserPrompt } from "./pdf-prompt";
 import { GenerateCoverLetterInput } from "./cover-letter-schema";
+import { TypstRepairInput, TypstRepairInputSchema, TypstRepairProposal } from "./repair-schema";
 
 /**
  * Unified AI Provider Gateway Connectivity Interface
@@ -217,6 +218,55 @@ export async function convertPdfTextToTypst(input: ConvertPdfInput): Promise<Con
     return {
       success: false,
       error: sanitizeError(`PDF conversion gateway exception: ${err instanceof Error ? err.message : String(err)}`),
+    };
+  }
+}
+
+/**
+  * Task 10.5: Dispatches AI Typst repair request through configured provider.
+  */
+export async function repairTypstSource(
+  providerConfig: ProviderConfig,
+  input: TypstRepairInput
+): Promise<{ success: boolean; data?: TypstRepairProposal; error?: string }> {
+  const parseResult = ProviderConfigSchema.safeParse(providerConfig);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: sanitizeError(`Invalid provider configuration: ${parseResult.error.message}`),
+    };
+  }
+
+  const inputValidate = TypstRepairInputSchema.safeParse(input);
+  if (!inputValidate.success) {
+    return {
+      success: false,
+      error: `Invalid repair payload: ${inputValidate.error.issues.map((i) => i.message).join(", ")}`,
+    };
+  }
+
+  const config = parseResult.data;
+
+  try {
+    switch (config.provider) {
+      case "openai":
+        return await repairTypstWithOpenAI(config, inputValidate.data);
+      case "anthropic":
+        return await repairTypstWithAnthropic(config, inputValidate.data);
+      case "gemini":
+        return await repairTypstWithGemini(config, inputValidate.data);
+      case "custom":
+        return await repairTypstWithCustom(config, inputValidate.data);
+      default:
+        return {
+          success: false,
+          error: `Unsupported AI provider for Typst repair: ${config.provider}`,
+        };
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: sanitizeError(`Typst repair gateway exception: ${err instanceof Error ? err.message : String(err)}`),
     };
   }
 }

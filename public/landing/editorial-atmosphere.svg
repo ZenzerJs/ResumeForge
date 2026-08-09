@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <defs>
+    <!-- Ambient Radial Light Glow -->
+    <radialGradient id="amberGlow" cx="50%" cy="30%" r="50%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.08" />
+      <stop offset="50%" stop-color="#d97706" stop-opacity="0.03" />
+      <stop offset="100%" stop-color="#0f1011" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Linear Grid Rule Shader -->
+    <pattern id="docGrid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#1e293b" stroke-opacity="0.15" stroke-width="1" />
+    </pattern>
+  </defs>
+
+  <!-- Background Base Canvas -->
+  <rect width="100%" height="100%" fill="#0f1011" />
+
+  <!-- Radial Glow Overlay -->
+  <rect width="100%" height="100%" fill="url(#amberGlow)" />
+
+  <!-- Document Geometry Rules Grid -->
+  <rect width="100%" height="100%" fill="url(#docGrid)" />
+
+  <!-- Editorial Document Crop Marks & Syntax Lines -->
+  <g stroke="#334155" stroke-opacity="0.3" stroke-width="1" fill="none">
+    <!-- Top Left Crop Mark -->
+    <path d="M 40 20 L 40 40 L 20 40" />
+    <!-- Top Right Crop Mark -->
+    <path d="M 1160 20 L 1160 40 L 1180 40" />
+    <!-- Center Guide Axis -->
+    <line x1="600" y1="40" x2="600" y2="760" stroke-dasharray="4 8" stroke-opacity="0.15" />
+    <!-- Horizontal Rule -->
+    <line x1="100" y1="120" x2="1100" y2="120" stroke-opacity="0.2" />
+  </g>
+</svg>

@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2, BarChart3 } from "lucide-react";
+import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2, BarChart3, Sparkles } from "lucide-react";
 import { compileTypstToPdf } from "@/lib/typst/compiler";
 import { AtsScorePanel } from "@/components/tailor/ats-score-panel";
 import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
 
 interface PreviewPanelProps {
   svg: string | null;
-  error: { message: string; line?: number } | null;
+  error: { message: string; line?: number; column?: number } | null;
   source: string;
   isCompiling: boolean;
   onResetTemplate: () => void;
@@ -18,6 +18,12 @@ interface PreviewPanelProps {
     domainTerms: string[];
   };
   roleTitle?: string;
+  onTriggerRepair?: (context: {
+    compileError: string;
+    line?: number;
+    column?: number;
+    sourceExcerpt?: string;
+  }) => void;
 }
 
 export function PreviewPanel({
@@ -28,6 +34,7 @@ export function PreviewPanel({
   onResetTemplate,
   extractedRequirements,
   roleTitle,
+  onTriggerRepair,
 }: PreviewPanelProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -168,9 +175,36 @@ export function PreviewPanel({
                 <p className="mt-1 font-mono text-[11px] leading-relaxed break-words whitespace-pre-wrap">
                   {error.message}
                 </p>
-                <p className="mt-1.5 text-[10px] text-red-600">
-                  Showing last valid compilation preview below.
-                </p>
+                <div className="mt-2 flex items-center justify-between">
+                  <p className="text-[10px] text-red-600">
+                    Showing last valid compilation preview below.
+                  </p>
+                  {onTriggerRepair && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const lineNum = typeof error.line === "number" ? error.line : undefined;
+                        const colNum = typeof error.column === "number" ? error.column : undefined;
+                        let excerpt: string | undefined = undefined;
+                        if (source && lineNum) {
+                          const lines = source.split("\n");
+                          excerpt = lines.slice(Math.max(0, lineNum - 3), lineNum + 2).join("\n");
+                        }
+                        onTriggerRepair({
+                          compileError: error.message,
+                          line: lineNum,
+                          column: colNum,
+                          sourceExcerpt: excerpt,
+                        });
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-sm transition-colors cursor-pointer"
+                      data-testid="fix-typst-ai-btn"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Fix with AI
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
