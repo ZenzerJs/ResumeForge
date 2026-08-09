@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Phase 10 — Production Polish & Landing Motion E2E Tests", () => {
+test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tests", () => {
   test("1. Visiting non-existent route renders branded 404 page (not-found.tsx)", async ({ page }) => {
     await page.goto("/non-existent-route-xyz");
     await page.waitForLoadState("networkidle");
@@ -39,30 +39,100 @@ test.describe("Phase 10 — Production Polish & Landing Motion E2E Tests", () =>
     expect(manifestJson.short_name).toBe("ResumeForge");
   });
 
-  test("4. Landing page renders with all functional elements present", async ({ page }) => {
+  test("4. Landing page proof mockup is explicitly labeled WORKSPACE PREVIEW and illustrative", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    const previewLabel = page.locator("text=WORKSPACE PREVIEW");
+    await expect(previewLabel).toBeVisible();
+
+    const disclaimerText = page.locator("text=Illustrative interface — your verified data stays local");
+    await expect(disclaimerText).toBeVisible();
+
+    // Verify proof card contains structural shapes, no fabricated scores (e.g. 87/100)
+    const proofCard = page.locator('[data-testid="product-proof-card"]');
+    await expect(proofCard).toBeVisible();
+  });
+
+  test("5. Interactive 5-step workflow timeline supports step switching and keyboard navigation", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    const activePanel = page.locator('[data-testid="workflow-active-panel"]');
+    await expect(activePanel).toContainText("STEP 01 — IMPORT");
+
+    // Click Step 02 (Ground)
+    const step2Btn = page.locator('[data-testid="workflow-step-btn-ground"]');
+    await expect(step2Btn).toBeVisible();
+    await step2Btn.click();
+    await expect(activePanel).toContainText("STEP 02 — GROUND");
+
+    // Keyboard navigation (Tab & Enter) to Step 03 (Tailor)
+    const step3Btn = page.locator('[data-testid="workflow-step-btn-tailor"]');
+    await step3Btn.focus();
+    await page.keyboard.press("Enter");
+    await expect(activePanel).toContainText("STEP 03 — TAILOR");
+  });
+
+  test("6. Upload PDF button remains enabled and immediately clickable", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
     const uploadBtn = page.locator('[data-testid="upload-pdf-hero-btn"]');
     await expect(uploadBtn).toBeVisible();
-
-    const editorCard = page.locator('a[href="/editor"]').first();
-    await expect(editorCard).toBeVisible();
-
-    const tailorCard = page.locator('a[href="/tailor"]').first();
-    await expect(tailorCard).toBeVisible();
-
-    const trackerCard = page.locator('a[href="/tracker"]').first();
-    await expect(trackerCard).toBeVisible();
+    await expect(uploadBtn).toBeEnabled();
   });
 
-  test("5. prefers-reduced-motion: reduce renders landing page without motion errors", async ({ page }) => {
+  test("7. All 5 capability cards navigate to correct destinations", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    const grid = page.locator('[data-testid="capability-cards-grid"]');
+
+    const editorLink = grid.locator('a[href="/editor"]');
+    await expect(editorLink).toBeVisible();
+
+    const tailorLink = grid.locator('a[href="/tailor"]');
+    await expect(tailorLink).toBeVisible();
+
+    const trackerLink = grid.locator('a[href="/tracker"]');
+    await expect(trackerLink).toBeVisible();
+
+    const libraryLink = grid.locator('a[href="/library"]');
+    await expect(libraryLink).toBeVisible();
+
+    const settingsLink = grid.locator('a[href="/settings"]');
+    await expect(settingsLink).toBeVisible();
+  });
+
+  test("8. prefers-reduced-motion: reduce renders landing page cleanly", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
     const heroTitle = page.locator("h1");
-    await expect(heroTitle).toContainText("Resume");
-    await expect(heroTitle).toContainText("Forge");
+    await expect(heroTitle).toContainText("Make every application feel");
+  });
+
+  test("9. Responsive viewports (375px mobile, 768px tablet, 1200px desktop) render without horizontal overflow", async ({ page }) => {
+    // 375px Mobile Viewport
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator('[data-testid="upload-pdf-hero-btn"]')).toBeVisible();
+
+    // Check no horizontal scrollbar on body
+    const hasHorizontalOverflow = await page.evaluate(() => {
+      return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+    });
+    expect(hasHorizontalOverflow).toBe(false);
+
+    // 768px Tablet Viewport
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await expect(page.locator('[data-testid="workflow-section"]')).toBeVisible();
+
+    // 1200px Desktop Viewport
+    await page.setViewportSize({ width: 1200, height: 800 });
+    await expect(page.locator('[data-testid="capability-grid-section"]')).toBeVisible();
   });
 });

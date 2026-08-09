@@ -118,4 +118,31 @@
   .skeleton-pulse {
     animation: skeleton-pulse 1.8s ease-in-out infinite;
   }
+
+  /* Marquee Ticker Animation */
+  @keyframes marquee-scroll {
+    0% { transform: translateX(0%); }
+    100% { transform: translateX(-50%); }
+  }
+
+  .animate-marquee {
+    display: flex;
+    width: max-content;
+    animation: marquee-scroll 25s linear infinite;
+  }
+
+  .animate-marquee:hover,
+  .animate-marquee:focus-within {
+    animation-play-state: paused;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-marquee {
+      animation: none !important;
+      width: 100% !important;
+      flex-wrap: wrap !important;
+      justify-content: center !important;
+      transform: none !important;
+    }
+  }
 }

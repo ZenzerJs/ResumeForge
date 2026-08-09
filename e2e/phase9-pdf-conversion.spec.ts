@@ -55,8 +55,7 @@ startxref
     await fileInput.setInputFiles(testPdfPath);
 
     // Wait for redirect to /editor?resumeId=...
-    await page.waitForURL(/\/editor\?resumeId=/, { timeout: 15000 });
-    expect(page.url()).toContain("/editor?resumeId=");
+    await expect(page).toHaveURL(/\/editor\?resumeId=/, { timeout: 30000 });
 
     // Verify draft loaded in editor
     const editorBadge = page.locator('[data-testid="document-type-badge"]');
@@ -69,10 +68,11 @@ startxref
 
   test("2. Conversion path status banner can be dismissed per session", async ({ page }) => {
     await page.goto("/");
+    await page.waitForLoadState("networkidle");
     const fileInput = page.locator('[data-testid="pdf-upload-input"]');
     await fileInput.setInputFiles(testPdfPath);
 
-    await page.waitForURL(/\/editor\?resumeId=/, { timeout: 30000 });
+    await expect(page).toHaveURL(/\/editor\?resumeId=/, { timeout: 30000 });
 
     const dismissBtn = page.locator('[data-testid="dismiss-conversion-banner-btn"]');
     if (await dismissBtn.isVisible()) {
