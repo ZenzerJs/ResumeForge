@@ -126,7 +126,7 @@ export function LandingHero({
 
       {/* Illustrative Product Proof Mockup framed in quiet surface container */}
       <div className="w-full max-w-4xl mx-auto pt-2 z-10 bg-[#161922]/80 border border-slate-800/80 rounded-2xl p-2 shadow-md">
-        <ProductProofCard />
+        <ProductProofCard shouldReduceMotion={shouldReduceMotion} />
       </div>
     </motion.section>
   );

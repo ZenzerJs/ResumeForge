@@ -1,9 +1,41 @@
-import React from "react";
+"use client";
+
+import React, { useState } from "react";
+import { motion } from "framer-motion";
 import { FileCode, ShieldCheck, Database, CheckCircle2, Sparkles } from "lucide-react";
 
-export function ProductProofCard() {
+interface ProductProofCardProps {
+  shouldReduceMotion?: boolean;
+}
+
+export function ProductProofCard({ shouldReduceMotion = false }: ProductProofCardProps) {
+  const [rotateX, setRotateX] = useState(0);
+  const [rotateY, setRotateY] = useState(0);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (shouldReduceMotion) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left - rect.width / 2;
+    const y = e.clientY - rect.top - rect.height / 2;
+    setRotateX(-y / 40);
+    setRotateY(x / 40);
+  };
+
+  const handleMouseLeave = () => {
+    setRotateX(0);
+    setRotateY(0);
+  };
+
   return (
-    <div className="w-full bg-slate-950/90 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4 backdrop-blur-md relative overflow-hidden" data-testid="product-proof-card">
+    <motion.div
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      animate={{ rotateX, rotateY }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      style={{ transformStyle: "preserve-3d" }}
+      className="w-full bg-slate-950/90 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4 backdrop-blur-md relative overflow-hidden"
+      data-testid="product-proof-card"
+    >
       {/* Illustrative Disclaimer Header */}
       <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
         <div className="flex items-center gap-2">
@@ -70,6 +102,6 @@ export function ProductProofCard() {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

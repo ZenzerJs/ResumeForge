@@ -9,6 +9,7 @@ import { LandingHero } from "@/components/landing/landing-hero";
 import { CapabilityMarquee } from "@/components/landing/capability-marquee";
 import { WorkflowTimeline } from "@/components/landing/workflow-timeline";
 import { CapabilityGrid } from "@/components/landing/capability-grid";
+import { LandingAtmosphere } from "@/components/landing/landing-atmosphere";
 import { LandingFooter } from "@/components/landing/landing-footer";
 
 interface DashboardStats {
@@ -131,8 +132,8 @@ export default function Home() {
       className="min-h-screen flex flex-col relative overflow-hidden"
       style={{ backgroundColor: "#0f1011" }}
     >
-      {/* Editorial Canvas Ambient Radial Glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-amber-500/5 rounded-full blur-[140px] pointer-events-none" />
+      {/* Editorial Master Atmosphere Environment */}
+      <LandingAtmosphere shouldReduceMotion={shouldReduceMotion ?? false} />
 
       <TopNav />
 
