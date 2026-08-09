@@ -289,6 +289,7 @@ export function AiSidebar({
   const [preValidationValid, setPreValidationValid] = useState<boolean | null>(null);
   const [preValidationError, setPreValidationError] = useState<string | null>(null);
   const [repairApplied, setRepairApplied] = useState(false);
+  const [confirmLargeRepair, setConfirmLargeRepair] = useState(false);
 
   const handleGenerateRepair = async () => {
     if (!repairContext) return;
@@ -475,55 +476,80 @@ export function AiSidebar({
                   </div>
                 )}
 
-                {/* Diff-scope warning if proposal modifies > 25% of lines */}
-                {repairProposal.changedLinesCount !== undefined &&
-                  source.split("\n").length > 0 &&
-                  repairProposal.changedLinesCount / source.split("\n").length > 0.25 && (
-                    <div className="p-2 rounded bg-amber-950/60 border border-amber-700 text-amber-300 text-[11px] flex items-center gap-1.5">
-                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
-                      <span>Warning: Fix modifies {repairProposal.changedLinesCount} lines (&gt;25% of document). Review carefully.</span>
-                    </div>
-                  )}
+                {/* Diff-scope warning & confirmation checkbox if proposal modifies > 25% of lines */}
+                {(() => {
+                  const origLineCount = source.split("\n").length;
+                  const isLargeDiff =
+                    repairProposal.changedLinesCount !== undefined &&
+                    origLineCount > 0 &&
+                    repairProposal.changedLinesCount / origLineCount > 0.25;
 
-                {repairProposal.warnings && repairProposal.warnings.length > 0 && (
-                  <ul className="list-disc pl-4 text-[10px] text-amber-400 space-y-0.5">
-                    {repairProposal.warnings.map((w, idx) => (
-                      <li key={idx}>{w}</li>
-                    ))}
-                  </ul>
-                )}
+                  return (
+                    <>
+                      {isLargeDiff && (
+                        <div className="p-2.5 rounded bg-amber-950/60 border border-amber-700 text-amber-300 text-[11px] space-y-2">
+                          <div className="flex items-center gap-1.5 font-bold text-amber-400">
+                            <AlertTriangle className="h-4 w-4 shrink-0" />
+                            <span>Large Repair Warning ({repairProposal.changedLinesCount} lines changed, &gt;25% of document)</span>
+                          </div>
+                          <p className="text-[10px] text-amber-200/90 leading-tight">
+                            Applying this proposal will replace a substantial portion of your document. Confirm below to enable Apply Fix.
+                          </p>
+                          <label className="flex items-start gap-2 text-[11px] text-amber-300 cursor-pointer pt-0.5">
+                            <input
+                              type="checkbox"
+                              checked={confirmLargeRepair}
+                              onChange={(e) => setConfirmLargeRepair(e.target.checked)}
+                              className="mt-0.5 rounded border-amber-600 bg-slate-900 text-amber-500 focus:ring-amber-500"
+                              data-testid="confirm-large-repair-checkbox"
+                            />
+                            <span>I confirm I want to replace &gt;25% of my document.</span>
+                          </label>
+                        </div>
+                      )}
 
-                <div className="flex items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    disabled={preValidationValid === false || repairApplied}
-                    onClick={handleApplyRepairFix}
-                    className="flex-1 py-1.5 px-3 rounded font-bold text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white shadow transition cursor-pointer"
-                    data-testid="apply-typst-fix-btn"
-                  >
-                    {repairApplied ? "Fix Applied!" : "Apply Fix"}
-                  </button>
+                      {repairProposal.warnings && repairProposal.warnings.length > 0 && (
+                        <ul className="list-disc pl-4 text-[10px] text-amber-400 space-y-0.5">
+                          {repairProposal.warnings.map((w, idx) => (
+                            <li key={idx}>{w}</li>
+                          ))}
+                        </ul>
+                      )}
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(repairProposal.replacementSource);
-                    }}
-                    className="py-1.5 px-3 rounded font-semibold text-xs border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-300 transition"
-                  >
-                    Copy
-                  </button>
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          disabled={preValidationValid === false || (isLargeDiff && !confirmLargeRepair) || repairApplied}
+                          onClick={handleApplyRepairFix}
+                          className="flex-1 py-1.5 px-3 rounded font-bold text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white shadow transition cursor-pointer"
+                          data-testid="apply-typst-fix-btn"
+                        >
+                          {repairApplied ? "Fix Applied!" : "Apply Fix"}
+                        </button>
 
-                  {onDismissRepair && (
-                    <button
-                      type="button"
-                      onClick={onDismissRepair}
-                      className="py-1.5 px-3 rounded font-semibold text-xs border border-slate-800 bg-slate-950 text-slate-400 hover:text-white transition"
-                    >
-                      Dismiss
-                    </button>
-                  )}
-                </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(repairProposal.replacementSource);
+                          }}
+                          className="py-1.5 px-3 rounded font-semibold text-xs border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-300 transition"
+                        >
+                          Copy
+                        </button>
+
+                        {onDismissRepair && (
+                          <button
+                            type="button"
+                            onClick={onDismissRepair}
+                            className="py-1.5 px-3 rounded font-semibold text-xs border border-slate-800 bg-slate-950 text-slate-400 hover:text-white transition"
+                          >
+                            Dismiss
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             )}
           </div>

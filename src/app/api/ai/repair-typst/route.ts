@@ -48,11 +48,24 @@ export async function POST(req: Request) {
       );
     }
 
-    const providerConfigToUse = providerConfig || {
-      provider: process.env.NEXT_PUBLIC_DEFAULT_AI_PROVIDER || "openai",
-      model: process.env.NEXT_PUBLIC_DEFAULT_AI_MODEL || "gpt-4o",
-      apiKey: process.env.OPENAI_API_KEY || "",
-    };
+    let providerConfigToUse = providerConfig;
+    if (!providerConfigToUse || !providerConfigToUse.apiKey) {
+      if (process.env.OPENAI_API_KEY) {
+        providerConfigToUse = { provider: "openai", apiKey: process.env.OPENAI_API_KEY, model: "gpt-4o" };
+      } else if (process.env.ANTHROPIC_API_KEY) {
+        providerConfigToUse = { provider: "anthropic", apiKey: process.env.ANTHROPIC_API_KEY, model: "claude-3-5-sonnet-20241022" };
+      } else if (process.env.GEMINI_API_KEY) {
+        providerConfigToUse = { provider: "gemini", apiKey: process.env.GEMINI_API_KEY, model: "gemini-1.5-pro" };
+      } else if (process.env.CUSTOM_OPENAI_API_KEY) {
+        providerConfigToUse = { provider: "custom", apiKey: process.env.CUSTOM_OPENAI_API_KEY, baseUrl: process.env.CUSTOM_OPENAI_BASE_URL };
+      } else {
+        providerConfigToUse = {
+          provider: process.env.NEXT_PUBLIC_DEFAULT_AI_PROVIDER || "openai",
+          model: process.env.NEXT_PUBLIC_DEFAULT_AI_MODEL || "gpt-4o",
+          apiKey: process.env.OPENAI_API_KEY || "",
+        };
+      }
+    }
 
     const configParse = ProviderConfigSchema.safeParse(providerConfigToUse);
     if (!configParse.success) {

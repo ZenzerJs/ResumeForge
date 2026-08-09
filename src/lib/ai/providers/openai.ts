@@ -288,6 +288,10 @@ export async function convertOpenAIPdfTextToTypst(
     const data = await res.json();
     const rawContent = data.choices?.[0]?.message?.content;
 
+    if (!rawContent) {
+      return { success: false, error: "OpenAI returned empty content in response." };
+    }
+
     const typstSource = stripCodeFences(rawContent);
     return { success: true, typstSource };
   } catch (err) {

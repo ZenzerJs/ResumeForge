@@ -570,11 +570,11 @@ All AI agents completing subsequent phases MUST update this file using the follo
 
 ---
 
-## Current Status: Phase 10 Complete — Production Polish, Root Metadata & Editorial Fintech Landing Redesign
+## Current Status: Phase 10 Complete — Production Polish, Metadata, Editorial Landing Atmosphere & Typst Repair Assist
 
-- **Phase Completed**: Phase 10 (Task 10.1 Production Polish, Task 10.2 Landing Page Motion & Task 10.3 Editorial Fintech Redesign)
+- **Phase Completed**: Phase 10 (Task 10.1 Production Polish, Task 10.2 Landing Motion, Task 10.3 Editorial Redesign, Task 10.4 Atmospheric Background & Task 10.5 Typst Repair Assist)
 - **Completed Date**: 2026-08-09
-- **Status Summary**: Implemented brand icon assets (`src/app/icon.tsx`, `src/app/apple-icon.tsx`, `src/app/opengraph-image.tsx`, `src/app/manifest.ts`), complete root layout metadata (`metadataBase`, `openGraph`, `twitter`, `themeColor`), branded App Router error boundaries and loading skeletons (`src/app/not-found.tsx`, `src/app/error.tsx`, `src/app/loading.tsx`), and a full **Editorial Fintech Landing Page Redesign** (`src/app/page.tsx`, `src/components/landing/*`) based on the Origin/Halo design systems.
+- **Status Summary**: Implemented brand icon assets (`src/app/icon.tsx`, `src/app/apple-icon.tsx`, `src/app/opengraph-image.tsx`, `src/app/manifest.ts`), complete root layout metadata (`metadataBase`, `openGraph`, `twitter`, `themeColor`), branded App Router error boundaries and loading skeletons (`src/app/not-found.tsx`, `src/app/error.tsx`, `src/app/loading.tsx`), an **Atmospheric Landing Background & Tone Softening** system (`public/landing/editorial-atmosphere.svg`, `src/components/landing/*`), and an **AI-Assisted Typst WASM Repair Assist** loop in the Editor (`src/lib/ai/repair-*`, `src/app/api/ai/repair-typst/route.ts`, `src/components/editor/*`).
 
 ### Completed Work in Phase 10
 - **Brand Icon & Metadata Assets (Task 10.1)**:
@@ -586,23 +586,27 @@ All AI agents completing subsequent phases MUST update this file using the follo
   - Built branded 404 page (`src/app/not-found.tsx`) with gold/amber accent, helpful message, and "Return to Dashboard" action.
   - Built client-side error boundary (`src/app/error.tsx`) with error details, "Try again" reset action, and home link.
   - Added root loading skeleton (`src/app/loading.tsx`) with ambient pulsing glow.
-- **Editorial Fintech Landing Page Redesign (Task 10.3)**:
-  - Decoupled landing page UI into modular components under `src/components/landing/`:
-    - `landing-hero.tsx`: Editorial eyebrow (`LOCAL-FIRST RESUME INTELLIGENCE`), headline (`Make every application feel intentional.`), White-on-Black main CTA, outline upload CTA, and proof mockup container.
-    - `product-proof-card.tsx`: Product proof mockup card explicitly labeled `WORKSPACE PREVIEW` — `Illustrative interface — your verified data stays local` with structural placeholder shapes.
-    - `capability-marquee.tsx`: Continuous ticker with pause-on-hover/focus and `prefers-reduced-motion` fallback.
-    - `workflow-timeline.tsx`: Interactive 5-step workflow timeline (`Import → Ground → Tailor → Verify → Apply`) with keyboard accessibility (`Tab`/`Space`/`Enter`) and code artifact previews.
-    - `capability-grid.tsx`: Origin-inspired mixed-surface grid with selective chromatic tiles (`Amber` Master Editor, `Silver Inverted` Evidence Bank, `Iris Violet` Tailor Engine, `Periwinkle` Tracker, `Cyan Signal` AI Settings).
-    - `landing-footer.tsx`: Refined landing footer with local-first security policy and workspace links.
+- **Atmospheric Landing Background & Tone Softening (Task 10.4 & Task 10.5 Part A)**:
+  - Created local SVG background asset (`public/landing/editorial-atmosphere.svg`) featuring dark paper texture, document geometry crop marks, and ambient radial light.
+  - Softened landing page text contrast (Display headings `#f5f5f7`, body text `#cbd5e1`, reserving pure `#ffffff` for primary CTA button).
+  - Quiet surface framing around `ProductProofCard` (`bg-[#161922]/80 border border-slate-800/80 shadow-md`) and softened Silver Inverted tile contrast (`bg-[#d1d5db] text-[#111827]`).
+- **Typst AI Repair Assist Loop (Task 10.5 Part B)**:
+  - Added **Fix with AI** action button (`data-testid="fix-typst-ai-btn"`) on compiler error banners in `preview-panel.tsx`.
+  - Built isolated **Typst Repair Assist Card** in `ai-sidebar.tsx` with dismiss action (`data-testid="close-repair-mode-btn"`), line/column error parsing, and source excerpt preview.
+  - Client pre-compilation validation via WASM `compileTypstToSvg(proposal.replacementSource)` before enabling **Apply Fix** (`data-testid="apply-typst-fix-btn"`).
+  - Payload bounds (20,000 char source limit) and diff-scope warning (>25% lines modified).
+  - Explicit provider adapters (`repairTypstWithOpenAI`, `repairTypstWithAnthropic`, `repairTypstWithGemini`, `repairTypstWithCustom`) in `src/lib/ai/providers/` and dedicated endpoint `POST /api/ai/repair-typst`.
+  - Shared source-update handler (`handleApplyRepair`) executing `handleSourceChange` + `compileSource` for draft storage, SVG recompilation, and Ctrl+S state sync.
 - **Automated Verification**:
-  - `e2e/phase10-polish.spec.ts`: Created Playwright spec testing 404 route rendering, OpenGraph metadata tags, `/icon` and `/manifest` 200 HTTP responses, illustrative proof card disclaimer, 5-step workflow step switching, keyboard accessibility, marquee pause/reduced motion, 375px/768px/1200px responsive viewports without horizontal overflow, immediate PDF upload CTA interactivity, and 5 capability module routes (51/51 E2E specs passing).
+  - `tests/typst-repair.test.ts`: Created Vitest suite testing repair schemas, payload limits, prompt builders, provider adapters, and gateway dispatching (177/177 Vitest tests passing).
+  - `e2e/phase10-repair.spec.ts` & `e2e/phase10-polish.spec.ts`: Created Playwright specs testing compile error repair journey, mock proposal pre-compilation validation, apply fix buffer update, atmospheric SVG rendering, and 375px/768px/1200px responsive viewports without horizontal overflow (55/55 E2E specs passing).
 
 ### Verification Tests Executed
 - `npm run lint` — Passed with 0 warnings or errors.
 - `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
-- `npm run test` — Vitest unit & integration tests passed cleanly (167/167 tests passing across 36 test files).
-- `npm run build` — Next.js production build succeeded cleanly (36/36 static & dynamic pages rendered).
-- `npx playwright test` — Playwright E2E tests passed cleanly (51/51 specs passing).
+- `npm run test` — Vitest unit & integration tests passed cleanly (177/177 tests passing across 37 test files).
+- `npm run build` — Next.js production build succeeded cleanly (37/37 static & dynamic pages rendered).
+- `npx playwright test` — Playwright E2E tests passed cleanly (55/55 specs passing).
 
 ---
 
