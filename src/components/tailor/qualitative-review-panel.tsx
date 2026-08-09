@@ -85,7 +85,6 @@ export function QualitativeReviewPanel({
         timestamp: Date.now(),
       };
       sessionStorage.setItem(`resumeforge_tailor_feedback_${activeJobId}`, JSON.stringify(payload));
-      sessionStorage.setItem("resumeforge_pending_feedback_job_id", activeJobId);
       router.push(`/editor?jobId=${activeJobId}`);
     }
   };

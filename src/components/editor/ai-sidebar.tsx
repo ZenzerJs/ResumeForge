@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   Bot,
   Sparkles,
@@ -17,6 +18,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
 } from "lucide-react";
+import { QualitativeCategoryFeedback, BulletFeedback } from "@/lib/ai/qualitative-schema";
 
 interface AiSidebarProps {
   /** Current Typst source in the editor buffer */
@@ -78,6 +80,9 @@ export function AiSidebar({
   onToggleCollapse,
   isCollapsed,
 }: AiSidebarProps) {
+  const searchParams = useSearchParams();
+  const urlJobId = searchParams ? searchParams.get("jobId") : null;
+
   const [jdText, setJdText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,15 +98,15 @@ export function AiSidebar({
   const [seededFeedback, setSeededFeedback] = useState<{
     jobId: string;
     overviewCommentary: string;
-    categoryFeedbacks: any[];
-    bulletFeedbacks: any[];
+    categoryFeedbacks: QualitativeCategoryFeedback[];
+    bulletFeedbacks: BulletFeedback[];
     nextStepsAdvice: string[];
     timestamp: number;
   } | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const activeJobId = sessionStorage.getItem("resumeforge_active_job_id") || "default";
+    const activeJobId = urlJobId || sessionStorage.getItem("resumeforge_active_job_id") || "default";
     const stored = sessionStorage.getItem(`resumeforge_tailor_feedback_${activeJobId}`);
     if (stored) {
       try {
@@ -114,12 +119,12 @@ export function AiSidebar({
         // ignore
       }
     }
-  }, []);
+  }, [urlJobId]);
 
   const handleDismissSeededFeedback = () => {
     setSeededFeedback(null);
     if (typeof window !== "undefined") {
-      const activeJobId = sessionStorage.getItem("resumeforge_active_job_id") || "default";
+      const activeJobId = urlJobId || sessionStorage.getItem("resumeforge_active_job_id") || "default";
       sessionStorage.removeItem(`resumeforge_tailor_feedback_${activeJobId}`);
     }
   };
