@@ -42,7 +42,8 @@ export function LandingHero({
           alt=""
           fill
           priority
-          className="object-cover opacity-60"
+          unoptimized
+          className="object-cover opacity-90"
         />
       </div>
 
