@@ -39,6 +39,11 @@ export interface EvidenceItemForPrompt {
   }[];
 }
 
+export interface TailorFeedbackContext {
+  overviewCommentary: string;
+  nextStepsAdvice?: string[];
+}
+
 export interface GeneratePatchesInput {
   providerConfig: ProviderConfig;
   masterTypst: string;
@@ -50,6 +55,7 @@ export interface GeneratePatchesInput {
     company?: string;
   };
   evidenceItems: EvidenceItemForPrompt[];
+  tailorFeedback?: TailorFeedbackContext;
 }
 
 export interface GeneratePatchesResult {

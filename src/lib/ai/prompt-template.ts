@@ -1,4 +1,4 @@
-import { EvidenceItemForPrompt, GeneratePatchesInput } from "./types";
+import { EvidenceItemForPrompt, GeneratePatchesInput, TailorFeedbackContext } from "./types";
 import { buildComposedSystemPrompt } from "./master-prompt";
 
 /**
@@ -7,12 +7,22 @@ import { buildComposedSystemPrompt } from "./master-prompt";
  * Enforces: zero-hallucination, mandatory evidence citations, explicit gap reporting,
  * Typst-clean output, and the PatchProposal JSON schema contract from docs/ai-guardrails.md.
  */
-export function buildPatchSystemPrompt(): string {
-  const taskInstructions = `## TASK-SPECIFIC: STRUCTURED RESUME PATCH GENERATION
+export function buildPatchSystemPrompt(tailorFeedback?: TailorFeedbackContext): string {
+  let taskInstructions = `## TASK-SPECIFIC: STRUCTURED RESUME PATCH GENERATION
 
-Your task is to analyze a master resume (in Typst markup format) against a job description's extracted requirements, and propose specific, evidence-backed edits to tailor the resume for the target role.
+Your task is to analyze a master resume (in Typst markup format) against a job description's extracted requirements, and propose specific, evidence-backed edits to tailor the resume for the target role.`;
 
-## PATCH & GAP SPECIFIC CONSTRAINTS
+  if (tailorFeedback) {
+    taskInstructions += `\n\n## CARRIED TAILOR REVIEW FEEDBACK CONTEXT
+
+The user has explicitly carried over qualitative review feedback from Tailor to guide this tailoring session:
+- Overview Commentary: ${tailorFeedback.overviewCommentary}
+${tailorFeedback.nextStepsAdvice && tailorFeedback.nextStepsAdvice.length > 0 ? `- Recommended Actions: ${tailorFeedback.nextStepsAdvice.join("; ")}` : ""}
+
+You MUST address the specific points raised in this qualitative feedback while generating patches, while strictly adhering to all master prompt guardrails.`;
+  }
+
+  taskInstructions += `\n\n## PATCH & GAP SPECIFIC CONSTRAINTS
 
 1. **ONE-PAGE CONSTRAINT**: The resume must remain within a single page. Do not add content that would cause overflow.
 2. **TYPST COMPATIBILITY**: The \`before\` and \`after\` fields must contain valid Typst markup that compiles without errors.
@@ -55,11 +65,15 @@ Return ONLY the JSON object. No markdown fences, no prose, no explanations outsi
  * Builds the user prompt containing the master resume, job requirements, and evidence bank.
  */
 export function buildPatchUserPrompt(input: GeneratePatchesInput): string {
-  const { masterTypst, jobRequirements, evidenceItems } = input;
+  const { masterTypst, jobRequirements, evidenceItems, tailorFeedback } = input;
 
   const evidenceSection = evidenceItems
     .map((item) => formatEvidenceItem(item))
     .join("\n\n");
+
+  const feedbackSection = tailorFeedback
+    ? `\n\n## CARRIED TAILOR REVIEW FEEDBACK CONTEXT\n**Overview Commentary**: ${tailorFeedback.overviewCommentary}`
+    : "";
 
   return `## MASTER RESUME (Typst Source)
 
@@ -74,7 +88,7 @@ ${masterTypst}
 
 **Required Skills**: ${jobRequirements.requiredSkills.join(", ") || "None specified"}
 **Preferred Skills**: ${jobRequirements.preferredSkills.join(", ") || "None specified"}
-**Domain Concepts**: ${jobRequirements.domainTerms.join(", ") || "None specified"}
+**Domain Concepts**: ${jobRequirements.domainTerms.join(", ") || "None specified"}${feedbackSection}
 
 ## EVIDENCE BANK (Your ONLY source of truth — do NOT use information outside this bank)
 

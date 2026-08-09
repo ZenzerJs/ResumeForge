@@ -17,6 +17,12 @@ const GeneratePatchesRequestSchema = z.object({
     roleTitle: z.string().optional(),
     company: z.string().optional(),
   }),
+  tailorFeedback: z
+    .object({
+      overviewCommentary: z.string(),
+      nextStepsAdvice: z.array(z.string()).optional(),
+    })
+    .optional(),
 });
 
 /**
@@ -40,7 +46,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { providerConfig, jobRequirements } = parseResult.data;
+    const { providerConfig, jobRequirements, tailorFeedback } = parseResult.data;
 
     // Fetch master resume (READ-ONLY — Amendment 3)
     const masterResume = await getMasterResume();
@@ -77,6 +83,7 @@ export async function POST(request: Request) {
       masterTypst: masterResume.typstSource,
       jobRequirements,
       evidenceItems: activeEvidence,
+      tailorFeedback,
     });
 
     if (!result.success || !result.rawJson) {

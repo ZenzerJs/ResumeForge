@@ -70,7 +70,7 @@ export async function generatePatchProposals(input: GeneratePatchesInput): Promi
   }
 
   const config = parseResult.data;
-  const systemPrompt = buildPatchSystemPrompt();
+  const systemPrompt = buildPatchSystemPrompt(input.tailorFeedback);
   const userPrompt = buildPatchUserPrompt(input);
 
   try {

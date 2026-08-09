@@ -89,6 +89,41 @@ export function AiSidebar({
   const [showGaps, setShowGaps] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
 
+  // Task 9.6: Seeded feedback context from Tailor review
+  const [seededFeedback, setSeededFeedback] = useState<{
+    jobId: string;
+    overviewCommentary: string;
+    categoryFeedbacks: any[];
+    bulletFeedbacks: any[];
+    nextStepsAdvice: string[];
+    timestamp: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const activeJobId = sessionStorage.getItem("resumeforge_active_job_id") || "default";
+    const stored = sessionStorage.getItem(`resumeforge_tailor_feedback_${activeJobId}`);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.overviewCommentary) {
+          setSeededFeedback(parsed);
+          sessionStorage.removeItem(`resumeforge_tailor_feedback_${activeJobId}`);
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
+  const handleDismissSeededFeedback = () => {
+    setSeededFeedback(null);
+    if (typeof window !== "undefined") {
+      const activeJobId = sessionStorage.getItem("resumeforge_active_job_id") || "default";
+      sessionStorage.removeItem(`resumeforge_tailor_feedback_${activeJobId}`);
+    }
+  };
+
   // Auto-populate from active job in sessionStorage
   useEffect(() => {
     const activeJobId = sessionStorage.getItem("resumeforge_active_job_id");
@@ -158,6 +193,12 @@ export function AiSidebar({
             preferredSkills: jobRequirements.preferredSkills,
             domainTerms: jobRequirements.domainTerms,
           },
+          tailorFeedback: seededFeedback
+            ? {
+                overviewCommentary: seededFeedback.overviewCommentary,
+                nextStepsAdvice: seededFeedback.nextStepsAdvice,
+              }
+            : undefined,
         }),
       });
 
@@ -179,7 +220,7 @@ export function AiSidebar({
     } finally {
       setIsGenerating(false);
     }
-  }, [jdText]);
+  }, [jdText, seededFeedback]);
 
   const handleAccept = (id: string) => {
     setAcceptedIds((prev) => {
@@ -258,6 +299,42 @@ export function AiSidebar({
       </div>
 
       <div className="flex flex-1 flex-col overflow-y-auto p-4 gap-4">
+        {/* Seeded Tailor Feedback Banner */}
+        {seededFeedback && (
+          <div
+            data-testid="seeded-feedback-banner"
+            className="p-3.5 bg-amber-950/40 border border-amber-800/60 rounded-xl space-y-2 text-xs shadow-md"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-amber-300 flex items-center gap-1.5 text-[11px] uppercase tracking-wide">
+                <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                Seeded Feedback from Tailor Review
+              </span>
+              <button
+                type="button"
+                onClick={handleDismissSeededFeedback}
+                data-testid="dismiss-seeded-feedback-btn"
+                className="text-amber-400 hover:text-amber-200 text-[10px] underline font-medium"
+              >
+                Dismiss Context
+              </button>
+            </div>
+            <p className="text-slate-300 text-xs leading-relaxed italic bg-slate-900/80 p-2 rounded border border-slate-800">
+              &quot;{seededFeedback.overviewCommentary}&quot;
+            </p>
+            {seededFeedback.nextStepsAdvice && seededFeedback.nextStepsAdvice.length > 0 && (
+              <div className="text-[10px] text-amber-200 space-y-0.5 pt-1">
+                <span className="font-semibold block text-amber-400">Recommended Actions:</span>
+                <ul className="list-disc list-inside space-y-0.5 text-slate-300">
+                  {seededFeedback.nextStepsAdvice.map((adv: string, idx: number) => (
+                    <li key={idx}>{adv}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* JD Input */}
         <div className="space-y-2">
           <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">

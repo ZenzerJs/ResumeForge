@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Sparkles,
   CheckCircle2,
@@ -12,6 +13,7 @@ import {
   Sliders,
   FileSearch,
   MessageSquareCode,
+  ArrowRight,
 } from "lucide-react";
 import {
   AtsQualitativeReviewResult,
@@ -21,6 +23,8 @@ import {
 interface QualitativeReviewPanelProps {
   result: AtsQualitativeReviewResult;
   deterministicScore: number;
+  jobId?: string;
+  onUseAsPrompt?: () => void;
 }
 
 const VERDICT_STYLES: Record<
@@ -60,8 +64,31 @@ const VERDICT_STYLES: Record<
 export function QualitativeReviewPanel({
   result,
   deterministicScore,
+  jobId,
+  onUseAsPrompt,
 }: QualitativeReviewPanelProps) {
+  const router = useRouter();
   const [showReasoning, setShowReasoning] = useState(true);
+
+  const handleUseAsPrompt = () => {
+    if (onUseAsPrompt) {
+      onUseAsPrompt();
+    }
+    if (typeof window !== "undefined") {
+      const activeJobId = jobId || sessionStorage.getItem("resumeforge_active_job_id") || "default";
+      const payload = {
+        jobId: activeJobId,
+        overviewCommentary: result.overviewCommentary,
+        categoryFeedbacks: result.categoryFeedbacks,
+        bulletFeedbacks: result.bulletFeedbacks,
+        nextStepsAdvice: result.nextStepsAdvice,
+        timestamp: Date.now(),
+      };
+      sessionStorage.setItem(`resumeforge_tailor_feedback_${activeJobId}`, JSON.stringify(payload));
+      sessionStorage.setItem("resumeforge_pending_feedback_job_id", activeJobId);
+      router.push(`/editor?jobId=${activeJobId}`);
+    }
+  };
 
   const adjustedScore = Math.min(
     100,
@@ -103,6 +130,16 @@ export function QualitativeReviewPanel({
             </p>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={handleUseAsPrompt}
+          data-testid="use-as-prompt-btn"
+          className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs rounded-lg flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition shrink-0"
+        >
+          <ArrowRight className="h-3.5 w-3.5" />
+          Use as prompt
+        </button>
       </div>
 
       {/* Bounded JD Context Adjustment Banner */}

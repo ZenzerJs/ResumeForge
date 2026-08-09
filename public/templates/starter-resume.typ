@@ -1,66 +1,139 @@
-// ResumeForge Starter One-Page Resume Template (Typst)
+// ResumeForge Canonical Resume Template (Typst)
 
 #set page(
   paper: "us-letter",
-  margin: (x: 1.5cm, y: 1.5cm),
+  margin: (x: 1.25cm, y: 1.1cm),
 )
 
+#set text(
+  font: "Liberation Sans",
+  size: 9pt,
+  fill: rgb("#111827"),
+)
+
+#set par(justify: true, leading: 0.48em)
+
+// Link styling matching LaTeX linkblue (#1155CC)
+#show link: set text(fill: rgb("#1155CC"))
+
+// Section heading helper
 #let section(title) = {
-  v(3pt)
-  text(weight: "bold", size: 11pt, fill: rgb("#0f172a"))[#title]
-  v(-4pt)
-  line(length: 100%, stroke: 0.5pt + rgb("#cbd5e1"))
-  v(1pt)
+  v(0.4em)
+  text(size: 10pt, weight: "bold", tracking: 0.05em, upper(title))
+  v(-0.4em)
+  line(length: 100%, stroke: 0.5pt + rgb("#9CA3AF"))
+  v(0.15em)
 }
+
+// Header/entry helper for aligned roles & dates
+#let entry(
+  title: "",
+  role: "",
+  location: "",
+  date: "",
+  details: [],
+) = {
+  block(width: 100%, breakable: false)[
+    #grid(
+      columns: (1fr, auto),
+      align: (left, right),
+      [
+        #if title != "" [*#title*]
+        #if role != "" [
+          #if title != "" [ | ]
+          #emph(role)
+        ]
+      ],
+      [
+        #if location != "" [
+          #location
+          #if date != "" [ | ]
+        ]
+        #if date != "" [*#date*]
+      ]
+    )
+    #v(-0.35em)
+    #details
+  ]
+}
+
+// Compact list styling
+#set list(
+  marker: [•],
+  spacing: 0.4em,
+  indent: 0em,
+  body-indent: 0.4em,
+)
 
 // HEADER
 #align(center)[
-  #text(size: 18pt, weight: "bold", fill: rgb("#0f172a"))[Alex Morgan] \
+  #text(size: 18pt, weight: "bold", fill: rgb("#111827"))[Alex Morgan] \
   #v(2pt)
   #text(size: 9pt, fill: rgb("#475569"))[
-    San Francisco, CA | alex.morgan\@example.com | (555) 019-2834 | github.com/alexmorgan | linkedin.com/in/alexmorgan
+    San Francisco, CA #sym.dot #link("mailto:alex.morgan@example.com")[alex.morgan\@example.com] #sym.dot (555) 019-2834 #sym.dot #link("https://github.com/alexmorgan")[github.com/alexmorgan] #sym.dot #link("https://linkedin.com/in/alexmorgan")[linkedin.com/in/alexmorgan]
   ]
 ]
 
-#v(4pt)
-
-// SUMMARY
-#section("Professional Summary")
-Full-stack software engineer with 3+ years of experience building performant web applications, scalable APIs, and developer tooling. Proven track record of improving system reliability and optimizing end-user experiences.
-
-// SKILLS
+// TECHNICAL SKILLS
 #section("Technical Skills")
-*Languages:* TypeScript, JavaScript, Python, Go, SQL, HTML/CSS \
-*Frameworks & Libraries:* React, Next.js, Node.js, Express, Tailwind CSS, Prisma \
-*Tools & Infrastructure:* Git, Docker, PostgreSQL, SQLite, Vitest, CI/CD Pipelines
+#entry(
+  details: [
+    - *Languages:* TypeScript, JavaScript, Python, Go, SQL, HTML/CSS
+    - *Frameworks & Libraries:* React, Next.js, Node.js, Express, Tailwind CSS, Prisma
+    - *Tools & Infrastructure:* Git, Docker, PostgreSQL, SQLite, Vitest, CI/CD Pipelines
+  ]
+)
 
 // EXPERIENCE
-#section("Work Experience")
+#section("Experience")
 
-*Software Engineer Intern* #h(1fr) *TechCorp Systems* \
-_Jun 2024 – Present_ #h(1fr) _San Francisco, CA_
-- Developed high-throughput REST and GraphQL API endpoints serving over 100k daily active requests with sub-100ms response latency.
-- Refactored legacy frontend components into modular React hooks, reducing bundle size by 24% and improving initial page load speed.
-- Collaborated with cross-functional product teams to design and deploy automated integration test pipelines.
+#entry(
+  title: "TechCorp Systems",
+  role: "Software Engineer Intern",
+  location: "San Francisco, CA",
+  date: "Jun 2024 – Present",
+  details: [
+    - Developed high-throughput REST and GraphQL API endpoints serving over 100k daily active requests with sub-100ms response latency.
+    - Refactored legacy frontend components into modular React hooks, reducing bundle size by 24% and improving initial page load speed.
+    - Collaborated with cross-functional product teams to design and deploy automated integration test pipelines.
+  ]
+)
 
-*Frontend Engineering Intern* #h(1fr) *WebScale Labs* \
-_May 2023 – Aug 2023_ #h(1fr) _Austin, TX_
-- Implemented responsive user interface dashboards utilizing Next.js, Tailwind CSS, and TypeScript.
-- Integrated real-time WebSocket client notifications, increasing user dashboard engagement by 35%.
-- Authored comprehensive unit test suites using Vitest, achieving 90%+ code coverage across core utilities.
+#entry(
+  title: "WebScale Labs",
+  role: "Frontend Engineering Intern",
+  location: "Austin, TX",
+  date: "May 2023 – Aug 2023",
+  details: [
+    - Implemented responsive user interface dashboards utilizing Next.js, Tailwind CSS, and TypeScript.
+    - Integrated real-time WebSocket client notifications, increasing user dashboard engagement by 35%.
+    - Authored comprehensive unit test suites using Vitest, achieving 90%+ code coverage across core utilities.
+  ]
+)
 
 // PROJECTS
-#section("Key Projects")
+#section("Projects")
 
-*ResumeForge — Local-First AI Resume Workspace* #h(1fr) _2026_
-- Engineered a local-first desktop web workspace utilizing Next.js, CodeMirror 6, and Typst WASM compilation for instantaneous document rendering.
-- Integrated evidence-backed patch diff workflows ensuring 100% truthful resume variants.
-
-*DataPulse — Metrics Analytics Dashboard* #h(1fr) _2024_
-- Built a high-performance web dashboard displaying real-time server telemetries with interactive charts and custom alerting rules.
+#entry(
+  title: "ResumeForge — Local-First AI Resume Workspace",
+  role: "Creator & Lead Developer",
+  location: "",
+  date: "2026",
+  details: [
+    - Engineered a local-first desktop web workspace utilizing Next.js, CodeMirror 6, and Typst WASM compilation for instantaneous document rendering.
+    - Integrated evidence-backed patch diff workflows ensuring 100% truthful resume variants.
+  ]
+)
 
 // EDUCATION
 #section("Education")
 
-*Bachelor of Science in Computer Science* #h(1fr) *University of California, Berkeley* \
-_Graduated May 2025_ #h(1fr) _GPA: 3.8 / 4.0_
+#entry(
+  title: "University of California, Berkeley",
+  role: "Bachelor of Science in Computer Science",
+  location: "Berkeley, CA",
+  date: "Graduated May 2025",
+  details: [
+    - GPA: 3.8 / 4.0 | Relevant Coursework: Data Structures, Operating Systems, Database Systems.
+  ]
+)

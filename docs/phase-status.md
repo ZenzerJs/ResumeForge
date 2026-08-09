@@ -514,7 +514,61 @@ All AI agents completing subsequent phases MUST update this file using the follo
 - `npx playwright test` — Playwright E2E tests passed cleanly (40/40 specs passing).
 
 ### Suggested Next Task
-- **Task 9.6 — Tailor-Feedback-to-Editor Handoff**: Connect AI qualitative review recommendations directly to editor cursor jump targets.
+- **Task 9.1b — PDF Conversion Template Exemplar**: Completed in full.
+
+---
+
+## Current Status: Task 9.1b Complete — Fixed Template Exemplar for AI PDF Conversion
+
+- **Task Completed**: Task 9.1b (PDF Conversion Template Exemplar)
+- **Completed Date**: 2026-08-09
+- **Status Summary**: Replaced freeform Typst prose styling rules in `src/lib/ai/pdf-prompt.ts` with a fixed, canonical Typst template exemplar (`#let section(title)`, `#let entry(...)`, `#set page`, `#set text`, `#show link`, `#set list`) and full worked example. Updated `public/templates/starter-resume.typ` to use the same canonical template pattern. Added template assertions to `tests/pdf-ai-conversion.test.ts`.
+
+### Completed Work in Task 9.1b
+- **AI PDF Prompt Exemplar (`src/lib/ai/pdf-prompt.ts`)**:
+  - Replaced prose styling rules with fixed Typst helper functions (`section()` and `entry()`) and full worked example document.
+  - Added strict instructions forbidding helper redefinitions or style block modifications while preserving character escaping and zero information loss rules.
+- **Starter Template Alignment (`public/templates/starter-resume.typ`)**:
+  - Reconciled default starter resume template to use the identical canonical `section()`/`entry()` pattern.
+- **Automated Verification**:
+  - `tests/pdf-ai-conversion.test.ts`: Added assertions verifying system prompt returns helper function definitions verbatim and forbids redefinitions (163/163 unit tests passing).
+
+### Suggested Next Task
+- **Task 9.6 — Tailor AI Feedback to Editor Handoff**: Completed in full.
+
+---
+
+## Current Status: Task 9.6 Complete — Tailor AI Feedback → Editor AI Chat Handoff
+
+- **Task Completed**: Task 9.6 (Tailor AI Feedback → Editor AI Chat Handoff)
+- **Completed Date**: 2026-08-09
+- **Status Summary**: Connected Tailor Qualitative Review findings directly to the Editor's AI tailoring assistant via a "Use as prompt" action (`data-testid="use-as-prompt-btn"`). Carried feedback is stored per-`jobId` in `sessionStorage` and pre-loads into the Editor AI sidebar with a clearly labeled banner (`data-testid="seeded-feedback-banner"`) and dismissal button (`data-testid="dismiss-seeded-feedback-btn"`). Subsequent patch generation requests compose the carried feedback into system and user prompts following the master prompt engine rules (`RESUMEFORGE_MASTER_SYSTEM_PROMPT`). Built Vitest unit tests (`tests/tailor-editor-handoff.test.ts`) and Playwright E2E spec (`e2e/phase9-tailor-handoff.spec.ts`).
+
+### Completed Work in Task 9.6
+- **"Use as prompt" Action (`src/components/tailor/qualitative-review-panel.tsx`)**:
+  - Added "Use as prompt" button (`data-testid="use-as-prompt-btn"`) on completed AI qualitative review cards.
+  - Navigates to `/editor?jobId=${activeJobId}` while writing `resumeforge_tailor_feedback_${activeJobId}` payload to `sessionStorage`.
+- **Editor AI Sidebar Pre-Load (`src/components/editor/ai-sidebar.tsx`)**:
+  - On `/editor` load, retrieves carried feedback payload for active `jobId` and renders a dedicated "Seeded Feedback from Tailor Review" banner (`data-testid="seeded-feedback-banner"`).
+  - Provided a "Dismiss Context" action (`data-testid="dismiss-seeded-feedback-btn"`). Clears `sessionStorage` key after single consumption so unseeded visits remain unaffected.
+- **Master Prompt Composition (`src/lib/ai/prompt-template.ts`, `src/lib/ai/gateway.ts`, `src/app/api/ai/generate-patches/route.ts`)**:
+  - Composed system prompt ordering: Master Prompt (`RESUMEFORGE_MASTER_SYSTEM_PROMPT`) → Structured Patch Instructions → Carried Tailor Review Feedback Context → JSON Schema Contract.
+  - Grounded all proposed edits in the Evidence Bank without bypassing zero-hallucination rules.
+- **Automated Verification**:
+  - `tests/tailor-editor-handoff.test.ts`: Vitest suite testing prompt composition order, carried feedback injection, and context clearing (167/167 unit tests passing).
+  - `e2e/phase9-tailor-handoff.spec.ts`: Playwright spec verifying handoff navigation, banner display, context dismissal, and single-use consumption (41/41 specs passing).
+
+### Verification Tests Executed
+- `npm run lint` — Passed with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (167/167 tests passing across 36 test files).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly (35/35 static & dynamic pages rendered).
+- `npx playwright test` — Playwright E2E tests passed cleanly (41/41 specs passing).
+
+### Suggested Next Task
+- **Phase 9 Milestone Completion**: All Phase 9 Tasks (9.1, 9.1b, 9.2, 9.3, 9.4, 9.5, 9.6) are fully complete, verified, and ready for release.
+
+
 
 
 

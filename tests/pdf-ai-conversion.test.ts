@@ -3,6 +3,7 @@ import { stripCodeFences } from "@/lib/ai/utils";
 import { convertPdfTextToTypst } from "@/lib/ai/gateway";
 import { ProviderConfig } from "@/lib/ai/types";
 import { convertTextToTypst } from "@/lib/pdf/parser";
+import { buildPdfToTypstSystemPrompt } from "@/lib/ai/pdf-prompt";
 
 const sampleExtractedText = `Jayden Saha
 Ontario, Canada | Jaydensaha@yahoo.com | LinkedIn | GitHub | Portfolio
@@ -28,7 +29,7 @@ AI/ML: LangGraph, LangChain, LangSmith, LLM Tool Calling, PyTorch
 Engineering: Next.js, React, FastAPI, REST APIs, GitHub Actions, Git, Vercel, Linux
 `;
 
-describe("Task 9.1 — AI-Powered PDF to Typst Conversion & Utilities", () => {
+describe("Task 9.1 & 9.1b — AI-Powered PDF to Typst Conversion & Template Exemplar", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -48,7 +49,7 @@ describe("Task 9.1 — AI-Powered PDF to Typst Conversion & Utilities", () => {
         choices: [
           {
             message: {
-              content: "```typst\n= Jayden Saha\n\n== Education\nWilfrid Laurier University\n```",
+              content: "```typst\n#align(center)[*Jayden Saha*]\n#section(\"Education\")\n#entry(title: \"Wilfrid Laurier University\")\n```",
             },
           },
         ],
@@ -63,7 +64,7 @@ describe("Task 9.1 — AI-Powered PDF to Typst Conversion & Utilities", () => {
     });
 
     expect(result.success).toBe(true);
-    expect(result.typstSource).toContain("= Jayden Saha");
+    expect(result.typstSource).toContain("Jayden Saha");
     expect(result.typstSource).not.toContain("```");
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
@@ -122,8 +123,8 @@ describe("Task 9.1 — AI-Powered PDF to Typst Conversion & Utilities", () => {
     expect(converted).toContain("\\\\ Main");
   });
 
-  it("7. AI conversion output verifies section headers and key term preservation against rich mocked AI response", async () => {
-    const mockedAiTypst = `= Jayden Saha\n\n== Education\nWilfrid Laurier University\nBachelor of Science\n\n== Experience\nTrillium Health Partners\n- Maintained data-center asset, rack, and cabinet documentation\n\n== Projects\nAI Stock Analyst Agent\n- Built full-stack AI agent with FastAPI and LangGraph\n\n== Technical Skills\nLanguages: Python, TypeScript`;
+  it("7. AI conversion output verifies section headers and key term preservation against template exemplar response", async () => {
+    const mockedAiTypst = `#align(center)[*Jayden Saha*]\n\n#section("Education")\n#entry(title: "Wilfrid Laurier University", role: "Bachelor of Science")\n\n#section("Experience")\n#entry(title: "Trillium Health Partners", role: "IT Operations", details: [- Maintained data-center asset documentation])\n\n#section("Projects")\n#entry(title: "AI Stock Analyst Agent", role: "FastAPI, LangGraph")\n\n#section("Technical Skills")\n#entry(details: [- *Languages:* Python, TypeScript])`;
 
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
       ok: true,
@@ -144,5 +145,18 @@ describe("Task 9.1 — AI-Powered PDF to Typst Conversion & Utilities", () => {
     expect(result.typstSource).toContain("Experience");
     expect(result.typstSource).toContain("Trillium Health");
     expect(result.typstSource).toContain("FastAPI");
+  });
+
+  it("8. Task 9.1b: System prompt contains fixed template helper function definitions verbatim", () => {
+    const prompt = buildPdfToTypstSystemPrompt();
+    expect(prompt).toContain("#let section(title)");
+    expect(prompt).toContain("#let entry(");
+    expect(prompt).toContain("paper: \"us-letter\"");
+  });
+
+  it("9. Task 9.1b: System prompt explicitly instructs model NOT to redefine or rename helper functions", () => {
+    const prompt = buildPdfToTypstSystemPrompt();
+    expect(prompt).toContain("DO NOT REDEFINE OR RENAME HELPER FUNCTIONS");
+    expect(prompt).toContain("DO NOT ALTER GLOBAL STYLE BLOCKS");
   });
 });
