@@ -25,11 +25,25 @@ import {
   Star,
   FileText,
   DownloadCloud,
-  RefreshCw,
 } from "lucide-react";
 import { JobStatus } from "@/lib/db/jobs";
-import { TopNav } from "@/components/navigation/top-nav";
+import { AppShell } from "@/components/design-system/app-shell";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  TrackerSubNav,
+  TrackerRefreshButton,
+} from "@/components/tracker/tracker-sub-nav";
+import {
+  extractLocationFromNotes,
+  extractApplyUrlFromNotes,
+  extractPostingDateFromNotes,
+  extractSalaryFromNotes,
+  isPlaceholderDescription,
+} from "@/lib/ingestion/helpers";
+import {
+  filterByPostedWithin,
+  type PostedWithin,
+} from "@/lib/jobs/posted-within";
 
 export interface JobVariant {
   id: string;
@@ -63,14 +77,6 @@ export interface JobItem {
   variants?: JobVariant[];
   coverLetters?: JobCoverLetter[];
 }
-
-import {
-  extractLocationFromNotes,
-  extractApplyUrlFromNotes,
-  extractPostingDateFromNotes,
-  extractSalaryFromNotes,
-  isPlaceholderDescription,
-} from "@/lib/ingestion/helpers";
 
 export {
   extractLocationFromNotes,
@@ -148,6 +154,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<JobStatus | "ALL">("ALL");
+  const [postedWithin, setPostedWithin] = useState<PostedWithin>("all");
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [copiedJobId, setCopiedJobId] = useState<string | null>(null);
@@ -355,19 +362,24 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   // Apply page-level status filter (for sub-routes /applied and /saved)
   const effectiveStatuses = filterStatuses ?? ALL_STATUSES;
 
-  const filteredJobs = jobs.filter((j) => {
-    const matchStatus =
-      statusFilter === "ALL"
-        ? effectiveStatuses.includes(j.status)
-        : j.status === statusFilter && effectiveStatuses.includes(j.status);
-    const q = searchQuery.toLowerCase().trim();
-    const matchSearch =
-      !q ||
-      (j.company || "").toLowerCase().includes(q) ||
-      (j.roleTitle || "").toLowerCase().includes(q) ||
-      j.rawDescription.toLowerCase().includes(q);
-    return matchStatus && matchSearch;
-  });
+  const filteredJobs = filterByPostedWithin(
+    jobs.filter((j) => {
+      const matchStatus =
+        statusFilter === "ALL"
+          ? effectiveStatuses.includes(j.status)
+          : j.status === statusFilter && effectiveStatuses.includes(j.status);
+      const q = searchQuery.toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        (j.company || "").toLowerCase().includes(q) ||
+        (j.roleTitle || "").toLowerCase().includes(q) ||
+        j.rawDescription.toLowerCase().includes(q);
+      return matchStatus && matchSearch;
+    }),
+    postedWithin,
+    (j) => extractPostingDateFromNotes(j.notes) || null,
+    (j) => j.createdAt,
+  );
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
@@ -375,61 +387,15 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#0A0E17" }}>
-      <TopNav />
-
-      {/* Sub-page nav tabs & Refresh button */}
-      <div className="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-[57px] z-10">
-        <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-11">
-          <div className="flex items-center gap-3 h-full">
-            <h1 data-testid="tracker-page-title" className="text-xs font-bold text-slate-100 flex items-center gap-1.5 shrink-0 border-r border-slate-800 pr-3">
-              <Briefcase className="h-3.5 w-3.5 text-amber-400" />
-              Application Tracker
-            </h1>
-            <Link
-              href="/tracker"
-              className="px-3 h-full flex items-center text-xs font-medium border-b-2 transition-colors border-transparent text-slate-400 hover:text-slate-200 data-[active]:border-amber-500 data-[active]:text-amber-400"
-              data-active={!filterStatuses ? true : undefined}
-            >
-              All Jobs
-            </Link>
-            <Link
-              href="/tracker/applied"
-              className="px-4 h-full flex items-center text-xs font-medium border-b-2 transition-colors border-transparent text-slate-400 hover:text-slate-200 data-[active]:border-amber-500 data-[active]:text-amber-400"
-              data-active={
-                filterStatuses?.includes("APPLIED") && !filterStatuses?.includes("SAVED")
-                  ? true
-                  : undefined
-              }
-            >
-              Applied &amp; Active
-            </Link>
-            <Link
-              href="/tracker/saved"
-              className="px-4 h-full flex items-center text-xs font-medium border-b-2 transition-colors border-transparent text-slate-400 hover:text-slate-200 data-[active]:border-amber-500 data-[active]:text-amber-400"
-              data-active={
-                filterStatuses?.length === 1 && filterStatuses?.[0] === "SAVED" ? true : undefined
-              }
-            >
-              Saved
-            </Link>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleRefreshFromSource}
-              disabled={isImporting}
-              data-testid="refresh-from-source-btn"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-medium text-amber-400 transition"
-              title="Manual refresh: Bulk import Tier 1 postings from SimplifyJobs source"
-            >
-              {isImporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              <span>{isImporting ? "Refreshing..." : "Refresh from Source"}</span>
-            </button>
-          </div>
-        </div>
-      </div>
+    <AppShell variant="tracker">
+      <TrackerSubNav
+        actions={
+          <TrackerRefreshButton
+            onClick={handleRefreshFromSource}
+            isImporting={isImporting}
+          />
+        }
+      />
 
       {importNotice && (
         <div
@@ -453,6 +419,35 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500/60 transition"
             />
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-1">
+            <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-3">
+              Posted
+            </h3>
+            {(
+              [
+                ["all", "Any time"],
+                ["1d", "Last 24h"],
+                ["3d", "Last 3 days"],
+                ["7d", "Last 7 days"],
+                ["30d", "Last 30 days"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setPostedWithin(value)}
+                data-testid={`tracker-posted-${value}`}
+                className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  postedWithin === value
+                    ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                    : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
           {/* Status filter */}
@@ -920,6 +915,6 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             })}
         </div>
       </main>
-    </div>
+    </AppShell>
   );
 }

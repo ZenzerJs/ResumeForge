@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, Database, Sparkles, Briefcase, Settings, Compass } from "lucide-react";
+import { FileText, Database, Sparkles, Briefcase, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
@@ -22,23 +22,16 @@ const NAV_LINKS = [
     hoverBg: "hover:bg-emerald-500/8",
   },
   {
-    href: "/discover",
-    label: "Discover Jobs",
-    icon: Compass,
+    href: "/tracker",
+    label: "Jobs",
+    icon: Briefcase,
     accent: "text-amber-400",
     hoverBg: "hover:bg-amber-500/8",
   },
   {
     href: "/tailor",
-    label: "Tailor Engine",
+    label: "Tailor",
     icon: Sparkles,
-    accent: "text-amber-400",
-    hoverBg: "hover:bg-amber-500/8",
-  },
-  {
-    href: "/tracker",
-    label: "Tracker",
-    icon: Briefcase,
     accent: "text-amber-400",
     hoverBg: "hover:bg-amber-500/8",
   },
@@ -63,14 +56,8 @@ export function TopNav({ actions, badge }: TopNavProps) {
 
   return (
     <header
-      className="sticky top-0 z-50 flex h-13 shrink-0 items-center justify-between border-b px-4 md:px-6"
-      style={{
-        backgroundColor: "rgba(10, 14, 23, 0.92)",
-        borderColor: "#1E2536",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-        height: "52px",
-      }}
+      className="sticky top-0 z-50 flex shrink-0 items-center justify-between border-b border-slate-800/80 bg-rf-bg/92 px-4 backdrop-blur-md md:px-6"
+      style={{ height: "52px" }}
     >
       {/* Left: Logo + Badge */}
       <div className="flex items-center gap-3 shrink-0">
@@ -83,7 +70,7 @@ export function TopNav({ actions, badge }: TopNavProps) {
             className="flex h-8 w-8 items-center justify-center rounded-lg font-bold text-sm transition-all"
             style={{
               background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
-              color: "#0A0E17",
+              color: "var(--rf-bg)",
               boxShadow: "0 0 12px rgba(245,158,11,0.3)",
             }}
           >

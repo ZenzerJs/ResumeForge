@@ -24,7 +24,7 @@ import { PatchDiffReview } from "./patch-diff-review";
 import { AtsScorePanel } from "./ats-score-panel";
 import { CoverLetterPanel } from "./cover-letter-panel";
 import type { PatchProposal, Gap, RejectedPatch } from "@/lib/ai/patch-schema";
-import { TopNav } from "@/components/navigation/top-nav";
+import { AppShell } from "@/components/design-system/app-shell";
 import { isPlaceholderDescription } from "@/lib/ingestion/helpers";
 
 interface RankedMatch {
@@ -492,9 +492,7 @@ export function TailorWorkspace() {
   };
 
   return (
-    <div className="min-h-screen text-slate-100 flex flex-col font-sans" style={{ backgroundColor: "#0A0E17" }}>
-      {/* Shared Top Nav */}
-      <TopNav />
+    <AppShell variant="tailor">
 
       {/* Active Job Header Indicator */}
       {(savedJobId || company || roleTitle) && (
@@ -1067,6 +1065,6 @@ export function TailorWorkspace() {
           </div>
         </div>
       )}
-    </div>
+    </AppShell>
   );
 }

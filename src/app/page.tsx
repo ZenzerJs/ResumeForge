@@ -4,12 +4,11 @@ import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { CheckCircle2, AlertCircle } from "lucide-react";
-import { TopNav } from "@/components/navigation/top-nav";
+import { AppShell } from "@/components/design-system/app-shell";
 import { LandingHero } from "@/components/landing/landing-hero";
 import { CapabilityMarquee } from "@/components/landing/capability-marquee";
 import { WorkflowTimeline } from "@/components/landing/workflow-timeline";
 import { CapabilityGrid } from "@/components/landing/capability-grid";
-import { LandingAtmosphere } from "@/components/landing/landing-atmosphere";
 import { LandingFooter } from "@/components/landing/landing-footer";
 
 interface DashboardStats {
@@ -128,15 +127,7 @@ export default function Home() {
   };
 
   return (
-    <div
-      className="min-h-screen flex flex-col relative overflow-hidden"
-      style={{ backgroundColor: "#0f1011" }}
-    >
-      {/* Editorial Master Atmosphere Environment */}
-      <LandingAtmosphere shouldReduceMotion={shouldReduceMotion ?? false} />
-
-      <TopNav />
-
+    <AppShell variant="landing">
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 md:px-8 py-8 flex flex-col gap-12 relative z-10">
         {/* Notification Toast */}
         <AnimatePresence>
@@ -194,6 +185,6 @@ export default function Home() {
 
       {/* 5. Editorial Landing Footer */}
       <LandingFooter />
-    </div>
+    </AppShell>
   );
 }

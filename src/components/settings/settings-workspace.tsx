@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
 import { ProviderType } from "@/lib/ai/types";
-import { ArrowLeft, CheckCircle2, XCircle, Loader2, Key, Server, ShieldCheck, Trash2, Briefcase } from "lucide-react";
-import { TopNav } from "@/components/navigation/top-nav";
+import { CheckCircle2, XCircle, Loader2, Key, Server, ShieldCheck, Trash2 } from "lucide-react";
+import { AppShell } from "@/components/design-system/app-shell";
+import { PageHeader } from "@/components/design-system/page-header";
+import { Surface } from "@/components/design-system/surface";
 
 const SETTINGS_STORAGE_KEY = "resumeforge_ai_settings";
 
@@ -125,27 +126,16 @@ export function SettingsWorkspace() {
   };
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-y-auto text-slate-100" style={{ backgroundColor: "#0A0E17" }}>
-      {/* Shared Top Navigation */}
-      <TopNav />
-
-      {/* Main Form Content */}
+    <AppShell variant="settings" className="overflow-y-auto">
       <main className="mx-auto w-full max-w-3xl flex-1 p-6 md:p-8">
         <div className="space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-              <Server className="h-6 w-6 text-amber-400" />
-              Bring-Your-Own-Key (BYOK) AI Configuration
-            </h1>
-            <p className="mt-1.5 text-xs font-mono" style={{ color: "#4B5A7A" }}>
-              AI Provider Gateway Settings
-            </p>
-            <p className="mt-1 text-sm text-slate-400">
-              Configure your preferred LLM provider or local OpenAI-compatible endpoint. API keys are stored in browser localStorage for local single-user convenience and never saved in SQLite.
-            </p>
-          </div>
+          <PageHeader
+            eyebrow="Control room"
+            title="Bring-Your-Own-Key (BYOK) AI Configuration"
+            description="Configure your preferred LLM provider or local OpenAI-compatible endpoint. API keys are stored in browser localStorage for local single-user convenience and never saved in SQLite."
+          />
 
-          <div className="rounded-xl border border-slate-800 bg-slate-950 p-6 space-y-6 shadow-sm">
+          <Surface variant="primary" className="p-6 space-y-6">
             {/* Provider Selection */}
             <div>
               <label htmlFor="provider-select" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
@@ -299,9 +289,9 @@ export function SettingsWorkspace() {
                 </div>
               </div>
             )}
-          </div>
+          </Surface>
         </div>
       </main>
-    </div>
+    </AppShell>
   );
 }

@@ -17,7 +17,7 @@ import {
   FileJson,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { TopNav } from "@/components/navigation/top-nav";
+import { AppShell } from "@/components/design-system/app-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export interface Bullet {
@@ -294,48 +294,48 @@ export function LibraryWorkspace() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#0A0E17" }}>
-      <TopNav
-        actions={
-          <div className="flex items-center gap-2">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileImport}
-              accept=".json"
-              className="hidden"
-              data-testid="evidence-import-input"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isImporting}
-              onClick={() => fileInputRef.current?.click()}
-              className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white gap-1.5 text-xs"
-              data-testid="evidence-import-btn"
-            >
-              {isImporting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Upload className="h-3.5 w-3.5 text-emerald-400" />
-              )}
-              Import JSON
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={openCreateModal}
-              className="gap-1.5 text-xs font-semibold shadow-sm"
-              style={{ background: "linear-gradient(135deg, #F59E0B, #D97706)", color: "#0A0E17" }}
-              data-testid="add-evidence-btn"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add Evidence Item
-            </Button>
-          </div>
-        }
-      />
+    <AppShell
+      variant="library"
+      actions={
+        <div className="flex items-center gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileImport}
+            accept=".json"
+            className="hidden"
+            data-testid="evidence-import-input"
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={isImporting}
+            onClick={() => fileInputRef.current?.click()}
+            className="gap-1.5 text-xs font-semibold border-slate-700 bg-slate-900/80 hover:bg-slate-800 text-slate-200"
+            data-testid="evidence-import-btn"
+          >
+            {isImporting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Upload className="h-3.5 w-3.5 text-emerald-400" />
+            )}
+            Import JSON
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={openCreateModal}
+            className="gap-1.5 text-xs font-semibold shadow-sm"
+            style={{ background: "linear-gradient(135deg, #F59E0B, #D97706)", color: "#0A0E17" }}
+            data-testid="add-evidence-btn"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Evidence Item
+          </Button>
+        </div>
+      }
+    >
 
       {/* Main Content Area */}
       <main className="mx-auto max-w-6xl w-full p-4 md:p-8 flex-1 flex flex-col gap-6">
@@ -687,6 +687,6 @@ export function LibraryWorkspace() {
           </div>
         </div>
       )}
-    </div>
+    </AppShell>
   );
 }

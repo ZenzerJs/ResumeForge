@@ -41,6 +41,19 @@ describe("Pitt CSC / Simplify Ingestion & Promotion API", () => {
     expect(json.data.length).toBeGreaterThan(0);
   });
 
+  it("filters discovered jobs by postedWithin", async () => {
+    const req = new Request(
+      "http://localhost/api/jobs/discovered?search=Stripe&postedWithin=1d",
+    );
+    const res = await getDiscoveredHandler(req);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.success).toBe(true);
+    expect(json.meta.postedWithin).toBe("1d");
+    // Stripe sample is "1 day ago" — should remain in 1d window
+    expect(json.data.some((j: { company: string }) => j.company === "Stripe")).toBe(true);
+  });
+
   it("promotes a discovered job into active Job tracker with status SAVED", async () => {
     const discovered = await prisma.discoveredJob.findFirst({
       where: { company: "Stripe" },

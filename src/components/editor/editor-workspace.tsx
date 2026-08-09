@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { TopNav } from "@/components/navigation/top-nav";
+import { AppShell } from "@/components/design-system/app-shell";
 
 const STORAGE_KEY = "resumeforge_typst_source";
 
@@ -446,10 +446,11 @@ export function EditorWorkspace() {
   };
 
   return (
-    <div className="dark flex h-dvh w-screen flex-col overflow-hidden text-foreground" style={{ backgroundColor: "#0A0E17" }}>
-      {/* Top Navbar — shared TopNav with badge + action slot */}
-      <TopNav
-        badge={
+    <AppShell
+      variant="editor"
+      isCompiling={isCompiling}
+      className="h-dvh overflow-hidden"
+      badge={
           <div className="hidden sm:flex items-center gap-2" data-testid="document-type-badge">
             {docMetadata.type === "MASTER_RESUME" && (
               <span
@@ -588,7 +589,7 @@ export function EditorWorkspace() {
             </div>
           </div>
         }
-      />
+      >
 
       {/* Task B1: Explicit Loading & Recoverable Error States */}
       {isLoadingDocument && (
@@ -854,6 +855,6 @@ export function EditorWorkspace() {
           )}
         </div>
       </main>
-    </div>
+    </AppShell>
   );
 }
