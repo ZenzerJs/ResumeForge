@@ -80,6 +80,7 @@ export async function POST(request: Request) {
     }
 
     let extractedText = "";
+    let extractedLinks: import("@/lib/pdf/parser").ExtractedPdfLink[] = [];
     let pageCount = 1;
 
     if (buffer) {
@@ -91,6 +92,7 @@ export async function POST(request: Request) {
         );
       }
       extractedText = parsedPdf.text;
+      extractedLinks = parsedPdf.links || [];
       pageCount = parsedPdf.numpages;
     } else if (rawTextFromPayload) {
       extractedText = rawTextFromPayload;
@@ -125,6 +127,7 @@ export async function POST(request: Request) {
           providerConfig,
           rawText: extractedText,
           fileName: title,
+          links: extractedLinks,
         });
 
         if (aiResult.success && aiResult.typstSource && aiResult.typstSource.trim().length > 0) {
@@ -139,7 +142,7 @@ export async function POST(request: Request) {
     // Deterministic fallback path
     if (!convertedSource) {
       conversionPath = "fallback";
-      convertedSource = convertTextToTypst(extractedText, title);
+      convertedSource = convertTextToTypst(extractedText, title, extractedLinks);
     }
 
     // Prepend header comments for status tracking and non-master draft labeling

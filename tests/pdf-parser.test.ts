@@ -27,4 +27,14 @@ B.S. Computer Science — UC Berkeley
     expect(typst).toContain("= John Doe");
     expect(typst).toContain("#line(length: 100%");
   });
+
+  it("renders verified extracted link annotations in header when provided", () => {
+    const links = [
+      { url: "https://linkedin.com/in/alex", label: "LinkedIn" },
+      { url: "https://github.com/alex", label: "GitHub" },
+    ];
+    const typst = convertTextToTypst("Alex Mercer\nalex@example.com", "MyResume.pdf", links);
+    expect(typst).toContain('#link("https://linkedin.com/in/alex")[LinkedIn]');
+    expect(typst).toContain('#link("https://github.com/alex")[GitHub]');
+  });
 });

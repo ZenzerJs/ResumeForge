@@ -3,7 +3,7 @@ import { stripCodeFences } from "@/lib/ai/utils";
 import { convertPdfTextToTypst } from "@/lib/ai/gateway";
 import { ProviderConfig } from "@/lib/ai/types";
 import { convertTextToTypst } from "@/lib/pdf/parser";
-import { buildPdfToTypstSystemPrompt } from "@/lib/ai/pdf-prompt";
+import { buildPdfToTypstSystemPrompt, buildPdfToTypstUserPrompt } from "@/lib/ai/pdf-prompt";
 import { sanitizeTypstSource } from "@/lib/typst/sanitizer";
 
 const sampleExtractedText = `Jayden Saha
@@ -199,5 +199,18 @@ describe("Task 9.1 & 9.1b — AI-Powered PDF to Typst Conversion & Template Exem
     expect(clean).not.toContain('font: "Some Random Font"');
     expect(clean).toContain('font: "Liberation Sans"');
     expect(clean).toContain("jayden@yahoo.com");
+  });
+
+  it("14. buildPdfToTypstUserPrompt embeds VERIFIED PDF HYPERLINKS section when links array is provided", () => {
+    const links = [
+      { url: "https://linkedin.com/in/jayden-saha", label: "LinkedIn" },
+      { url: "https://github.com/jayden-saha", label: "GitHub" },
+    ];
+    const userPrompt = buildPdfToTypstUserPrompt("Extracted text here", "Jayden_Resume.pdf", links);
+
+    expect(userPrompt).toContain("VERIFIED PDF HYPERLINKS");
+    expect(userPrompt).toContain("https://linkedin.com/in/jayden-saha");
+    expect(userPrompt).toContain("https://github.com/jayden-saha");
+    expect(userPrompt).toContain("NEVER invent, guess, or infer URLs");
   });
 });

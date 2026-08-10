@@ -154,11 +154,26 @@ You MUST use the exact styling, helper functions, and structural pattern defined
   return buildComposedSystemPrompt(taskInstructions);
 }
 
-export function buildPdfToTypstUserPrompt(rawText: string, fileName?: string): string {
+import { ExtractedPdfLink } from "../pdf/parser";
+
+export function buildPdfToTypstUserPrompt(
+  rawText: string,
+  fileName?: string,
+  links?: ExtractedPdfLink[]
+): string {
+  let linkSection = "";
+  if (links && links.length > 0) {
+    const linkItems = links
+      .map((l) => `- URL: ${l.url}${l.label ? ` (Label: "${l.label}")` : ""}`)
+      .join("\n");
+
+    linkSection = `\n### VERIFIED PDF HYPERLINKS (PRESERVE ALL EXACTLY)\n${linkItems}\n\nCRITICAL LINK INSTRUCTIONS:\n1. Preserve every extracted URL above EXACTLY. Match URLs to their visible header/text labels (e.g. LinkedIn, GitHub, Email, Portfolio).\n2. Render links using Typst link syntax: #link("URL")[Label]\n3. NEVER invent, guess, or infer URLs that are not listed in the VERIFIED PDF HYPERLINKS list above.\n`;
+  }
+
   return `Convert the following extracted PDF resume text into clean Typst markup:
 
 FILE NAME: ${fileName || "Resume"}
-
+${linkSection}
 === EXTRACTED RAW TEXT START ===
 ${rawText}
 === EXTRACTED RAW TEXT END ===

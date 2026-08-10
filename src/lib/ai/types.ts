@@ -82,10 +82,13 @@ export interface GenerateCoverLetterResult {
 
 // --- Task 9.1: PDF-to-Typst conversion types ---
 
+import { ExtractedPdfLink } from "../pdf/parser";
+
 export interface ConvertPdfInput {
   providerConfig: ProviderConfig;
   rawText: string;
   fileName?: string;
+  links?: ExtractedPdfLink[];
 }
 
 export interface ConvertPdfResult {

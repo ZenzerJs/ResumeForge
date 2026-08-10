@@ -198,7 +198,7 @@ export async function convertPdfTextToTypst(input: ConvertPdfInput): Promise<Con
 
   const config = parseResult.data;
   const systemPrompt = buildPdfToTypstSystemPrompt();
-  const userPrompt = buildPdfToTypstUserPrompt(input.rawText, input.fileName);
+  const userPrompt = buildPdfToTypstUserPrompt(input.rawText, input.fileName, input.links);
 
   try {
     let result: ConvertPdfResult;

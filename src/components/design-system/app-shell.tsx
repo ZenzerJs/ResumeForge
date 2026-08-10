@@ -27,7 +27,10 @@ export function AppShell({
 }: AppShellProps) {
   return (
     <div
-      className="relative flex min-h-screen flex-col overflow-hidden bg-rf-bg text-rf-body"
+      className={cn(
+        "relative flex flex-col overflow-hidden bg-rf-bg text-rf-body",
+        variant === "editor" ? "h-screen max-h-screen" : "min-h-screen"
+      )}
       data-testid={`app-shell-${variant}`}
     >
       <AmbientBackground variant={variant} isCompiling={isCompiling} />
