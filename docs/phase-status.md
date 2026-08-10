@@ -610,6 +610,32 @@ All AI agents completing subsequent phases MUST update this file using the follo
 
 ---
 
+## Phase Update: AI Prompt Docs Sync + Master→Evidence Draft Extract
+
+- **Completed Date**: 2026-08-09
+- **Status Summary**: Prompt markdown specs now mirror runtime TS builders. Opt-in Save-as-Master flow can draft Evidence Bank items (`status: draft`, bullets `verified: false`) via `POST /api/ai/extract-evidence`, with dedupe that never overwrites verified items.
+
+### Completed Work
+- Rewrote/added `prompts/*.md` (master, tailor, qualitative-review, cover letter, pdf-to-typst, typst-repair, evidence-extract); JD parser documented as deterministic; ATS evaluator stub redirects to qualitative-review.
+- Added `evidence-extract-schema.ts`, `evidence-prompt.ts`, `evidence-persist.ts`, gateway `extractEvidenceFromMaster`, and API route.
+- Editor Save-as-Master modal: “Draft Evidence Bank from this resume” (default checked when bank empty).
+- Tests: extended `master-prompt.test.ts`; new `evidence-extract.test.ts` (schema, persist, 400, mocked happy path).
+
+### Verification Tests Executed
+- `npm run lint` — Pass
+- `npm run typecheck` — Pass
+- `npm run test` — Pass (196/196)
+- `npm run build` — Pass
+
+### Known Limitations
+- No auto-verify; no bullet-merge on draft duplicates (skip only).
+- Markdown prompts are documentation mirrors only (not loaded at runtime).
+
+### Suggested Next Task
+- Library bulk verify/reject for Master-extract drafts; optional E2E for the extract toast path.
+
+---
+
 
 
 

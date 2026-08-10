@@ -41,8 +41,9 @@ test.describe("Phase 6 Job Application Tracker E2E Tests", () => {
     expect(getJson.data.status).toBe("APPLIED");
     expect(getJson.data.appliedAt).not.toBeNull();
 
-    // Expand notes section for specific job card
-    await page.click(`[data-testid='notes-toggle-btn-${jobId}']`);
+    // Select job card so detail pane (with notes) is visible
+    await page.locator(`[data-testid='tracker-job-card-${jobId}']`).click();
+    await expect(page.locator(`[data-testid='notes-textarea-${jobId}']`)).toBeVisible();
 
     // Type notes and click Save Notes
     const patchPromise = page.waitForResponse(
@@ -57,12 +58,12 @@ test.describe("Phase 6 Job Application Tracker E2E Tests", () => {
     const getJson2 = await getRes2.json();
     expect(getJson2.data.notes).toBe("Referred by Alex. Initial screen scheduled for next Tuesday.");
 
-    // Toggle sub-page tab to Applied & Active
-    await page.click("a:has-text('Applied & Active')");
+    // Toggle sub-page tab to Applied
+    await page.click("[data-testid='tracker-tab-applied']");
     await expect(page.locator("text=Stripe").first()).toBeVisible();
 
-    // Toggle back to All Jobs
-    await page.click("a:has-text('All Jobs')");
+    // Toggle back to All
+    await page.click("[data-testid='tracker-tab-all']");
     await expect(page.locator("[data-testid='tracker-page-title']")).toBeVisible();
   });
 

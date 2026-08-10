@@ -77,6 +77,9 @@ export function EditorWorkspace() {
   const [lastSnapshotId, setLastSnapshotId] = useState<string | null>(null);
   const [isUndoing, setIsUndoing] = useState<boolean>(false);
   const [undoSuccess, setUndoSuccess] = useState<boolean>(false);
+  const [draftEvidenceFromMaster, setDraftEvidenceFromMaster] = useState<boolean>(true);
+  const [evidenceExtractToast, setEvidenceExtractToast] = useState<string | null>(null);
+  const [isExtractingEvidence, setIsExtractingEvidence] = useState<boolean>(false);
 
   // Task B1: Canonical Document Loading & Metadata State
   const [isLoadingDocument, setIsLoadingDocument] = useState<boolean>(true);
@@ -366,11 +369,62 @@ export function EditorWorkspace() {
   };
 
   const handleSaveAsMaster = async () => {
+    // Default checkbox: checked when Evidence Bank is empty; otherwise unchecked
+    try {
+      const res = await fetch("/api/evidence");
+      const json = await res.json();
+      const items = Array.isArray(json?.data) ? json.data : [];
+      const activeCount = items.filter((i: { status?: string }) => i.status !== "archived").length;
+      setDraftEvidenceFromMaster(activeCount === 0);
+    } catch {
+      setDraftEvidenceFromMaster(true);
+    }
     setShowSaveConfirm(true);
+  };
+
+  const runEvidenceExtractAfterSave = async (typstSource: string) => {
+    try {
+      setIsExtractingEvidence(true);
+      let providerConfig: Record<string, unknown> | undefined;
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("resumeforge_ai_settings");
+        if (stored) {
+          providerConfig = JSON.parse(stored);
+        }
+      }
+      if (!providerConfig?.provider || !providerConfig?.apiKey) {
+        setEvidenceExtractToast("Configure an AI provider in Settings to draft Evidence Bank items.");
+        setTimeout(() => setEvidenceExtractToast(null), 5000);
+        return;
+      }
+
+      const res = await fetch("/api/ai/extract-evidence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ typstSource, providerConfig }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        const n = json.data?.persist?.createdCount ?? 0;
+        setEvidenceExtractToast(
+          `${n} draft evidence item${n === 1 ? "" : "s"} created — review in Library`
+        );
+      } else {
+        setEvidenceExtractToast(json.error || "Evidence extract failed.");
+      }
+      setTimeout(() => setEvidenceExtractToast(null), 6000);
+    } catch (err) {
+      console.error("Evidence extract failed:", err);
+      setEvidenceExtractToast("Evidence extract failed.");
+      setTimeout(() => setEvidenceExtractToast(null), 5000);
+    } finally {
+      setIsExtractingEvidence(false);
+    }
   };
 
   const handleConfirmSaveAsMaster = async () => {
     if (!source || source.trim().length === 0) return;
+    const shouldExtractEvidence = draftEvidenceFromMaster;
     try {
       setIsSavingMaster(true);
       setSaveSuccess(false);
@@ -400,6 +454,10 @@ export function EditorWorkspace() {
         });
         setShowSaveConfirm(false);
         setTimeout(() => setSaveSuccess(false), 3000);
+
+        if (shouldExtractEvidence) {
+          await runEvidenceExtractAfterSave(source);
+        }
       }
     } catch (err) {
       console.error("Failed to save master resume:", err);
@@ -698,6 +756,24 @@ export function EditorWorkspace() {
         </div>
       )}
 
+      {evidenceExtractToast && (
+        <div
+          data-testid="evidence-extract-toast"
+          className="flex items-center gap-2 px-4 py-2 bg-sky-950/90 border-b border-sky-800 text-xs text-sky-200"
+        >
+          <BookOpen className="h-4 w-4 text-sky-400 shrink-0" />
+          <span>{evidenceExtractToast}</span>
+          {evidenceExtractToast.includes("Library") && (
+            <Link
+              href="/library"
+              className="ml-auto text-sky-300 underline underline-offset-2 hover:text-sky-100"
+            >
+              Open Library
+            </Link>
+          )}
+        </div>
+      )}
+
       {/* Task 7.9: Confirmation Modal for Save as Master */}
       {showSaveConfirm && (
         <div
@@ -729,6 +805,25 @@ export function EditorWorkspace() {
               </p>
             </div>
 
+            <label
+              className="flex items-start gap-2.5 p-3 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"
+              data-testid="draft-evidence-checkbox-label"
+            >
+              <input
+                type="checkbox"
+                checked={draftEvidenceFromMaster}
+                onChange={(e) => setDraftEvidenceFromMaster(e.target.checked)}
+                data-testid="draft-evidence-from-master-checkbox"
+                className="mt-0.5 h-3.5 w-3.5 rounded border-slate-600 bg-slate-900 text-amber-500 focus:ring-amber-500/40"
+              />
+              <span className="text-[11px] text-slate-300 leading-relaxed">
+                <span className="font-semibold text-slate-100">Draft Evidence Bank from this resume</span>
+                <span className="block text-slate-500 mt-0.5">
+                  Creates unverified draft items for Library review. Never auto-verifies.
+                </span>
+              </span>
+            </label>
+
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
@@ -740,11 +835,15 @@ export function EditorWorkspace() {
               <button
                 type="button"
                 onClick={handleConfirmSaveAsMaster}
-                disabled={isSavingMaster}
+                disabled={isSavingMaster || isExtractingEvidence}
                 data-testid="confirm-save-master-btn"
                 className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-lg shadow-amber-500/20 transition"
               >
-                {isSavingMaster ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {isSavingMaster || isExtractingEvidence ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
                 Confirm Overwrite &amp; Save
               </button>
             </div>

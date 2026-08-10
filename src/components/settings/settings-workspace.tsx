@@ -131,7 +131,7 @@ export function SettingsWorkspace() {
         <div className="space-y-6">
           <PageHeader
             eyebrow="Control room"
-            title="Bring-Your-Own-Key (BYOK) AI Configuration"
+            title="AI Provider Gateway Settings — Bring-Your-Own-Key (BYOK) AI Configuration"
             description="Configure your preferred LLM provider or local OpenAI-compatible endpoint. API keys are stored in browser localStorage for local single-user convenience and never saved in SQLite."
           />
 

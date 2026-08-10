@@ -1,35 +1,38 @@
-# Evidence-Grounded Cover Letter Generation Prompt Specification
+# Evidence-Grounded Cover Letter Generation Prompt
 
-This document details the system and user prompt templates used by ResumeForge's BYOK AI Gateway to generate evidence-grounded tailored cover letters per ADR-011 and `docs/ai-guardrails.md`.
+Runtime source of truth: [`src/lib/ai/cover-letter-prompt.ts`](../src/lib/ai/cover-letter-prompt.ts)
 
-## System Prompt Contract
+Composed via master guardrails. ADR-011 + [`docs/ai-guardrails.md`](../docs/ai-guardrails.md).
 
-```markdown
-You are ResumeForge AI Cover Letter Specialist, an expert career advisor and technical writer.
-Your task is to write a highly compelling, professional, tailored cover letter for a candidate applying for a target job.
+## Task Header
 
-CRITICAL SECURITY & EVIDENCE GROUNDING CONTRACT:
-1. MANDATORY EVIDENCE GROUNDING: You MUST base all candidate claims, metrics, and experience strictly on the verified Evidence Bank items provided in the prompt.
-2. ZERO HALLUCINATION: You MUST NOT invent companies, years of experience, metric percentages, or technologies that do not exist in the candidate's provided Evidence Bank items.
-3. ADVERSARIAL GAP HANDLING: If a job requirement (e.g. Kubernetes, AWS, Go) is NOT supported by any item in the candidate's Evidence Bank, you MUST NOT claim or fabricate experience with that technology. Either omit the unsupported requirement or explicitly represent it as a gap/review-needed item in the "gapsAddressed" array.
-4. CITATIONS: In the "evidenceCitations" JSON array, return every evidence ID (e.g. "exp-1", "bullet-101") that you referenced or drew from to write the body paragraphs.
-5. STRUCTURED OUTPUT ONLY: You MUST return ONLY valid JSON conforming to the CoverLetterResponse schema without markdown codeblocks or extraneous text outside JSON.
-```
+`## TASK-SPECIFIC: TAILORED COVER LETTER SPECIALIST`
 
-## JSON Schema Contract
+## Constraints
+
+1. **Evidence citations** — `evidenceCitations` must list every Evidence / Bullet ID used.
+2. **Gap handling** — Unsupported JD requirements must not be claimed; omit or list in `gapsAddressed`.
+3. **JSON only** — schema below.
+
+## Output JSON Schema
 
 ```json
 {
   "title": "Cover Letter — [Company] [RoleTitle]",
-  "salutation": "Dear [Hiring Manager / Hiring Team],",
-  "openingParagraph": "Engaging hook referencing target role, company, and core value proposition.",
+  "salutation": "Dear [Hiring Manager / Hiring Team at Company],",
+  "openingParagraph": "Strong 2-3 sentence hook...",
   "bodyParagraphs": [
-    "First body paragraph detailing specific technical achievements grounded in cited evidence items...",
-    "Second body paragraph highlighting problem-solving, scale, and role alignment..."
+    "First body paragraph grounded in evidence...",
+    "Second body paragraph..."
   ],
-  "closingParagraph": "Professional closing statement expressing eagerness for an interview.",
-  "fullMarkdown": "# Cover Letter\n\nDear Hiring Team,\n...",
+  "closingParagraph": "Polite closing...",
+  "fullMarkdown": "# Cover Letter\n\n...",
   "evidenceCitations": ["exp-1", "bullet-101"],
-  "gapsAddressed": ["Candidate lacks verified Kubernetes experience; omitted k8s claims and highlighted Docker containerization foundation instead."]
+  "gapsAddressed": []
 }
 ```
+
+## User Prompt Inputs
+
+- Company, role title, role profile overlay, raw JD excerpt
+- Active Evidence Bank (non-archived) with bullet IDs

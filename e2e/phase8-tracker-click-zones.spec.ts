@@ -16,24 +16,14 @@ test.describe("Task 8.3 & Task 8.6: Tracker Card Click-Zone & Unified Actions E2
     await page.waitForSelector("[data-testid^='tracker-job-card-']", { timeout: 15000 });
   });
 
-  test("1. Clicking card title/body opens external job applyUrl in a new tab popup", async ({ page, context }) => {
-    // Find job card that has an external apply link
-    const cardWithLink = page.locator("[data-testid^='tracker-job-card-']").filter({ has: page.locator("a[data-testid^='open-original-btn-']") }).first();
-    await expect(cardWithLink).toBeVisible();
-
-    // Listen for new tab popup
-    const popupPromise = context.waitForEvent("page", { timeout: 5000 });
-
-    // Click card title
-    await cardWithLink.locator("h3").first().click();
-
-    const popup = await popupPromise;
-    expect(popup).toBeDefined();
-    await popup.close();
-  });
-
-  test("2. Clicking action bar buttons (Copy JD, Tailor) stops propagation and does NOT open external popup", async ({ page, context }) => {
-    const cardWithLink = page.locator("[data-testid^='tracker-job-card-']").filter({ has: page.locator("a[data-testid^='open-original-btn-']") }).first();
+  test("1. Clicking card row selects job for detail (does NOT open apply URL)", async ({
+    page,
+    context,
+  }) => {
+    const cardWithLink = page
+      .locator("[data-testid^='tracker-job-card-']")
+      .filter({ has: page.locator("a[data-testid^='open-original-btn-']") })
+      .first();
     await expect(cardWithLink).toBeVisible();
 
     let popupTriggered = false;
@@ -42,20 +32,36 @@ test.describe("Task 8.3 & Task 8.6: Tracker Card Click-Zone & Unified Actions E2
     };
     context.on("page", pageListener);
 
-    // Click Tailor Resume button inside action bar (links to /tailor within current tab)
-    const tailorBtn = cardWithLink.locator("a:has-text('Tailor Resume')").first();
-    await tailorBtn.click();
-
-    // Wait short delay to ensure no external popup tab was opened
+    await cardWithLink.locator("h3").first().click();
     await page.waitForTimeout(500);
 
     context.off("page", pageListener);
+    expect(popupTriggered).toBe(false);
+    await expect(page.locator("[data-testid='job-detail-pane']")).toBeVisible();
+  });
 
-    // Assert event propagation was stopped: NO external popup tab opened
+  test("2. Clicking Tailor Resume does NOT open external popup", async ({ page, context }) => {
+    const cardWithLink = page
+      .locator("[data-testid^='tracker-job-card-']")
+      .filter({ has: page.locator("a[data-testid^='open-original-btn-']") })
+      .first();
+    await expect(cardWithLink).toBeVisible();
+
+    let popupTriggered = false;
+    const pageListener = () => {
+      popupTriggered = true;
+    };
+    context.on("page", pageListener);
+
+    const tailorBtn = cardWithLink.locator("a:has-text('Tailor Resume')").first();
+    await tailorBtn.click();
+    await page.waitForTimeout(500);
+
+    context.off("page", pageListener);
     expect(popupTriggered).toBe(false);
   });
 
-  test("3. Open Posting button opens external applyUrl in new tab", async ({ page, context }) => {
+  test("3. Open Posting icon opens external applyUrl in new tab", async ({ page, context }) => {
     const openBtn = page.locator("a[data-testid^='open-original-btn-']").first();
     await expect(openBtn).toBeVisible();
 
@@ -66,8 +72,18 @@ test.describe("Task 8.3 & Task 8.6: Tracker Card Click-Zone & Unified Actions E2
     await popup.close();
   });
 
-  test("4. Generate/Open Cover Letter action button navigates to /tailor with active jobId", async ({ page }) => {
-    const coverBtn = page.locator("[data-testid^='generate-cover-letter-btn-'], [data-testid^='open-cover-letter-btn-']").first();
+  test("4. Generate/Open Cover Letter in detail navigates to /tailor with jobId", async ({
+    page,
+  }) => {
+    const card = page.locator("[data-testid^='tracker-job-card-']").first();
+    await card.click();
+    await expect(page.locator("[data-testid='job-detail-pane']")).toBeVisible();
+
+    const coverBtn = page
+      .locator(
+        "[data-testid^='generate-cover-letter-btn-'], [data-testid^='open-cover-letter-btn-']",
+      )
+      .first();
     await expect(coverBtn).toBeVisible();
 
     await coverBtn.click();

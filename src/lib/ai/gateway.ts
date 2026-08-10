@@ -10,6 +10,7 @@ import { buildCoverLetterSystemPrompt, buildCoverLetterUserPrompt } from "./cove
 import { buildPdfToTypstSystemPrompt, buildPdfToTypstUserPrompt } from "./pdf-prompt";
 import { GenerateCoverLetterInput } from "./cover-letter-schema";
 import { TypstRepairInput, TypstRepairInputSchema, TypstRepairProposal } from "./repair-schema";
+import { buildEvidenceExtractSystemPrompt, buildEvidenceExtractUserPrompt } from "./evidence-prompt";
 
 /**
  * Unified AI Provider Gateway Connectivity Interface
@@ -267,6 +268,52 @@ export async function repairTypstSource(
     return {
       success: false,
       error: sanitizeError(`Typst repair gateway exception: ${err instanceof Error ? err.message : String(err)}`),
+    };
+  }
+}
+
+/**
+ * Extract draft Evidence Bank items from Master Typst via BYOK provider.
+ * Reuses JSON chat completion adapters (same shape as cover letter / patches).
+ */
+export async function extractEvidenceFromMaster(
+  providerConfig: ProviderConfig,
+  typstSource: string
+): Promise<GeneratePatchesResult> {
+  const parseResult = ProviderConfigSchema.safeParse(providerConfig);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: sanitizeError(`Invalid provider configuration: ${parseResult.error.message}`),
+    };
+  }
+
+  const config = parseResult.data;
+  const systemPrompt = buildEvidenceExtractSystemPrompt();
+  const userPrompt = buildEvidenceExtractUserPrompt(typstSource);
+
+  try {
+    switch (config.provider) {
+      case "openai":
+        return await generateOpenAICoverLetter(config, systemPrompt, userPrompt);
+      case "anthropic":
+        return await generateAnthropicCoverLetter(config, systemPrompt, userPrompt);
+      case "gemini":
+        return await generateGeminiCoverLetter(config, systemPrompt, userPrompt);
+      case "custom":
+        return await generateCustomCoverLetter(config, systemPrompt, userPrompt);
+      default:
+        return {
+          success: false,
+          error: `Unsupported AI provider for evidence extract: ${config.provider}`,
+        };
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: sanitizeError(
+        `Evidence extract gateway exception: ${err instanceof Error ? err.message : String(err)}`
+      ),
     };
   }
 }
