@@ -11,6 +11,7 @@ import { buildPdfToTypstSystemPrompt, buildPdfToTypstUserPrompt } from "./pdf-pr
 import { GenerateCoverLetterInput } from "./cover-letter-schema";
 import { TypstRepairInput, TypstRepairInputSchema, TypstRepairProposal } from "./repair-schema";
 import { buildEvidenceExtractSystemPrompt, buildEvidenceExtractUserPrompt } from "./evidence-prompt";
+import { sanitizeTypstSource } from "../typst/sanitizer";
 
 /**
  * Unified AI Provider Gateway Connectivity Interface
@@ -200,21 +201,31 @@ export async function convertPdfTextToTypst(input: ConvertPdfInput): Promise<Con
   const userPrompt = buildPdfToTypstUserPrompt(input.rawText, input.fileName);
 
   try {
+    let result: ConvertPdfResult;
     switch (config.provider) {
       case "openai":
-        return await convertOpenAIPdfTextToTypst(config, systemPrompt, userPrompt);
+        result = await convertOpenAIPdfTextToTypst(config, systemPrompt, userPrompt);
+        break;
       case "anthropic":
-        return await convertAnthropicPdfTextToTypst(config, systemPrompt, userPrompt);
+        result = await convertAnthropicPdfTextToTypst(config, systemPrompt, userPrompt);
+        break;
       case "gemini":
-        return await convertGeminiPdfTextToTypst(config, systemPrompt, userPrompt);
+        result = await convertGeminiPdfTextToTypst(config, systemPrompt, userPrompt);
+        break;
       case "custom":
-        return await convertCustomPdfTextToTypst(config, systemPrompt, userPrompt);
+        result = await convertCustomPdfTextToTypst(config, systemPrompt, userPrompt);
+        break;
       default:
         return {
           success: false,
           error: `Unsupported AI provider for PDF conversion: ${config.provider}`,
         };
     }
+
+    if (result.success && result.typstSource) {
+      result.typstSource = sanitizeTypstSource(result.typstSource);
+    }
+    return result;
   } catch (err) {
     return {
       success: false,

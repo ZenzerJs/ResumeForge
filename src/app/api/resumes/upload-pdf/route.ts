@@ -3,6 +3,7 @@ import { parsePdfBuffer, convertTextToTypst } from "@/lib/pdf/parser";
 import { createResume } from "@/lib/db/resumes";
 import { convertPdfTextToTypst } from "@/lib/ai/gateway";
 import { ProviderConfig, ProviderConfigSchema } from "@/lib/ai/types";
+import { sanitizeTypstSource } from "@/lib/typst/sanitizer";
 
 export async function POST(request: Request) {
   try {
@@ -142,7 +143,7 @@ export async function POST(request: Request) {
     }
 
     // Prepend header comments for status tracking and non-master draft labeling
-    const typstSource = `// @pdf-conversion-draft: Review and edit before saving as Master Resume\n// @conversion-path: ${conversionPath}\n// PDF source: "${fileName}" — converted ${new Date().toISOString().slice(0, 10)}\n\n${convertedSource}`;
+    const typstSource = `// @pdf-conversion-draft: Review and edit before saving as Master Resume\n// @conversion-path: ${conversionPath}\n// PDF source: "${fileName}" — converted ${new Date().toISOString().slice(0, 10)}\n\n${sanitizeTypstSource(convertedSource)}`;
 
     // Always create as non-master draft (isMaster: false)
     const newResume = await createResume({

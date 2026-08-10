@@ -17,7 +17,10 @@ Convert extracted PDF resume text into a single-page Typst document using the **
 3. Populate with real candidate content; omit missing sections; do not invent sections.
 4. Escape Typst special characters in plain text (`#`, `$`, `@`, `\`).
 5. Zero information loss from extracted text.
-6. **Output:** Typst source only — no markdown fences, no prose.
+6. **Forbidden angle-bracket labels:** Never wrap emails or URLs in `<...>` (e.g., `<yahoo.com>`), as Typst parses angle brackets as document label references.
+7. **Forbidden labels:** Do not emit `#label(...)` commands.
+8. **Approved font stack:** Use `font: "Liberation Sans"` and do not output lowercased/custom font overrides.
+9. **Output:** Typst source only — no markdown fences, no prose.
 
 ## User Prompt Inputs
 
