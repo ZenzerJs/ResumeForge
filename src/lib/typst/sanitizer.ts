@@ -4,7 +4,7 @@
  * 1. Strips stray angle-bracket email/domain constructs like `<yahoo.com>` or `<user@domain.com>`.
  *    (Typst interprets `<...>` as document label references, causing `label '<yahoo.com>' does not exist` compiler errors).
  * 2. Removes explicit `#label(<...>)` declarations.
- * 3. Normalizes font family declarations (e.g. `font: "liberation sans"` -> `font: "Liberation Sans"`).
+ * 3. Normalizes font family declarations: any custom/unsupported `font: "..."` override is normalized to `font: "Liberation Sans"`.
  */
 
 export function sanitizeTypstSource(source: string): string {
@@ -23,9 +23,9 @@ export function sanitizeTypstSource(source: string): string {
   // 3. Strip angle brackets around domain names like <yahoo.com> -> "yahoo.com"
   sanitized = sanitized.replace(/<([a-zA-Z0-9.-]+\.(?:com|org|net|edu|io|gov|me|dev|co))>/g, "$1");
 
-  // 4. Normalize font family declarations (e.g., font: "liberation sans" -> font: "Liberation Sans")
+  // 4. Normalize any font family override to template-supported font: "Liberation Sans"
   sanitized = sanitized.replace(
-    /font\s*:\s*"(?:liberation sans|helvetica|arial|calibri|times new roman)"/gi,
+    /font\s*:\s*"[^"]+"/gi,
     'font: "Liberation Sans"'
   );
 

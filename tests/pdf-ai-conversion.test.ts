@@ -170,15 +170,34 @@ describe("Task 9.1 & 9.1b — AI-Powered PDF to Typst Conversion & Template Exem
     expect(cleaned).toContain("yahoo.com");
   });
 
-  it("11. sanitizeTypstSource normalizes lowercase font: \"liberation sans\" to \"Liberation Sans\"", () => {
-    const raw = '#set text(font: "liberation sans", size: 9pt)';
+  it("11. sanitizeTypstSource normalizes arbitrary font declarations to Liberation Sans", () => {
+    const raw = '#set text(font: "liberation sans", size: 9pt)\n#set text(font: "Helvetica Custom", size: 10pt)';
     const cleaned = sanitizeTypstSource(raw);
-    expect(cleaned).toBe('#set text(font: "Liberation Sans", size: 9pt)');
+    expect(cleaned).toContain('font: "Liberation Sans"');
+    expect(cleaned).not.toContain('font: "liberation sans"');
+    expect(cleaned).not.toContain('font: "Helvetica Custom"');
   });
 
   it("12. System prompt includes forbidden angle-bracket label and font stack rules", () => {
     const prompt = buildPdfToTypstSystemPrompt();
     expect(prompt).toContain("FORBIDDEN ANGLE-BRACKET LABELS");
     expect(prompt).toContain("APPROVED FONT STACK ONLY");
+  });
+
+  it("13. Full pre-compilation source sanitization removes #label, angle brackets, and fixes font overrides", () => {
+    const dirtyTypst = `#set page(paper: "us-letter")
+#set text(font: "Some Random Font", size: 9pt)
+#label(<invalid_label>)
+#align(center)[
+  Jayden #link("mailto:jayden@yahoo.com")[<jayden@yahoo.com>] <yahoo.com>
+]`;
+    const clean = sanitizeTypstSource(dirtyTypst);
+
+    expect(clean).not.toContain("#label(<invalid_label>)");
+    expect(clean).not.toContain("<jayden@yahoo.com>");
+    expect(clean).not.toContain("<yahoo.com>");
+    expect(clean).not.toContain('font: "Some Random Font"');
+    expect(clean).toContain('font: "Liberation Sans"');
+    expect(clean).toContain("jayden@yahoo.com");
   });
 });
