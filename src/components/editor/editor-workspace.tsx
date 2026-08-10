@@ -813,7 +813,7 @@ export function EditorWorkspace() {
                 type="checkbox"
                 checked={draftEvidenceFromMaster}
                 onChange={(e) => setDraftEvidenceFromMaster(e.target.checked)}
-                data-testid="draft-evidence-from-master-checkbox"
+                data-testid="extract-evidence-checkbox"
                 className="mt-0.5 h-3.5 w-3.5 rounded border-slate-600 bg-slate-900 text-amber-500 focus:ring-amber-500/40"
               />
               <span className="text-[11px] text-slate-300 leading-relaxed">
