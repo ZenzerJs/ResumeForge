@@ -1,11 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
+const hankenGrotesk = Hanken_Grotesk({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-hanken",
   display: "swap",
+  weight: ["400", "500", "600", "700", "800"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+  weight: ["400", "600"],
 });
 
 const defaultUrl = process.env.NEXT_PUBLIC_APP_URL || "https://resumeforge.app";
@@ -52,7 +60,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f59e0b",
+  themeColor: "#ff8c00",
 };
 
 export default function RootLayout({
@@ -61,10 +69,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`dark ${inter.variable}`} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`dark ${hankenGrotesk.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
+    >
       <body
-        className="ink-navy font-sans antialiased min-h-screen"
-        style={{ backgroundColor: "#0A0E17" }}
+        className="bg-background text-on-surface font-body-regular antialiased min-h-screen"
         suppressHydrationWarning
       >
         {children}
