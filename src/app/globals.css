@@ -135,6 +135,30 @@
     background-size: 40px 40px;
   }
 
+  /* Glassmorphism Panel & Glow utilities */
+  .glass-panel {
+    background-color: rgba(45, 52, 73, 0.4);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(164, 140, 122, 0.2);
+    transition: all 0.3s ease;
+  }
+
+  .glow-effect:hover {
+    box-shadow: 0 0 20px rgba(255, 140, 0, 0.2);
+    border-color: rgba(255, 140, 0, 0.5);
+  }
+
+  .glow-secondary:hover {
+    box-shadow: 0 0 20px rgba(78, 222, 163, 0.2);
+    border-color: rgba(78, 222, 163, 0.5);
+  }
+
+  .terminal-text {
+    color: #ff8c00;
+    text-shadow: 0 0 8px rgba(255, 140, 0, 0.4);
+  }
+
   /* Ink spotlight hover */
   .hover-spotlight {
     transition: box-shadow 0.25s ease, border-color 0.25s ease;
