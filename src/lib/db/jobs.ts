@@ -1,7 +1,12 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { JobRequirements, JobRequirementsSchema } from "@/lib/jd-parser/types";
-import { extractPostingDateFromNotes, isPlaceholderDescription } from "@/lib/ingestion/helpers";
+import {
+  extractPostingDateFromNotes,
+  isPlaceholderDescription,
+  matchesWorkplaceFilter,
+  type WorkplaceFilter,
+} from "@/lib/ingestion/helpers";
 import {
   filterByPostedWithin,
   type PostedWithin,
@@ -131,10 +136,14 @@ export async function getJobs(userId?: string) {
   }));
 }
 
+export type { WorkplaceFilter };
+
 export interface JobListQuery {
   page?: number;
   limit?: number;
   q?: string;
+  location?: string;
+  workplace?: WorkplaceFilter;
   status?: JobStatus | JobStatus[] | "ALL";
   postedWithin?: PostedWithin;
   userId?: string;
@@ -161,6 +170,22 @@ export async function getJobsList(query: JobListQuery = {}) {
     ];
   }
 
+  if (query.location?.trim()) {
+    const loc = query.location.trim();
+    const locationFilter: Prisma.JobWhereInput = {
+      OR: [
+        { notes: { contains: loc, mode: "insensitive" } },
+        { rawDescription: { contains: loc, mode: "insensitive" } },
+      ],
+    };
+    const existingAnd = where.AND
+      ? Array.isArray(where.AND)
+        ? where.AND
+        : [where.AND]
+      : [];
+    where.AND = [...existingAnd, locationFilter];
+  }
+
   const jobs = await prisma.job.findMany({
     where,
     orderBy: { createdAt: "desc" },
@@ -177,7 +202,7 @@ export async function getJobsList(query: JobListQuery = {}) {
   });
 
   const postedWithin = query.postedWithin ?? "all";
-  const filtered =
+  const postedFiltered =
     postedWithin === "all"
       ? mapped
       : filterByPostedWithin(
@@ -190,6 +215,12 @@ export async function getJobsList(query: JobListQuery = {}) {
           },
           (j) => j.createdAt
         );
+
+  const workplace = query.workplace ?? "all";
+  const filtered =
+    workplace === "all"
+      ? postedFiltered
+      : postedFiltered.filter((j) => matchesWorkplaceFilter(j.notes, workplace));
 
   const total = filtered.length;
   const start = (page - 1) * limit;

@@ -27,6 +27,26 @@ export function extractLocationFromNotes(notes?: string | null): string {
   return match ? match[1].trim() : "";
 }
 
+export type WorkplaceFilter = "all" | "remote" | "hybrid" | "onsite";
+
+export function isWorkplaceFilter(value: string | null | undefined): value is WorkplaceFilter {
+  return value === "all" || value === "remote" || value === "hybrid" || value === "onsite";
+}
+
+export function matchesWorkplaceFilter(
+  notes: string | null | undefined,
+  workplace: WorkplaceFilter,
+): boolean {
+  if (workplace === "all") return true;
+  const loc = extractLocationFromNotes(notes).toLowerCase();
+  const hay = `${loc} ${(notes ?? "").toLowerCase()}`;
+  const remote = /\bremote\b/.test(hay);
+  const hybrid = /\bhybrid\b/.test(hay);
+  if (workplace === "remote") return remote;
+  if (workplace === "hybrid") return hybrid;
+  return !remote && !hybrid && loc.length > 0;
+}
+
 export function extractPostingDateFromNotes(notes?: string | null): string {
   if (!notes) return "";
   const match = notes.match(/(?:Date )?Posted:\s*([^|]+)/i);

@@ -27,8 +27,8 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
     );
 
   return (
-    <div className="sticky top-[52px] z-10 border-b border-slate-800 bg-slate-950/80 backdrop-blur">
-      <div className="mx-auto flex h-11 max-w-6xl items-center justify-between px-4">
+    <div className="shrink-0 border-b border-slate-800 bg-slate-950/80 backdrop-blur">
+      <div className="flex h-11 items-center justify-between gap-2 px-4">
         <div className="flex h-full items-center gap-1 sm:gap-3">
           <h1
             data-testid="tracker-page-title"

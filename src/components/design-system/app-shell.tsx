@@ -70,11 +70,13 @@ export function AppShell({
   actions,
   hideNav = false,
 }: AppShellProps) {
+  const lockViewport = variant === "editor" || variant === "tracker";
+
   return (
     <div
       className={cn(
         "relative flex flex-col bg-rf-bg text-rf-body",
-        variant === "editor" ? "h-screen max-h-screen overflow-hidden" : "min-h-screen overflow-x-hidden"
+        lockViewport ? "h-dvh max-h-dvh overflow-hidden" : "min-h-screen overflow-x-hidden"
       )}
       data-testid={`app-shell-${variant}`}
     >
@@ -85,7 +87,7 @@ export function AppShell({
         className={cn(
           "relative flex min-h-0 flex-1 flex-col",
           !hideNav && "pt-[calc(4rem+env(safe-area-inset-top))]",
-          variant === "editor" ? "overflow-hidden" : "overflow-y-auto",
+          lockViewport ? "overflow-hidden" : "overflow-y-auto",
           className
         )}
       >

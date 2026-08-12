@@ -139,7 +139,7 @@ export function JobDetailPane({
     : `generate-cover-letter-btn-${job.id}`;
 
   const content = (
-    <div className="flex-1 overflow-y-auto p-margin-desktop z-10 relative">
+    <div className={isSheet ? "p-margin-desktop" : "relative z-10 min-h-0 flex-1 overflow-y-auto p-margin-desktop"}>
       <div className="max-w-4xl mx-auto space-y-6 relative z-10">
         {/* Mobile close button */}
         {isSheet && (
@@ -358,7 +358,7 @@ export function JobDetailPane({
                 <p className="mb-2 text-xs italic text-primary/90">{tier2Notice}</p>
               )}
 
-              <div className="prose prose-invert max-w-none font-body-regular text-sm text-on-surface/90 space-y-4 overflow-y-auto pr-2 whitespace-pre-wrap leading-relaxed max-h-[600px]">
+              <div className="prose prose-invert max-w-none font-body-regular text-sm text-on-surface/90 space-y-4 pr-2 whitespace-pre-wrap leading-relaxed">
                 {convertHtmlToCleanMarkdown(detailJob.rawDescription ?? "")}
               </div>
             </div>
@@ -382,7 +382,7 @@ export function JobDetailPane({
   }
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto bg-background/50 relative" data-testid="job-detail-pane">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background/50 relative" data-testid="job-detail-pane">
       {content}
     </div>
   );

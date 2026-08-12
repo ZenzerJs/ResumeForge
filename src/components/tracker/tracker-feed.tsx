@@ -9,8 +9,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  MapPin,
 } from "lucide-react";
-import { JobStatus } from "@/lib/db/jobs";
+import { JobStatus, type WorkplaceFilter } from "@/lib/db/jobs";
 import { AppShell } from "@/components/design-system/app-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -64,6 +65,16 @@ const POSTED_OPTIONS: { value: PostedWithin; label: string }[] = [
   { value: "30d", label: "Last 30 days" },
 ];
 
+const WORKPLACE_OPTIONS: { value: WorkplaceFilter; label: string }[] = [
+  { value: "all", label: "Any workplace" },
+  { value: "remote", label: "Remote" },
+  { value: "hybrid", label: "Hybrid" },
+  { value: "onsite", label: "On-site" },
+];
+
+const FILTER_CONTROL =
+  "min-h-11 rounded-md border border-slate-700 bg-rf-elevated px-2.5 text-[12.5px] text-rf-cloud placeholder-slate-500 transition-colors duration-150 focus:border-amber-500/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60";
+
 interface TrackerFeedProps {
   filterStatuses?: JobStatus[];
 }
@@ -90,6 +101,9 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [locationQuery, setLocationQuery] = useState("");
+  const [debouncedLocation, setDebouncedLocation] = useState("");
+  const [workplace, setWorkplace] = useState<WorkplaceFilter>("all");
   const [statusFilter, setStatusFilter] = useState<JobStatus | "ALL">("ALL");
   const [postedWithin, setPostedWithin] = useState<PostedWithin>("all");
   const [page, setPage] = useState(1);
@@ -115,6 +129,11 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
     return () => window.clearTimeout(timer);
   }, [searchQuery]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedLocation(locationQuery.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [locationQuery]);
+
   const fetchJobs = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -124,6 +143,8 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         postedWithin,
       });
       if (debouncedSearch) params.set("q", debouncedSearch);
+      if (debouncedLocation) params.set("location", debouncedLocation);
+      if (workplace !== "all") params.set("workplace", workplace);
       if (statusFilter !== "ALL") {
         params.set("status", statusFilter);
       } else if (filterStatuses?.length) {
@@ -146,7 +167,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [page, postedWithin, debouncedSearch, statusFilter, filterStatuses]);
+  }, [page, postedWithin, debouncedSearch, debouncedLocation, workplace, statusFilter, filterStatuses]);
 
   useEffect(() => {
     fetchJobs();
@@ -161,7 +182,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   // Reset page when filters/search change
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, statusFilter, postedWithin, filterStatuses]);
+  }, [searchQuery, locationQuery, workplace, statusFilter, postedWithin, filterStatuses]);
 
   const handleSelectJob = (jobId: string) => {
     setActiveJobId(jobId);
@@ -388,45 +409,85 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         </div>
       )}
 
-      {/* Sticky filter bar */}
-      <div className="sticky top-0 z-[9] flex flex-wrap items-center gap-2 border-b border-slate-800 bg-rf-bg px-4 py-2.5">
+      {/* Filter subheader — locked, not part of pane scroll */}
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-800 bg-rf-bg px-4 py-2.5">
         <div className="relative min-w-[180px] flex-1 sm:max-w-xs">
           <label htmlFor="tracker-job-search" className="sr-only">
-            Search company or role
+            Search jobs, companies, or keywords
           </label>
-          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
           <input
             id="tracker-job-search"
-            type="text"
-            placeholder="Search company, role…"
+            data-testid="tracker-job-search"
+            type="search"
+            placeholder="Search jobs, companies…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-md border border-slate-700 bg-rf-elevated py-1.5 pl-8 pr-3 text-[12.5px] text-rf-cloud placeholder-slate-500 transition-colors duration-150 focus:border-amber-500/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+            className={`${FILTER_CONTROL} w-full py-0 pl-8 pr-3`}
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5">
-          {POSTED_OPTIONS.map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setPostedWithin(value)}
-              data-testid={`tracker-posted-${value}`}
-              className={
-                postedWithin === value
-                  ? "rounded-md border border-amber-500 bg-amber-500/15 px-2.5 py-1.5 text-[12.5px] text-amber-400 transition-colors duration-150"
-                  : "rounded-md border border-slate-700 bg-rf-elevated px-2.5 py-1.5 text-[12.5px] text-rf-meta transition-colors duration-150 hover:text-rf-cloud"
-              }
-            >
-              {label}
-            </button>
-          ))}
+        <div className="relative min-w-[140px] flex-1 sm:max-w-[180px]">
+          <label htmlFor="tracker-location-filter" className="sr-only">
+            Filter by location
+          </label>
+          <MapPin className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+          <input
+            id="tracker-location-filter"
+            data-testid="tracker-location-filter"
+            type="search"
+            placeholder="Location"
+            value={locationQuery}
+            onChange={(e) => setLocationQuery(e.target.value)}
+            className={`${FILTER_CONTROL} w-full py-0 pl-8 pr-3`}
+          />
         </div>
 
+        <label htmlFor="tracker-posted-select" className="sr-only">
+          How recently posted
+        </label>
         <select
+          id="tracker-posted-select"
+          data-testid="tracker-posted-select"
+          value={postedWithin}
+          onChange={(e) => setPostedWithin(e.target.value as PostedWithin)}
+          className={`${FILTER_CONTROL} cursor-pointer text-rf-meta`}
+          aria-label="How recently posted"
+        >
+          {POSTED_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value} data-testid={`tracker-posted-${value}`}>
+              {label}
+            </option>
+          ))}
+        </select>
+
+        <label htmlFor="tracker-workplace-filter" className="sr-only">
+          Workplace type
+        </label>
+        <select
+          id="tracker-workplace-filter"
+          data-testid="tracker-workplace-filter"
+          value={workplace}
+          onChange={(e) => setWorkplace(e.target.value as WorkplaceFilter)}
+          className={`${FILTER_CONTROL} cursor-pointer text-rf-meta`}
+          aria-label="Workplace type"
+        >
+          {WORKPLACE_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+
+        <label htmlFor="tracker-status-filter" className="sr-only">
+          Filter by status
+        </label>
+        <select
+          id="tracker-status-filter"
+          data-testid="tracker-status-filter"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as JobStatus | "ALL")}
-          className="rounded-md border border-slate-700 bg-rf-elevated px-2.5 py-1.5 text-[12.5px] text-rf-meta transition-colors duration-150 focus:border-amber-500/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 cursor-pointer"
+          className={`${FILTER_CONTROL} cursor-pointer text-rf-meta`}
           aria-label="Filter by status"
         >
           <option value="ALL">All Statuses</option>
@@ -450,7 +511,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           </span>
           <Link
             href="/tailor"
-            className="inline-flex items-center gap-1 rounded-md bg-amber-500 px-2.5 py-1.5 text-xs font-semibold text-rf-bg transition-colors duration-150 hover:bg-amber-400"
+            className="inline-flex min-h-11 items-center gap-1 rounded-md bg-amber-500 px-2.5 py-1.5 text-xs font-semibold text-rf-bg transition-colors duration-150 hover:bg-amber-400"
           >
             <Plus className="h-3.5 w-3.5" />
             Add Job
@@ -458,10 +519,10 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        {/* List pane */}
-        <div className="flex max-h-[calc(100vh-160px)] w-full flex-col border-r border-slate-800 lg:max-h-none lg:h-full lg:min-h-0 lg:w-[400px] lg:shrink-0">
-          <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {/* List pane — independent scroll */}
+        <div className="flex min-h-0 w-full flex-col border-r border-slate-800 lg:w-[400px] lg:shrink-0">
+          <div className="min-h-0 flex-1 overflow-y-auto" data-testid="tracker-job-list">
             {isLoading && (
               <div className="space-y-0 p-0">
                 {[...Array(6)].map((_, i) => (
@@ -476,8 +537,8 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                 <div>
                   <p className="font-medium text-rf-meta">No jobs found</p>
                   <p className="mt-1 text-sm text-slate-600">
-                    {searchQuery
-                      ? "Try adjusting your search query."
+                    {searchQuery || locationQuery
+                      ? "Try adjusting search or location filters."
                       : "Go to the Tailor workspace to paste a job posting."}
                   </p>
                 </div>
@@ -538,8 +599,11 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           )}
         </div>
 
-        {/* Desktop detail pane */}
-        <div className="hidden min-h-0 min-w-0 flex-1 lg:block">
+        {/* Desktop detail pane — independent scroll */}
+        <div
+          className="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex"
+          data-testid="tracker-job-detail"
+        >
           {selectedJob ? (
             <JobDetailPane
               job={selectedJob}
