@@ -394,7 +394,7 @@ export function EditorWorkspace() {
       }
       if (!providerConfig?.provider || !providerConfig?.apiKey) {
         setEvidenceExtractToast("Configure an AI provider in Settings to draft Evidence Bank items.");
-        setTimeout(() => setEvidenceExtractToast(null), 5000);
+        setTimeout(() => setEvidenceExtractToast(null), 8000);
         return;
       }
 
@@ -406,17 +406,26 @@ export function EditorWorkspace() {
       const json = await res.json();
       if (res.ok && json.success) {
         const n = json.data?.persist?.createdCount ?? 0;
-        setEvidenceExtractToast(
-          `${n} draft evidence item${n === 1 ? "" : "s"} created — review in Library`
-        );
+        const dup = json.data?.persist?.skippedDuplicateDraftCount ?? 0;
+        const ver = json.data?.persist?.skippedVerifiedCount ?? 0;
+
+        const msg =
+          n > 0
+            ? `${n} draft evidence item${n === 1 ? "" : "s"} created — review in Library`
+            : dup > 0 || ver > 0
+            ? `No new items — ${dup} already drafted, ${ver} verified (edit in Library)`
+            : "No extractable evidence found in this resume.";
+
+        setEvidenceExtractToast(msg);
       } else {
-        setEvidenceExtractToast(json.error || "Evidence extract failed.");
+        const detailsStr = json.details ? ` (${JSON.stringify(json.details)})` : "";
+        setEvidenceExtractToast((json.error || "Evidence extract failed.") + detailsStr);
       }
-      setTimeout(() => setEvidenceExtractToast(null), 6000);
+      setTimeout(() => setEvidenceExtractToast(null), 8000);
     } catch (err) {
       console.error("Evidence extract failed:", err);
       setEvidenceExtractToast("Evidence extract failed.");
-      setTimeout(() => setEvidenceExtractToast(null), 5000);
+      setTimeout(() => setEvidenceExtractToast(null), 6000);
     } finally {
       setIsExtractingEvidence(false);
     }
@@ -852,7 +861,7 @@ export function EditorWorkspace() {
       )}
 
       {/* Main Workspace Body */}
-      <main className="flex flex-1 overflow-hidden bg-background p-2 md:p-3">
+      <main className="flex flex-1 min-h-0 overflow-hidden bg-background p-2 md:p-3">
         {/* Desktop 3-Panel Resizable Layout (>= lg screens) */}
         <ResizablePanelGroup
           id="editor-resizable-panel-group"

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ResumeForge - Editor</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;800&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "on-surface-variant": "#ddc1ae",
+                "on-secondary": "#003824",
+                "inverse-primary": "#904d00",
+                "secondary": "#4edea3",
+                "secondary-fixed-dim": "#4edea3",
+                "primary": "#ffb77d",
+                "on-secondary-container": "#00311f",
+                "outline-variant": "#564334",
+                "surface-tint": "#ffb77d",
+                "on-primary-fixed": "#2f1500",
+                "on-tertiary-fixed-variant": "#930013",
+                "error": "#ffb4ab",
+                "tertiary-container": "#ff8780",
+                "tertiary": "#ffb3ad",
+                "on-tertiary-fixed": "#410004",
+                "on-background": "#dae2fd",
+                "surface-container-low": "#131b2e",
+                "on-primary": "#4d2600",
+                "surface-variant": "#2d3449",
+                "outline": "#a48c7a",
+                "on-primary-fixed-variant": "#6e3900",
+                "tertiary-fixed-dim": "#ffb3ad",
+                "surface-dim": "#0b1326",
+                "on-tertiary": "#68000a",
+                "on-primary-container": "#623200",
+                "tertiary-fixed": "#ffdad7",
+                "on-secondary-fixed-variant": "#005236",
+                "inverse-surface": "#dae2fd",
+                "surface-container-high": "#222a3d",
+                "on-error-container": "#ffdad6",
+                "background": "#0b1326",
+                "surface": "#0b1326",
+                "surface-container": "#171f33",
+                "surface-container-highest": "#2d3449",
+                "primary-fixed": "#ffdcc3",
+                "surface-container-lowest": "#060e20",
+                "primary-fixed-dim": "#ffb77d",
+                "error-container": "#93000a",
+                "on-tertiary-container": "#830010",
+                "on-error": "#690005",
+                "on-secondary-fixed": "#002113",
+                "surface-bright": "#31394d",
+                "primary-container": "#ff8c00",
+                "on-surface": "#dae2fd",
+                "secondary-container": "#00a572",
+                "secondary-fixed": "#6ffbbe",
+                "inverse-on-surface": "#283044"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "gutter": "16px",
+                "margin-mobile": "16px",
+                "unit": "4px",
+                "panel-padding": "20px",
+                "margin-desktop": "32px"
+        },
+        "fontFamily": {
+                "mono-data": [
+                        "JetBrains Mono"
+                ],
+                "page-title": [
+                        "Hanken Grotesk"
+                ],
+                "body-regular": [
+                        "Hanken Grotesk"
+                ],
+                "body-dense": [
+                        "Hanken Grotesk"
+                ],
+                "page-title-mobile": [
+                        "Hanken Grotesk"
+                ],
+                "section-label": [
+                        "JetBrains Mono"
+                ]
+        },
+        "fontSize": {
+                "mono-data": [
+                        "13px",
+                        {
+                                "lineHeight": "1.5",
+                                "fontWeight": "400"
+                        }
+                ],
+                "page-title": [
+                        "40px",
+                        {
+                                "lineHeight": "1.2",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "800"
+                        }
+                ],
+                "body-regular": [
+                        "16px",
+                        {
+                                "lineHeight": "1.6",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-dense": [
+                        "14px",
+                        {
+                                "lineHeight": "1.4",
+                                "fontWeight": "400"
+                        }
+                ],
+                "page-title-mobile": [
+                        "32px",
+                        {
+                                "lineHeight": "1.2",
+                                "fontWeight": "800"
+                        }
+                ],
+                "section-label": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.1em",
+                                "fontWeight": "600"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        body {
+            background-color: theme('colors.background');
+            color: theme('colors.on-background');
+        }
+        .glass-panel {
+            background: rgba(45, 52, 73, 0.4);
+            backdrop-filter: blur(12px);
+            border: 1px solid theme('colors.outline-variant');
+        }
+        .glow-hover:hover {
+            box-shadow: 0 0 20px rgba(255, 140, 0, 0.2);
+            border-color: rgba(255, 140, 0, 0.5);
+        }
+        .glow-active {
+            box-shadow: 0 0 15px rgba(255, 140, 0, 0.3);
+        }
+        /* Custom scrollbar for terminal feel */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: theme('colors.surface-container-lowest');
+        }
+        ::-webkit-scrollbar-thumb {
+            background: theme('colors.surface-variant');
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: theme('colors.outline');
+        }
+    </style>
+</head>
+<body class="h-screen w-full flex flex-col overflow-hidden font-body-regular antialiased">
+<!-- TopNavBar -->
+<header class="bg-background/80 backdrop-blur-xl fixed top-0 w-full z-50 border-b border-outline-variant shadow-[0_0_20px_rgba(255,140,0,0.05)] flex items-center justify-between px-margin-desktop h-16 max-w-full">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded bg-primary-container flex items-center justify-center text-on-primary font-bold">R</div>
+<span class="font-page-title text-[24px] text-primary tracking-tighter">ResumeForge</span>
+</div>
+<nav class="hidden md:flex items-center gap-6 ml-8">
+<a class="text-primary-container font-bold border-b-2 border-primary-container pb-1 flex items-center gap-2 active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-[20px]">edit_note</span> Editor
+                </a>
+<a class="text-on-surface hover:text-primary-container transition-colors flex items-center gap-2 duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]">database</span> Evidence Bank
+                </a>
+<a class="text-on-surface hover:text-primary-container transition-colors flex items-center gap-2 duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]">work</span> Jobs
+                </a>
+<a class="text-on-surface hover:text-primary-container transition-colors flex items-center gap-2 duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]">auto_fix_high</span> Tailor
+                </a>
+<a class="text-on-surface hover:text-primary-container transition-colors flex items-center gap-2 duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span> Settings
+                </a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-secondary/30 bg-secondary/10 text-secondary font-section-label text-section-label uppercase">
+<span class="material-symbols-outlined text-[16px]">verified</span> Master Resume
+            </div>
+<button class="text-on-surface-variant hover:text-primary-container transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary-container transition-colors">
+<span class="material-symbols-outlined">terminal</span>
+</button>
+<img alt="User Profile Avatar" class="w-8 h-8 rounded-full border border-outline-variant" data-alt="A small circular user profile avatar showing a stylized portrait against a dark background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAKE15AEZHrDU6Ay_engwsxcy6SWr9qqaDtyRK2vHNEqJ-aP9Zq4U0RIlE56-21Lf5GMHyaumlFA9Z9NiiFT3Yt9TWFOoD2qqPYX8hOifSPi8aNBfEFWEVbpSclNlGJ7sHEBsvUZ8T2CBZ2MPyG0kp4eVwTKvZu2oYmsH444TasEbChYYN3YL-tcuuNoCKpcC13Yt_leuCy01WJzMT6ZdUWMAzbIAPcc00esVGO8SN3nSR_Gz6ruCSjAA"/>
+</div>
+</header>
+<!-- Main Workspace -->
+<main class="flex-1 mt-16 flex overflow-hidden p-unit gap-unit bg-surface-container-lowest">
+<!-- Left Panel: Typst Source Editor -->
+<section class="flex-[1_1_30%] min-w-[300px] flex flex-col glass-panel rounded-lg overflow-hidden relative border border-outline-variant hover:border-outline transition-colors">
+<div class="h-12 border-b border-outline-variant/50 flex items-center justify-between px-4 bg-surface/50">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></div>
+<h2 class="font-section-label text-section-label text-on-surface uppercase">Typst Source Editor</h2>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-1 px-2 py-1 rounded bg-secondary/10 border border-secondary/20 text-secondary font-mono-data text-mono-data">
+<span class="material-symbols-outlined text-[14px]">check_circle</span> Mark
+                    </div>
+<span class="font-mono-data text-mono-data text-on-surface-variant">CodeMirror 6</span>
+</div>
+</div>
+<div class="flex-1 overflow-auto bg-[#1e1e1e] text-on-surface font-mono-data text-mono-data p-4">
+<div class="flex">
+<span class="text-outline-variant select-none pr-4 text-right w-8">1</span>
+<span class="text-[#ce9178]">= Database Master Typst Content</span>
+</div>
+<!-- Editor lines would go here -->
+</div>
+<!-- Floating Issue Indicator -->
+<button class="absolute bottom-4 left-4 bg-error text-on-error px-3 py-1.5 rounded-full flex items-center gap-2 shadow-lg font-body-dense text-body-dense font-bold hover:bg-error/90 transition-colors">
+<div class="w-5 h-5 rounded-full bg-on-error/20 flex items-center justify-center">N</div>
+                1 Issue
+                <span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</section>
+<!-- Center Panel: Live Document Preview -->
+<section class="flex-[1_1_40%] min-w-[400px] flex flex-col glass-panel rounded-lg overflow-hidden border border-outline-variant hover:border-outline transition-colors">
+<div class="h-12 border-b border-outline-variant/50 flex items-center justify-between px-4 bg-surface/50">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-secondary"></div>
+<h2 class="font-section-label text-section-label text-on-surface uppercase">Live Document Preview</h2>
+</div>
+<div class="flex items-center gap-2">
+<button class="flex items-center gap-1 px-3 py-1 rounded border border-surface-variant bg-surface-variant/30 text-on-surface-variant hover:bg-surface-variant/50 transition-colors font-section-label text-section-label">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">bar_chart</span> Grade
+                    </button>
+<button class="flex items-center gap-1 px-3 py-1 rounded border border-surface-variant bg-surface-variant/30 text-on-surface-variant hover:text-on-surface transition-colors font-section-label text-section-label">
+<span class="material-symbols-outlined text-[16px]">refresh</span> Reset Template
+                    </button>
+<button class="flex items-center gap-1 px-3 py-1 rounded bg-primary-container text-on-primary hover:bg-primary-container/90 transition-colors font-section-label text-section-label shadow-[0_0_15px_rgba(255,140,0,0.3)] glow-active">
+<span class="material-symbols-outlined text-[16px]">download</span> Export PDF
+                    </button>
+</div>
+</div>
+<div class="flex-1 overflow-auto bg-surface-container-highest p-8 flex justify-center">
+<!-- White Paper Preview -->
+<div class="w-full max-w-[800px] bg-white aspect-[8.5/11] shadow-2xl rounded-sm p-12 flex flex-col relative group">
+<h1 class="text-black font-bold text-2xl text-center font-serif">Database Master Typst Content</h1>
+<!-- Content placeholder -->
+<div class="absolute inset-0 ring-1 ring-black/5 rounded-sm pointer-events-none group-hover:ring-primary-container/50 transition-colors"></div>
+</div>
+</div>
+</section>
+<!-- Right Panel: AI Tailoring Assistant -->
+<section class="flex-[1_1_30%] min-w-[300px] flex flex-col glass-panel rounded-lg overflow-hidden border border-outline-variant hover:border-outline transition-colors">
+<div class="h-12 border-b border-outline-variant/50 flex items-center justify-between px-4 bg-surface/50">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container text-[18px]">auto_fix_high</span>
+<h2 class="font-section-label text-section-label text-on-surface uppercase">AI Tailoring Assistant</h2>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<button class="hover:text-primary-container transition-colors flex items-center gap-1 font-section-label text-[10px] uppercase">
+<span class="material-symbols-outlined text-[14px]">settings</span> Settings
+                    </button>
+<button class="hover:text-primary-container transition-colors">
+<span class="material-symbols-outlined text-[16px]">right_panel_open</span>
+</button>
+</div>
+</div>
+<div class="p-4 flex flex-col gap-6 overflow-auto">
+<!-- Action Buttons from Header (Moved to contextual panel for consistency in layout request) -->
+<div class="flex gap-2 w-full">
+<button class="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/30 transition-colors font-body-dense text-body-dense">
+<span class="material-symbols-outlined text-[16px]">history</span> Revert to Master
+                    </button>
+<button class="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded bg-primary-container text-on-primary hover:bg-primary-container/90 transition-colors font-body-dense text-body-dense shadow-[0_0_10px_rgba(255,140,0,0.2)]">
+<span class="material-symbols-outlined text-[16px]">save</span> Save as Master
+                    </button>
+</div>
+<div class="flex flex-col gap-2">
+<label class="font-section-label text-section-label text-on-surface-variant uppercase tracking-widest">Job Description</label>
+<div class="relative">
+<textarea class="w-full h-48 bg-surface-container-lowest border border-outline-variant rounded p-3 text-on-surface font-mono-data text-mono-data resize-none focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-all placeholder:text-outline-variant/50" placeholder="Paste the job posting here...
+
+(or navigate to a job in the Tracker and click Copy JD to auto-fill)"></textarea>
+</div>
+</div>
+<button class="w-full py-3 rounded bg-primary-container/20 border border-primary-container/50 text-primary-container font-body-regular text-body-regular flex items-center justify-center gap-2 transition-colors glow-hover">
+<span class="material-symbols-outlined">auto_awesome</span> Generate Suggestions
+                </button>
+<div class="flex-1 flex flex-col items-center justify-center text-center p-6 gap-4 opacity-50 mt-12">
+<div class="w-16 h-16 rounded-full bg-surface-variant flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-[32px] text-primary-container">smart_toy</span>
+</div>
+<div>
+<h3 class="font-body-regular text-body-regular font-bold text-on-surface mb-2">Tailoring Assistant</h3>
+<p class="font-body-dense text-body-dense text-on-surface-variant mb-4">Paste a job description and click Generate to get evidence-backed resume suggestions.</p>
+<a class="font-body-dense text-body-dense text-primary-container hover:underline underline-offset-4 flex items-center justify-center gap-1" href="#">
+                            Browse saved jobs in Tracker <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+</main>
+</body></html>

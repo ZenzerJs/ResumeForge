@@ -118,7 +118,7 @@ export function PreviewPanel({
       </div>
 
       {/* Main Preview Container */}
-      <div className="relative flex-1 overflow-auto p-4 md:p-6 flex flex-col items-center">
+      <div className="relative flex-1 min-h-0 overflow-auto p-4 md:p-6 flex flex-col items-center">
         {/* Task 9.5: ATS Grade Overlay Breakdown */}
         {showGrade && (
           <div data-testid="editor-ats-score-overlay" className="w-full max-w-[850px] mb-6">

@@ -401,7 +401,7 @@ export function AiSidebar({
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col overflow-y-auto p-4 gap-4">
+      <div className="flex flex-1 min-h-0 flex-col overflow-y-auto p-4 gap-4">
         {/* Task 10.5: Typst Repair Assist Mode Card */}
         {repairContext && (
           <div className="rounded-lg border border-amber-500/40 bg-amber-950/30 p-3.5 text-xs text-amber-200 shadow-md space-y-3">

@@ -8,14 +8,16 @@ export const metadata = {
 
 export default function EditorPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="dark flex h-dvh w-screen items-center justify-center bg-background text-muted-foreground text-xs font-mono">
-          Loading editor workspace...
-        </div>
-      }
-    >
-      <EditorWorkspace />
-    </Suspense>
+    <div className="h-screen flex flex-col overflow-hidden">
+      <Suspense
+        fallback={
+          <div className="dark flex h-dvh w-screen items-center justify-center bg-background text-muted-foreground text-xs font-mono">
+            Loading editor workspace...
+          </div>
+        }
+      >
+        <EditorWorkspace />
+      </Suspense>
+    </div>
   );
 }
