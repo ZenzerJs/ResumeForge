@@ -56,34 +56,28 @@ export function TopNav({ actions, badge }: TopNavProps) {
 
   return (
     <header
-      className="sticky top-0 z-50 flex shrink-0 items-center justify-between border-b border-slate-800/80 bg-rf-bg/92 px-4 backdrop-blur-md md:px-6"
-      style={{ height: "52px" }}
+      className="bg-background/80 backdrop-blur-xl border-b border-outline-variant shadow-[0_0_20px_rgba(255,140,0,0.05)] fixed top-0 w-full z-50 flex items-center justify-between px-margin-desktop h-16 max-w-full"
     >
       {/* Left: Logo + Badge */}
-      <div className="flex items-center gap-3 shrink-0">
+      <div className="flex items-center gap-4 shrink-0">
         <Link
           href="/"
-          className="flex items-center gap-2.5 group outline-none"
+          className="flex items-center gap-2 group outline-none"
           aria-label="ResumeForge home"
         >
           <div
-            className="flex h-8 w-8 items-center justify-center rounded-lg font-bold text-sm transition-all"
-            style={{
-              background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
-              color: "var(--rf-bg)",
-              boxShadow: "0 0 12px rgba(245,158,11,0.3)",
-            }}
+            className="w-8 h-8 rounded bg-primary flex items-center justify-center font-bold text-on-primary text-sm shadow-[0_0_12px_rgba(255,140,0,0.3)] transition-transform group-hover:scale-105"
           >
             R
           </div>
-          <span className="hidden sm:block text-sm font-semibold tracking-tight text-white/90 group-hover:text-white transition-colors">
-            Resume<span className="text-amber-400">Forge</span>
+          <span className="font-page-title text-[22px] text-primary tracking-tighter transition-colors">
+            ResumeForge
           </span>
         </Link>
 
         {badge && (
           <>
-            <span className="hidden sm:block h-4 w-px" style={{ backgroundColor: "#1E2536" }} aria-hidden />
+            <span className="hidden sm:block h-4 w-px bg-outline-variant" aria-hidden />
             {badge}
           </>
         )}
@@ -91,26 +85,23 @@ export function TopNav({ actions, badge }: TopNavProps) {
 
       {/* Center: Nav Links */}
       <nav
-        className="hidden md:flex items-center gap-0.5 text-xs font-medium absolute left-1/2 -translate-x-1/2"
+        className="hidden md:flex items-center gap-1 text-sm font-body-regular"
         aria-label="Primary navigation"
       >
-        {NAV_LINKS.map(({ href, label, icon: Icon, accent, hoverBg }) => {
+        {NAV_LINKS.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
           return (
             <Link
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-amber-400/50",
-                hoverBg,
+                "flex items-center gap-2 px-3 py-1.5 rounded transition-all duration-200 active:scale-95",
                 isActive
-                  ? "bg-slate-800/80 text-white border border-slate-700/60"
-                  : "text-slate-400 hover:text-slate-100"
+                  ? "text-primary font-bold border-b-2 border-primary bg-surface-variant/20"
+                  : "text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/50"
               )}
             >
-              <Icon
-                className={cn("h-3.5 w-3.5 transition-colors", isActive ? accent : "text-current")}
-              />
+              <Icon className="h-4 w-4" />
               <span>{label}</span>
             </Link>
           );
@@ -118,7 +109,7 @@ export function TopNav({ actions, badge }: TopNavProps) {
       </nav>
 
       {/* Right: Actions */}
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-4 shrink-0">
         {actions}
       </div>
     </header>
