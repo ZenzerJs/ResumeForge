@@ -14,12 +14,18 @@ jobs:
           curl -s https://raw.githubusercontent.com/SimplifyJobs/Summer2027-Internships/dev/README.md > raw_feed.md
 
       - name: Push to ResumeForge Sync API
+        if: ${{ secrets.APP_SYNC_URL != '' && secrets.JOB_SYNC_SECRET != '' }}
         env:
           APP_SYNC_URL: ${{ secrets.APP_SYNC_URL }}
           JOB_SYNC_SECRET: ${{ secrets.JOB_SYNC_SECRET }}
         run: |
           MARKDOWN_JSON=$(jq -Rs '.' raw_feed.md)
-          curl -X POST "$APP_SYNC_URL/api/jobs/sync-pittcsc" \
+          curl --fail-with-body -X POST "${APP_SYNC_URL%/}/api/jobs/sync-pittcsc" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $JOB_SYNC_SECRET" \
             -d "{\"rawMarkdown\": $MARKDOWN_JSON, \"jobType\": \"Internship\"}"
+
+      - name: Skip sync when secrets are missing
+        if: ${{ secrets.APP_SYNC_URL == '' || secrets.JOB_SYNC_SECRET == '' }}
+        run: |
+          echo "Skipping ingest sync: APP_SYNC_URL or JOB_SYNC_SECRET is not configured."
