@@ -4,38 +4,38 @@
 
 @layer base {
   :root {
-    /* ResumeForge brand surfaces */
-    --rf-bg: #0f1011;
-    --rf-surface: #161922;
-    --rf-surface-elevated: #1c202b;
-    --rf-cloud: #f5f5f7;
-    --rf-body: #cbd5e1;
-    --rf-meta: #94a3b8;
-    --rf-border: rgba(148, 163, 184, 0.16);
-    --rf-amber: #f59e0b;
-    --rf-emerald: #10b981;
+    /* ResumeForge Forge Terminal tokens */
+    --rf-bg: #0b1326;
+    --rf-surface: #171f33;
+    --rf-surface-elevated: #222a3d;
+    --rf-cloud: #dae2fd;
+    --rf-body: #dae2fd;
+    --rf-meta: #ddc1ae;
+    --rf-border: rgba(164, 140, 122, 0.2);
+    --rf-amber: #ff8c00;
+    --rf-emerald: #4edea3;
 
-    /* shadcn HSL tokens aligned to brand */
-    --background: 210 5% 6%;
-    --foreground: 240 5% 96%;
-    --card: 222 16% 11%;
-    --card-foreground: 240 5% 96%;
-    --popover: 222 16% 11%;
-    --popover-foreground: 240 5% 96%;
-    --primary: 43 96% 56%;
-    --primary-foreground: 210 5% 6%;
-    --secondary: 222 16% 14%;
-    --secondary-foreground: 215 20% 82%;
-    --muted: 222 16% 14%;
-    --muted-foreground: 215 16% 58%;
-    --accent: 222 16% 14%;
-    --accent-foreground: 43 96% 56%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 240 5% 96%;
-    --border: 220 14% 18%;
-    --input: 220 14% 18%;
-    --ring: 43 96% 56%;
-    --radius: 0.6rem;
+    /* Theme colors */
+    --background: #0b1326;
+    --foreground: #dae2fd;
+    --card: #171f33;
+    --card-foreground: #dae2fd;
+    --popover: #171f33;
+    --popover-foreground: #dae2fd;
+    --primary: #ff8c00;
+    --primary-foreground: #4d2600;
+    --secondary: #4edea3;
+    --secondary-foreground: #003824;
+    --muted: #2d3449;
+    --muted-foreground: #ddc1ae;
+    --accent: #222a3d;
+    --accent-foreground: #ff8c00;
+    --destructive: #ffb4ab;
+    --destructive-foreground: #690005;
+    --border: #564334;
+    --input: #564334;
+    --ring: #ff8c00;
+    --radius: 0.25rem;
   }
 
   * {
