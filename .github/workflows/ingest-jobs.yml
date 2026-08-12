@@ -9,9 +9,9 @@ jobs:
   ingest:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch Pitt CSC README
+      - name: Fetch SimplifyJobs README
         run: |
-          curl -s https://raw.githubusercontent.com/pittcsc/Summer2026-Internships/main/README.md > raw_feed.md
+          curl -s https://raw.githubusercontent.com/SimplifyJobs/Summer2027-Internships/dev/README.md > raw_feed.md
 
       - name: Push to ResumeForge Sync API
         env:
