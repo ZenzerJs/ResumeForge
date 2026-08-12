@@ -11,7 +11,7 @@ import { CreateJobSchema } from "@/lib/jd-parser/types";
 
 export const DEFAULT_SIMPLIFY_SOURCE_URL =
   process.env.SIMPLIFY_JOBS_URL ||
-  "https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/README.md";
+  "https://raw.githubusercontent.com/SimplifyJobs/Summer2027-Internships/dev/README.md";
 
 export interface ParsedJobRow {
   company: string;
