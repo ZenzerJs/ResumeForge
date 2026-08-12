@@ -37,7 +37,7 @@ export function AppShell({
 
       {!hideNav ? <TopNav badge={badge} actions={actions} /> : null}
 
-      <div className={cn("relative z-10 flex min-h-0 flex-1 flex-col", className)}>
+      <div className={cn("relative z-10 flex min-h-0 flex-1 flex-col", !hideNav && "pt-16", className)}>
         {children}
       </div>
     </div>

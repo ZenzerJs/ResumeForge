@@ -52,4 +52,36 @@ describe("Jobs API Endpoint Rejection Path & Zod Validation Tests", () => {
     expect(json.data.requiredSkills).toContain("React");
     expect(json.data.requiredSkills).toContain("Docker");
   });
+
+  it("persists job description and extracted requirements via PATCH", async () => {
+    const { createJob, updateJob, getJobById } = await import("@/lib/db/jobs");
+    const created = await createJob({
+      company: "PersistCo",
+      roleTitle: "Engineer",
+      rawDescription: "Initial description mentioning TypeScript.",
+      source: "pasted",
+    });
+
+    const updated = await updateJob(created.id, {
+      rawDescription: "Updated description requiring TypeScript, React, and Docker.",
+      extractedRequirements: {
+        requiredSkills: ["TypeScript", "React", "Docker"],
+        preferredSkills: ["AWS"],
+        domainTerms: ["APIs"],
+      },
+      company: "PersistCo Inc",
+    });
+
+    expect(updated).not.toBeNull();
+    expect(updated?.rawDescription).toContain("Updated description");
+    expect(updated?.company).toBe("PersistCo Inc");
+    expect(updated?.extractedRequirements.requiredSkills).toContain("Docker");
+
+    const fetched = await getJobById(created.id);
+    expect(fetched?.rawDescription).toContain("Updated description");
+    expect(fetched?.extractedRequirements.preferredSkills).toContain("AWS");
+
+    const { prisma } = await import("@/lib/prisma");
+    await prisma.job.deleteMany({ where: { id: created.id } });
+  });
 });

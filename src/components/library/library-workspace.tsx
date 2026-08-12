@@ -6,7 +6,6 @@ import {
   Plus,
   Edit2,
   Archive,
-  FileText,
   Loader2,
   Tag,
   Upload,
@@ -14,6 +13,8 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
+  ChevronDown,
+  ChevronRight,
   FileJson,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -47,12 +48,12 @@ export function LibraryWorkspace() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isImporting, setIsImporting] = useState<boolean>(false);
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [notification, setNotification] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
 
-  // File input ref for JSON import
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Modal State
@@ -82,6 +83,10 @@ export function LibraryWorkspace() {
       const json = await res.json();
       if (json.success) {
         setItems(json.data);
+        // Expand first item by default
+        if (json.data.length > 0) {
+          setExpandedIds({ [json.data[0].id]: true });
+        }
       }
     } catch (err) {
       console.error("Failed to fetch evidence items:", err);
@@ -94,7 +99,10 @@ export function LibraryWorkspace() {
     fetchItems();
   }, [fetchItems]);
 
-  // Client-side search filtering
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const filteredItems = items.filter((item) => {
     if (!searchQuery.trim()) return true;
     const query = searchQuery.toLowerCase();
@@ -214,7 +222,6 @@ export function LibraryWorkspace() {
     }
   };
 
-  // JSON File Import Handler
   const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -297,69 +304,55 @@ export function LibraryWorkspace() {
     <AppShell
       variant="library"
       actions={
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <input
             type="file"
             ref={fileInputRef}
             onChange={handleFileImport}
             accept=".json"
             className="hidden"
-            data-testid="evidence-import-input"
           />
-          <Button
+          <button
             type="button"
-            size="sm"
-            variant="outline"
             disabled={isImporting}
             onClick={() => fileInputRef.current?.click()}
-            className="gap-1.5 text-xs font-semibold border-slate-700 bg-slate-900/80 hover:bg-slate-800 text-slate-200"
-            data-testid="evidence-import-btn"
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded border border-slate-700 bg-slate-800/80 text-xs font-mono text-slate-300 hover:bg-slate-700/80 transition-colors"
           >
             {isImporting ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Upload className="h-3.5 w-3.5 text-emerald-400" />
+              <Upload className="h-3.5 w-3.5 text-slate-300" />
             )}
             Import JSON
-          </Button>
-          <Button
+          </button>
+          <button
             type="button"
-            size="sm"
             onClick={openCreateModal}
-            className="gap-1.5 text-xs font-semibold shadow-sm"
-            style={{ background: "linear-gradient(135deg, #F59E0B, #D97706)", color: "#0A0E17" }}
-            data-testid="add-evidence-btn"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded border border-[#ff8c00]/40 bg-[#ff8c00]/10 text-[#ff8c00] hover:bg-[#ff8c00]/20 font-bold text-xs transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
             Add Evidence Item
-          </Button>
+          </button>
         </div>
       }
     >
-
-      {/* Main Content Area */}
-      <main className="mx-auto max-w-6xl w-full p-4 md:p-8 flex-1 flex flex-col gap-6">
-        {/* Page Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-white flex items-center gap-2">
-              <FileJson className="h-5 w-5 text-emerald-400" />
-              Verified Evidence Bank
-            </h1>
-            <p className="text-xs mt-0.5 font-mono" style={{ color: "#4B5A7A" }}>
-              Career achievements, verified bullets, and skill inventory
-            </p>
-          </div>
+      {/* Main Content Area with Header Margin Clearance matching preview (1).webp */}
+      <main className="mx-auto max-w-5xl w-full px-6 pt-8 pb-16 flex-1 flex flex-col gap-8">
+        {/* Page Title Header */}
+        <div>
+          <h1 className="text-3xl font-extrabold text-white tracking-[-0.03em]">
+            Verified Evidence Bank Inventory
+          </h1>
         </div>
 
-        {/* Notification Toast Banner */}
+        {/* Toast Notification Banner */}
         <AnimatePresence>
           {notification && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className={`p-3 rounded-md border flex items-center justify-between text-xs font-medium ${
+              className={`p-3.5 rounded-lg border flex items-center justify-between text-xs font-medium ${
                 notification.type === "success"
                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
                   : "bg-red-500/10 border-red-500/30 text-red-400"
@@ -384,50 +377,47 @@ export function LibraryWorkspace() {
           )}
         </AnimatePresence>
 
-        {/* Toolbar: Search Input + Status Filters */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 rounded-xl bg-slate-900/80 border border-slate-800 shadow-sm">
-          {/* Search Bar Input */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+        {/* Search Input Bar + Status Select Dropdown + Item Count Bar */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          {/* Search Input Box */}
+          <div className="relative flex-1 w-full max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search evidence by title, org, summary, or tags..."
-              className="w-full h-8 pl-9 pr-3 rounded-md bg-slate-950 border border-slate-800 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
-              data-testid="evidence-search-input"
+              className="w-full h-10 pl-9 pr-4 rounded bg-white text-slate-900 text-xs font-mono placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#ff8c00]"
             />
           </div>
 
-          {/* Status Filters */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-            <span className="text-xs font-mono text-slate-500 mr-1">Status:</span>
-            {["all", "verified", "draft", "archived"].map((st) => (
-              <button
-                key={st}
-                type="button"
-                onClick={() => setFilterStatus(st)}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-colors font-mono ${
-                  filterStatus === st
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-950 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
-                }`}
+          {/* Status Dropdown + Item Counter */}
+          <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono text-slate-400">Status:</span>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="bg-[#121929] border border-slate-700 text-slate-200 rounded px-3 py-1.5 text-xs font-mono focus:outline-none focus:border-[#ff8c00]"
               >
-                {st}
-              </button>
-            ))}
+                <option value="all">All, Verified, Draft, Archived</option>
+                <option value="verified">Verified Only</option>
+                <option value="draft">Draft Only</option>
+                <option value="archived">Archived Only</option>
+              </select>
+            </div>
 
-            <span className="text-xs text-slate-500 font-mono ml-2">
-              {filteredItems.length} item{filteredItems.length === 1 ? "" : "s"}
+            <span className="text-xs font-mono text-slate-400">
+              {filteredItems.length} items
             </span>
           </div>
         </div>
 
-        {/* List of Evidence Items */}
+        {/* Evidence Items List matching preview (1).webp */}
         {isLoading ? (
-          <div className="grid gap-3">
+          <div className="grid gap-4">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="rounded-lg border p-5" style={{ borderColor: "#1E2536", backgroundColor: "#111622" }}>
+              <div key={i} className="rounded-xl border border-slate-800 bg-[#121929] p-5">
                 <Skeleton className="h-4 w-48 mb-3" />
                 <Skeleton className="h-3 w-full mb-2" />
                 <Skeleton className="h-3 w-3/4" />
@@ -435,156 +425,136 @@ export function LibraryWorkspace() {
             ))}
           </div>
         ) : filteredItems.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="rounded-xl border border-dashed border-slate-800 bg-slate-900/40 p-12 text-center"
-          >
-            <FileText className="mx-auto h-8 w-8 text-slate-600 mb-2" />
+          <div className="rounded-xl border border-dashed border-slate-800 bg-[#121929]/50 p-12 text-center">
+            <FileJson className="mx-auto h-8 w-8 text-slate-600 mb-2" />
             <h3 className="text-sm font-semibold text-slate-300">No evidence items found</h3>
             <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
               {searchQuery
                 ? `No evidence items matching search "${searchQuery}".`
                 : `No evidence items matching status filter "${filterStatus}".`}
             </p>
-            <div className="mt-4 flex items-center justify-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                className="border-slate-700 bg-slate-800 text-slate-200 text-xs gap-1.5"
-              >
-                <Upload className="h-3.5 w-3.5 text-emerald-400" />
-                Import JSON
-              </Button>
-              <Button
-                size="sm"
-                onClick={openCreateModal}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add Item
-              </Button>
-            </div>
-          </motion.div>
+          </div>
         ) : (
-          <motion.div layout className="grid gap-3">
-            <AnimatePresence>
-              {filteredItems.map((item) => (
-                <motion.div
+          <div className="grid gap-4">
+            {filteredItems.map((item) => {
+              const isExpanded = expandedIds[item.id] ?? false;
+              return (
+                <div
                   key={item.id}
-                  layout
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  whileHover={{ y: -1 }}
-                  transition={{ duration: 0.2 }}
-                  className="rounded-lg border border-slate-800 bg-slate-900/80 p-5 shadow-sm hover:border-slate-700 transition-colors"
+                  className="rounded-xl border border-slate-800 bg-[#121929]/90 hover:border-slate-700 transition-colors p-5 overflow-hidden"
                 >
+                  {/* Card Header Row */}
                   <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-indigo-400 border border-slate-700">
-                          {item.type}
-                        </span>
-                        <h2 className="text-base font-bold text-white tracking-tight">{item.title}</h2>
-                        {item.organization && (
-                          <span className="text-xs text-slate-400 font-medium">@ {item.organization}</span>
+                    <div className="flex items-start gap-3">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(item.id)}
+                        className="text-slate-400 hover:text-white mt-1 transition-colors"
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
                         )}
-                      </div>
+                      </button>
 
-                      {item.dates && (
-                        <p className="mt-1 text-xs text-slate-500 font-mono">{item.dates}</p>
-                      )}
+                      <div>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="rounded bg-[#172033] border border-slate-700 px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
+                            {item.type}
+                          </span>
+                          <h2 className="text-base font-bold text-white tracking-tight">
+                            {item.title}
+                            {item.organization ? ` @ ${item.organization}` : ""}
+                          </h2>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-300 leading-relaxed max-w-3xl">
+                          {item.verifiedSummary}
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-3 shrink-0">
                       <span
-                        className={`rounded px-2 py-0.5 text-[10px] font-mono font-medium capitalize border ${
+                        className={`rounded px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider ${
                           item.status === "verified"
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                            : item.status === "archived"
-                            ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                            : "bg-slate-800 text-slate-400 border-slate-700"
+                            ? "bg-[#062c24] border border-[#065f46] text-[#34d399]"
+                            : "bg-[#172033] border border-slate-700 text-slate-400"
                         }`}
                       >
-                        {item.status}
+                        {item.status === "verified" ? "✓ VERIFIED" : item.status}
                       </span>
-
+                      {item.dates && (
+                        <span className="text-xs font-mono text-slate-400">
+                          {item.dates}
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() => openEditModal(item)}
-                        className="rounded-md p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+                        className="text-slate-500 hover:text-white p-1 rounded hover:bg-slate-800 transition-colors ml-1"
                         title="Edit Item"
                       >
                         <Edit2 className="h-3.5 w-3.5" />
                       </button>
-
-                      {item.status !== "archived" && (
-                        <button
-                          type="button"
-                          onClick={() => handleArchiveItem(item.id)}
-                          className="rounded-md p-1.5 text-slate-400 hover:bg-amber-500/10 hover:text-amber-400 transition-colors"
-                          title="Archive Item"
-                        >
-                          <Archive className="h-3.5 w-3.5" />
-                        </button>
-                      )}
                     </div>
                   </div>
 
-                  <p className="mt-3 text-xs leading-relaxed text-slate-300 bg-slate-950 p-3 rounded-lg border border-slate-800/80 font-sans">
-                    {item.verifiedSummary}
-                  </p>
-
-                  {/* Bullets List */}
-                  {item.bullets && item.bullets.length > 0 && (
-                    <ul className="mt-3 space-y-1.5 pl-4 text-xs text-slate-400 list-disc font-sans">
-                      {item.bullets.map((b, idx) => (
-                        <li key={b.id || idx} className="leading-relaxed">
-                          {b.text}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  {/* Tags */}
+                  {/* Tag Pills Row */}
                   {item.tags && item.tags.length > 0 && (
-                    <div className="mt-4 flex flex-wrap items-center gap-1.5">
-                      <Tag className="h-3 w-3 text-slate-500" />
+                    <div className="mt-4 flex flex-wrap items-center gap-2 pl-7">
                       {item.tags.map((t, idx) => (
                         <span
                           key={idx}
-                          className="rounded bg-indigo-500/10 px-2 py-0.5 text-[10px] font-mono font-medium text-indigo-300 border border-indigo-500/20"
+                          className="rounded bg-[#172033] border border-slate-700 px-2.5 py-1 text-[11px] font-mono text-slate-300"
                         >
                           {t}
                         </span>
                       ))}
                     </div>
                   )}
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </motion.div>
+
+                  {/* Expanded Bullets List */}
+                  <AnimatePresence>
+                    {isExpanded && item.bullets && item.bullets.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-4 pt-4 border-t border-slate-800/80 pl-7"
+                      >
+                        <ul className="space-y-2 text-xs text-slate-300 list-disc pl-4 font-sans">
+                          {item.bullets.map((b, idx) => (
+                            <li key={b.id || idx} className="leading-relaxed">
+                              {b.text}
+                            </li>
+                          ))}
+                        </ul>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
+          </div>
         )}
       </main>
 
       {/* Modal Dialog for Create/Edit */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-            <h2 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-              <FileText className="h-4 w-4 text-indigo-400" />
+          <div className="w-full max-w-lg rounded-xl border border-slate-800 bg-[#121929] p-6 shadow-2xl">
+            <h2 className="text-base font-bold text-white mb-4">
               {editingItem ? "Edit Evidence Item" : "Create Evidence Item"}
             </h2>
 
             <form onSubmit={handleSaveItem} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono font-medium text-slate-300 mb-1">Type</label>
+                <label className="block text-xs font-mono text-slate-300 mb-1">Type</label>
                 <select
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                  className="w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
+                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-[#ff8c00]"
                 >
                   <option value="experience">Experience</option>
                   <option value="project">Project</option>
@@ -596,71 +566,71 @@ export function LibraryWorkspace() {
               </div>
 
               <div>
-                <label className="block text-xs font-mono font-medium text-slate-300 mb-1">Title</label>
+                <label className="block text-xs font-mono text-slate-300 mb-1">Title</label>
                 <input
                   type="text"
                   required
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500"
+                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-[#ff8c00]"
                   placeholder="e.g. Software Engineer Intern"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-mono font-medium text-slate-300 mb-1">Organization</label>
+                  <label className="block text-xs font-mono text-slate-300 mb-1">Organization</label>
                   <input
                     type="text"
                     value={formData.organization}
                     onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
-                    className="w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500"
+                    className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-[#ff8c00]"
                     placeholder="e.g. Stripe"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono font-medium text-slate-300 mb-1">Dates</label>
+                  <label className="block text-xs font-mono text-slate-300 mb-1">Dates</label>
                   <input
                     type="text"
                     value={formData.dates}
                     onChange={(e) => setFormData({ ...formData, dates: e.target.value })}
-                    className="w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500"
-                    placeholder="e.g. 2024 – Present"
+                    className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-[#ff8c00]"
+                    placeholder="e.g. Jun 29, 2023"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-mono font-medium text-slate-300 mb-1">Verified Summary</label>
+                <label className="block text-xs font-mono text-slate-300 mb-1">Verified Summary</label>
                 <textarea
                   required
                   rows={3}
                   value={formData.verifiedSummary}
                   onChange={(e) => setFormData({ ...formData, verifiedSummary: e.target.value })}
-                  className="w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 font-sans"
+                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-[#ff8c00]"
                   placeholder="Detailed summary of verified accomplishment claim..."
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono font-medium text-slate-300 mb-1">Tags (Comma-separated)</label>
+                <label className="block text-xs font-mono text-slate-300 mb-1">Tags (Comma-separated)</label>
                 <input
                   type="text"
                   value={formData.tagsInput}
                   onChange={(e) => setFormData({ ...formData, tagsInput: e.target.value })}
-                  className="w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 font-mono"
+                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-[#ff8c00] font-mono"
                   placeholder="TypeScript, React, Node.js"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono font-medium text-slate-300 mb-1">Bullets (One per line)</label>
+                <label className="block text-xs font-mono text-slate-300 mb-1">Bullets (One per line)</label>
                 <textarea
                   rows={3}
                   value={formData.bulletsInput.join("\n")}
                   onChange={(e) => setFormData({ ...formData, bulletsInput: e.target.value.split("\n") })}
-                  className="w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 font-mono"
+                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-[#ff8c00] font-mono"
                   placeholder="Developed high-throughput API endpoints..."
                 />
               </div>
@@ -671,14 +641,14 @@ export function LibraryWorkspace() {
                   variant="outline"
                   size="sm"
                   onClick={() => setIsModalOpen(false)}
-                  className="border-slate-800 bg-slate-950 text-slate-400 hover:text-white hover:bg-slate-800 text-xs"
+                  className="border-slate-800 bg-[#0b1326] text-slate-400 hover:text-white text-xs"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium shadow-sm"
+                  className="bg-[#ff8c00] text-black font-bold text-xs"
                 >
                   Save Item
                 </Button>

@@ -46,6 +46,7 @@ const config: Config = {
       },
       colors: {
         background: "#0b1326",
+        foreground: "#dae2fd",
         surface: "#0b1326",
         "surface-dim": "#0b1326",
         "surface-bright": "#31394d",
@@ -87,6 +88,7 @@ const config: Config = {
         "error-container": "#93000a",
         "on-error-container": "#ffdad6",
 
+        border: "rgba(164, 140, 122, 0.2)",
         outline: "#a48c7a",
         "outline-variant": "#564334",
         rf: {

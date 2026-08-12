@@ -74,6 +74,12 @@ export default function RootLayout({
       className={`dark ${hankenGrotesk.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
+        />
+      </head>
       <body
         className="bg-background text-on-surface font-body-regular antialiased min-h-screen"
         suppressHydrationWarning

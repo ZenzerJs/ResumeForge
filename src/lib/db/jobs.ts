@@ -17,6 +17,8 @@ export interface CreateJobInput {
 export interface UpdateJobInput {
   company?: string;
   roleTitle?: string;
+  rawDescription?: string;
+  extractedRequirements?: JobRequirements;
   status?: JobStatus;
   appliedAt?: Date | string | null;
   notes?: string | null;
@@ -58,10 +60,14 @@ export async function updateJob(id: string, input: UpdateJobInput) {
   const existing = await prisma.job.findUnique({ where: { id } });
   if (!existing) return null;
 
-  const dataToUpdate: any = {};
+  const dataToUpdate: Record<string, unknown> = {};
   if (input.company !== undefined) dataToUpdate.company = input.company;
   if (input.roleTitle !== undefined) dataToUpdate.roleTitle = input.roleTitle;
   if (input.notes !== undefined) dataToUpdate.notes = input.notes;
+  if (input.rawDescription !== undefined) dataToUpdate.rawDescription = input.rawDescription;
+  if (input.extractedRequirements !== undefined) {
+    dataToUpdate.extractedRequirements = JSON.stringify(input.extractedRequirements);
+  }
 
   if (input.status !== undefined) {
     dataToUpdate.status = input.status;

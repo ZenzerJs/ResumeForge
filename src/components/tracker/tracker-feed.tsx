@@ -402,7 +402,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       )}
 
       {/* Sticky filter bar */}
-      <div className="sticky top-[96px] z-[9] flex flex-wrap items-center gap-2 border-b border-slate-800 bg-rf-bg px-4 py-2.5">
+      <div className="sticky top-0 z-[9] flex flex-wrap items-center gap-2 border-b border-slate-800 bg-rf-bg px-4 py-2.5">
         <div className="relative min-w-[180px] flex-1 sm:max-w-xs">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
           <input

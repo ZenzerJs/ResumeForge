@@ -30,8 +30,14 @@ interface AtsScorePanelProps {
     domainTerms: string[];
   };
   roleTitle?: string;
+  rawDescription?: string;
+  /** Score against DB master resume instead of the provided typstContent. */
+  useMasterResume?: boolean;
+  /** Merge latest Evidence Bank into the scored document. */
+  includeEvidenceBank?: boolean;
   initialProfile?: RoleProfile;
   onProfileChange?: (profile: RoleProfile) => void;
+  className?: string;
 }
 
 const STATUS_BADGES: Record<
@@ -65,8 +71,12 @@ export function AtsScorePanel({
   typstContent,
   extractedRequirements,
   roleTitle,
+  rawDescription,
+  useMasterResume = false,
+  includeEvidenceBank = true,
   initialProfile = "Backend",
   onProfileChange,
+  className = "",
 }: AtsScorePanelProps) {
   const [selectedProfile, setSelectedProfile] = useState<RoleProfile>(initialProfile);
   const [result, setResult] = useState<AtsEvaluationResult | null>(null);
@@ -78,20 +88,24 @@ export function AtsScorePanel({
   const [qualitativeError, setQualitativeError] = useState<string | null>(null);
 
   const runEvaluation = useCallback(async (profile: RoleProfile) => {
-    if (!typstContent.trim()) return;
+    if (!useMasterResume && !typstContent.trim()) return;
 
     setIsEvaluating(true);
     setEvalError(null);
+    setQualitativeResult(null);
+    setQualitativeError(null);
 
     try {
       const res = await fetch("/api/ats/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          typstContent,
+          typstContent: typstContent || undefined,
           extractedRequirements,
           roleTitle,
           roleProfile: profile,
+          useMasterResume,
+          includeEvidenceBank,
         }),
       });
 
@@ -106,7 +120,7 @@ export function AtsScorePanel({
     } finally {
       setIsEvaluating(false);
     }
-  }, [typstContent, extractedRequirements, roleTitle]);
+  }, [typstContent, extractedRequirements, roleTitle, useMasterResume, includeEvidenceBank]);
 
   useEffect(() => {
     runEvaluation(selectedProfile);
@@ -149,6 +163,7 @@ export function AtsScorePanel({
             domainTerms: extractedRequirements.domainTerms,
             roleTitle: roleTitle || undefined,
           },
+          rawDescription: rawDescription || undefined,
           deterministicResult: result,
         }),
       });
@@ -157,11 +172,13 @@ export function AtsScorePanel({
 
       if (!res.ok || !json.success) {
         setQualitativeError(json.error || "Failed to generate qualitative review.");
+        setQualitativeResult(null);
       } else {
         setQualitativeResult(json.data);
       }
     } catch (err) {
       setQualitativeError(`Error generating review: ${err instanceof Error ? err.message : String(err)}`);
+      setQualitativeResult(null);
     } finally {
       setIsLoadingQualitative(false);
     }
@@ -172,7 +189,7 @@ export function AtsScorePanel({
     onProfileChange?.(profile);
   };
 
-  if (!typstContent.trim()) {
+  if (!useMasterResume && !typstContent.trim()) {
     return null;
   }
 
@@ -185,7 +202,7 @@ export function AtsScorePanel({
 
   return (
     <div
-      className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg space-y-6"
+      className={`bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg space-y-6 ${className}`}
       data-testid="ats-score-panel"
     >
       {/* Header & Overall Match Meter */}

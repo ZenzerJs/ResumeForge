@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { evaluateAtsScore } from "@/lib/ats-evaluator/evaluator";
 import { inferRoleProfile } from "@/lib/ats-evaluator/profile-inference";
+import { augmentTypstWithEvidenceBank } from "@/lib/ats-evaluator/evidence-augment";
 import { AtsEvaluateInputSchema, RoleProfile } from "@/lib/ats-evaluator/types";
 import { JobRequirements } from "@/lib/jd-parser/types";
+import { getMasterResume } from "@/lib/db/resumes";
+import { getEvidenceItems } from "@/lib/db/evidence";
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,7 +25,7 @@ export async function POST(req: NextRequest) {
 
     const input = parseResult.data;
 
-    let typstContent = input.typstContent;
+    let typstContent = input.typstContent || "";
     let requirements: JobRequirements = input.extractedRequirements || {
       requiredSkills: [],
       preferredSkills: [],
@@ -31,7 +34,6 @@ export async function POST(req: NextRequest) {
     let roleTitle = input.roleTitle;
     let rawDescription = "";
 
-    // Resolve variant from DB if ID provided
     if (input.variantId) {
       const variant = await prisma.resumeVariant.findUnique({
         where: { id: input.variantId },
@@ -45,7 +47,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      if (!typstContent) {
+      if (!typstContent.trim()) {
         typstContent = variant.typstContent;
       }
 
@@ -56,18 +58,14 @@ export async function POST(req: NextRequest) {
           try {
             requirements = JSON.parse(variant.job.extractedRequirements);
           } catch {
-            // Keep default empty requirements
+            // keep defaults
           }
         }
       }
     }
 
-    // Resolve job from DB if jobId provided
-    if (input.jobId && (!requirements.requiredSkills.length && !requirements.preferredSkills.length)) {
-      const job = await prisma.job.findUnique({
-        where: { id: input.jobId },
-      });
-
+    if (input.jobId && !requirements.requiredSkills.length && !requirements.preferredSkills.length) {
+      const job = await prisma.job.findUnique({ where: { id: input.jobId } });
       if (job) {
         if (!roleTitle) roleTitle = job.roleTitle || undefined;
         rawDescription = job.rawDescription || "";
@@ -75,30 +73,39 @@ export async function POST(req: NextRequest) {
           try {
             requirements = JSON.parse(job.extractedRequirements);
           } catch {
-            // Keep default
+            // keep defaults
           }
         }
       }
     }
 
-    if (!typstContent || !typstContent.trim()) {
+    // Prefer the saved master resume when explicitly requested.
+    if (input.useMasterResume) {
+      const master = await getMasterResume();
+      if (master?.typstSource?.trim()) {
+        typstContent = master.typstSource;
+      }
+    }
+
+    if (!typstContent.trim()) {
       return NextResponse.json(
         {
           success: false,
-          error: "Missing typstContent or valid variantId containing resume markup.",
+          error: "Missing typstContent, master resume, or valid variantId containing resume markup.",
         },
         { status: 400 }
       );
     }
 
+    if (input.includeEvidenceBank) {
+      const evidenceItems = await getEvidenceItems();
+      typstContent = augmentTypstWithEvidenceBank(typstContent, evidenceItems);
+    }
+
     const selectedProfile: RoleProfile =
       input.roleProfile || inferRoleProfile(roleTitle, rawDescription);
 
-    const evaluationResult = evaluateAtsScore(
-      typstContent,
-      requirements,
-      selectedProfile
-    );
+    const evaluationResult = evaluateAtsScore(typstContent, requirements, selectedProfile);
 
     return NextResponse.json({
       success: true,

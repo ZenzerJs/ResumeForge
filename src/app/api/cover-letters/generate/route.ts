@@ -5,6 +5,7 @@ import { generateCoverLetter } from "@/lib/ai/gateway";
 import { verifyCoverLetterGrounding } from "@/lib/ai/cover-letter-verifier";
 import { getEvidenceItems } from "@/lib/db/evidence";
 import { createCoverLetter } from "@/lib/db/cover-letters";
+import { getMasterResume } from "@/lib/db/resumes";
 import { sanitizeError } from "@/lib/ai/redact";
 import { ProviderConfig } from "@/lib/ai/types";
 
@@ -91,8 +92,15 @@ export async function POST(req: NextRequest) {
       activeRoleProfile: body.activeRoleProfile || "Full-stack",
     };
 
+    const master = await getMasterResume();
+
     // Call BYOK AI Gateway
-    const gatewayResult = await generateCoverLetter(providerConfig, inputPayload, activeEvidenceItems);
+    const gatewayResult = await generateCoverLetter(
+      providerConfig,
+      inputPayload,
+      activeEvidenceItems,
+      master?.typstSource
+    );
 
     if (!gatewayResult.success || !gatewayResult.rawJson) {
       return NextResponse.json(

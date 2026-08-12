@@ -83,14 +83,36 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
   });
 
   it("4. Generate Cover Letter sends the correct jobId and selected variantId", async () => {
+    const evidence = await prisma.evidenceItem.create({
+      data: {
+        type: "experience",
+        title: "ML Engineer",
+        organization: "DataLab",
+        verifiedSummary: "Built machine learning pipelines using Python and Docker.",
+        tags: JSON.stringify(["Python", "Docker"]),
+        status: "verified",
+        bullets: {
+          create: [
+            {
+              text: "Built machine learning pipelines using Python and Docker.",
+              technologies: JSON.stringify(["Python", "Docker"]),
+              verified: true,
+              orderIndex: 0,
+            },
+          ],
+        },
+      },
+      include: { bullets: true },
+    });
+
     const mockLlmResponse = JSON.stringify({
       title: "Cover Letter — IMC Trading ML Intern",
       salutation: "Dear IMC Hiring Team,",
       openingParagraph: "I am writing to apply for the Machine Learning Research Intern position.",
       bodyParagraphs: ["Built machine learning pipelines using Python and Docker."],
       closingParagraph: "Sincerely, Candidate.",
-      fullMarkdown: "# Cover Letter\n\nDear IMC Hiring Team,\n\nI am writing to apply for the Machine Learning Research Intern position. Built machine learning pipelines using Python and Docker. Thank you.",
-      evidenceCitations: [],
+      fullMarkdown: "# Cover Letter\n\nDear IMC Hiring Team,\n\nI am writing to apply for the Machine Learning Research Intern position. Built machine learning pipelines using Python and Docker. Thank you.\n\nSincerely,\nCandidate",
+      evidenceCitations: [evidence.id, evidence.bullets[0].id],
       gapsAddressed: [],
     });
 
@@ -122,6 +144,9 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
     expect(json.success).toBe(true);
     expect(json.data.jobId).toBe(testJobId);
     expect(json.data.variantId).toBe(testVariantId);
+
+    await prisma.bullet.deleteMany({ where: { evidenceId: evidence.id } });
+    await prisma.evidenceItem.deleteMany({ where: { id: evidence.id } });
   });
 
   it("5. An existing cover-letter draft is opened instead of duplicated automatically", async () => {

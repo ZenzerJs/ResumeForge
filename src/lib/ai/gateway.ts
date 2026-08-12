@@ -146,7 +146,8 @@ export async function generateQualitativeReview(input: QualitativeReviewPromptIn
 export async function generateCoverLetter(
   providerConfig: ProviderConfig,
   input: GenerateCoverLetterInput,
-  evidenceItems: EvidenceItemForPrompt[]
+  evidenceItems: EvidenceItemForPrompt[],
+  masterTypstSource?: string
 ): Promise<GeneratePatchesResult> {
   const parseResult = ProviderConfigSchema.safeParse(providerConfig);
   if (!parseResult.success) {
@@ -158,7 +159,7 @@ export async function generateCoverLetter(
 
   const config = parseResult.data;
   const systemPrompt = buildCoverLetterSystemPrompt();
-  const userPrompt = buildCoverLetterUserPrompt(input, evidenceItems);
+  const userPrompt = buildCoverLetterUserPrompt(input, evidenceItems, masterTypstSource);
 
   try {
     switch (config.provider) {

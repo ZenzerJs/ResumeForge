@@ -3,6 +3,7 @@ import { GenerateCoverLetterInputSchema, CoverLetterResponseSchema } from "@/lib
 import { generateCoverLetter } from "@/lib/ai/gateway";
 import { verifyCoverLetterGrounding } from "@/lib/ai/cover-letter-verifier";
 import { getEvidenceItems } from "@/lib/db/evidence";
+import { getMasterResume } from "@/lib/db/resumes";
 import { sanitizeError } from "@/lib/ai/redact";
 import { ProviderConfig } from "@/lib/ai/types";
 
@@ -50,8 +51,15 @@ export async function POST(request: Request) {
       }
     }
 
+    const master = await getMasterResume();
+
     // Invoke BYOK AI Gateway
-    const gatewayResult = await generateCoverLetter(providerConfig, input, activeEvidenceItems);
+    const gatewayResult = await generateCoverLetter(
+      providerConfig,
+      input,
+      activeEvidenceItems,
+      master?.typstSource
+    );
 
     if (!gatewayResult.success || !gatewayResult.rawJson) {
       return NextResponse.json(

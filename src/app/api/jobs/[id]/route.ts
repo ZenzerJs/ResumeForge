@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getJobById, updateJob } from "@/lib/db/jobs";
+import { JobRequirementsSchema } from "@/lib/jd-parser/types";
 import { sanitizeError } from "@/lib/ai/redact";
 
 const UpdateJobSchema = z.object({
   company: z.string().optional(),
   roleTitle: z.string().optional(),
+  rawDescription: z.string().min(1).optional(),
+  extractedRequirements: JobRequirementsSchema.optional(),
   status: z.enum(["SAVED", "APPLIED", "INTERVIEWING", "OFFER", "REJECTED", "ARCHIVED"]).optional(),
   appliedAt: z.union([z.string(), z.date(), z.null()]).optional(),
   notes: z.union([z.string(), z.null()]).optional(),

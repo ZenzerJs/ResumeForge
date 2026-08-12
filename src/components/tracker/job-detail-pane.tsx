@@ -9,6 +9,9 @@ import {
   X,
   DownloadCloud,
   Check,
+  MoreHorizontal,
+  Sparkles,
+  FileText,
 } from "lucide-react";
 import { JobStatus } from "@/lib/db/jobs";
 import {
@@ -24,7 +27,6 @@ import {
 } from "@/lib/jobs/evidence-match-checklist";
 import type { EvidenceItemWithBullets } from "@/lib/matching/matcher";
 import type { JobItem } from "@/components/tracker/job-types";
-import { companyAvatarClass } from "@/components/tracker/job-list-row";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABELS: Record<JobStatus, string> = {
@@ -46,7 +48,6 @@ interface JobDetailPaneProps {
   isFetchingFullText: boolean;
   tier2Notice?: string;
   showNotes: boolean;
-  /** Mobile full-screen sheet mode */
   isSheet?: boolean;
   onClose?: () => void;
   onStatusChange: (jobId: string, status: JobStatus) => void;
@@ -106,265 +107,253 @@ export function JobDetailPane({
     [job.extractedRequirements, evidence],
   );
 
-  const metaLine = [
-    job.company || "Unknown Company",
-    location || null,
-    datePosted ? `Posted ${datePosted}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
-  const ringDeg = Math.round((checklist.percent / 100) * 360);
-
   const coverTestId = hasCoverLetter
     ? `open-cover-letter-btn-${job.id}`
     : `generate-cover-letter-btn-${job.id}`;
 
   const content = (
-    <div className={cn("mx-auto max-w-[640px]", isSheet ? "p-5 pb-16" : "px-8 py-7 pb-16")}>
-      {isSheet && (
-        <div className="mb-4 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close job detail"
-            data-testid="job-detail-close-btn"
-            className="rounded-lg border border-slate-700 p-2 text-rf-meta transition-colors duration-150 hover:bg-rf-elevated hover:text-rf-cloud"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+    <div className="flex-1 overflow-y-auto p-margin-desktop z-10 relative">
+      {/* Background glow layer */}
+      <div className="absolute top-20 right-20 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
 
-      <div className="mb-4 flex items-start gap-3.5">
-        <div
-          className={cn(
-            "flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] text-lg font-extrabold text-rf-bg",
-            companyAvatarClass(job.company),
-          )}
-        >
-          {companyInitial}
-        </div>
-        <div className="min-w-0">
-          <h2 className="m-0 text-xl font-bold text-rf-cloud">
-            {job.roleTitle || "Untitled Role"}
-          </h2>
-          <p className="mt-1 text-[13px] text-rf-meta">{metaLine}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {salary ? (
-              <span className="rounded border border-emerald-800/60 bg-emerald-950/50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-400">
-                {salary}
-              </span>
-            ) : (
-              <span className="text-[11px] italic text-slate-500">No salary listed</span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        <Link
-          href={`/tailor?jobId=${job.id}`}
-          onClick={() => sessionStorage.setItem("resumeforge_active_job_id", job.id)}
-          className="rounded-lg bg-amber-500 px-4 py-2 text-[13px] font-bold text-rf-bg transition-colors duration-150 hover:bg-amber-400"
-        >
-          Tailor Resume
-        </Link>
-
-        <Link
-          href={`/tailor?jobId=${job.id}&tab=cover-letter`}
-          data-testid={coverTestId}
-          onClick={() => sessionStorage.setItem("resumeforge_active_job_id", job.id)}
-          className="rounded-lg border border-slate-700 px-3.5 py-2 text-[13px] text-rf-cloud transition-colors duration-150 hover:bg-rf-elevated"
-        >
-          {hasCoverLetter ? "Open Cover Letter" : "Generate Cover Letter"}
-        </Link>
-
-        {applyUrl && applyUrl.startsWith("http") ? (
-          <a
-            href={applyUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3.5 py-2 text-[13px] text-rf-cloud transition-colors duration-150 hover:bg-rf-elevated"
-          >
-            Open Posting
-            <ExternalLink className="h-3.5 w-3.5" />
-          </a>
-        ) : (
-          <button
-            type="button"
-            disabled
-            className="cursor-not-allowed rounded-lg border border-slate-800 px-3.5 py-2 text-[13px] text-slate-600 opacity-60"
-          >
-            Open Posting
-          </button>
-        )}
-
-        <div className="ml-auto">
-          {isUpdatingStatus ? (
-            <Loader2 className="h-4 w-4 animate-spin text-rf-meta" />
-          ) : (
-            <select
-              value={job.status}
-              onChange={(e) => onStatusChange(job.id, e.target.value as JobStatus)}
-              className="appearance-none rounded-lg border border-slate-700 bg-rf-elevated px-3 py-2 text-xs text-rf-meta transition-colors duration-150 focus:border-amber-500/60 focus:outline-none cursor-pointer"
-              aria-label="Job status"
-            >
-              {ALL_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_LABELS[s]}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-      </div>
-
-      <div className="mb-4 rounded-[10px] border border-slate-800 bg-rf-elevated p-4">
-        <h3 className="mb-3 text-[12.5px] font-bold uppercase tracking-wide text-rf-meta">
-          Match against your Evidence Bank
-        </h3>
-        {!evidenceLoaded ? (
-          <div className="flex items-center gap-2 text-xs text-rf-meta">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Loading evidence…
-          </div>
-        ) : checklist.total === 0 ? (
-          <p className="text-xs text-rf-meta">
-            No extracted requirements for this posting yet.
-          </p>
-        ) : (
-          <>
-            <div className="mb-3.5 flex items-center gap-2.5">
-              <div
-                className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full"
-                style={{
-                  background: `conic-gradient(#3ecf8e 0deg ${ringDeg}deg, #26313f ${ringDeg}deg 360deg)`,
-                }}
-                aria-hidden
-              >
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-rf-elevated text-[10.5px] font-bold text-emerald-400">
-                  {checklist.percent}%
-                </span>
-              </div>
-              <p className="text-[13px] text-rf-meta">
-                {checklist.percent >= 70
-                  ? "Solid match"
-                  : checklist.percent >= 40
-                    ? "Partial match"
-                    : "Low match"}{" "}
-                —{" "}
-                <span className="font-semibold text-rf-cloud">
-                  {checklist.matched} of {checklist.total}
-                </span>{" "}
-                stated requirements backed by evidence
-              </p>
-            </div>
-            <ul className="flex flex-col gap-2">
-              {checklist.items.map((item) => (
-                <li
-                  key={item.label}
-                  className={cn(
-                    "flex items-center gap-2 text-[12.5px]",
-                    item.matched ? "text-rf-cloud" : "text-rf-meta",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold",
-                      item.matched
-                        ? "bg-emerald-950 text-emerald-400"
-                        : "bg-red-950/80 text-red-400",
-                    )}
-                  >
-                    {item.matched ? <Check className="h-2.5 w-2.5" /> : "✕"}
-                  </span>
-                  {item.label}
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </div>
-
-      <div className="mb-4 rounded-[10px] border border-slate-800 bg-rf-elevated p-4">
-        <h3 className="mb-3 text-[12.5px] font-bold uppercase tracking-wide text-rf-meta">
-          Job details
-        </h3>
-        {isPlaceholder && (
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-[11px] text-slate-500">Needs description</span>
+      <div className="max-w-4xl mx-auto space-y-6 relative z-10">
+        {/* Mobile close button */}
+        {isSheet && (
+          <div className="flex justify-end mb-2">
             <button
               type="button"
-              data-testid={`fetch-fulltext-btn-${job.id}`}
-              disabled={isFetchingFullText}
-              onClick={() => onFetchFullText(job.id)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/15 px-2.5 py-1 text-[11px] font-medium text-amber-400 transition-colors duration-150 hover:bg-amber-500/25 disabled:opacity-50"
+              onClick={onClose}
+              aria-label="Close detail sheet"
+              data-testid="job-detail-close-btn"
+              className="p-2 rounded-lg bg-surface-variant border border-outline-variant text-on-surface"
             >
-              {isFetchingFullText ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <DownloadCloud className="h-3 w-3" />
-              )}
-              Pull Full Description
+              <X className="w-5 h-5" />
             </button>
           </div>
         )}
-        {tier2Notice && (
-          <p className="mb-2 text-[11px] italic text-amber-300/90">{tier2Notice}</p>
-        )}
-        <div className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-300">
-          {job.rawDescription}
+
+        {/* Detail Header Card */}
+        <div className="bg-surface/80 backdrop-blur-md border border-outline-variant rounded-xl p-6 shadow-[0_0_15px_rgba(255,140,0,0.05)]">
+          <div className="flex gap-6 items-start">
+            <div className="w-16 h-16 rounded-lg bg-surface-variant border border-outline flex items-center justify-center shrink-0 text-3xl font-bold text-primary shadow-[0_0_15px_rgba(255,140,0,0.1)]">
+              {companyInitial}
+            </div>
+            <div className="flex-1">
+              <h1 className="font-page-title-mobile text-2xl md:text-3xl text-on-surface mb-2 tracking-tighter font-bold">
+                {job.roleTitle || "Untitled Role"}
+              </h1>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm font-body-dense text-on-surface-variant mb-4">
+                <span className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px]">business</span>
+                  {job.company || "Unknown Company"}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px]">location_on</span>
+                  {location || "Location unlisted"}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px]">payments</span>
+                  {salary || "No salary listed"}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px]">schedule</span>
+                  {datePosted ? `Posted ${datePosted}` : "Recently posted"}
+                </span>
+              </div>
+
+              {/* Primary Actions */}
+              <div className="flex flex-wrap gap-3 items-center">
+                <Link
+                  href={`/tailor?jobId=${job.id}`}
+                  onClick={() => sessionStorage.setItem("resumeforge_active_job_id", job.id)}
+                  className="px-5 py-2 rounded bg-primary text-on-primary font-section-label text-xs font-bold hover:bg-primary-fixed hover:shadow-[0_0_15px_rgba(255,140,0,0.3)] transition-all flex items-center gap-2"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Tailor Resume
+                </Link>
+
+                <Link
+                  href={`/tailor?jobId=${job.id}&tab=cover-letter`}
+                  data-testid={coverTestId}
+                  onClick={() => sessionStorage.setItem("resumeforge_active_job_id", job.id)}
+                  className="px-4 py-2 rounded bg-transparent border border-outline text-on-surface font-section-label text-xs hover:border-primary hover:text-primary transition-all flex items-center gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  {hasCoverLetter ? "Open Cover Letter" : "Generate Cover Letter"}
+                </Link>
+
+                {applyUrl && applyUrl.startsWith("http") ? (
+                  <a
+                    href={applyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 rounded bg-surface-variant border border-transparent text-on-surface font-section-label text-xs hover:border-outline-variant transition-all flex items-center gap-2"
+                  >
+                    Open Posting <ExternalLink className="w-4 h-4" />
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    className="px-4 py-2 rounded bg-surface-variant/50 border border-transparent text-on-surface-variant/50 font-section-label text-xs cursor-not-allowed"
+                  >
+                    Open Posting
+                  </button>
+                )}
+
+                <div className="ml-auto">
+                  {isUpdatingStatus ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-on-surface-variant" />
+                  ) : (
+                    <select
+                      value={job.status}
+                      onChange={(e) => onStatusChange(job.id, e.target.value as JobStatus)}
+                      className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-xs font-mono-data text-on-surface-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all cursor-pointer"
+                      aria-label="Job status"
+                    >
+                      {ALL_STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {STATUS_LABELS[s]}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 2 Sub-Columns */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Left Sub-column: Match & Notes */}
+          <div className="xl:col-span-1 space-y-6">
+            {/* Match Score Module */}
+            <div className="bg-surface/80 backdrop-blur-md border border-outline-variant rounded-xl p-5 shadow-[0_0_15px_rgba(255,140,0,0.05)]">
+              <details className="group" open>
+                <summary className="flex justify-between items-center cursor-pointer mb-4 border-b border-outline-variant/50 pb-2 outline-none">
+                  <h3 className="font-section-label text-xs text-on-surface-variant uppercase tracking-widest">
+                    EVIDENCE MATCH &amp; GAPS
+                  </h3>
+                  <span className="material-symbols-outlined text-on-surface-variant group-open:rotate-180 transition-transform">
+                    expand_more
+                  </span>
+                </summary>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full border-2 border-primary/40 flex items-center justify-center font-bold text-xs text-primary bg-primary/10">
+                    {checklist.percent}%
+                  </div>
+                  <div className="text-sm font-body-dense text-on-surface-variant">
+                    <span className="text-on-surface font-bold">
+                      {checklist.percent >= 70
+                        ? "High match"
+                        : checklist.percent >= 40
+                        ? "Partial match"
+                        : "Low match"}
+                    </span>{" "}
+                    — {checklist.matched} of {checklist.total} requirements backed by evidence.
+                  </div>
+                </div>
+                <ul className="space-y-2 font-mono-data text-xs">
+                  {checklist.items.map((item) => (
+                    <li key={item.label} className="flex items-center gap-2 text-on-surface-variant">
+                      {item.matched ? (
+                        <span className="material-symbols-outlined text-[16px] text-secondary">check</span>
+                      ) : (
+                        <span className="material-symbols-outlined text-[16px] text-error">close</span>
+                      )}
+                      <span>{item.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </div>
+
+            {/* Notes Module */}
+            {showNotes && (
+              <div className="bg-surface/80 backdrop-blur-md border border-outline-variant rounded-xl p-5 shadow-[0_0_15px_rgba(255,140,0,0.05)] flex flex-col">
+                <h3 className="font-section-label text-xs text-on-surface-variant mb-3 border-b border-outline-variant/50 pb-2 uppercase tracking-widest">
+                  NOTES
+                </h3>
+                <textarea
+                  data-testid={`notes-textarea-${job.id}`}
+                  value={notesValue}
+                  onChange={(e) => onNotesChange(job.id, e.target.value)}
+                  className="w-full bg-background border border-outline-variant rounded p-3 text-sm font-mono-data text-on-surface focus:border-primary focus:ring-1 focus:ring-primary transition-all resize-y min-h-[120px] mb-3"
+                  placeholder="Add custom notes here..."
+                />
+                <button
+                  type="button"
+                  data-testid={`notes-save-btn-${job.id}`}
+                  disabled={isSavingNotes}
+                  onClick={() => onSaveNotes(job.id)}
+                  className="px-3 py-1.5 rounded bg-surface-variant border border-outline text-on-surface text-xs font-mono-data self-start hover:border-primary hover:text-primary transition-all flex items-center gap-1 disabled:opacity-50"
+                >
+                  {isSavingNotes ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Save className="w-3.5 h-3.5" />
+                  )}
+                  Save Notes
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Right Sub-column: Job Details */}
+          <div className="xl:col-span-2">
+            <div className="bg-surface/80 backdrop-blur-md border border-outline-variant rounded-xl p-6 shadow-[0_0_15px_rgba(255,140,0,0.05)] h-full flex flex-col">
+              <div className="flex justify-between items-center mb-4 border-b border-outline-variant/50 pb-2 sticky top-0 bg-surface/90 backdrop-blur-md z-10 py-2">
+                <h3 className="font-section-label text-xs text-on-surface-variant uppercase tracking-widest">
+                  JOB DETAILS
+                </h3>
+                {isPlaceholder && (
+                  <button
+                    type="button"
+                    data-testid={`fetch-fulltext-btn-${job.id}`}
+                    disabled={isFetchingFullText}
+                    onClick={() => onFetchFullText(job.id)}
+                    className="inline-flex items-center gap-1.5 rounded border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-mono-data text-primary hover:bg-primary/20 transition-colors disabled:opacity-50"
+                  >
+                    {isFetchingFullText ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <DownloadCloud className="h-3 w-3" />
+                    )}
+                    Pull Full Description
+                  </button>
+                )}
+              </div>
+
+              {tier2Notice && (
+                <p className="mb-2 text-xs italic text-primary/90">{tier2Notice}</p>
+              )}
+
+              <div className="prose prose-invert max-w-none font-body-regular text-sm text-on-surface/90 space-y-4 overflow-y-auto pr-2 whitespace-pre-wrap leading-relaxed max-h-[600px]">
+                {job.rawDescription}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-
-      {showNotes && (
-        <div className="rounded-[10px] border border-slate-800 bg-rf-elevated p-4 space-y-2">
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-rf-meta">
-            Notes
-          </label>
-          <textarea
-            rows={4}
-            data-testid={`notes-textarea-${job.id}`}
-            value={notesValue}
-            onChange={(e) => onNotesChange(job.id, e.target.value)}
-            placeholder="Interview notes, contacts, next steps..."
-            className="w-full resize-none rounded-lg border border-slate-800 bg-rf-bg p-3 font-mono text-xs text-rf-cloud placeholder-slate-600 transition-colors duration-150 focus:border-amber-500/60 focus:outline-none"
-          />
-          <button
-            type="button"
-            data-testid={`notes-save-btn-${job.id}`}
-            onClick={() => onSaveNotes(job.id)}
-            disabled={isSavingNotes}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/15 px-3 py-1.5 text-xs font-medium text-amber-400 transition-colors duration-150 hover:bg-amber-500/25 disabled:opacity-50"
-          >
-            {isSavingNotes ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Save className="h-3.5 w-3.5" />
-            )}
-            Save Notes
-          </button>
-        </div>
-      )}
     </div>
   );
 
   if (isSheet) {
     return (
       <div
-        className="fixed inset-0 z-50 flex flex-col bg-rf-surface"
+        className="fixed inset-0 z-50 flex flex-col bg-background overflow-y-auto"
         data-testid="job-detail-sheet"
         role="dialog"
         aria-modal="true"
       >
-        <div className="min-h-0 flex-1 overflow-y-auto">{content}</div>
+        {content}
       </div>
     );
   }
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto bg-rf-surface" data-testid="job-detail-pane">
+    <div className="h-full min-h-0 overflow-y-auto bg-background/50 relative" data-testid="job-detail-pane">
       {content}
     </div>
   );

@@ -13,6 +13,7 @@ import {
   parsePersistedLayout,
   serializeLayoutState,
   EDITOR_LAYOUT_STORAGE_KEY,
+  DEFAULT_EDITOR_LAYOUT,
 } from "@/lib/editor/layout-persistence";
 import { handleSaveShortcut } from "@/lib/editor/shortcut-handler";
 import {
@@ -109,15 +110,22 @@ export function EditorWorkspace() {
   };
 
   // Task 9.2: Resizable 3-pane layout state & imperatively controlled AI collapse
+  // Restore localStorage sizes only after mount to avoid SSR/client hydration mismatch.
   const aiPanelRef = usePanelRef();
-  const [initialLayoutState] = useState(() => {
-    if (typeof window === "undefined") return parsePersistedLayout(null);
-    return parsePersistedLayout(localStorage.getItem(EDITOR_LAYOUT_STORAGE_KEY));
-  });
-
-  const [layout, setLayout] = useState<Record<string, number>>(initialLayoutState.sizes);
-  const [isAiCollapsed, setIsAiCollapsed] = useState<boolean>(initialLayoutState.isAiCollapsed);
+  const [layout, setLayout] = useState<Record<string, number>>(DEFAULT_EDITOR_LAYOUT.sizes);
+  const [isAiCollapsed, setIsAiCollapsed] = useState<boolean>(DEFAULT_EDITOR_LAYOUT.isAiCollapsed);
+  const [isLayoutReady, setIsLayoutReady] = useState(false);
   const isAiCollapsedRef = useRef<boolean>(isAiCollapsed);
+
+  useEffect(() => {
+    const persisted = parsePersistedLayout(
+      localStorage.getItem(EDITOR_LAYOUT_STORAGE_KEY)
+    );
+    setLayout(persisted.sizes);
+    setIsAiCollapsed(persisted.isAiCollapsed);
+    isAiCollapsedRef.current = persisted.isAiCollapsed;
+    setIsLayoutReady(true);
+  }, []);
 
   useEffect(() => {
     isAiCollapsedRef.current = isAiCollapsed;
@@ -130,13 +138,12 @@ export function EditorWorkspace() {
 
   // Collapse panel on mount if layout was persisted as collapsed
   useEffect(() => {
-    if (isAiCollapsed) {
-      const timer = setTimeout(() => {
-        aiPanelRef.current?.collapse();
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-  }, [aiPanelRef, isAiCollapsed]);
+    if (!isLayoutReady || !isAiCollapsed) return;
+    const timer = setTimeout(() => {
+      aiPanelRef.current?.collapse();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [aiPanelRef, isAiCollapsed, isLayoutReady]);
 
   const persistLayoutState = (sizes: Record<string, number>, collapsed: boolean) => {
     if (typeof window === "undefined") return;
@@ -862,7 +869,8 @@ export function EditorWorkspace() {
 
       {/* Main Workspace Body */}
       <main className="flex flex-1 min-h-0 overflow-hidden bg-background p-2 md:p-3">
-        {/* Desktop 3-Panel Resizable Layout (>= lg screens) */}
+        {/* Desktop 3-Panel Resizable Layout (>= lg screens) — client-only to avoid SSR style hydration mismatch */}
+        {isLayoutReady ? (
         <ResizablePanelGroup
           id="editor-resizable-panel-group"
           orientation="horizontal"
@@ -931,6 +939,13 @@ export function EditorWorkspace() {
             />
           </ResizablePanel>
         </ResizablePanelGroup>
+        ) : (
+          <div
+            className="hidden lg:flex h-full w-full"
+            data-testid="editor-resizable-panel-group-placeholder"
+            aria-hidden
+          />
+        )}
 
         {/* Mobile Tabbed View (< lg screens) */}
         <div className="flex h-full w-full flex-col lg:hidden">

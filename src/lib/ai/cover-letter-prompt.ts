@@ -31,30 +31,68 @@ OUTPUT JSON SCHEMA:
 
 export function buildCoverLetterUserPrompt(
   input: GenerateCoverLetterInput,
-  evidenceItems: EvidenceItemForPrompt[]
+  evidenceItems: EvidenceItemForPrompt[],
+  masterTypstSource?: string
 ): string {
   const company = input.company || "Hiring Organization";
   const roleTitle = input.roleTitle || "Target Position";
+  const candidateName = input.candidateName || "Candidate";
 
-  const evidenceSummary = evidenceItems
-    .map((item) => {
-      const bulletsText = (item.bullets || [])
-        .map((b: { id: string; text: string }) => `  - [ID: ${b.id}] ${b.text}`)
-        .join("\n");
-      return `Item [ID: ${item.id}] ${item.title} (${item.organization || "N/A"})\nSummary: ${item.verifiedSummary}\nBullets:\n${bulletsText}`;
-    })
-    .join("\n\n");
+  const verified = evidenceItems.filter((item) => item.status === "verified");
+  const drafts = evidenceItems.filter((item) => item.status === "draft");
+  const preferred = verified.length > 0 ? verified : evidenceItems;
+
+  const formatEvidence = (items: EvidenceItemForPrompt[], label: string) => {
+    if (items.length === 0) return `${label}: (none)\n`;
+    return `${label}:\n${items
+      .map((item) => {
+        const bulletsText = (item.bullets || [])
+          .map((b: { id: string; text: string }) => `  - [ID: ${b.id}] ${b.text}`)
+          .join("\n");
+        return `Item [ID: ${item.id}] ${item.title} (${item.organization || "N/A"}) [${item.status}]\nSummary: ${item.verifiedSummary}\nBullets:\n${bulletsText}`;
+      })
+      .join("\n\n")}\n`;
+  };
+
+  const reqs = input.extractedRequirements as
+    | { requiredSkills?: string[]; preferredSkills?: string[]; domainTerms?: string[] }
+    | undefined;
+  const reqBlock = reqs
+    ? `EXTRACTED REQUIREMENTS:
+- Required: ${(reqs.requiredSkills || []).join(", ") || "n/a"}
+- Preferred: ${(reqs.preferredSkills || []).join(", ") || "n/a"}
+- Domain: ${(reqs.domainTerms || []).join(", ") || "n/a"}`
+    : "";
+
+  const jdExcerpt = input.rawDescription.slice(0, 6000);
+  const masterBlock = masterTypstSource?.trim()
+    ? `CANDIDATE MASTER RESUME (Typst — use for tone, role history, and phrasing; still cite Evidence Bank IDs for claims):
+\`\`\`
+${masterTypstSource.slice(0, 8000)}
+\`\`\`
+`
+    : "CANDIDATE MASTER RESUME: (not available — ground exclusively in Evidence Bank)\n";
 
   return `TARGET JOB DETAILS:
 - Company: ${company}
 - Role Title: ${roleTitle}
+- Candidate Name: ${candidateName}
 - Target Role Profile Overlay: ${input.activeRoleProfile}
-- Raw Description Excerpt:
-${input.rawDescription.slice(0, 1500)}
+- Raw Job Description:
+${jdExcerpt}
 
-CANDIDATE VERIFIED EVIDENCE BANK:
-${evidenceSummary}
+${reqBlock}
+
+${masterBlock}
+${formatEvidence(preferred, "CANDIDATE EVIDENCE BANK (prefer verified)")}
+${drafts.length > 0 && verified.length > 0 ? formatEvidence(drafts, "DRAFT EVIDENCE (use sparingly; label as unverified if used)") : ""}
 
 INSTRUCTIONS:
-Craft a 3-4 paragraph tailored cover letter for ${company} (${roleTitle}). Ground all claims in verified evidence IDs. If job requirements are unsupported by evidence, omit them or flag in gapsAddressed. Return valid JSON only.`;
+Write a professional 3–4 paragraph cover letter for ${candidateName} applying to ${roleTitle} at ${company}.
+- Ground every concrete claim in Evidence Bank IDs listed above; put those IDs in evidenceCitations.
+- Mirror the candidate's real experience from the master resume and evidence — do not invent employers, metrics, or skills.
+- Prefer verified evidence; never present draft-only claims as verified fact.
+- fullMarkdown MUST be a complete letter with salutation, blank-line paragraph spacing, closing, and signature "${candidateName}".
+- Omit unsupported JD requirements or list them only in gapsAddressed.
+Return valid JSON only.`;
 }

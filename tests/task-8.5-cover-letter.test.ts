@@ -165,7 +165,7 @@ describe("Task 8.5: Cover Letter Data Model & Evidence-Backed Drafting", () => {
 
     expect(systemPrompt).toContain("ADVERSARIAL GAP HANDLING");
     expect(systemPrompt).toContain("MUST NOT claim or fabricate experience with that technology");
-    expect(userPrompt).toContain("CANDIDATE VERIFIED EVIDENCE BANK");
+    expect(userPrompt).toContain("CANDIDATE EVIDENCE BANK");
   });
 
   it("5. An adversarial JD requesting an unsupported technology (e.g. Kubernetes when no k8s evidence exists) never produces a Kubernetes claim in verified grounding", () => {
@@ -189,14 +189,37 @@ describe("Task 8.5: Cover Letter Data Model & Evidence-Backed Drafting", () => {
   });
 
   it("6. A generated draft is linked to the correct job and resume/variant", async () => {
+    const evidence = await prisma.evidenceItem.create({
+      data: {
+        type: "experience",
+        title: "Backend Engineer",
+        organization: "TechCo",
+        verifiedSummary: "Built backend services using Docker and Node.js.",
+        tags: JSON.stringify(["Docker", "Node.js"]),
+        status: "verified",
+        bullets: {
+          create: [
+            {
+              text: "Built backend services using Docker and Node.js.",
+              technologies: JSON.stringify(["Docker", "Node.js"]),
+              verified: true,
+              orderIndex: 0,
+            },
+          ],
+        },
+      },
+      include: { bullets: true },
+    });
+
     const mockValidLlmResponse = JSON.stringify({
       title: "Cover Letter — Acme Corp Senior Backend Engineer",
       salutation: "Dear Acme Hiring Team,",
       openingParagraph: "I am writing to apply for the Senior Backend Engineer position.",
       bodyParagraphs: ["Built backend services using Docker and Node.js."],
       closingParagraph: "Sincerely, Candidate.",
-      fullMarkdown: "# Cover Letter\n\nDear Acme Hiring Team,\n\nI am writing to apply for the Senior Backend Engineer position. Built backend services using Docker and Node.js. Thank you for your consideration.",
-      evidenceCitations: [],
+      fullMarkdown:
+        "# Cover Letter\n\nDear Acme Hiring Team,\n\nI am writing to apply for the Senior Backend Engineer position. Built backend services using Docker and Node.js. Thank you for your consideration.\n\nSincerely,\nCandidate",
+      evidenceCitations: [evidence.id, evidence.bullets[0].id],
       gapsAddressed: [],
     });
 
@@ -228,6 +251,9 @@ describe("Task 8.5: Cover Letter Data Model & Evidence-Backed Drafting", () => {
     expect(json.success).toBe(true);
     expect(json.data.jobId).toBe(testJobId);
     expect(json.data.variantId).toBe(testVariantId);
+
+    await prisma.bullet.deleteMany({ where: { evidenceId: evidence.id } });
+    await prisma.evidenceItem.deleteMany({ where: { id: evidence.id } });
   });
 
   it("7. A persisted draft can be retrieved by ID", async () => {

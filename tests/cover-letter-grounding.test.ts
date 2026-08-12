@@ -43,4 +43,19 @@ describe("Cover Letter Evidence Grounding Verifier (Fail-First Protocol)", () =>
     expect(result.verified).toBe(false);
     expect(result.invalidCitations).toContain("fake-nonexistent-id-999");
   });
+
+  it("3. rejects cover letter with empty citations when Evidence Bank has active items", () => {
+    const genericLetter = {
+      salutation: "Dear Hiring Manager,",
+      openingParagraph: "I am excited to apply for this role at your company.",
+      bodyParagraphs: ["I have strong experience and would be a great fit for the team."],
+      closingParagraph: "Thank you for your consideration.",
+      fullMarkdown: "# Cover Letter\n...",
+      evidenceCitations: [],
+    };
+
+    const result = verifyCoverLetterGrounding(genericLetter, activeEvidenceIds);
+    expect(result.verified).toBe(false);
+    expect(result.reason).toMatch(/at least one Evidence Bank ID/i);
+  });
 });

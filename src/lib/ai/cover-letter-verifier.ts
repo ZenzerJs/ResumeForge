@@ -48,6 +48,16 @@ export function verifyCoverLetterGrounding(
     };
   }
 
+  if (activeEvidenceIds.length > 0 && citations.length === 0) {
+    return {
+      verified: false,
+      validCitations: [],
+      invalidCitations: [],
+      reason:
+        "Cover letter must cite at least one Evidence Bank ID when evidence items exist. Generic ungrounded letters are rejected.",
+    };
+  }
+
   return {
     verified: true,
     validCitations,

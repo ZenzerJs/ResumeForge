@@ -8,8 +8,8 @@ import { Variants } from 'framer-motion';
 // Ease curves
 export const EASE_BLUR_SLIDE: [number, number, number, number] = [0.25, 0.46, 0.45, 0.94];
 export const EASE_LINE_REVEAL: [number, number, number, number] = [0.76, 0, 0.24, 1];
-export const EASE_SPRING_CARD = { type: 'spring', stiffness: 300, damping: 22 };
-export const EASE_SPRING_BUTTON = { type: 'spring', stiffness: 400, damping: 20 };
+export const EASE_SPRING_CARD = { type: 'spring' as const, stiffness: 300, damping: 22 };
+export const EASE_SPRING_BUTTON = { type: 'spring' as const, stiffness: 400, damping: 20 };
 
 /**
  * Viewport Entrance: Blur-Slide-Up Variant

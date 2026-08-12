@@ -31,6 +31,7 @@ export function CoverLetterPanel({
   company,
   roleTitle,
   rawDescription,
+  extractedRequirements,
   activeRoleProfile = "Full-stack",
 }: CoverLetterPanelProps) {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -97,6 +98,7 @@ export function CoverLetterPanel({
           company: company || "Target Company",
           roleTitle: roleTitle || "Target Position",
           rawDescription,
+          extractedRequirements: extractedRequirements || undefined,
           activeRoleProfile,
           providerConfig,
         }),
@@ -121,10 +123,12 @@ export function CoverLetterPanel({
     if (!coverLetter) return "";
     if (activeFormat === "markdown") return coverLetter.fullMarkdown;
 
-    // Plain text assembly
+    const name =
+      coverLetter.fullMarkdown.match(/Sincerely,\s*\n([^\n]+)/i)?.[1]?.trim() || "Candidate";
+
     return `${coverLetter.salutation}\n\n${coverLetter.openingParagraph}\n\n${coverLetter.bodyParagraphs.join(
       "\n\n"
-    )}\n\n${coverLetter.closingParagraph}\n\nSincerely,\nCandidate`;
+    )}\n\n${coverLetter.closingParagraph}\n\nSincerely,\n${name}`;
   };
 
   const handleCopy = () => {
@@ -337,36 +341,46 @@ export function CoverLetterPanel({
             </div>
           )}
 
-          {/* Modular Paragraph Cards View */}
-          <div className="space-y-3">
-            {/* Salutation & Opening Hook */}
-            <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
-              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                Salutation & Opening Hook
-              </span>
-              <p className="text-xs text-slate-200 font-medium">{coverLetter.salutation}</p>
-              <p className="text-xs text-slate-300 leading-relaxed font-sans">{coverLetter.openingParagraph}</p>
+          {/* Letter body — markdown shows assembled letter; text shows modular paragraphs */}
+          {activeFormat === "markdown" ? (
+            <div
+              data-testid="cover-letter-markdown-view"
+              className="bg-slate-950/80 border border-slate-800 rounded-xl p-5 text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-sans"
+            >
+              {coverLetter.fullMarkdown}
             </div>
-
-            {/* Body Paragraphs */}
-            {coverLetter.bodyParagraphs.map((para, idx) => (
-              <div key={idx} className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
-                <span className="text-[10px] uppercase font-bold text-indigo-400 tracking-wider">
-                  Body Paragraph {idx + 1}
+          ) : (
+            <div className="space-y-3" data-testid="cover-letter-plain-view">
+              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                  Salutation & Opening Hook
                 </span>
-                <p className="text-xs text-slate-200 leading-relaxed font-sans">{para}</p>
+                <p className="text-xs text-slate-200 font-medium">{coverLetter.salutation}</p>
+                <p className="text-xs text-slate-300 leading-relaxed font-sans">{coverLetter.openingParagraph}</p>
               </div>
-            ))}
 
-            {/* Closing */}
-            <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
-              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                Closing Statement
-              </span>
-              <p className="text-xs text-slate-300 leading-relaxed font-sans">{coverLetter.closingParagraph}</p>
-              <p className="text-xs text-slate-400 font-medium">Sincerely,<br />Candidate</p>
+              {coverLetter.bodyParagraphs.map((para, idx) => (
+                <div key={idx} className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
+                  <span className="text-[10px] uppercase font-bold text-indigo-400 tracking-wider">
+                    Body Paragraph {idx + 1}
+                  </span>
+                  <p className="text-xs text-slate-200 leading-relaxed font-sans">{para}</p>
+                </div>
+              ))}
+
+              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                  Closing Statement
+                </span>
+                <p className="text-xs text-slate-300 leading-relaxed font-sans">{coverLetter.closingParagraph}</p>
+                <p className="text-xs text-slate-400 font-medium whitespace-pre-line">
+                  {`Sincerely,\n${
+                    coverLetter.fullMarkdown.match(/Sincerely,\s*\n([^\n]+)/i)?.[1]?.trim() || "Candidate"
+                  }`}
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>
