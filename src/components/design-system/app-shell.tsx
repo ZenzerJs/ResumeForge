@@ -3,11 +3,22 @@
 import React from "react";
 import { TopNav } from "@/components/navigation/top-nav";
 import { cn } from "@/lib/utils";
-import { AmbientBackground, type AtmosphereVariant } from "./ambient-background";
+
+/** Kept for layout/testid affinity; no longer drives decorative atmosphere. */
+export type AtmosphereVariant =
+  | "landing"
+  | "editor"
+  | "tracker"
+  | "tailor"
+  | "library"
+  | "discover"
+  | "settings"
+  | "quiet";
 
 interface AppShellProps {
   children: React.ReactNode;
   variant?: AtmosphereVariant;
+  /** @deprecated Unused — ambient glow removed for performance. */
   isCompiling?: boolean;
   className?: string;
   badge?: React.ReactNode;
@@ -19,7 +30,6 @@ interface AppShellProps {
 export function AppShell({
   children,
   variant = "quiet",
-  isCompiling = false,
   className = "",
   badge,
   actions,
@@ -33,8 +43,6 @@ export function AppShell({
       )}
       data-testid={`app-shell-${variant}`}
     >
-      <AmbientBackground variant={variant} isCompiling={isCompiling} />
-
       {!hideNav ? <TopNav badge={badge} actions={actions} /> : null}
 
       <div className={cn("relative z-10 flex min-h-0 flex-1 flex-col", !hideNav && "pt-16", className)}>

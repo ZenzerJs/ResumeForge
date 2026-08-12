@@ -74,16 +74,6 @@
   ]
 ]
 
-// TECHNICAL SKILLS
-#section("Technical Skills")
-#entry(
-  details: [
-    - *Languages:* TypeScript, JavaScript, Python, Go, SQL, HTML/CSS
-    - *Frameworks & Libraries:* React, Next.js, Node.js, Express, Tailwind CSS, Prisma
-    - *Tools & Infrastructure:* Git, Docker, PostgreSQL, SQLite, Vitest, CI/CD Pipelines
-  ]
-)
-
 // EXPERIENCE
 #section("Experience")
 
@@ -111,6 +101,19 @@
   ]
 )
 
+// EDUCATION
+#section("Education")
+
+#entry(
+  title: "University of California, Berkeley",
+  role: "Bachelor of Science in Computer Science",
+  location: "Berkeley, CA",
+  date: "Graduated May 2025",
+  details: [
+    - GPA: 3.8 / 4.0 | Relevant Coursework: Data Structures, Operating Systems, Database Systems.
+  ]
+)
+
 // PROJECTS
 #section("Projects")
 
@@ -125,15 +128,12 @@
   ]
 )
 
-// EDUCATION
-#section("Education")
-
+// SKILLS
+#section("Skills")
 #entry(
-  title: "University of California, Berkeley",
-  role: "Bachelor of Science in Computer Science",
-  location: "Berkeley, CA",
-  date: "Graduated May 2025",
   details: [
-    - GPA: 3.8 / 4.0 | Relevant Coursework: Data Structures, Operating Systems, Database Systems.
+    - *Languages:* TypeScript, JavaScript, Python, Go, SQL, HTML/CSS
+    - *Frameworks & Libraries:* React, Next.js, Node.js, Express, Tailwind CSS, Prisma
+    - *Tools & Infrastructure:* Git, Docker, PostgreSQL, SQLite, Vitest, CI/CD Pipelines
   ]
 )

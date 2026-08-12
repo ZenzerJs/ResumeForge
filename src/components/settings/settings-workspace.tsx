@@ -6,6 +6,7 @@ import { CheckCircle2, XCircle, Loader2, Key, Server, ShieldCheck, Trash2 } from
 import { AppShell } from "@/components/design-system/app-shell";
 import { PageHeader } from "@/components/design-system/page-header";
 import { Surface } from "@/components/design-system/surface";
+import { PageSkeleton } from "@/components/design-system/page-skeleton";
 
 const SETTINGS_STORAGE_KEY = "resumeforge_ai_settings";
 
@@ -20,6 +21,7 @@ export function SettingsWorkspace() {
     message: string;
     latencyMs?: number;
   } | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   // Load saved settings from localStorage
   useEffect(() => {
@@ -34,6 +36,8 @@ export function SettingsWorkspace() {
       }
     } catch (err) {
       console.error("Failed to load saved settings:", err);
+    } finally {
+      setIsHydrated(true);
     }
   }, []);
 
@@ -124,6 +128,10 @@ export function SettingsWorkspace() {
     if (!key || key.length < 8) return "••••••••";
     return `${key.slice(0, 4)}••••••••${key.slice(-4)}`;
   };
+
+  if (!isHydrated) {
+    return <PageSkeleton variant="settings" />;
+  }
 
   return (
     <AppShell variant="settings" className="overflow-y-auto">

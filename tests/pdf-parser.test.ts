@@ -17,9 +17,9 @@ B.S. Computer Science — UC Berkeley
 
     const typst = convertTextToTypst(sampleText);
     expect(typst).toContain("= Alex Mercer");
-    expect(typst).toContain("== EXPERIENCE");
+    expect(typst).toContain("== Experience");
     expect(typst).toContain("- Built high-throughput");
-    expect(typst).toContain("== EDUCATION");
+    expect(typst).toContain("== Education");
   });
 
   it("handles empty or single line text gracefully", () => {

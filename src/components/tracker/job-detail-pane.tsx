@@ -113,9 +113,6 @@ export function JobDetailPane({
 
   const content = (
     <div className="flex-1 overflow-y-auto p-margin-desktop z-10 relative">
-      {/* Background glow layer */}
-      <div className="absolute top-20 right-20 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
-
       <div className="max-w-4xl mx-auto space-y-6 relative z-10">
         {/* Mobile close button */}
         {isSheet && (

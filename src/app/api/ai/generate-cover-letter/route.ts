@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { GenerateCoverLetterInputSchema, CoverLetterResponseSchema } from "@/lib/ai/cover-letter-schema";
 import { generateCoverLetter } from "@/lib/ai/gateway";
 import { verifyCoverLetterGrounding } from "@/lib/ai/cover-letter-verifier";
+import { extractJsonObject, normalizeCoverLetterPayload } from "@/lib/ai/json-response";
 import { getEvidenceItems } from "@/lib/db/evidence";
 import { getMasterResume } from "@/lib/db/resumes";
 import { sanitizeError } from "@/lib/ai/redact";
@@ -71,27 +72,23 @@ export async function POST(request: Request) {
       );
     }
 
-    // Clean JSON response (strip markdown fences if present)
-    let cleanedJson = gatewayResult.rawJson.trim();
-    if (cleanedJson.startsWith("```")) {
-      cleanedJson = cleanedJson.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
-    }
-
-    let parsedResponse;
+    // Parse + normalize AI JSON (fences, length floors, etc.)
+    let parsedResponse: unknown;
     try {
-      parsedResponse = JSON.parse(cleanedJson);
+      parsedResponse = extractJsonObject(gatewayResult.rawJson);
     } catch {
       return NextResponse.json(
         {
           success: false,
           error: "AI provider returned malformed non-JSON output for cover letter.",
-          rawOutput: sanitizeError(cleanedJson.slice(0, 300)),
+          rawOutput: sanitizeError(gatewayResult.rawJson.slice(0, 300)),
         },
         { status: 422 }
       );
     }
 
-    const schemaValidation = CoverLetterResponseSchema.safeParse(parsedResponse);
+    const normalized = normalizeCoverLetterPayload(parsedResponse, input.candidateName);
+    const schemaValidation = CoverLetterResponseSchema.safeParse(normalized);
     if (!schemaValidation.success) {
       return NextResponse.json(
         {

@@ -5,25 +5,39 @@ import { buildComposedSystemPrompt } from "./master-prompt";
 export function buildCoverLetterSystemPrompt(): string {
   const taskInstructions = `## TASK-SPECIFIC: TAILORED COVER LETTER SPECIALIST
 
-Your task is to write a highly compelling, professional, tailored cover letter for a candidate applying for a target job.
+Write a professional, evidence-grounded cover letter. Never invent employers, metrics, or skills.
 
-CITATIONS & COVER LETTER CONSTRAINTS:
-1. CITATIONS: In the "evidenceCitations" JSON array, return every evidence ID (e.g. "exp-1", "bullet-101") that you referenced or drew from to write the body paragraphs.
-2. ADVERSARIAL GAP HANDLING: If a job requirement (e.g. Kubernetes, AWS, Go) is NOT supported by any item in the candidate's Evidence Bank, you MUST NOT claim or fabricate experience with that technology. Either omit the unsupported requirement or explicitly represent it as a gap/review-needed item in the "gapsAddressed" array.
+### ADVERSARIAL GAP HANDLING
+If a job requirement (e.g. Kubernetes, AWS, Go) is NOT supported by any item in the candidate's Evidence Bank, you MUST NOT claim or fabricate experience with that technology. Either omit the unsupported requirement or list it in gapsAddressed.
 
-OUTPUT JSON SCHEMA:
+### OUTPUT FORMAT (CRITICAL)
+- Return ONE raw JSON object only.
+- Do NOT wrap in markdown fences (\`\`\`json).
+- Do NOT add prose before or after the JSON.
+
+### HARD VALIDATION RULES
+1. evidenceCitations: every Evidence/Bullet ID you used from the prompt. If Evidence Bank has items, include at least one valid ID.
+2. Never claim JD requirements unsupported by evidence — omit them or list in gapsAddressed.
+3. Length floors:
+   - openingParagraph ≥ 20 chars
+   - each bodyParagraphs entry ≥ 30 chars
+   - closingParagraph ≥ 20 chars
+   - fullMarkdown ≥ 100 chars (complete letter)
+4. fullMarkdown must include salutation, blank-line paragraphs, closing, and signature.
+
+### CANONICAL VALID JSON SHAPE
 {
-  "title": "Cover Letter — [Company] [RoleTitle]",
-  "salutation": "Dear [Hiring Manager / Hiring Team at Company],",
-  "openingParagraph": "Strong 2-3 sentence hook referencing the candidate's enthusiasm, target role title, company name, and core value proposition.",
+  "title": "Cover Letter — Acme Corp Senior Backend Engineer",
+  "salutation": "Dear Hiring Team at Acme Corp,",
+  "openingParagraph": "I am writing to apply for the Senior Backend Engineer role at Acme Corp. My verified backend experience building APIs and data systems aligns with your reliability and scale priorities.",
   "bodyParagraphs": [
-    "First body paragraph detailing specific technical achievements grounded in evidence items...",
-    "Second body paragraph highlighting problem-solving, scale, and role alignment..."
+    "In my recent platform work, I designed service APIs and improved database performance using approaches documented in my Evidence Bank, including measurable latency reductions on production queries.",
+    "I also collaborated on containerized deployments with a focus on maintainable services, staying within technologies I can verify from my evidence."
   ],
-  "closingParagraph": "Polite, confident closing statement thanking the reader, expressing eagerness for an interview, and offering to discuss qualifications.",
-  "fullMarkdown": "# Cover Letter\n\nDear Hiring Team,\n\n[Opening]\n\n[Body]\n\n[Closing]\n\nSincerely,\nCandidate",
+  "closingParagraph": "Thank you for considering my application. I would welcome the chance to discuss how my verified experience can support your backend roadmap.",
+  "fullMarkdown": "# Cover Letter — Acme Corp Senior Backend Engineer\\n\\nDear Hiring Team at Acme Corp,\\n\\nI am writing to apply for the Senior Backend Engineer role at Acme Corp. My verified backend experience building APIs and data systems aligns with your reliability and scale priorities.\\n\\nIn my recent platform work, I designed service APIs and improved database performance using approaches documented in my Evidence Bank, including measurable latency reductions on production queries.\\n\\nI also collaborated on containerized deployments with a focus on maintainable services, staying within technologies I can verify from my evidence.\\n\\nThank you for considering my application. I would welcome the chance to discuss how my verified experience can support your backend roadmap.\\n\\nSincerely,\\nCandidate",
   "evidenceCitations": ["exp-1", "bullet-101"],
-  "gapsAddressed": []
+  "gapsAddressed": ["No verified Kubernetes production ownership in Evidence Bank."]
 }`;
 
   return buildComposedSystemPrompt(taskInstructions);
@@ -66,12 +80,16 @@ export function buildCoverLetterUserPrompt(
 
   const jdExcerpt = input.rawDescription.slice(0, 6000);
   const masterBlock = masterTypstSource?.trim()
-    ? `CANDIDATE MASTER RESUME (Typst — use for tone, role history, and phrasing; still cite Evidence Bank IDs for claims):
+    ? `CANDIDATE MASTER RESUME (Typst — use for tone/history; still cite Evidence Bank IDs for claims):
 \`\`\`
 ${masterTypstSource.slice(0, 8000)}
 \`\`\`
 `
     : "CANDIDATE MASTER RESUME: (not available — ground exclusively in Evidence Bank)\n";
+
+  const availableIds = preferred
+    .flatMap((item) => [item.id, ...(item.bullets || []).map((b) => b.id)])
+    .filter(Boolean);
 
   return `TARGET JOB DETAILS:
 - Company: ${company}
@@ -87,12 +105,14 @@ ${masterBlock}
 ${formatEvidence(preferred, "CANDIDATE EVIDENCE BANK (prefer verified)")}
 ${drafts.length > 0 && verified.length > 0 ? formatEvidence(drafts, "DRAFT EVIDENCE (use sparingly; label as unverified if used)") : ""}
 
+AVAILABLE CITATION IDS (use only these in evidenceCitations):
+${availableIds.length > 0 ? availableIds.map((id) => `- ${id}`).join("\n") : "- (none)"}
+
 INSTRUCTIONS:
-Write a professional 3–4 paragraph cover letter for ${candidateName} applying to ${roleTitle} at ${company}.
-- Ground every concrete claim in Evidence Bank IDs listed above; put those IDs in evidenceCitations.
-- Mirror the candidate's real experience from the master resume and evidence — do not invent employers, metrics, or skills.
-- Prefer verified evidence; never present draft-only claims as verified fact.
-- fullMarkdown MUST be a complete letter with salutation, blank-line paragraph spacing, closing, and signature "${candidateName}".
-- Omit unsupported JD requirements or list them only in gapsAddressed.
-Return valid JSON only.`;
+Write a 3–4 paragraph cover letter for ${candidateName} applying to ${roleTitle} at ${company}.
+- Return ONE raw JSON object matching the canonical schema (no markdown fences).
+- Cite real Evidence Bank IDs in evidenceCitations (required when IDs are listed above).
+- Do not invent experience. Unsupported JD requirements go in gapsAddressed.
+- fullMarkdown must be the complete letter signed "${candidateName}".
+- Meet minimum lengths: opening≥20, each body≥30, closing≥20, fullMarkdown≥100.`;
 }

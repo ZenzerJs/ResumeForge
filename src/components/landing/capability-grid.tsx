@@ -84,7 +84,6 @@ export function CapabilityGrid({ stats, loading }: CapabilityGridProps) {
 
         {/* Card 3: Tailor Engine & AI Gateway */}
         <motion.div variants={blurSlideUpVariants} {...cardHoverProps} className="glass-panel rounded-xl p-panel-padding flex flex-col justify-between min-h-[280px] glow-effect transition-all duration-300 group lg:col-span-1 md:col-span-2 lg:row-span-2 relative overflow-hidden">
-          <div className="absolute -right-10 -top-10 w-40 h-40 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
           <div>
             <div className="w-12 h-12 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(255,140,0,0.15)]">
               <Sparkles className="h-6 w-6 text-primary" />

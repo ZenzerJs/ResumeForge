@@ -37,6 +37,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AppShell } from "@/components/design-system/app-shell";
+import { EditorWorkspaceSkeleton } from "@/components/editor/editor-workspace-skeleton";
 
 const STORAGE_KEY = "resumeforge_typst_source";
 
@@ -669,10 +670,11 @@ export function EditorWorkspace() {
       {isLoadingDocument && (
         <div
           data-testid="editor-loading-state"
-          className="flex h-8 items-center justify-center bg-slate-900 border-b border-slate-800 text-xs text-slate-400 gap-2 font-mono"
+          className="absolute inset-0 z-30"
+          aria-busy="true"
+          aria-label="Loading document"
         >
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />
-          Loading document from database...
+          <EditorWorkspaceSkeleton showNav={false} className="h-full max-h-none" />
         </div>
       )}
 

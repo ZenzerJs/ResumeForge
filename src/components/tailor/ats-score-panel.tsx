@@ -210,9 +210,9 @@ export function AtsScorePanel({
         <div>
           <h2 className="text-base font-semibold text-white flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-amber-400" />
-            ATS Quality Score Engine
+            ATS Quality Score
             <span className="text-xs font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-0.5 rounded-full">
-              Phase 4.3 Deterministic Engine
+              Deterministic Engine
             </span>
           </h2>
           <p className="text-xs text-slate-400 mt-1">

@@ -1,3 +1,5 @@
+import { reorderTypstSections } from "@/lib/typst/section-order";
+
 /**
  * Pre-compilation Typst Source Sanitizer.
  * Cleans up invalid LLM-emitted syntax before sending to Typst WASM compiler:
@@ -5,6 +7,7 @@
  *    (Typst interprets `<...>` as document label references, causing `label '<yahoo.com>' does not exist` compiler errors).
  * 2. Removes explicit `#label(<...>)` declarations.
  * 3. Normalizes font family declarations: any custom/unsupported `font: "..."` override is normalized to `font: "Liberation Sans"`.
+ * 4. Reorders `#section(...)` blocks to Experience → Education → Projects → Skills → other.
  */
 
 export function sanitizeTypstSource(source: string): string {
@@ -28,6 +31,9 @@ export function sanitizeTypstSource(source: string): string {
     /font\s*:\s*"[^"]+"/gi,
     'font: "Liberation Sans"'
   );
+
+  // 5. Canonical section order for converted resumes
+  sanitized = reorderTypstSections(sanitized);
 
   return sanitized;
 }

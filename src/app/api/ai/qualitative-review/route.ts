@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateQualitativeReview } from "@/lib/ai/gateway";
 import { AtsQualitativeReviewSchema } from "@/lib/ai/qualitative-schema";
+import { extractJsonObject, normalizeQualitativeReviewPayload } from "@/lib/ai/json-response";
 import { ProviderConfigSchema } from "@/lib/ai/types";
 import { sanitizeError } from "@/lib/ai/redact";
 import { z } from "zod";
@@ -65,33 +66,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Parse JSON — strip markdown fences if model wrapped output (e.g. ```json ... ```)
     let parsedJson: unknown;
     try {
-      const stripped = gatewayResult.rawJson
-        .trim()
-        .replace(/^```(?:json)?\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
-      parsedJson = JSON.parse(stripped);
+      parsedJson = extractJsonObject(gatewayResult.rawJson);
     } catch {
       return NextResponse.json(
         {
           success: false,
-          error: "AI provider returned malformed JSON payload.",
+          error:
+            "AI provider returned malformed JSON payload. Please retry — the model must return a single raw JSON object.",
         },
         { status: 502 }
       );
     }
 
-    const schemaValidation = AtsQualitativeReviewSchema.safeParse(parsedJson);
+    const normalized = normalizeQualitativeReviewPayload(parsedJson);
+    const schemaValidation = AtsQualitativeReviewSchema.safeParse(normalized);
     if (!schemaValidation.success) {
+      const details = schemaValidation.error.issues
+        .map((i) => `${i.path.join(".") || "root"}: ${i.message}`)
+        .join("; ");
       return NextResponse.json(
         {
           success: false,
-          error: `AI qualitative output failed guardrail schema validation: ${schemaValidation.error.issues
-            .map((i) => i.message)
-            .join(", ")}`,
+          error: `AI qualitative output failed schema validation: ${details}`,
         },
         { status: 502 }
       );

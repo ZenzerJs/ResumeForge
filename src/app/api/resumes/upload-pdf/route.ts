@@ -4,6 +4,7 @@ import { createResume } from "@/lib/db/resumes";
 import { convertPdfTextToTypst } from "@/lib/ai/gateway";
 import { ProviderConfig, ProviderConfigSchema } from "@/lib/ai/types";
 import { sanitizeTypstSource } from "@/lib/typst/sanitizer";
+import { ensureTypstLinks } from "@/lib/typst/ensure-links";
 
 export async function POST(request: Request) {
   try {
@@ -145,8 +146,14 @@ export async function POST(request: Request) {
       convertedSource = convertTextToTypst(extractedText, title, extractedLinks);
     }
 
+    // Sanitize, enforce Experience→Education→Projects→Skills order, and keep scraped links
+    const sanitized = ensureTypstLinks(
+      sanitizeTypstSource(convertedSource),
+      extractedLinks
+    );
+
     // Prepend header comments for status tracking and non-master draft labeling
-    const typstSource = `// @pdf-conversion-draft: Review and edit before saving as Master Resume\n// @conversion-path: ${conversionPath}\n// PDF source: "${fileName}" — converted ${new Date().toISOString().slice(0, 10)}\n\n${sanitizeTypstSource(convertedSource)}`;
+    const typstSource = `// @pdf-conversion-draft: Review and edit before saving as Master Resume\n// @conversion-path: ${conversionPath}\n// PDF source: "${fileName}" — converted ${new Date().toISOString().slice(0, 10)}\n\n${sanitized}`;
 
     // Always create as non-master draft (isMaster: false)
     const newResume = await createResume({

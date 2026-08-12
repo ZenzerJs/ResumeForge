@@ -94,11 +94,20 @@ describe("Task 9.1 & 9.1b — AI-Powered PDF to Typst Conversion & Template Exem
   it("5. Zero-content-drop metric assertion: verifies key section headers and >= 90% word preservation", () => {
     const fallbackTypst = convertTextToTypst(sampleExtractedText, "Jayden Saha Resume");
 
-    // Section headers preservation
-    const requiredSections = ["Education", "Experience", "Projects", "Technical Skills"];
+    // Section headers preservation (canonical names)
+    const requiredSections = ["Education", "Experience", "Projects", "Skills"];
     for (const section of requiredSections) {
       expect(fallbackTypst.toLowerCase()).toContain(section.toLowerCase());
     }
+
+    // Canonical order: Experience → Education → Projects → Skills
+    const exp = fallbackTypst.indexOf("== Experience");
+    const edu = fallbackTypst.indexOf("== Education");
+    const proj = fallbackTypst.indexOf("== Projects");
+    const skills = fallbackTypst.indexOf("== Skills");
+    expect(exp).toBeLessThan(edu);
+    expect(edu).toBeLessThan(proj);
+    expect(proj).toBeLessThan(skills);
 
     // Key terminology preservation
     const keyTerms = ["Wilfrid Laurier", "Trillium Health", "FastAPI", "LangGraph", "Python", "TypeScript"];
@@ -152,7 +161,18 @@ describe("Task 9.1 & 9.1b — AI-Powered PDF to Typst Conversion & Template Exem
     const prompt = buildPdfToTypstSystemPrompt();
     expect(prompt).toContain("#let section(title)");
     expect(prompt).toContain("#let entry(");
-    expect(prompt).toContain("paper: \"us-letter\"");
+    expect(prompt).toContain('paper: "us-letter"');
+    expect(prompt).toContain("Experience → Education → Projects → Skills");
+    expect(prompt).toContain('#section("Experience")');
+    expect(prompt.indexOf('#section("Experience")')).toBeLessThan(
+      prompt.indexOf('#section("Education")')
+    );
+    expect(prompt.indexOf('#section("Education")')).toBeLessThan(
+      prompt.indexOf('#section("Projects")')
+    );
+    expect(prompt.indexOf('#section("Projects")')).toBeLessThan(
+      prompt.indexOf('#section("Skills")')
+    );
   });
 
   it("9. Task 9.1b: System prompt explicitly instructs model NOT to redefine or rename helper functions", () => {

@@ -15,6 +15,7 @@ import { AtsScorePanel } from "./ats-score-panel";
 import { CoverLetterPanel } from "./cover-letter-panel";
 import type { PatchProposal, Gap, RejectedPatch } from "@/lib/ai/patch-schema";
 import { AppShell } from "@/components/design-system/app-shell";
+import { PageSkeleton } from "@/components/design-system/page-skeleton";
 import { isPlaceholderDescription } from "@/lib/ingestion/helpers";
 
 interface RankedMatch {
@@ -105,6 +106,7 @@ export function TailorWorkspace() {
 
   const [isTier2Fetching, setIsTier2Fetching] = useState<boolean>(false);
   const [tier2Status, setTier2Status] = useState<{ type: "loading" | "success" | "error"; message: string } | null>(null);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
 
   useEffect(() => {
     async function loadMasterOrStarterResume() {
@@ -135,7 +137,7 @@ export function TailorWorkspace() {
       setActiveVariantContent(defaultSource);
     }
 
-    loadMasterOrStarterResume();
+    void loadMasterOrStarterResume().finally(() => setIsBootstrapping(false));
   }, []);
 
   const triggerTier2Fetch = async (jobIdToFetch: string) => {
@@ -434,6 +436,10 @@ export function TailorWorkspace() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  if (isBootstrapping) {
+    return <PageSkeleton variant="tailor" />;
+  }
 
   return (
     <AppShell variant="tailor">
