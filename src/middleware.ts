@@ -5,14 +5,14 @@ import { isMutationMethod, isPublicPath, originAllowed } from "@/lib/security/se
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (isPublicPath(pathname)) {
-    if (
-      (pathname === "/api/auth/signup" || pathname === "/api/auth/login") &&
-      isMutationMethod(request.method)
-    ) {
+    if (pathname.startsWith("/api/auth/") && isMutationMethod(request.method)) {
       if (!originAllowed(request)) {
         return NextResponse.json({ success: false, error: "Invalid request origin" }, { status: 403 });
       }
-      if (!rateLimit(clientKey(request, "auth"), 10, 60_000)) {
+      if (
+        (pathname === "/api/auth/signup" || pathname === "/api/auth/login") &&
+        !rateLimit(clientKey(request, "auth"), 10, 60_000)
+      ) {
         return NextResponse.json({ success: false, error: "Too many sign-in attempts" }, { status: 429 });
       }
     }

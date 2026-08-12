@@ -42,7 +42,7 @@ test.describe("hosted auth and a11y gates", () => {
     const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const page = await context.newPage();
     await page.goto("/login");
-    await expect(page.getByLabel("Email")).toBeVisible();
+    await expect(page.getByLabel("Email or username")).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Password" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Sign In" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Continue as guest" })).toBeVisible();
@@ -56,8 +56,9 @@ test.describe("hosted auth and a11y gates", () => {
     const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const page = await context.newPage();
     const email = `e2e-${Date.now()}@resumeforge.test`;
+    const username = `e2e_${Date.now()}`;
     const signup = await page.request.post(`${baseURL}/api/auth/signup`, {
-      data: { email, password: "playwright-test-secret" },
+      data: { email, username, password: "playwright-test-secret" },
     });
     expect(signup.ok()).toBeTruthy();
     const jobs = await page.request.get(`${baseURL}/api/jobs`);
@@ -72,7 +73,7 @@ test.describe("hosted auth and a11y gates", () => {
     await page.goto("/");
     await page.getByRole("button", { name: "Open menu" }).click();
     await expect(page.getByRole("navigation", { name: "Mobile navigation" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Editor" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Mobile navigation" }).getByRole("link", { name: "Editor" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Sign Out" })).toBeVisible();
   });
 
@@ -84,6 +85,23 @@ test.describe("hosted auth and a11y gates", () => {
     expect(res.status()).toBe(200);
     const json = await res.json();
     expect(json.guest).toBe(true);
+  });
+
+  test("settings page can sign out the current session", async ({ page }) => {
+    await page.goto("/settings");
+    await expect(page.getByTestId("account-settings")).toBeVisible();
+    await expect(page.locator("#settings-username")).toBeVisible();
+    await page.getByTestId("account-settings").getByRole("button", { name: "Sign Out" }).click();
+    await expect(page.getByRole("link", { name: "Sign In" }).first()).toBeVisible({ timeout: 10000 });
+  });
+
+  test("nav shows username instead of email", async ({ page }) => {
+    await page.goto("/");
+    const me = await page.request.get("/api/auth/me");
+    const json = await me.json();
+    expect(json.data?.username).toBeTruthy();
+    await expect(page.getByRole("link", { name: new RegExp(`@${json.data.username}`) })).toBeVisible();
+    await expect(page.getByText("playwright@resumeforge.test")).toHaveCount(0);
   });
 
   test("protected master cannot be overwritten via PUT", async ({ request }) => {

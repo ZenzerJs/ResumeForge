@@ -12,7 +12,7 @@ export default async function globalSetup(config: FullConfig) {
   const page = await browser.newPage();
 
   const signup = await page.request.post(`${baseURL}/api/auth/signup`, {
-    data: { email: EMAIL, password: PASSWORD },
+    data: { email: EMAIL, username: "playwright", password: PASSWORD },
   });
   if (!signup.ok()) {
     const login = await page.request.post(`${baseURL}/api/auth/login`, {
@@ -20,12 +20,16 @@ export default async function globalSetup(config: FullConfig) {
     });
     if (!login.ok()) {
       await page.goto(`${baseURL}/login`);
-      await page.getByLabel("Email").fill(EMAIL);
+      await page.getByLabel("Email or username").fill(EMAIL);
       await page.getByLabel("Password").fill(PASSWORD);
       await page.getByRole("button", { name: "Sign In" }).click();
       await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15000 });
     }
   }
+
+  await page.request.patch(`${baseURL}/api/auth/me`, {
+    data: { username: "playwright" },
+  });
 
   await page.context().storageState({ path: "e2e/.auth/user.json" });
   await browser.close();

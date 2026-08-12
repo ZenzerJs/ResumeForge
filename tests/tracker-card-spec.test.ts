@@ -24,6 +24,11 @@ describe("Task 8.3: Tracker Card Spec & Click Zone Refinements", () => {
     expect(salary).toBeNull();
   });
 
+  it("2b. pulls labeled base salary from job description text", () => {
+    const jd = "The Base Salary range for the role is included below. Base Salary: $300,000";
+    expect(extractSalaryFromNotes(sampleTier1Notes, jd)).toBe("$300,000");
+  });
+
   it("3. detects pending placeholder descriptions vs full JDs", () => {
     const placeholderText =
       "[Pending Import] Full job description text not yet fetched from posting page for TikTok — Software Engineer Intern.";

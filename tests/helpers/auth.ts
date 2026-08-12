@@ -4,9 +4,11 @@ import { hashPassword } from "@/lib/security/passwords";
 import { createSessionToken, getSessionCookieName } from "@/lib/security/session";
 
 export async function createTestUser(email?: string) {
+  const suffix = crypto.randomUUID().replace(/-/g, "").slice(0, 10);
   const user = await prisma.user.create({
     data: {
-      email: email ?? `test-${crypto.randomUUID()}@resumeforge.test`,
+      email: email ?? `test-${suffix}@resumeforge.test`,
+      username: `user_${suffix}`,
       passwordHash: await hashPassword("test-password-ok"),
     },
   });

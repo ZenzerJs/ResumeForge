@@ -73,8 +73,8 @@ export function AppShell({
   return (
     <div
       className={cn(
-        "relative flex flex-col overflow-hidden bg-rf-bg text-rf-body",
-        variant === "editor" ? "h-screen max-h-screen" : "min-h-screen"
+        "relative flex flex-col bg-rf-bg text-rf-body",
+        variant === "editor" ? "h-screen max-h-screen overflow-hidden" : "min-h-screen overflow-x-hidden"
       )}
       data-testid={`app-shell-${variant}`}
     >

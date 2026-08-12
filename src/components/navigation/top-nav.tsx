@@ -12,8 +12,16 @@ import {
   LogOut,
   Menu,
   X,
+  Bell,
+  Terminal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  fetchSessionUser,
+  signOutAndRedirect,
+  usernameInitial,
+  type SessionUser,
+} from "@/components/auth/session-user";
 
 const NAV_LINKS = [
   { href: "/editor", label: "Editor", icon: Edit },
@@ -26,16 +34,6 @@ const NAV_LINKS = [
 interface TopNavProps {
   actions?: React.ReactNode;
   badge?: React.ReactNode;
-}
-
-type AuthUser = { id: string; email: string };
-
-async function signOutAndRedirect() {
-  try {
-    await fetch("/api/auth/logout", { method: "POST" });
-  } finally {
-    window.location.assign("/");
-  }
 }
 
 function SignOutButton({ className }: { className?: string }) {
@@ -80,24 +78,39 @@ function GuestAuthLinks({ className }: { className?: string }) {
   );
 }
 
+function NavUtilities() {
+  return (
+    <div className="hidden md:flex items-center gap-1">
+      <button
+        type="button"
+        aria-label="Notifications"
+        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800/50 hover:text-[#ff8c00] focus-visible:ring-2 focus-visible:ring-amber-500/60"
+      >
+        <Bell className="h-4 w-4" aria-hidden />
+      </button>
+      <Link
+        href="/editor"
+        aria-label="Terminal"
+        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800/50 hover:text-[#ff8c00] focus-visible:ring-2 focus-visible:ring-amber-500/60"
+      >
+        <Terminal className="h-4 w-4" aria-hidden />
+      </Link>
+    </div>
+  );
+}
+
 export function TopNav({ actions, badge }: TopNavProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [user, setUser] = useState<AuthUser | null | undefined>(undefined);
+  const [user, setUser] = useState<SessionUser | null | undefined>(undefined);
   const drawerRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
 
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((json) => {
-        if (cancelled) return;
-        setUser(json?.data ?? null);
-      })
-      .catch(() => {
-        if (!cancelled) setUser(null);
-      });
+    void fetchSessionUser().then((next) => {
+      if (!cancelled) setUser(next);
+    });
     return () => {
       cancelled = true;
     };
@@ -139,7 +152,7 @@ export function TopNav({ actions, badge }: TopNavProps) {
   const isGuest = user === null;
 
   return (
-    <header className="bg-[#0b1326]/90 backdrop-blur-xl border-b border-slate-800/80 fixed top-0 w-full z-50 flex items-center justify-between gap-3 px-4 md:px-8 h-16 pt-[env(safe-area-inset-top)] max-w-full overflow-x-auto">
+    <header className="bg-[#0b1326]/90 backdrop-blur-xl border-b border-slate-800/80 fixed top-0 w-full z-50 flex items-center justify-between gap-3 px-4 md:px-8 h-16 pt-[env(safe-area-inset-top)] max-w-full overflow-visible">
       <div className="flex items-center gap-8 min-w-0">
         <Link
           href="/"
@@ -198,11 +211,19 @@ export function TopNav({ actions, badge }: TopNavProps) {
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
         {actions}
+        <NavUtilities />
         {user ? (
           <>
-            <span className="hidden lg:inline max-w-[12rem] truncate text-xs text-slate-400" title={user.email}>
-              {user.email}
-            </span>
+            <Link
+              href="/settings"
+              title={user.username}
+              className="hidden lg:inline-flex max-w-[10rem] items-center gap-2 rounded-md px-2 py-1 text-xs text-slate-200 hover:bg-slate-800/60 focus-visible:ring-2 focus-visible:ring-amber-500/60"
+            >
+              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-700 bg-slate-800 font-bold text-[#ff8c00]">
+                {usernameInitial(user.username)}
+              </span>
+              <span className="truncate">@{user.username}</span>
+            </Link>
             <SignOutButton className="hidden md:inline-flex" />
           </>
         ) : isGuest ? (
@@ -234,16 +255,19 @@ export function TopNav({ actions, badge }: TopNavProps) {
               );
             })}
             {user ? (
-              <button
-                type="button"
-                className="mt-2 flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800/40 focus-visible:ring-2 focus-visible:ring-amber-500/60"
-                onClick={() => {
-                  void signOutAndRedirect();
-                }}
-              >
-                <LogOut className="h-4 w-4" aria-hidden />
-                Sign Out
-              </button>
+              <>
+                <p className="mt-2 px-3 text-xs text-slate-400">@{user.username}</p>
+                <button
+                  type="button"
+                  className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800/40 focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                  onClick={() => {
+                    void signOutAndRedirect();
+                  }}
+                >
+                  <LogOut className="h-4 w-4" aria-hidden />
+                  Sign Out
+                </button>
+              </>
             ) : (
               <>
                 <Link

@@ -8,6 +8,11 @@ import {
   AlertTriangle,
   X,
   Loader2,
+  Briefcase,
+  ClipboardCheck,
+  FileText,
+  Database,
+  XCircle,
 } from "lucide-react";
 import { JobRequirements } from "@/lib/jd-parser/types";
 import { PatchDiffReview } from "./patch-diff-review";
@@ -17,6 +22,7 @@ import type { PatchProposal, Gap, RejectedPatch } from "@/lib/ai/patch-schema";
 import { AppShell } from "@/components/design-system/app-shell";
 import { PageSkeleton } from "@/components/design-system/page-skeleton";
 import { isPlaceholderDescription } from "@/lib/ingestion/helpers";
+import { JD_PASTE_TEMPLATE, convertHtmlToCleanMarkdown } from "@/lib/ingestion/jd-format";
 
 interface RankedMatch {
   id: string;
@@ -154,7 +160,7 @@ export function TailorWorkspace() {
       const json = await res.json();
 
       if (res.ok && json.success && json.data) {
-        setRawDescription(json.data.rawDescription);
+        setRawDescription(convertHtmlToCleanMarkdown(json.data.rawDescription));
         setTier2Status({
           type: "success",
           message: json.cached
@@ -166,7 +172,7 @@ export function TailorWorkspace() {
           type: "error",
           message:
             json.error ||
-            "Couldn't extract automatically (page requires JavaScript rendering or login) — please paste the description manually below.",
+            "Couldn't extract automatically (page requires JavaScript rendering or login). Paste using the Role / Company / Requirements format below.",
         });
       }
     } catch {
@@ -189,7 +195,7 @@ export function TailorWorkspace() {
           const job = json.data;
           if (job.company) setCompany(job.company);
           if (job.roleTitle) setRoleTitle(job.roleTitle);
-          if (job.rawDescription) setRawDescription(job.rawDescription);
+          if (job.rawDescription) setRawDescription(convertHtmlToCleanMarkdown(job.rawDescription));
           if (job.id) setSavedJobId(job.id);
           sessionStorage.setItem("resumeforge_active_job_id", job.id);
 
@@ -503,7 +509,7 @@ export function TailorWorkspace() {
 
         {tier2Status && (
           <div
-            className={`mb-4 rounded-lg border px-3 py-2 text-xs flex items-center gap-2 ${
+            className={`mb-4 rounded-lg border px-3 py-2 text-xs flex items-start gap-2 ${
               tier2Status.type === "error"
                 ? "border-red-800/60 bg-red-950/40 text-red-300"
                 : tier2Status.type === "success"
@@ -512,15 +518,15 @@ export function TailorWorkspace() {
             }`}
           >
             {isTier2Fetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-            {tier2Status.message}
+            <span>{tier2Status.message}</span>
           </div>
         )}
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
           <div className="xl:col-span-8 flex flex-col gap-6">
-            <section className="glass-panel rounded-lg p-5 glow-hover transition-shadow">
+            <section className="glass-panel rounded-lg p-5 glow-effect transition-shadow">
               <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800/60">
-                <span className="material-symbols-outlined text-[#ff8c00] text-sm" data-icon="work">work</span>
+                <Briefcase className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
                 <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">Target Job Posting</h2>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -568,8 +574,14 @@ export function TailorWorkspace() {
                   rows={8}
                   data-testid="jd-textarea"
                   aria-label="Job description"
+                  placeholder={JD_PASTE_TEMPLATE}
                   className="w-full bg-[#060e20] text-slate-200 font-mono text-xs p-4 rounded border border-slate-800 focus:border-[#ff8c00] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 resize-none leading-relaxed"
                 />
+                {tier2Status?.type === "error" ? (
+                  <pre className="mt-2 whitespace-pre-wrap rounded border border-slate-800 bg-[#060e20] p-3 font-mono text-[10px] leading-relaxed text-slate-500">
+                    {JD_PASTE_TEMPLATE}
+                  </pre>
+                ) : null}
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -607,10 +619,10 @@ export function TailorWorkspace() {
               </div>
             </section>
 
-            <section className="glass-panel rounded-lg p-5 glow-hover transition-shadow">
+            <section className="glass-panel rounded-lg p-5 glow-effect transition-shadow">
               <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#ff8c00] text-sm" data-icon="fact_check">fact_check</span>
+                  <ClipboardCheck className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
                   <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">Extracted Requirements</h2>
                 </div>
                 <button
@@ -640,14 +652,11 @@ export function TailorWorkspace() {
                               covered ? "border-[#4edea3]/40 text-slate-300" : "border-red-500/40 text-slate-300"
                             }`}
                           >
-                            <span
-                              className={`material-symbols-outlined text-sm ${
-                                covered ? "text-[#4edea3]" : "text-red-400"
-                              }`}
-                              data-icon={covered ? "check_circle" : "cancel"}
-                            >
-                              {covered ? "check_circle" : "cancel"}
-                            </span>
+                            {covered ? (
+                              <CheckCircle2 className="h-3.5 w-3.5 text-[#4edea3] shrink-0" aria-hidden />
+                            ) : (
+                              <XCircle className="h-3.5 w-3.5 text-red-400 shrink-0" aria-hidden />
+                            )}
                             {skill}
                             <span data-testid={`remove-term-${skill}`} className="inline-flex">
                               <X className="h-3 w-3 opacity-50" />
@@ -695,9 +704,9 @@ export function TailorWorkspace() {
                 />
               )}
 
-            <section className="glass-panel rounded-lg p-5 flex flex-col glow-hover transition-shadow">
+            <section className="glass-panel rounded-lg p-5 flex flex-col glow-effect transition-shadow">
               <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800/60">
-                <span className="material-symbols-outlined text-[#ff8c00] text-sm" data-icon="edit_document">edit_document</span>
+                <FileText className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
                 <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">Generated Cover Letter</h2>
               </div>
               {savedJobId ? (
@@ -736,7 +745,7 @@ export function TailorWorkspace() {
 
             <section className="glass-panel rounded-lg p-5">
               <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800/60">
-                <span className="material-symbols-outlined text-[#ff8c00] text-sm" data-icon="database">database</span>
+                <Database className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
                 <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">Evidence Matches</h2>
               </div>
               <div className="space-y-3">

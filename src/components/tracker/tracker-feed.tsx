@@ -255,7 +255,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           ...p,
           [jobId]:
             json.error ||
-            "Couldn't extract automatically. Click Tailor Resume to paste manually.",
+            "Couldn't extract automatically. Click Tailor Resume and paste using the Role / Company / Requirements format.",
         }));
       }
     } catch {

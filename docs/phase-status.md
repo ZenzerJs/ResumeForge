@@ -9,6 +9,10 @@ This document records completed project milestones, current state, known limitat
 - **Completed Date**: 2026-08-12
 - **Status Summary**: The app is usable without signing up. Guest work stays in the browser. Email/password accounts persist resumes, evidence, and jobs to Postgres scoped by `userId`.
 
+### Follow-up (2026-08-12): Restore landing chrome + usernames
+- Landing atmosphere layers, capability marquee, proof-card badges, and footer links restored. Landing `main` no longer uses `overflow-hidden` (that was clipping sections below the fold).
+- Accounts have a unique `username`. Nav shows `@username` instead of the full email. Settings includes Sign In / Sign Up / Sign Out and username editing.
+
 ### Delivered
 - `User` model and optional `userId` on `Resume`, `EvidenceItem`, and `Job`.
 - Signup/login/me/logout; session cookie carries `userId`.

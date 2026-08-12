@@ -91,10 +91,18 @@ export function getImportAllowlist(): string[] {
 export async function safeFetch(
   rawUrl: string,
   init: RequestInit = {},
-  options?: { allowLocalhost?: boolean; allowedHosts?: string[]; timeoutMs?: number }
+  options?: {
+    allowLocalhost?: boolean;
+    allowedHosts?: string[];
+    timeoutMs?: number;
+    followRedirects?: boolean;
+    maxRedirects?: number;
+  }
 ): Promise<Response> {
   const parsed = assertSafePublicUrl(rawUrl, options);
   const timeoutMs = options?.timeoutMs ?? 8000;
+  const followRedirects = options?.followRedirects ?? false;
+  const maxRedirects = options?.maxRedirects ?? 5;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -105,11 +113,36 @@ export async function safeFetch(
   }
 
   try {
-    return await fetch(parsed.toString(), {
-      ...init,
-      redirect: "manual",
-      signal: controller.signal,
-    });
+    let current = parsed.toString();
+    const hops = followRedirects ? maxRedirects : 0;
+
+    for (let hop = 0; hop <= hops; hop++) {
+      const res = await fetch(current, {
+        ...init,
+        redirect: "manual",
+        signal: controller.signal,
+      });
+
+      const isRedirect = res.status >= 300 && res.status < 400;
+      if (!isRedirect || hop === hops) {
+        return res;
+      }
+
+      const location = res.headers.get("location");
+      if (!location) return res;
+
+      try {
+        await res.body?.cancel();
+      } catch {
+        // Ignore cancel errors on unused redirect bodies.
+      }
+
+      const next = new URL(location, current).toString();
+      assertSafePublicUrl(next, options);
+      current = next;
+    }
+
+    throw new UnsafeUrlError("Too many redirects");
   } finally {
     clearTimeout(timeoutId);
   }

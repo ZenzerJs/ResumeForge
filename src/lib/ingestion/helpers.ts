@@ -41,24 +41,55 @@ export function extractSalaryFromNotes(notes?: string | null, rawDescription?: s
     }
   }
 
-  const textToScan = [notes, rawDescription].filter(Boolean).join(" ");
+  const textToScan = [notes, rawDescription]
+    .filter(Boolean)
+    .join(" ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ");
   if (!textToScan) return null;
 
-  // Hourly wage pattern: e.g., $35/hr, $40 - $50/hour, $25.50 / hr, $60/h
-  const hourlyMatch = textToScan.match(/\$(\d+(?:\.\d{1,2})?)\s*(?:-\s*\$?(\d+(?:\.\d{1,2})?))?\s*(?:\/|\s*per\s*)(?:hr|hour|h)\b/i);
+  const hourlyMatch = textToScan.match(
+    /\$(\d+(?:\.\d{1,2})?)\s*(?:-\s*\$?(\d+(?:\.\d{1,2})?))?\s*(?:\/|\s*per\s*)(?:hr|hour|h)\b/i
+  );
   if (hourlyMatch) {
     const min = hourlyMatch[1];
     const max = hourlyMatch[2];
     return max ? `$${min}-$${max}/hr` : `$${min}/hr`;
   }
 
-  // Yearly salary pattern: e.g., $100k - $150k, $120,000/yr
-  const yearlyMatch = textToScan.match(/\$(\d{2,3}(?:,\d{3})?|\d{2,3}k)\s*(?:-\s*\$?(\d{2,3}(?:,\d{3})?|\d{2,3}k))?\s*(?:\/|\s*per\s*)?(?:yr|year|annually)?\b/i);
+  const amount = "(\\d{1,3}(?:,\\d{3})+|\\d{4,7}|\\d{2,3}\\s*k)";
+  const labeled = textToScan.match(
+    new RegExp(
+      `(?:base\\s+salary|salary(?:\\s+range)?|compensation(?:\\s+range)?)\\s*[:\\-–]\\s*\\$?\\s*${amount}(?:\\s*[-–—]\\s*\\$?\\s*${amount})?`,
+      "i"
+    )
+  );
+  if (labeled) {
+    const min = formatSalaryFigure(labeled[1]);
+    const max = labeled[2] ? formatSalaryFigure(labeled[2]) : null;
+    return max && max !== min ? `${min}-${max}` : min;
+  }
+
+  const yearlyMatch = textToScan.match(
+    new RegExp(`\\$${amount}(?:\\s*[-–—]\\s*\\$?${amount})?`, "i")
+  );
   if (yearlyMatch) {
-    const min = yearlyMatch[1];
-    const max = yearlyMatch[2];
-    return max ? `$${min}-$${max}` : `$${min}`;
+    const min = formatSalaryFigure(yearlyMatch[1]);
+    const max = yearlyMatch[2] ? formatSalaryFigure(yearlyMatch[2]) : null;
+    return max && max !== min ? `${min}-${max}` : min;
   }
 
   return null;
+}
+
+function formatSalaryFigure(raw: string): string {
+  const compact = raw.replace(/[$,\s]/g, "").toLowerCase();
+  if (compact.endsWith("k")) {
+    return `$${compact}`;
+  }
+  const n = Number(compact);
+  if (Number.isFinite(n)) {
+    return `$${n.toLocaleString("en-US")}`;
+  }
+  return `$${raw.replace(/^\$/, "").trim()}`;
 }

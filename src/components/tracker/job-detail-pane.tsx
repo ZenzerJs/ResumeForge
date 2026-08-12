@@ -12,6 +12,11 @@ import {
   MoreHorizontal,
   Sparkles,
   FileText,
+  Building2,
+  MapPin,
+  Banknote,
+  Clock,
+  ChevronDown,
 } from "lucide-react";
 import { JobStatus } from "@/lib/db/jobs";
 import {
@@ -28,6 +33,7 @@ import {
 import type { EvidenceItemWithBullets } from "@/lib/matching/matcher";
 import type { JobItem } from "@/components/tracker/job-types";
 import { isSafeHref } from "@/lib/security/safe-fetch";
+import { convertHtmlToCleanMarkdown } from "@/lib/ingestion/jd-format";
 
 const STATUS_LABELS: Record<JobStatus, string> = {
   SAVED: "Saved",
@@ -98,7 +104,7 @@ export function JobDetailPane({
   const location = extractLocationFromNotes(detailJob.notes);
   const applyUrl = extractApplyUrlFromNotes(detailJob.notes);
   const datePosted = extractPostingDateFromNotes(detailJob.notes);
-  const salary = extractSalaryFromNotes(detailJob.notes);
+  const salary = extractSalaryFromNotes(detailJob.notes, detailJob.rawDescription);
   const isPlaceholder = isPlaceholderDescription(detailJob.rawDescription);
   const companyInitial = detailJob.company ? detailJob.company[0].toUpperCase() : "J";
   const hasCoverLetter = Boolean(detailJob.coverLetters && detailJob.coverLetters.length > 0);
@@ -162,19 +168,19 @@ export function JobDetailPane({
               </h1>
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm font-body-dense text-on-surface-variant mb-4">
                 <span className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[16px]">business</span>
+                  <Building2 className="h-4 w-4 shrink-0" aria-hidden />
                   {job.company || "Unknown Company"}
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[16px]">location_on</span>
+                  <MapPin className="h-4 w-4 shrink-0" aria-hidden />
                   {location || "Location unlisted"}
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[16px]">payments</span>
+                  <Banknote className="h-4 w-4 shrink-0" aria-hidden />
                   {salary || "No salary listed"}
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[16px]">schedule</span>
+                  <Clock className="h-4 w-4 shrink-0" aria-hidden />
                   {datePosted ? `Posted ${datePosted}` : "Recently posted"}
                 </span>
               </div>
@@ -253,9 +259,10 @@ export function JobDetailPane({
                   <h3 className="font-section-label text-xs text-on-surface-variant uppercase tracking-widest">
                     EVIDENCE MATCH &amp; GAPS
                   </h3>
-                  <span className="material-symbols-outlined text-on-surface-variant group-open:rotate-180 transition-transform">
-                    expand_more
-                  </span>
+                  <ChevronDown
+                    className="h-5 w-5 text-on-surface-variant transition-transform group-open:rotate-180"
+                    aria-hidden
+                  />
                 </summary>
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-full border-2 border-primary/40 flex items-center justify-center font-bold text-xs text-primary bg-primary/10">
@@ -276,9 +283,9 @@ export function JobDetailPane({
                   {checklist.items.map((item) => (
                     <li key={item.label} className="flex items-center gap-2 text-on-surface-variant">
                       {item.matched ? (
-                        <span className="material-symbols-outlined text-[16px] text-secondary">check</span>
+                        <Check className="h-4 w-4 shrink-0 text-secondary" aria-hidden />
                       ) : (
-                        <span className="material-symbols-outlined text-[16px] text-error">close</span>
+                        <X className="h-4 w-4 shrink-0 text-error" aria-hidden />
                       )}
                       <span>{item.label}</span>
                     </li>
@@ -352,7 +359,7 @@ export function JobDetailPane({
               )}
 
               <div className="prose prose-invert max-w-none font-body-regular text-sm text-on-surface/90 space-y-4 overflow-y-auto pr-2 whitespace-pre-wrap leading-relaxed max-h-[600px]">
-                {detailJob.rawDescription}
+                {convertHtmlToCleanMarkdown(detailJob.rawDescription ?? "")}
               </div>
             </div>
           </div>

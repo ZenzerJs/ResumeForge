@@ -11,7 +11,6 @@ import {
   KeyRound,
   ArrowRight,
   Upload,
-  Terminal,
   FileText,
   FolderOpen,
   Settings,
@@ -23,10 +22,12 @@ import {
   X,
 } from "lucide-react";
 import { blurSlideUpVariants, cardHoverProps } from "@/lib/theme/animations";
-import TextType from "@/components/ui/text-type";
-import { AsciiWaves } from "@/components/design-system/ascii-waves";
 import { StaggeredText } from "@/components/ui/staggered-text";
 import { TopNav } from "@/components/navigation/top-nav";
+import { LandingAtmosphere } from "@/components/landing/landing-atmosphere";
+import { ProductProofCard } from "@/components/landing/product-proof-card";
+import { CapabilityMarquee } from "@/components/landing/capability-marquee";
+import { LandingFooter } from "@/components/landing/landing-footer";
 import type { DashboardStats } from "@/lib/db/stats";
 
 interface HomeLandingProps {
@@ -130,36 +131,11 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
 
   return (
     <div className="bg-[#0b1326] text-slate-100 font-body-regular min-h-screen flex flex-col antialiased selection:bg-[#ff8c00]/30 selection:text-[#ff8c00] leading-[1.6] relative">
-      {/* Full-window Ascii Waves — default motion + soft blur so hero stays primary */}
-      <div
-        className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
-        aria-hidden
-        data-testid="landing-atmosphere"
-      >
-        {reduceMotion ? (
-          <div
-            className="absolute inset-0 bg-[#0b1326]"
-            data-testid="atmosphere-static-fallback"
-          />
-        ) : (
-          <AsciiWaves
-            color="#94a3b8"
-            speed={1}
-            intensity={1}
-            noiseScale={1}
-            elementSize={16}
-            waveTension={0.5}
-            waveTwist={0.1}
-            hasCursorInteraction={false}
-          />
-        )}
-        <div className="absolute inset-0 bg-[#0b1326]/45 backdrop-blur-[2px]" />
-      </div>
+      <LandingAtmosphere shouldReduceMotion={reduceMotion} />
 
       <TopNav />
 
-      {/* Main Content Canvas */}
-      <main id="main-content" className="flex-grow pt-[calc(6rem+env(safe-area-inset-top))] pb-16 flex flex-col relative z-10 overflow-hidden">
+      <main id="main-content" className="flex-grow pt-[calc(6rem+env(safe-area-inset-top))] pb-16 flex flex-col relative z-10 overflow-visible">
         {/* Notification Toast */}
         <AnimatePresence>
           {notification && (
@@ -270,50 +246,11 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
               </div>
             </div>
 
-            {/* Hero Terminal Preview Right Column */}
-            <motion.div
-              variants={blurSlideUpVariants}
-              initial="initial"
-              animate="animate"
-              data-testid="product-proof-card"
-              className="bg-[#121929] border border-slate-800 rounded-xl p-1 relative overflow-hidden shadow-2xl"
-            >
-              <div className="bg-[#0b111e] rounded-lg overflow-hidden border border-slate-800/80">
-                {/* Terminal Header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-[#131b2c]">
-                  <div className="flex items-center gap-3">
-                    <Terminal className="h-4 w-4 text-slate-400" />
-                    <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-amber-400">
-                      WORKSPACE PREVIEW
-                    </span>
-                    <span className="font-mono text-xs text-slate-300">master-resume.typ</span>
-                    <span className="px-2 py-0.5 rounded text-[10px] uppercase font-mono bg-slate-800 text-slate-300 border border-slate-700">PROTECTED MASTER</span>
-                  </div>
-                  <span className="font-mono text-[10px] text-slate-400 italic">
-                    Illustrative interface — sample layout only
-                  </span>
-                </div>
-                {/* Terminal Body with React Bits TextType Component */}
-                <div className="p-6 font-mono text-xs leading-relaxed text-slate-300 overflow-x-auto min-h-[220px]">
-                  <div className="text-slate-500 mb-3"># Editor View - Typst Markup</div>
-                  <TextType
-                    text={[
-                      '#let master = import("resume.pdf")',
-                      '#set section(title) = block(width: 100%) [ ... ]\n\n#section("Technical Experience")\n#entry(title: "Senior Software Engineer", company: "TechCorp") [\n  - Architected high-throughput microservices using Go and gRPC.\n  - Reduced deployment latency by 40% via CI/CD pipeline optimization.\n  - Spearheaded migration from legacy monolith to Kubernetes cluster.\n]',
-                    ]}
-                    typingSpeed={35}
-                    pauseDuration={3000}
-                    loop={true}
-                    showCursor={true}
-                    cursorCharacter="█"
-                    cursorClassName="text-[#ff8c00] font-bold"
-                    className="font-mono text-xs text-amber-200/90 leading-relaxed"
-                  />
-                </div>
-              </div>
-            </motion.div>
+            <ProductProofCard shouldReduceMotion={reduceMotion} />
           </div>
         </section>
+
+        <CapabilityMarquee />
 
         {/* How ResumeForge Operates Pipeline Section */}
         <section
@@ -323,7 +260,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-12">
               <h2 className="text-2xl md:text-3xl text-white font-bold tracking-[-0.03em] mb-2">How ResumeForge Operates</h2>
-              <p className="text-slate-400 font-mono text-xs">Password-gated workspace. Evidence-grounded output.</p>
+              <p className="text-slate-400 font-mono text-xs">Guest-ready workspace. Evidence-grounded output.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-6" data-testid="workflow-active-panel">
               <div className="flex flex-col items-center text-center p-4">
@@ -345,7 +282,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
 
               <div className="flex flex-col items-center text-center p-4 relative">
                 <div className="hidden md:block absolute top-10 left-[-50%] w-full h-[1px] bg-slate-800 z-0"></div>
-                <div className="w-12 h-12 rounded-xl bg-[#ff8c00]/20 flex items-center justify-center border border-[#ff8c00]/60 mb-4 relative z-10 shadow-[0_0_15px_rgba(255,140,0,0.2)]">
+                <div className="w-12 h-12 rounded-xl bg-[#ff8c00]/20 flex items-center justify-center border border-[#ff8c00]/60 mb-4 relative z-10">
                   <Sparkles className="h-5 w-5 text-[#ff8c00]" />
                 </div>
                 <h3 className="font-mono text-xs uppercase tracking-[0.15em] text-white font-bold mb-1">3. TAILOR</h3>
@@ -440,7 +377,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                     <span className="text-slate-400 text-[11px]">Processing...</span>
                   </div>
                   <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-[#ff8c00] h-full w-[70%] rounded-full shadow-[0_0_8px_rgba(255,140,0,0.8)]"></div>
+                    <div className="bg-[#ff8c00] h-full w-[70%] rounded-full"></div>
                   </div>
                 </div>
               </div>
@@ -497,17 +434,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
         </section>
       </main>
 
-      {/* Footer matching 3cdbdb78-e8bb-42f8-a268-f74c4bedd482.jpg */}
-      <footer className="bg-[#0b1326] w-full py-8 border-t border-slate-800/60 flex flex-col items-center justify-center gap-3 px-6 z-20 relative">
-        <div className="flex gap-6 font-mono text-xs">
-          <Link className="text-slate-400 hover:text-white transition-colors" href="#">Privacy</Link>
-          <Link className="text-slate-400 hover:text-white transition-colors" href="#">Terms</Link>
-          <a className="text-slate-400 hover:text-white transition-colors" href="https://github.com" target="_blank" rel="noopener noreferrer">Github</a>
-        </div>
-        <p className="font-mono text-xs text-slate-500">
-          <span className="text-[#ff8c00] font-bold">ResumeForge</span> © 2026. Local-First. Secure.
-        </p>
-      </footer>
+      <LandingFooter />
       {showClearConfirm ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"

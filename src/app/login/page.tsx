@@ -14,6 +14,7 @@ function LoginForm() {
     searchParams.get("mode") === "signup" ? "signup" : "signin"
   );
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,14 +26,18 @@ function LoginForm() {
     setError(null);
     try {
       const endpoint = mode === "signup" ? "/api/auth/signup" : "/api/auth/login";
+      const body =
+        mode === "signup"
+          ? { email, username, password }
+          : { email, password };
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(body),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.success) {
-        setError(json.error || (mode === "signup" ? "Unable to create account" : "Invalid email or password"));
+        setError(json.error || (mode === "signup" ? "Unable to create account" : "Invalid email, username, or password"));
         return;
       }
       const next = searchParams.get("next") || "/";
@@ -58,16 +63,36 @@ function LoginForm() {
         <p className="mt-2 text-sm text-slate-400">
           {mode === "signup"
             ? "Create an account to save resumes, evidence, and jobs."
-            : "Sign in to save your work, or continue as a guest."}
+            : "Sign in with your email or username, or continue as a guest."}
         </p>
-        <label htmlFor="email" className="mt-6 block text-sm font-medium text-slate-200">
-          Email
+        {mode === "signup" ? (
+          <>
+            <label htmlFor="username" className="mt-6 block text-sm font-medium text-slate-200">
+              Username
+            </label>
+            <input
+              id="username"
+              name="username"
+              type="text"
+              autoComplete="username"
+              required
+              minLength={3}
+              maxLength={24}
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              className="mt-2 h-11 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+            />
+            <p className="mt-1.5 text-[11px] text-slate-500">3–24 characters. Letters, numbers, underscores, or hyphens.</p>
+          </>
+        ) : null}
+        <label htmlFor="email" className={`block text-sm font-medium text-slate-200 ${mode === "signup" ? "mt-4" : "mt-6"}`}>
+          {mode === "signup" ? "Email" : "Email or username"}
         </label>
         <input
           id="email"
           name="email"
-          type="email"
-          autoComplete="email"
+          type={mode === "signup" ? "email" : "text"}
+          autoComplete={mode === "signup" ? "email" : "username"}
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}

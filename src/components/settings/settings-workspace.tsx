@@ -1,12 +1,19 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { ProviderType } from "@/lib/ai/types";
-import { CheckCircle2, XCircle, Loader2, Key, Server, ShieldCheck, Trash2 } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, Key, Server, ShieldCheck, Trash2, LogOut, LogIn, UserRound } from "lucide-react";
 import { AppShell } from "@/components/design-system/app-shell";
 import { PageHeader } from "@/components/design-system/page-header";
 import { Surface } from "@/components/design-system/surface";
 import { PageSkeleton } from "@/components/design-system/page-skeleton";
+import {
+  fetchSessionUser,
+  signOutAndRedirect,
+  usernameInitial,
+  type SessionUser,
+} from "@/components/auth/session-user";
 
 const SETTINGS_STORAGE_KEY = "resumeforge_ai_settings";
 
@@ -22,6 +29,11 @@ export function SettingsWorkspace() {
     latencyMs?: number;
   } | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [usernameDraft, setUsernameDraft] = useState("");
+  const [usernameStatus, setUsernameStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [isSavingUsername, setIsSavingUsername] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Load saved settings from localStorage
   useEffect(() => {
@@ -40,6 +52,42 @@ export function SettingsWorkspace() {
       setIsHydrated(true);
     }
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchSessionUser().then((user) => {
+      if (cancelled) return;
+      setSessionUser(user);
+      setUsernameDraft(user?.username ?? "");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSaveUsername = async () => {
+    setIsSavingUsername(true);
+    setUsernameStatus(null);
+    try {
+      const res = await fetch("/api/auth/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: usernameDraft }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        setUsernameStatus({ type: "error", message: json.error || "Unable to update username" });
+        return;
+      }
+      setSessionUser(json.data);
+      setUsernameDraft(json.data.username);
+      setUsernameStatus({ type: "success", message: "Username saved." });
+    } catch {
+      setUsernameStatus({ type: "error", message: "Unable to update username" });
+    } finally {
+      setIsSavingUsername(false);
+    }
+  };
 
   // Save settings to localStorage on change
   const saveSettingsToStorage = (newProvider: ProviderType, newKey: string, newUrl: string, newModel: string) => {
@@ -142,6 +190,84 @@ export function SettingsWorkspace() {
             title="AI Provider Gateway Settings — Bring-Your-Own-Key (BYOK) AI Configuration"
             description="Configure your preferred LLM provider or local OpenAI-compatible endpoint. API keys stay in this browser and are never written to the database."
           />
+
+          <Surface variant="primary" className="p-6 space-y-5" data-testid="account-settings">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300">Account</h2>
+                <p className="mt-1 text-xs text-slate-400">
+                  Sign in to save resumes, evidence, and jobs. The nav shows your username, not your email.
+                </p>
+              </div>
+              {sessionUser ? (
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-700 bg-slate-800 font-bold text-[#ff8c00]">
+                  {usernameInitial(sessionUser.username)}
+                </span>
+              ) : (
+                <UserRound className="h-5 w-5 text-slate-500" aria-hidden />
+              )}
+            </div>
+
+            {sessionUser ? (
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="settings-username" className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
+                    Username
+                  </label>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <input
+                      id="settings-username"
+                      value={usernameDraft}
+                      onChange={(event) => setUsernameDraft(event.target.value)}
+                      className="h-11 w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 text-sm text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                    />
+                    <button
+                      type="button"
+                      disabled={isSavingUsername || usernameDraft.trim() === sessionUser.username}
+                      onClick={() => void handleSaveUsername()}
+                      className="inline-flex h-11 shrink-0 items-center justify-center rounded-md bg-slate-800 px-4 text-sm font-semibold text-white hover:bg-slate-700 focus-visible:ring-2 focus-visible:ring-amber-500/60 disabled:opacity-50"
+                    >
+                      {isSavingUsername ? "Saving…" : "Save username"}
+                    </button>
+                  </div>
+                </div>
+                {usernameStatus ? (
+                  <p className={`text-xs ${usernameStatus.type === "success" ? "text-emerald-400" : "text-rose-400"}`} role="status">
+                    {usernameStatus.message}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  aria-label="Sign Out"
+                  disabled={isSigningOut}
+                  onClick={() => {
+                    setIsSigningOut(true);
+                    void signOutAndRedirect("/");
+                  }}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-700 px-4 text-sm font-medium text-slate-200 hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-amber-500/60 disabled:opacity-50"
+                >
+                  <LogOut className="h-4 w-4" aria-hidden />
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href="/login"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-700 px-4 text-sm font-medium text-slate-200 hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                >
+                  <LogIn className="h-4 w-4" aria-hidden />
+                  Sign In
+                </Link>
+                <Link
+                  href="/login?mode=signup"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#ff8c00] px-4 text-sm font-semibold text-black hover:bg-[#ffa024] focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                >
+                  Sign Up
+                </Link>
+              </div>
+            )}
+          </Surface>
 
           <Surface variant="primary" className="p-6 space-y-6">
             {/* Provider Selection */}

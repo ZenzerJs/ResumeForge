@@ -9,6 +9,7 @@ import {
   MoreHorizontal,
   Trash2,
   DownloadCloud,
+  Clock,
 } from "lucide-react";
 import { JobStatus } from "@/lib/db/jobs";
 import {
@@ -79,7 +80,7 @@ export function JobListRow({
   const location = extractLocationFromNotes(job.notes);
   const applyUrl = extractApplyUrlFromNotes(job.notes);
   const datePosted = extractPostingDateFromNotes(job.notes);
-  const salary = extractSalaryFromNotes(job.notes);
+  const salary = extractSalaryFromNotes(job.notes, job.rawDescription);
   const isPlaceholder = job.isPlaceholder ?? isPlaceholderDescription(job.rawDescription);
   const companyInitial = job.company ? job.company[0].toUpperCase() : "J";
   const hasCoverLetter = Boolean(job.coverLetters && job.coverLetters.length > 0);
@@ -94,12 +95,6 @@ export function JobListRow({
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
-
-  const metaParts = [
-    job.company || "Unknown Company",
-    location || null,
-    datePosted || null,
-  ].filter(Boolean);
 
   return (
     <div
@@ -136,7 +131,15 @@ export function JobListRow({
             <h3 className="text-[13.5px] font-semibold leading-snug text-rf-cloud">
               {job.roleTitle || "Untitled Role"}
             </h3>
-            <p className="mt-0.5 text-xs text-rf-meta">{metaParts.join(" · ")}</p>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-rf-meta">
+              <span>{job.company || "Unknown Company"}</span>
+              {location ? <span>· {location}</span> : null}
+              {datePosted ? (
+                <span className="inline-flex items-center gap-1">
+                  · <Clock className="h-3 w-3 shrink-0" aria-hidden /> {datePosted}
+                </span>
+              ) : null}
+            </p>
           </div>
 
           <div
