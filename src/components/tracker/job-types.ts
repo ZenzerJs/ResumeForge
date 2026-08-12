@@ -18,7 +18,8 @@ export interface JobItem {
   id: string;
   company?: string | null;
   roleTitle?: string | null;
-  rawDescription: string;
+  rawDescription?: string;
+  isPlaceholder?: boolean;
   source: string;
   extractedRequirements: {
     requiredSkills: string[];

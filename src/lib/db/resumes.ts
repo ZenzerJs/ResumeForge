@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import { ProtectedResumeError } from "@/lib/security/protected-resume";
 
 export interface CreateResumeInput {
   title?: string;
   typstSource: string;
   isMaster?: boolean;
+  userId?: string;
 }
 
 export interface UpdateResumeInput {
@@ -22,19 +24,18 @@ export async function createResume(input: CreateResumeInput) {
 
   if (isMaster) {
     return await prisma.$transaction(async (tx) => {
-      // Un-master all previous resumes
       await tx.resume.updateMany({
-        where: { isMaster: true },
+        where: { isMaster: true, ...(input.userId ? { userId: input.userId } : {}) },
         data: { isMaster: false },
       });
 
-      // Create new master resume
       return await tx.resume.create({
         data: {
           title: input.title || "Master Resume",
           typstSource: input.typstSource,
           isMaster: true,
           isProtected: true,
+          userId: input.userId,
         },
       });
     });
@@ -46,6 +47,7 @@ export async function createResume(input: CreateResumeInput) {
       typstSource: input.typstSource,
       isMaster: false,
       isProtected: false,
+      userId: input.userId,
     },
   });
 }
@@ -55,6 +57,13 @@ export async function createResume(input: CreateResumeInput) {
  * If `isMaster` is set to true, un-masters all other resumes in a transaction.
  */
 export async function updateResume(id: string, input: UpdateResumeInput) {
+  const existing = await prisma.resume.findUnique({ where: { id } });
+  if (!existing) return null;
+
+  if (existing.isProtected) {
+    throw new ProtectedResumeError();
+  }
+
   if (input.isMaster) {
     return await prisma.$transaction(async (tx) => {
       await tx.resume.updateMany({
@@ -68,6 +77,7 @@ export async function updateResume(id: string, input: UpdateResumeInput) {
           title: input.title,
           typstSource: input.typstSource,
           isMaster: true,
+          isProtected: true,
         },
       });
     });
@@ -83,21 +93,22 @@ export async function updateResume(id: string, input: UpdateResumeInput) {
   });
 }
 
-export async function getResumes() {
+export async function getResumes(userId?: string) {
   return await prisma.resume.findMany({
+    where: userId ? { userId } : undefined,
     orderBy: { updatedAt: "desc" },
   });
 }
 
-export async function getMasterResume() {
+export async function getMasterResume(userId?: string) {
   return await prisma.resume.findFirst({
-    where: { isMaster: true },
+    where: { isMaster: true, ...(userId ? { userId } : {}) },
   });
 }
 
-export async function getResumeById(id: string) {
-  return await prisma.resume.findUnique({
-    where: { id },
+export async function getResumeById(id: string, userId?: string) {
+  return await prisma.resume.findFirst({
+    where: { id, ...(userId ? { userId } : {}) },
   });
 }
 
@@ -106,6 +117,7 @@ export interface SaveMasterInput {
   title?: string;
   typstSource: string;
   confirmOverwrite?: boolean;
+  userId?: string;
 }
 
 export interface SaveMasterResult {
@@ -125,19 +137,25 @@ export interface SaveMasterResult {
  * 4. Returns the updated master resume and the snapshotId for instant Undo.
  */
 export async function saveMasterResume(input: SaveMasterInput): Promise<SaveMasterResult> {
-  const currentMaster = await getMasterResume();
+  const currentMaster = await getMasterResume(input.userId);
 
   if (currentMaster && !input.confirmOverwrite) {
     throw new Error("Unconfirmed Master Resume overwrite blocked. Explicit confirmation required before saving to Master.");
   }
 
+  let targetId = input.id || currentMaster?.id;
+  if (targetId && input.userId) {
+    const owned = await getResumeById(targetId, input.userId);
+    if (!owned) targetId = currentMaster?.id;
+  }
+
   return await prisma.$transaction(async (tx) => {
-    const targetId = input.id || currentMaster?.id;
     let master: any;
+    const ownerFilter = input.userId ? { userId: input.userId } : {};
 
     if (targetId && currentMaster) {
       await tx.resume.updateMany({
-        where: { isMaster: true, NOT: { id: targetId } },
+        where: { isMaster: true, ...ownerFilter, NOT: { id: targetId } },
         data: { isMaster: false },
       });
 
@@ -148,11 +166,12 @@ export async function saveMasterResume(input: SaveMasterInput): Promise<SaveMast
           typstSource: input.typstSource,
           isMaster: true,
           isProtected: true,
+          ...(input.userId ? { userId: input.userId } : {}),
         },
       });
     } else {
       await tx.resume.updateMany({
-        where: { isMaster: true },
+        where: { isMaster: true, ...ownerFilter },
         data: { isMaster: false },
       });
 
@@ -162,6 +181,7 @@ export async function saveMasterResume(input: SaveMasterInput): Promise<SaveMast
           typstSource: input.typstSource,
           isMaster: true,
           isProtected: true,
+          userId: input.userId,
         },
       });
     }
@@ -194,13 +214,20 @@ export async function getLatestSnapshot(resumeId: string) {
   });
 }
 
-export async function restoreMasterSnapshot(snapshotId: string) {
+export async function restoreMasterSnapshot(snapshotId: string, userId?: string) {
   const snapshot = await (prisma as any).masterHistory.findUnique({
     where: { id: snapshotId },
   });
 
   if (!snapshot) {
     throw new Error(`MasterHistory snapshot record "${snapshotId}" not found.`);
+  }
+
+  if (userId) {
+    const owned = await getResumeById(snapshot.resumeId, userId);
+    if (!owned) {
+      throw new Error(`MasterHistory snapshot record "${snapshotId}" not found.`);
+    }
   }
 
   return await prisma.$transaction(async (tx) => {
@@ -211,6 +238,7 @@ export async function restoreMasterSnapshot(snapshotId: string) {
         typstSource: snapshot.typstSource,
         title: snapshot.title,
         isMaster: true,
+        isProtected: true,
       },
     });
 

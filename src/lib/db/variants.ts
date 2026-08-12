@@ -13,6 +13,7 @@ export interface CreateVariantInput {
   jobId: string;
   variantTitle: string;
   typstContent: string;
+  userId?: string;
 }
 
 export interface UpdateVariantInput {
@@ -27,8 +28,8 @@ export interface UpdateVariantInput {
  */
 export async function createVariant(input: CreateVariantInput) {
   // Verify master resume exists
-  const masterResume = await prisma.resume.findUnique({
-    where: { id: input.masterResumeId },
+  const masterResume = await prisma.resume.findFirst({
+    where: { id: input.masterResumeId, ...(input.userId ? { userId: input.userId } : {}) },
   });
 
   if (!masterResume) {
@@ -36,8 +37,8 @@ export async function createVariant(input: CreateVariantInput) {
   }
 
   // Verify job exists
-  const job = await prisma.job.findUnique({
-    where: { id: input.jobId },
+  const job = await prisma.job.findFirst({
+    where: { id: input.jobId, ...(input.userId ? { userId: input.userId } : {}) },
   });
 
   if (!job) {
@@ -94,9 +95,12 @@ export async function updateVariant(variantId: string, input: UpdateVariantInput
 /**
  * Fetches a ResumeVariant by ID with its patches.
  */
-export async function getVariantById(variantId: string) {
-  return await prisma.resumeVariant.findUnique({
-    where: { id: variantId },
+export async function getVariantById(variantId: string, userId?: string) {
+  return await prisma.resumeVariant.findFirst({
+    where: {
+      id: variantId,
+      ...(userId ? { job: { userId } } : {}),
+    },
     include: {
       patches: {
         orderBy: { createdAt: "asc" },
@@ -118,8 +122,9 @@ export async function getVariantsByJobId(jobId: string) {
 /**
  * Fetches all ResumeVariants ordered by creation date descending.
  */
-export async function getVariants() {
+export async function getVariants(userId?: string) {
   return await prisma.resumeVariant.findMany({
+    where: userId ? { job: { userId } } : undefined,
     orderBy: { createdAt: "desc" },
     include: {
       job: {

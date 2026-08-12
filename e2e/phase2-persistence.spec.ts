@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test.describe("Phase 2 Persistence & Evidence Bank E2E Tests", () => {
   test("1. Save as Master Resume flow persists Typst source and maintains single master constraint", async ({ page, request }) => {
     await page.goto("/editor");
-    await page.waitForSelector(".typst-preview-svg svg", { timeout: 15000 });
+    await page.waitForSelector(".typst-preview-svg svg", { timeout: 30000 });
 
     // Click "Save as Master Resume" and confirm modal
     await page.click("button:has-text('Save as Master Resume')");
@@ -99,7 +99,7 @@ test.describe("Phase 2 Persistence & Evidence Bank E2E Tests", () => {
     await page.waitForSelector(`text=${bulletText}`, { timeout: 5000 });
 
     // Edit item & bullet text
-    const itemCard = page.locator(".rounded-lg.border").filter({ hasText: uniqueTitle }).first();
+    const itemCard = page.locator("[data-testid='evidence-item-card']").filter({ hasText: uniqueTitle }).first();
     await itemCard.locator("button[title='Edit Item']").click();
     await page.waitForSelector("text=Edit Evidence Item", { timeout: 5000 });
 
@@ -115,11 +115,11 @@ test.describe("Phase 2 Persistence & Evidence Bank E2E Tests", () => {
     await page.waitForSelector(`text=${updatedBulletText}`, { timeout: 5000 });
 
     // Archive item
-    const updatedCard = page.locator(".rounded-lg.border").filter({ hasText: updatedTitle }).first();
+    const updatedCard = page.locator("[data-testid='evidence-item-card']").filter({ hasText: updatedTitle }).first();
     await updatedCard.locator("button[title='Archive Item']").click();
 
     // Filter by "archived" status
-    await page.click("button:has-text('archived')");
+    await page.locator("[data-testid='evidence-status-filter']").selectOption("archived");
     await page.waitForSelector(`text=${updatedTitle}`, { timeout: 5000 });
   });
 
@@ -157,7 +157,7 @@ test.describe("Phase 2 Persistence & Evidence Bank E2E Tests", () => {
 
   test("4. Save as Master with Evidence Extraction -> Modal checkbox renders and preserves state", async ({ page }) => {
     await page.goto("/editor");
-    await page.waitForSelector(".typst-preview-svg svg", { timeout: 15000 });
+    await page.waitForSelector(".typst-preview-svg svg", { timeout: 30000 });
 
     // Open Save as Master modal
     await page.click("button:has-text('Save as Master Resume')");

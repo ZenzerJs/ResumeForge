@@ -4,6 +4,103 @@ This document records completed project milestones, current state, known limitat
 
 ---
 
+## Current Status: Guest Sessions + Optional Accounts
+
+- **Completed Date**: 2026-08-12
+- **Status Summary**: The app is usable without signing up. Guest work stays in the browser. Email/password accounts persist resumes, evidence, and jobs to Postgres scoped by `userId`.
+
+### Delivered
+- `User` model and optional `userId` on `Resume`, `EvidenceItem`, and `Job`.
+- Signup/login/me/logout; session cookie carries `userId`.
+- Public pages; CSRF and rate limits unchanged. Missing `APP_ACCESS_SECRET` no longer locks browsing.
+- Persist APIs return `401 GUEST_READ_ONLY` for guests; list GETs return empty data.
+- Sign In / Sign Up nav, guest banner, login+signup page, Continue as guest.
+- ADR-014 overrides ADR-013’s page-level password gate.
+
+### Verification (2026-08-12)
+- `npm run lint` — pass
+- `npm run typecheck` — pass
+- `npm run test` — pass (233/233)
+- `npm run build` — pass
+- `npx playwright test` — pass (68/68)
+
+### Known limitations
+- BYOK keys remain in `localStorage`.
+- Rate limits are in-memory (one Render instance).
+- Clerk/OAuth is out of scope.
+- Guest editor drafts use localStorage + WASM; they are not written to Postgres.
+
+---
+
+## Current Status: Hosted Polish (Waves D–G)
+
+- **Completed Date**: 2026-08-12
+- **Status Summary**: Session chrome, leftover a11y, dead landing/kanban code, self-hosted Typst fonts, and Render start config. Host-readiness from Waves A–C is unchanged.
+
+### Polish delivered
+- Sign Out in nav (desktop + mobile). Dummy Notifications/Terminal controls removed.
+- Login password show/hide. Hosted copy no longer claims local-first.
+- One `<main>` per AppShell page. Search labels, focus-visible rings, 44px icon hits, editor `beforeunload`.
+- Deleted unused landing modules and `tracker-workspace.tsx`. Home no longer refetches `/api/stats`.
+- Typst text fonts served from `/fonts/typst/`; CSP no longer allows jsDelivr.
+- `npm start` binds `0.0.0.0`; `render.yaml` documents Render Web + Postgres.
+- CSRF origin check compares `Origin`/`Referer` to the `Host` header so `next start -H 0.0.0.0` does not 403 same-origin browser fetches.
+
+### Verification (2026-08-12)
+- `npm run lint` — pass
+- `npm run typecheck` — pass
+- `npm run test` — pass (231/231)
+- `npm run build` — pass
+- `npx playwright test` — pass (65/65)
+
+### Known limitations
+- BYOK keys remain in `localStorage` (CSP-mitigated, not vaulted).
+- Rate limits are in-memory (one Render instance).
+- Clerk/OAuth multi-user is out of scope.
+- Live Render/Vercel provisioning is still a manual step (`render.yaml` is the blueprint).
+
+---
+
+## Current Status: Hosted Security & Optimization (Wave A–C)
+
+- **Completed Date**: 2026-08-12
+- **Status Summary**: ResumeForge is host-ready for a single-user public deploy: Postgres, password middleware, real master immutability, SSRF-safe fetches, rate/body limits, security headers, editor debounce + dynamic panels, slim paginated jobs API, one landing animation, and a11y (skip link, mobile nav, reduced motion).
+
+### Hosted blockers closed
+- Prisma datasource is PostgreSQL (`docker-compose.yml` for local). ADR-013 records the override of ADR-002/ADR-005.
+- `src/middleware.ts` gates `/api/*` and app routes behind `rf_session`. Unauthenticated `GET /api/jobs` returns 401.
+- Protected masters reject `PUT /api/resumes/[id]` (403). `generate-patches` no longer auto-creates a master.
+- `safeFetch` wraps bulk-import, tier-2, and custom AI URLs. `JOB_SYNC_SECRET` is fail-closed.
+- PDF 10 MB + `%PDF-` magic, Zod string caps, AI/import rate limits, CSP and related headers, Gemini `x-goog-api-key`.
+
+### Optimization & a11y
+- Typst compile debounced 400ms; CodeEditor/Preview/AI sidebar and ATS grade are `next/dynamic`.
+- `GET /api/jobs` is paginated and omits `rawDescription`.
+- Tier 1 import uses one `findMany` + `createMany`.
+- Landing keeps AsciiWaves only (no WebGL/gsap). Stats load on the server. Nav uses Lucide. Skip link + mobile drawer.
+
+### Verification (2026-08-12)
+- `npm run lint` — pass
+- `npm run typecheck` — pass
+- `npm run test` — pass (229/229)
+- `npm run build` — pass (local Hanken/JetBrains fonts; `/` 168 kB, `/editor` 152 kB first-load JS)
+- `npx playwright test` — pass (64/64), including `hosted-security.spec.ts`
+
+### Follow-up hardening during verification
+- Restored missing `public/wasm/*.wasm` (git checkout).
+- CSP `connect-src`/`font-src` allow `cdn.jsdelivr.net` for Typst default fonts (was blocking live preview).
+- Landing `StaggeredText` emits real spaces (a11y + Playwright text assertions).
+- Editor AI-collapse persistence ignores mount-time `onResize` races.
+- Remaining API `String(err)` paths sanitized on generate-patches / ATS evaluate.
+
+### Known limitations
+- BYOK keys remain in `localStorage` (CSP-mitigated, not vaulted).
+- Rate limits are in-memory (one Render instance).
+- Clerk/OAuth multi-user is out of scope.
+- Provision Render/Vercel + Postgres after Playwright passes; this work is host-readiness, not the live deploy.
+
+---
+
 ## Current Status: Phase 2 Complete
 
 - **Phase Completed**: Phase 2 (Master Resume Persistence & Evidence Bank Data Layer)

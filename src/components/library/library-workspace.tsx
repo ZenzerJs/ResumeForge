@@ -194,6 +194,12 @@ export function LibraryWorkspace() {
             type: "success",
             message: `Created evidence item "${formData.title}".`,
           });
+        } else {
+          const json = await res.json().catch(() => ({}));
+          setNotification({
+            type: "error",
+            message: json.error || "Failed to save evidence item.",
+          });
         }
       }
     } catch (err) {
@@ -337,7 +343,7 @@ export function LibraryWorkspace() {
       }
     >
       {/* Main Content Area with Header Margin Clearance matching preview (1).webp */}
-      <main className="mx-auto max-w-5xl w-full px-6 pt-8 pb-16 flex-1 flex flex-col gap-8">
+      <div className="mx-auto max-w-5xl w-full px-6 pt-8 pb-16 flex-1 flex flex-col gap-8">
         {/* Page Title Header */}
         <div>
           <h1 className="text-3xl font-extrabold text-white tracking-[-0.03em]">
@@ -368,10 +374,11 @@ export function LibraryWorkspace() {
               </div>
               <button
                 type="button"
+                aria-label="Dismiss notification"
                 onClick={() => setNotification(null)}
-                className="hover:opacity-80 transition-opacity"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-white focus-visible:ring-2 focus-visible:ring-amber-500/60"
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4" aria-hidden />
               </button>
             </motion.div>
           )}
@@ -381,13 +388,19 @@ export function LibraryWorkspace() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           {/* Search Input Box */}
           <div className="relative flex-1 w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <label htmlFor="evidence-search" className="sr-only">
+              Search evidence by title, org, summary, or tags
+            </label>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" aria-hidden />
             <input
-              type="text"
+              id="evidence-search"
+              type="search"
+              name="evidence-search"
+              autoComplete="off"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search evidence by title, org, summary, or tags..."
-              className="w-full h-10 pl-9 pr-4 rounded bg-white text-slate-900 text-xs font-mono placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#ff8c00]"
+              placeholder="Search evidence by title, org, summary, or tags…"
+              className="w-full h-11 pl-9 pr-4 rounded bg-white text-slate-900 text-xs font-mono placeholder:text-slate-500 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00]"
             />
           </div>
 
@@ -398,7 +411,9 @@ export function LibraryWorkspace() {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-[#121929] border border-slate-700 text-slate-200 rounded px-3 py-1.5 text-xs font-mono focus:outline-none focus:border-[#ff8c00]"
+                data-testid="evidence-status-filter"
+                aria-label="Filter evidence by status"
+                className="bg-[#121929] border border-slate-700 text-slate-200 rounded px-3 py-1.5 text-xs font-mono outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00]"
               >
                 <option value="all">All, Verified, Draft, Archived</option>
                 <option value="verified">Verified Only</option>
@@ -441,6 +456,7 @@ export function LibraryWorkspace() {
               return (
                 <div
                   key={item.id}
+                  data-testid="evidence-item-card"
                   className="rounded-xl border border-slate-800 bg-[#121929]/90 hover:border-slate-700 transition-colors p-5 overflow-hidden"
                 >
                   {/* Card Header Row */}
@@ -492,10 +508,20 @@ export function LibraryWorkspace() {
                       <button
                         type="button"
                         onClick={() => openEditModal(item)}
-                        className="text-slate-500 hover:text-white p-1 rounded hover:bg-slate-800 transition-colors ml-1"
+                        className="text-slate-500 hover:text-white p-2 rounded hover:bg-slate-800 transition-colors ml-1 min-h-11 min-w-11 inline-flex items-center justify-center"
                         title="Edit Item"
+                        aria-label="Edit Item"
                       >
                         <Edit2 className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleArchiveItem(item.id)}
+                        className="text-slate-500 hover:text-red-300 p-2 rounded hover:bg-slate-800 transition-colors min-h-11 min-w-11 inline-flex items-center justify-center"
+                        title="Archive Item"
+                        aria-label="Archive Item"
+                      >
+                        <Archive className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </div>
@@ -538,11 +564,11 @@ export function LibraryWorkspace() {
             })}
           </div>
         )}
-      </main>
+      </div>
 
       {/* Modal Dialog for Create/Edit */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
           <div className="w-full max-w-lg rounded-xl border border-slate-800 bg-[#121929] p-6 shadow-2xl">
             <h2 className="text-base font-bold text-white mb-4">
               {editingItem ? "Edit Evidence Item" : "Create Evidence Item"}
@@ -554,7 +580,7 @@ export function LibraryWorkspace() {
                 <select
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-[#ff8c00]"
+                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00]"
                 >
                   <option value="experience">Experience</option>
                   <option value="project">Project</option>
@@ -572,7 +598,7 @@ export function LibraryWorkspace() {
                   required
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-[#ff8c00]"
+                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00]"
                   placeholder="e.g. Software Engineer Intern"
                 />
               </div>
@@ -584,7 +610,7 @@ export function LibraryWorkspace() {
                     type="text"
                     value={formData.organization}
                     onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
-                    className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-[#ff8c00]"
+                    className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00]"
                     placeholder="e.g. Stripe"
                   />
                 </div>
@@ -595,7 +621,7 @@ export function LibraryWorkspace() {
                     type="text"
                     value={formData.dates}
                     onChange={(e) => setFormData({ ...formData, dates: e.target.value })}
-                    className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-[#ff8c00]"
+                    className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00]"
                     placeholder="e.g. Jun 29, 2023"
                   />
                 </div>
@@ -608,7 +634,7 @@ export function LibraryWorkspace() {
                   rows={3}
                   value={formData.verifiedSummary}
                   onChange={(e) => setFormData({ ...formData, verifiedSummary: e.target.value })}
-                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-[#ff8c00]"
+                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00]"
                   placeholder="Detailed summary of verified accomplishment claim..."
                 />
               </div>
@@ -619,7 +645,7 @@ export function LibraryWorkspace() {
                   type="text"
                   value={formData.tagsInput}
                   onChange={(e) => setFormData({ ...formData, tagsInput: e.target.value })}
-                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-[#ff8c00] font-mono"
+                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00] font-mono"
                   placeholder="TypeScript, React, Node.js"
                 />
               </div>
@@ -630,7 +656,7 @@ export function LibraryWorkspace() {
                   rows={3}
                   value={formData.bulletsInput.join("\n")}
                   onChange={(e) => setFormData({ ...formData, bulletsInput: e.target.value.split("\n") })}
-                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-[#ff8c00] font-mono"
+                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00] font-mono"
                   placeholder="Developed high-throughput API endpoints..."
                 />
               </div>

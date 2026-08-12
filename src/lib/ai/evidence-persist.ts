@@ -18,9 +18,10 @@ function normalizeKey(type: string, title: string, organization?: string | null)
  * - Skips exact draft duplicates by (type, title, organization).
  */
 export async function persistDraftEvidenceFromExtract(
-  extract: EvidenceExtractResponse
+  extract: EvidenceExtractResponse,
+  userId?: string
 ): Promise<PersistDraftEvidenceResult> {
-  const existing = await getEvidenceItems();
+  const existing = await getEvidenceItems(undefined, userId);
   const verifiedKeys = new Set(
     existing
       .filter((e) => e.status === "verified")
@@ -56,6 +57,7 @@ export async function persistDraftEvidenceFromExtract(
       verifiedSummary: item.verifiedSummary,
       tags: item.tags || [],
       status: "draft",
+      userId,
       bullets: (item.bullets || []).map((b, idx) => ({
         text: b.text,
         technologies: b.technologies || [],

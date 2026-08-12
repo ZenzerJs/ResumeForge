@@ -6,8 +6,8 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { createJob } from "@/lib/db/jobs";
 import { CreateJobSchema } from "@/lib/jd-parser/types";
+import { getImportAllowlist, isSafeHref, safeFetch, UnsafeUrlError } from "@/lib/security/safe-fetch";
 
 export const DEFAULT_SIMPLIFY_SOURCE_URL =
   process.env.SIMPLIFY_JOBS_URL ||
@@ -24,6 +24,7 @@ export interface ParsedJobRow {
 export interface ImportTier1Input {
   tableMarkdown?: string;
   sourceUrl?: string;
+  userId?: string;
 }
 
 export interface ImportTier1Result {
@@ -199,11 +200,25 @@ export async function importTier1Jobs(input: ImportTier1Input = {}): Promise<Imp
   if (!tableText && (input.sourceUrl || DEFAULT_SIMPLIFY_SOURCE_URL)) {
     const targetUrl = input.sourceUrl || DEFAULT_SIMPLIFY_SOURCE_URL;
     try {
-      const res = await fetch(targetUrl);
+      const res = await safeFetch(
+        targetUrl,
+        { headers: { Accept: "text/plain, text/markdown, */*" } },
+        { allowedHosts: getImportAllowlist(), timeoutMs: 15000 }
+      );
       if (res.ok) {
         tableText = await res.text();
       }
     } catch (err) {
+      if (err instanceof UnsafeUrlError) {
+        return {
+          success: false,
+          createdCount: 0,
+          skippedCount: 0,
+          totalProcessed: 0,
+          data: [],
+          message: err.message,
+        };
+      }
       console.warn(`Failed to fetch Tier 1 jobs from source URL (${targetUrl}):`, err);
     }
   }
@@ -234,27 +249,39 @@ export async function importTier1Jobs(input: ImportTier1Input = {}): Promise<Imp
 
   let createdCount = 0;
   let skippedCount = 0;
-  const createdJobs: any[] = [];
+
+  const existingJobs = await prisma.job.findMany({
+    where: input.userId ? { userId: input.userId } : undefined,
+    select: { company: true, roleTitle: true, notes: true },
+  });
+
+  const isExistingDuplicate = (company: string, roleTitle: string, location: string) =>
+    existingJobs.some((job) => {
+      if (job.company !== company || job.roleTitle !== roleTitle) return false;
+      if (!location) return true;
+      return !job.notes || job.notes.includes(`Location: ${location}`);
+    });
+
+  const seenInBatch = new Set<string>();
+  const payloads: Array<{
+    company: string;
+    roleTitle: string;
+    rawDescription: string;
+    source: string;
+    notes: string;
+    extractedRequirements: string;
+    userId?: string;
+  }> = [];
 
   for (const row of parsedRows) {
-    // Deduplication check: match company + roleTitle + location
-    const existingMatches = await prisma.job.findMany({
-      where: {
-        company: row.company,
-        roleTitle: row.roleTitle,
-      },
-    });
-
-    const isDuplicate = existingMatches.some((job) => {
-      if (!row.location) return true;
-      return !job.notes || job.notes.includes(`Location: ${row.location}`);
-    });
-
-    if (isDuplicate) {
+    const batchKey = `${row.company}::${row.roleTitle}::${row.location}`;
+    if (seenInBatch.has(batchKey) || isExistingDuplicate(row.company, row.roleTitle, row.location)) {
       skippedCount++;
       continue;
     }
+    seenInBatch.add(batchKey);
 
+    const applyUrl = isSafeHref(row.applyUrl) ? row.applyUrl : "";
     const placeholderDescription = `[Pending Import] Full job description text not yet fetched from posting page for ${row.company} — ${row.roleTitle}${row.location ? ` (${row.location})` : ""}. Navigate to the Tailor workspace to paste the complete job description text.`;
 
     const validatedInput = CreateJobSchema.parse({
@@ -267,23 +294,48 @@ export async function importTier1Jobs(input: ImportTier1Input = {}): Promise<Imp
     const notesInfo = [
       `Tier 1 Bulk Import`,
       row.location ? `Location: ${row.location}` : null,
-      row.applyUrl ? `Apply Link: ${row.applyUrl}` : null,
+      applyUrl ? `Apply Link: ${applyUrl}` : null,
       row.datePosted ? `Posted: ${row.datePosted}` : null,
     ]
       .filter(Boolean)
       .join(" | ");
 
-    const created = await createJob({
-      company: validatedInput.company,
-      roleTitle: validatedInput.roleTitle,
+    payloads.push({
+      company: validatedInput.company || row.company,
+      roleTitle: validatedInput.roleTitle || row.roleTitle,
       rawDescription: validatedInput.rawDescription,
       source: "simplify-jobs",
       notes: notesInfo,
+      extractedRequirements: JSON.stringify({
+        requiredSkills: [],
+        preferredSkills: [],
+        domainTerms: [],
+      }),
+      ...(input.userId ? { userId: input.userId } : {}),
     });
-
-    createdJobs.push(created);
-    createdCount++;
   }
+
+  if (payloads.length > 0) {
+    await prisma.$transaction(async (tx) => {
+      await tx.job.createMany({ data: payloads });
+    });
+  }
+
+  createdCount = payloads.length;
+  const createdJobs =
+    payloads.length === 0
+      ? []
+      : await prisma.job.findMany({
+          where: {
+            OR: payloads.map((p) => ({
+              company: p.company,
+              roleTitle: p.roleTitle,
+              notes: p.notes,
+            })),
+          },
+          orderBy: { createdAt: "desc" },
+          take: payloads.length,
+        });
 
   return {
     success: true,

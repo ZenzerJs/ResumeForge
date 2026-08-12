@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, createElement, useMemo, useCallback, ElementType, ReactNode } from "react";
-import { gsap } from "gsap";
 import "./text-type.css";
 
 export interface TextTypeProps {
@@ -39,7 +38,7 @@ export default function TextType({
   hideCursorWhileTyping = false,
   cursorCharacter = "|",
   cursorClassName = "",
-  cursorBlinkDuration = 0.5,
+  cursorBlinkDuration: _cursorBlinkDuration = 0.5,
   textColors = [],
   variableSpeed,
   onSentenceComplete,
@@ -85,19 +84,6 @@ export default function TextType({
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, [startOnVisible]);
-
-  useEffect(() => {
-    if (showCursor && cursorRef.current) {
-      gsap.set(cursorRef.current, { opacity: 1 });
-      gsap.to(cursorRef.current, {
-        opacity: 0,
-        duration: cursorBlinkDuration,
-        repeat: -1,
-        yoyo: true,
-        ease: "power2.inOut",
-      });
-    }
-  }, [showCursor, cursorBlinkDuration]);
 
   useEffect(() => {
     if (!isVisible) return;

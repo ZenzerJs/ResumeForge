@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { POST as extractPOST } from "@/app/api/jobs/extract/route";
 import { POST as jobsPOST } from "@/app/api/jobs/route";
+import { authedRequest, createTestUser } from "./helpers/auth";
 
 describe("Jobs API Endpoint Rejection Path & Zod Validation Tests", () => {
   it("returns 400 Bad Request for empty/malformed extract request", async () => {
@@ -19,12 +20,30 @@ describe("Jobs API Endpoint Rejection Path & Zod Validation Tests", () => {
     expect(json.details).toBeDefined();
   });
 
-  it("returns 400 Bad Request when posting invalid job payload", async () => {
+  it("returns 401 when a guest posts a job", async () => {
     const request = new Request("http://localhost:3000/api/jobs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ company: "Acme", rawDescription: "" }),
+      body: JSON.stringify({ company: "Acme", rawDescription: "TypeScript required." }),
     });
+
+    const response = await jobsPOST(request);
+    expect(response.status).toBe(401);
+    const json = await response.json();
+    expect(json.code).toBe("GUEST_READ_ONLY");
+  });
+
+  it("returns 400 Bad Request when posting invalid job payload", async () => {
+    const { cookie } = await createTestUser();
+    const request = authedRequest(
+      "http://localhost:3000/api/jobs",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company: "Acme", rawDescription: "" }),
+      },
+      cookie
+    );
 
     const response = await jobsPOST(request);
     expect(response.status).toBe(400);

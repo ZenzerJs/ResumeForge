@@ -365,6 +365,15 @@ export function TailorWorkspace() {
     }
   };
 
+  const handleSaveJob = async () => {
+    const id = await ensureJobSaved({ forceUpdate: true });
+    if (id) {
+      setSaveStatus("Job posting saved successfully!");
+    } else {
+      setErrorMessage("Failed to save job posting.");
+    }
+  };
+
   const fetchMatches = async (reqs: JobRequirements) => {
     setIsMatching(true);
     try {
@@ -443,7 +452,7 @@ export function TailorWorkspace() {
 
   return (
     <AppShell variant="tailor">
-      <main className="relative z-10 flex-1 pt-8 pb-12 px-4 md:px-8 max-w-7xl mx-auto w-full">
+      <div className="relative z-10 flex-1 pt-8 pb-12 px-4 md:px-8 max-w-7xl mx-auto w-full">
         <div className="flex justify-between items-end mb-8 gap-4 flex-wrap">
           <div>
             <h1 className="font-page-title text-4xl font-extrabold text-[#ff8c00] tracking-tighter mb-1">Tailor</h1>
@@ -455,12 +464,22 @@ export function TailorWorkspace() {
             type="button"
             onClick={handleGeneratePatches}
             disabled={isGeneratingPatches}
-            className="bg-[#ff8c00] text-black font-bold px-6 py-2.5 rounded font-mono text-xs uppercase hover:shadow-[0_0_15px_rgba(255,140,0,0.4)] transition-all flex items-center gap-2"
+            data-testid="generate-patches-btn"
+            className="bg-[#ff8c00] text-black font-bold px-6 py-2.5 rounded font-mono text-xs uppercase hover:shadow-[0_0_15px_rgba(255,140,0,0.4)] transition-shadow flex items-center gap-2"
           >
             {isGeneratingPatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             Generate AI Patches
           </button>
         </div>
+
+        {(jobIdParam || savedJobId) && (
+          <div
+            data-testid="active-job-header-banner"
+            className="mb-4 rounded-lg border border-amber-800/50 bg-amber-950/30 px-3 py-2 text-xs text-amber-200"
+          >
+            Active job: {company || "Untitled"} — {roleTitle || "Role"}
+          </div>
+        )}
 
         {(errorMessage || patchError || saveStatus) && (
           <div className="mb-4 space-y-2">
@@ -506,21 +525,27 @@ export function TailorWorkspace() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block font-mono text-xs text-slate-400 mb-1">Company</label>
+                  <label htmlFor="tailor-company" className="block font-mono text-xs text-slate-400 mb-1">Company</label>
                   <input
+                    id="tailor-company"
+                    name="company"
                     type="text"
+                    autoComplete="organization"
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
-                    className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t focus:outline-none focus:border-[#ff8c00]"
+                    className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-xs text-slate-400 mb-1">Role</label>
+                  <label htmlFor="tailor-role" className="block font-mono text-xs text-slate-400 mb-1">Role</label>
                   <input
+                    id="tailor-role"
+                    name="role"
                     type="text"
+                    autoComplete="off"
                     value={roleTitle}
                     onChange={(e) => setRoleTitle(e.target.value)}
-                    className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t focus:outline-none focus:border-[#ff8c00]"
+                    className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
                   />
                 </div>
               </div>
@@ -531,6 +556,7 @@ export function TailorWorkspace() {
                     type="button"
                     onClick={handleExtract}
                     disabled={isExtracting}
+                    data-testid="extract-reqs-btn"
                     className="text-xs text-[#4edea3] hover:underline font-mono"
                   >
                     {isExtracting ? "Scanning..." : "Extract Requirements"}
@@ -540,11 +566,14 @@ export function TailorWorkspace() {
                   value={rawDescription}
                   onChange={(e) => setRawDescription(e.target.value)}
                   rows={8}
-                  className="w-full bg-[#060e20] text-slate-200 font-mono text-xs p-4 rounded border border-slate-800 focus:border-[#ff8c00] focus:outline-none resize-none leading-relaxed"
+                  data-testid="jd-textarea"
+                  aria-label="Job description"
+                  className="w-full bg-[#060e20] text-slate-200 font-mono text-xs p-4 rounded border border-slate-800 focus:border-[#ff8c00] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 resize-none leading-relaxed"
                 />
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     type="button"
+                    data-testid="sample-backend-btn"
                     onClick={() => {
                       setCompany("Nova Labs");
                       setRoleTitle("Senior Backend Engineer");
@@ -556,6 +585,7 @@ export function TailorWorkspace() {
                   </button>
                   <button
                     type="button"
+                    data-testid="sample-frontend-btn"
                     onClick={() => {
                       setCompany("WebCraft Systems");
                       setRoleTitle("Frontend Engineer");
@@ -564,6 +594,14 @@ export function TailorWorkspace() {
                     className="text-[10px] font-mono px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-white"
                   >
                     Sample Frontend JD
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="save-job-btn"
+                    onClick={() => void handleSaveJob()}
+                    className="text-[10px] font-mono px-2 py-1 rounded border border-emerald-700/60 text-emerald-300 hover:text-white"
+                  >
+                    Save Job
                   </button>
                 </div>
               </div>
@@ -597,6 +635,7 @@ export function TailorWorkspace() {
                             key={skill}
                             onClick={() => handleRemoveRequirement("required", skill)}
                             title="Click to remove"
+                            data-testid={`req-skill-${skill}`}
                             className={`px-2.5 py-1 bg-[#171f33] rounded text-xs font-mono border flex items-center gap-1.5 ${
                               covered ? "border-[#4edea3]/40 text-slate-300" : "border-red-500/40 text-slate-300"
                             }`}
@@ -610,7 +649,9 @@ export function TailorWorkspace() {
                               {covered ? "check_circle" : "cancel"}
                             </span>
                             {skill}
-                            <X className="h-3 w-3 opacity-50" />
+                            <span data-testid={`remove-term-${skill}`} className="inline-flex">
+                              <X className="h-3 w-3 opacity-50" />
+                            </span>
                           </button>
                         );
                       })}
@@ -730,13 +771,26 @@ export function TailorWorkspace() {
                       {m.isDraft ? " · draft" : ""}
                     </p>
                     <p className="text-xs text-slate-300 line-clamp-2">{m.verifiedSummary}</p>
+                    {m.matchedRequirements.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {m.matchedRequirements.slice(0, 4).map((req) => (
+                          <span
+                            key={req}
+                            data-testid="matched-req-badge"
+                            className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700"
+                          >
+                            {req}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
             </section>
           </div>
         </div>
-      </main>
+      </div>
     </AppShell>
   );
 }

@@ -26,7 +26,7 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
     await expect(twitterCard).toHaveAttribute("content", "summary_large_image");
 
     const themeColor = page.locator('meta[name="theme-color"]');
-    await expect(themeColor).toHaveAttribute("content", "#f59e0b");
+    await expect(themeColor).toHaveAttribute("content", "#ff8c00");
   });
 
   test("3. Manifest and Icon routes serve valid 200 HTTP responses", async ({ request }) => {
@@ -46,7 +46,7 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
     const previewLabel = page.locator("text=WORKSPACE PREVIEW");
     await expect(previewLabel).toBeVisible();
 
-    const disclaimerText = page.locator("text=Illustrative interface — your verified data stays local");
+    const disclaimerText = page.locator("text=Illustrative interface — sample layout only");
     await expect(disclaimerText).toBeVisible();
 
     // Verify proof card contains structural shapes, no fabricated scores (e.g. 87/100)
@@ -59,19 +59,11 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
     await page.waitForLoadState("networkidle");
 
     const activePanel = page.locator('[data-testid="workflow-active-panel"]');
-    await expect(activePanel).toContainText("STEP 01 — IMPORT");
-
-    // Click Step 02 (Ground)
-    const step2Btn = page.locator('[data-testid="workflow-step-btn-ground"]');
-    await expect(step2Btn).toBeVisible();
-    await step2Btn.click();
-    await expect(activePanel).toContainText("STEP 02 — GROUND");
-
-    // Keyboard navigation (Tab & Enter) to Step 03 (Tailor)
-    const step3Btn = page.locator('[data-testid="workflow-step-btn-tailor"]');
-    await step3Btn.focus();
-    await page.keyboard.press("Enter");
-    await expect(activePanel).toContainText("STEP 03 — TAILOR");
+    await expect(activePanel).toContainText("1. IMPORT");
+    await expect(activePanel).toContainText("2. GROUND");
+    await expect(activePanel).toContainText("3. TAILOR");
+    await expect(activePanel).toContainText("4. VERIFY");
+    await expect(activePanel).toContainText("5. APPLY");
   });
 
   test("6. Upload PDF button remains enabled and immediately clickable", async ({ page }) => {

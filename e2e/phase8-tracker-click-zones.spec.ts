@@ -2,15 +2,19 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Task 8.3 & Task 8.6: Tracker Card Click-Zone & Unified Actions E2E Tests", () => {
   test.beforeEach(async ({ page, request }) => {
-    // Seed job with valid apply link
-    await request.post("/api/jobs", {
+    const created = await request.post("/api/jobs", {
       data: {
         company: "Playwright E2E Corp",
         roleTitle: "Senior Automation Engineer",
         rawDescription: "TypeScript, Playwright, CI/CD, Next.js",
-        notes: "Apply Link: https://example.com/jobs/12345",
       },
     });
+    expect(created.ok()).toBeTruthy();
+    const json = await created.json();
+    const patch = await request.patch(`/api/jobs/${json.data.id}`, {
+      data: { notes: "Apply Link: https://example.com/jobs/12345" },
+    });
+    expect(patch.ok()).toBeTruthy();
 
     await page.goto("/tracker");
     await page.waitForSelector("[data-testid^='tracker-job-card-']", { timeout: 15000 });

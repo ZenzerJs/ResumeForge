@@ -6,10 +6,13 @@ import { extractJsonObject, normalizeCoverLetterPayload } from "@/lib/ai/json-re
 import { getEvidenceItems } from "@/lib/db/evidence";
 import { getMasterResume } from "@/lib/db/resumes";
 import { sanitizeError } from "@/lib/ai/redact";
-import { ProviderConfig } from "@/lib/ai/types";
+import { requireUserId } from "@/lib/security/auth-request";
 
 export async function POST(request: Request) {
   try {
+    const userId = await requireUserId(request);
+    if (userId instanceof NextResponse) return userId;
+
     const body = await request.json();
 
     const parseResult = GenerateCoverLetterInputSchema.safeParse(body);
@@ -25,9 +28,9 @@ export async function POST(request: Request) {
     }
 
     const input = parseResult.data;
-    const providerConfig: ProviderConfig = body.providerConfig || {};
+    const providerConfig = input.providerConfig;
 
-    if (!providerConfig.provider || !providerConfig.apiKey) {
+    if (!providerConfig?.provider || (!providerConfig.apiKey && providerConfig.provider !== "custom")) {
       return NextResponse.json(
         {
           success: false,
@@ -38,7 +41,7 @@ export async function POST(request: Request) {
     }
 
     // Fetch active evidence items from database
-    const evidenceItems = await getEvidenceItems();
+    const evidenceItems = await getEvidenceItems(undefined, userId);
     const activeEvidenceItems = evidenceItems.filter((e) => e.status !== "archived");
 
     // Collect all active evidence item and bullet IDs
@@ -52,7 +55,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const master = await getMasterResume();
+    const master = await getMasterResume(userId);
 
     // Invoke BYOK AI Gateway
     const gatewayResult = await generateCoverLetter(

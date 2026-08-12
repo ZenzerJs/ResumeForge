@@ -19,6 +19,7 @@ import {
   isPlaceholderDescription,
 } from "@/lib/ingestion/helpers";
 import type { JobItem } from "@/components/tracker/job-types";
+import { isSafeHref } from "@/lib/security/safe-fetch";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABELS: Record<JobStatus, string> = {
@@ -79,7 +80,7 @@ export function JobListRow({
   const applyUrl = extractApplyUrlFromNotes(job.notes);
   const datePosted = extractPostingDateFromNotes(job.notes);
   const salary = extractSalaryFromNotes(job.notes);
-  const isPlaceholder = isPlaceholderDescription(job.rawDescription);
+  const isPlaceholder = job.isPlaceholder ?? isPlaceholderDescription(job.rawDescription);
   const companyInitial = job.company ? job.company[0].toUpperCase() : "J";
   const hasCoverLetter = Boolean(job.coverLetters && job.coverLetters.length > 0);
 
@@ -150,7 +151,7 @@ export function JobListRow({
                 value={job.status}
                 data-testid={`job-status-select-${job.id}`}
                 onChange={(e) => onStatusChange(job.id, e.target.value as JobStatus)}
-                className="appearance-none rounded-full border border-slate-700 bg-rf-elevated px-2.5 py-1 pr-6 text-[11px] text-rf-meta transition-colors duration-150 focus:border-amber-500/60 focus:outline-none cursor-pointer"
+                className="appearance-none rounded-full border border-slate-700 bg-rf-elevated px-2.5 py-1 pr-6 text-[11px] text-rf-meta transition-colors duration-150 focus:border-amber-500/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 cursor-pointer"
                 aria-label="Job status"
               >
                 {ALL_STATUSES.map((s) => (
@@ -191,7 +192,7 @@ export function JobListRow({
             Tailor Resume
           </Link>
 
-          {applyUrl && applyUrl.startsWith("http") ? (
+          {isSafeHref(applyUrl) ? (
             <a
               href={applyUrl}
               target="_blank"

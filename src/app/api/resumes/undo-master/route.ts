@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { restoreMasterSnapshot } from "@/lib/db/resumes";
 import { sanitizeError } from "@/lib/ai/redact";
+import { requireUserId } from "@/lib/security/auth-request";
 
 const UndoMasterSchema = z.object({
   snapshotId: z.string().min(1, "snapshotId is required"),
@@ -9,6 +10,9 @@ const UndoMasterSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const userId = await requireUserId(request);
+    if (userId instanceof NextResponse) return userId;
+
     const body = await request.json();
     const parseResult = UndoMasterSchema.safeParse(body);
 
@@ -24,7 +28,7 @@ export async function POST(request: Request) {
     }
 
     const { snapshotId } = parseResult.data;
-    const restoredMaster = await restoreMasterSnapshot(snapshotId);
+    const restoredMaster = await restoreMasterSnapshot(snapshotId, userId);
 
     return NextResponse.json({
       success: true,

@@ -6,6 +6,7 @@ import {
   createResume,
   getMasterResume,
 } from "@/lib/db/resumes";
+import { authedRequest, createTestUser } from "./helpers/auth";
 
 describe("Task 7.9: Save as Master + Revert Safety & Snapshot Protocol", () => {
   beforeEach(async () => {
@@ -82,15 +83,26 @@ describe("Task 7.9: Save as Master + Revert Safety & Snapshot Protocol", () => {
 
   it("4. API route blocks unconfirmed save-master requests with 400", async () => {
     const { POST: saveMasterHandler } = await import("@/app/api/resumes/save-master/route");
-
-    const req = new Request("http://localhost/api/resumes/save-master", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        typstSource: "= Unconfirmed Overwrite\n",
-        confirmOverwrite: false,
-      }),
+    const { user, cookie } = await createTestUser();
+    await createResume({
+      title: "Initial Master Resume",
+      typstSource: "= Initial Master Content\n",
+      isMaster: true,
+      userId: user.id,
     });
+
+    const req = authedRequest(
+      "http://localhost/api/resumes/save-master",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          typstSource: "= Unconfirmed Overwrite\n",
+          confirmOverwrite: false,
+        }),
+      },
+      cookie
+    );
 
     const res = await saveMasterHandler(req);
     expect(res.status).toBe(400);
@@ -102,28 +114,28 @@ describe("Task 7.9: Save as Master + Revert Safety & Snapshot Protocol", () => {
   it("5. API route handles confirmed save-master and undo-master flow", async () => {
     const { POST: saveMasterHandler } = await import("@/app/api/resumes/save-master/route");
     const { POST: undoMasterHandler } = await import("@/app/api/resumes/undo-master/route");
+    const { user, cookie } = await createTestUser();
 
-    const master = await getMasterResume();
-    expect(master).not.toBeNull();
-
-    // Set known starting content
     const priorSource = "= Test Master Typst";
     await saveMasterResume({
-      id: master!.id,
       title: "Test Master",
       typstSource: priorSource,
       confirmOverwrite: true,
+      userId: user.id,
     });
 
-    // 1. Confirmed Save
-    const saveReq = new Request("http://localhost/api/resumes/save-master", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        typstSource: "= Save via API\n- Bullet 1\n",
-        confirmOverwrite: true,
-      }),
-    });
+    const saveReq = authedRequest(
+      "http://localhost/api/resumes/save-master",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          typstSource: "= Save via API\n- Bullet 1\n",
+          confirmOverwrite: true,
+        }),
+      },
+      cookie
+    );
 
     const saveRes = await saveMasterHandler(saveReq);
     expect(saveRes.status).toBe(200);
@@ -131,14 +143,17 @@ describe("Task 7.9: Save as Master + Revert Safety & Snapshot Protocol", () => {
     expect(saveJson.success).toBe(true);
     expect(saveJson.snapshotId).toBeDefined();
 
-    // 2. Undo via API
-    const undoReq = new Request("http://localhost/api/resumes/undo-master", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        snapshotId: saveJson.snapshotId,
-      }),
-    });
+    const undoReq = authedRequest(
+      "http://localhost/api/resumes/undo-master",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          snapshotId: saveJson.snapshotId,
+        }),
+      },
+      cookie
+    );
 
     const undoRes = await undoMasterHandler(undoReq);
     expect(undoRes.status).toBe(200);

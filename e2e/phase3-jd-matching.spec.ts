@@ -38,7 +38,10 @@ test.describe("Phase 3 Job Description Parser & Evidence Matcher E2E Tests", () 
     expect(jobsJson.data.length).toBeGreaterThan(0);
 
     const savedJob = jobsJson.data[0];
-    expect(savedJob.rawDescription).toContain("Senior Backend Engineer");
+    expect(savedJob.rawDescription).toBeUndefined();
+    const detailRes = await request.get(`/api/jobs/${savedJob.id}`);
+    const detailJson = await detailRes.json();
+    expect(detailJson.data.rawDescription).toContain("Senior Backend Engineer");
     expect(savedJob.extractedRequirements.requiredSkills).not.toContain("Python");
     expect(savedJob.extractedRequirements.requiredSkills).toContain("PostgreSQL");
   });
@@ -96,10 +99,13 @@ test.describe("Phase 3 Job Description Parser & Evidence Matcher E2E Tests", () 
     const jobsJson = await jobsRes.json();
     expect(jobsJson.success).toBe(true);
 
-    const savedJob = jobsJson.data.find((j: { rawDescription: string }) =>
-      j.rawDescription.includes("Frontend Engineer")
+    const savedJob = jobsJson.data.find((j: { id: string; roleTitle?: string }) =>
+      (j.roleTitle || "").includes("Frontend")
     );
     expect(savedJob).toBeDefined();
+    const detailRes = await request.get(`/api/jobs/${savedJob.id}`);
+    const detailJson = await detailRes.json();
+    expect(detailJson.data.rawDescription).toContain("Frontend Engineer");
     expect(savedJob.extractedRequirements.requiredSkills).toContain("TypeScript");
     expect(savedJob.extractedRequirements.requiredSkills).toContain("React");
   });

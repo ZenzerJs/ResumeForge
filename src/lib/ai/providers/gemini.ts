@@ -4,6 +4,13 @@ import { stripCodeFences } from "../utils";
 import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from "../repair-schema";
 import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
 
+function geminiHeaders(apiKey: string): HeadersInit {
+  return {
+    "Content-Type": "application/json",
+    "x-goog-api-key": apiKey,
+  };
+}
+
 export async function testGeminiConnection(config: ProviderConfig): Promise<TestConnectionResult> {
   const apiKey = config.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
   const baseUrl = (config.baseUrl?.trim() || process.env.GEMINI_BASE_URL?.trim() || "https://generativelanguage.googleapis.com").replace(/\/+$/, "");
@@ -18,10 +25,11 @@ export async function testGeminiConnection(config: ProviderConfig): Promise<Test
 
   const startTime = Date.now();
   try {
-    const res = await fetch(`${baseUrl}/v1beta/models?key=${apiKey}`, {
+    const res = await fetch(`${baseUrl}/v1beta/models`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
       },
       signal: AbortSignal.timeout(5000),
     });
@@ -83,10 +91,10 @@ export async function generateGeminiPatches(
 
   try {
     const res = await fetch(
-      `${baseUrl}/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      `${baseUrl}/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: geminiHeaders(apiKey),
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemPrompt }] },
           contents: [{ parts: [{ text: userPrompt }] }],
@@ -140,10 +148,10 @@ export async function generateGeminiQualitativeReview(
 
   try {
     const res = await fetch(
-      `${baseUrl}/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      `${baseUrl}/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: geminiHeaders(apiKey),
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemPrompt }] },
           contents: [{ parts: [{ text: userPrompt }] }],
@@ -197,10 +205,10 @@ export async function generateGeminiCoverLetter(
 
   try {
     const res = await fetch(
-      `${baseUrl}/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      `${baseUrl}/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: geminiHeaders(apiKey),
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemPrompt }] },
           contents: [{ parts: [{ text: userPrompt }] }],
@@ -254,10 +262,10 @@ export async function convertGeminiPdfTextToTypst(
 
   try {
     const res = await fetch(
-      `${baseUrl}/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      `${baseUrl}/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: geminiHeaders(apiKey),
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemPrompt }] },
           contents: [{ parts: [{ text: userPrompt }] }],
@@ -311,10 +319,10 @@ export async function repairTypstWithGemini(
 
   try {
     const res = await fetch(
-      `${baseUrl}/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      `${baseUrl}/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: geminiHeaders(apiKey),
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemPrompt }] },
           contents: [{ parts: [{ text: userPrompt }] }],

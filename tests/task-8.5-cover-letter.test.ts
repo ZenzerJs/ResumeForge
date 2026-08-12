@@ -6,14 +6,19 @@ import { verifyCoverLetterGrounding } from "@/lib/ai/cover-letter-verifier";
 import { buildCoverLetterSystemPrompt, buildCoverLetterUserPrompt } from "@/lib/ai/cover-letter-prompt";
 import { POST as generateRoute } from "@/app/api/cover-letters/generate/route";
 import { GET as getByIdRoute } from "@/app/api/cover-letters/[id]/route";
-import { NextRequest } from "next/server";
+import { authedNextRequest, createTestUser } from "./helpers/auth";
 
 describe("Task 8.5: Cover Letter Data Model & Evidence-Backed Drafting", () => {
   let testJobId: string;
   let testMasterResumeId: string;
   let testVariantId: string;
+  let cookie: string;
+  let userId: string;
 
   beforeEach(async () => {
+    const auth = await createTestUser();
+    cookie = auth.cookie;
+    userId = auth.user.id;
     // Create master resume
     const master = await prisma.resume.create({
       data: {
@@ -21,6 +26,7 @@ describe("Task 8.5: Cover Letter Data Model & Evidence-Backed Drafting", () => {
         typstSource: "#let name = [Jane Candidate]\n#resume-section('Skills')\nPython, Node.js, Docker, PostgreSQL",
         isMaster: true,
         isProtected: true,
+        userId,
       },
     });
     testMasterResumeId = master.id;
@@ -30,6 +36,7 @@ describe("Task 8.5: Cover Letter Data Model & Evidence-Backed Drafting", () => {
       company: "Acme Corp",
       roleTitle: "Senior Backend Engineer",
       rawDescription: "Seeking a Backend Engineer with 5+ years managing Kubernetes clusters and Docker.",
+      userId,
     });
     testJobId = job.id;
 
@@ -79,7 +86,7 @@ describe("Task 8.5: Cover Letter Data Model & Evidence-Backed Drafting", () => {
   });
 
   it("2. Malformed provider output is rejected and is not persisted", async () => {
-    const req = new NextRequest("http://localhost:3000/api/cover-letters/generate", {
+    const req = authedNextRequest("http://localhost:3000/api/cover-letters/generate", {
       method: "POST",
       body: JSON.stringify({
         jobId: testJobId,
@@ -89,7 +96,7 @@ describe("Task 8.5: Cover Letter Data Model & Evidence-Backed Drafting", () => {
           apiKey: "sk-proj-valid-test-key-12345",
         },
       }),
-    });
+    }, cookie);
 
     // Mock AI gateway to return valid HTTP 200 response with malformed non-JSON LLM text content
     vi.spyOn(global, "fetch").mockResolvedValueOnce(
@@ -117,7 +124,7 @@ describe("Task 8.5: Cover Letter Data Model & Evidence-Backed Drafting", () => {
   });
 
   it("3. Missing provider configuration returns the expected safe error", async () => {
-    const req = new NextRequest("http://localhost:3000/api/cover-letters/generate", {
+    const req = authedNextRequest("http://localhost:3000/api/cover-letters/generate", {
       method: "POST",
       body: JSON.stringify({
         jobId: testJobId,
@@ -127,7 +134,7 @@ describe("Task 8.5: Cover Letter Data Model & Evidence-Backed Drafting", () => {
           // apiKey intentionally missing
         },
       }),
-    });
+    }, cookie);
 
     const res = await generateRoute(req);
     const json = await res.json();
@@ -197,6 +204,7 @@ describe("Task 8.5: Cover Letter Data Model & Evidence-Backed Drafting", () => {
         verifiedSummary: "Built backend services using Docker and Node.js.",
         tags: JSON.stringify(["Docker", "Node.js"]),
         status: "verified",
+        userId,
         bullets: {
           create: [
             {
@@ -232,7 +240,7 @@ describe("Task 8.5: Cover Letter Data Model & Evidence-Backed Drafting", () => {
       )
     );
 
-    const req = new NextRequest("http://localhost:3000/api/cover-letters/generate", {
+    const req = authedNextRequest("http://localhost:3000/api/cover-letters/generate", {
       method: "POST",
       body: JSON.stringify({
         jobId: testJobId,
@@ -242,7 +250,7 @@ describe("Task 8.5: Cover Letter Data Model & Evidence-Backed Drafting", () => {
           apiKey: "sk-proj-test-valid-key-99999",
         },
       }),
-    });
+    }, cookie);
 
     const res = await generateRoute(req);
     const json = await res.json();
@@ -271,7 +279,7 @@ describe("Task 8.5: Cover Letter Data Model & Evidence-Backed Drafting", () => {
       },
     });
 
-    const req = new NextRequest(`http://localhost:3000/api/cover-letters/${createdDraft.id}`);
+    const req = authedNextRequest(`http://localhost:3000/api/cover-letters/${createdDraft.id}`, {}, cookie);
     const res = await getByIdRoute(req, { params: Promise.resolve({ id: createdDraft.id }) });
     const json = await res.json();
 
@@ -307,7 +315,7 @@ describe("Task 8.5: Cover Letter Data Model & Evidence-Backed Drafting", () => {
       )
     );
 
-    const req = new NextRequest("http://localhost:3000/api/cover-letters/generate", {
+    const req = authedNextRequest("http://localhost:3000/api/cover-letters/generate", {
       method: "POST",
       body: JSON.stringify({
         jobId: testJobId,
@@ -317,7 +325,7 @@ describe("Task 8.5: Cover Letter Data Model & Evidence-Backed Drafting", () => {
           apiKey: "sk-proj-valid-key-88888",
         },
       }),
-    });
+    }, cookie);
 
     await generateRoute(req);
 

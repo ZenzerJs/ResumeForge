@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
+import { sanitizeError } from "@/lib/ai/redact";
 
 const ExtractRequestSchema = z.object({
-  rawDescription: z.string().min(1, "Job description text is required"),
+  rawDescription: z.string().min(1, "Job description text is required").max(200_000),
 });
 
 export async function POST(request: Request) {
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, data: extracted });
   } catch (err) {
     return NextResponse.json(
-      { success: false, error: "Failed to extract requirements", message: String(err) },
+      { success: false, error: "Failed to extract requirements", message: sanitizeError(err) },
       { status: 500 }
     );
   }

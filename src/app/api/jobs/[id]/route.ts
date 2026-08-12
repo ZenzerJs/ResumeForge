@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getJobById, updateJob } from "@/lib/db/jobs";
+import { deleteJob, getJobById, updateJob } from "@/lib/db/jobs";
 import { JobRequirementsSchema } from "@/lib/jd-parser/types";
 import { sanitizeError } from "@/lib/ai/redact";
+import { getRequestUserId, requireUserId } from "@/lib/security/auth-request";
 
 const UpdateJobSchema = z.object({
   company: z.string().optional(),
@@ -15,12 +16,19 @@ const UpdateJobSchema = z.object({
 });
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getRequestUserId(request);
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, error: "Job posting not found" },
+        { status: 404 }
+      );
+    }
     const { id } = await params;
-    const job = await getJobById(id);
+    const job = await getJobById(id, userId);
 
     if (!job) {
       return NextResponse.json(
@@ -43,6 +51,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await requireUserId(request);
+    if (userId instanceof NextResponse) return userId;
+
     const { id } = await params;
     const body = await request.json();
 
@@ -58,7 +69,7 @@ export async function PATCH(
       );
     }
 
-    const updatedJob = await updateJob(id, validation.data);
+    const updatedJob = await updateJob(id, validation.data, userId);
     if (!updatedJob) {
       return NextResponse.json(
         { success: false, error: "Job posting not found" },
@@ -70,6 +81,32 @@ export async function PATCH(
   } catch (err) {
     return NextResponse.json(
       { success: false, error: "Failed to update job", message: sanitizeError(err) },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const userId = await requireUserId(request);
+    if (userId instanceof NextResponse) return userId;
+
+    const { id } = await params;
+    const deleted = await deleteJob(id, userId);
+    if (!deleted) {
+      return NextResponse.json(
+        { success: false, error: "Job posting not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true, message: "Job posting deleted" });
+  } catch (err) {
+    return NextResponse.json(
+      { success: false, error: "Failed to delete job", message: sanitizeError(err) },
       { status: 500 }
     );
   }

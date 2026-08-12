@@ -45,6 +45,7 @@
 
   html {
     scroll-behavior: smooth;
+    color-scheme: dark;
   }
 
   body {
@@ -53,6 +54,7 @@
     margin: 0;
     padding: 0;
     font-feature-settings: "kern" 1, "liga" 1;
+    touch-action: manipulation;
   }
 
   /* Smooth scrollbar */
@@ -198,8 +200,16 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    .skeleton-pulse,
     .animate-marquee {
       animation: none !important;
+    }
+
+    .animate-marquee {
       width: 100% !important;
       flex-wrap: wrap !important;
       justify-content: center !important;

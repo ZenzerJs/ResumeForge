@@ -1,17 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchAndCacheJobFullText } from "@/lib/ingestion/tier2-fetcher";
 import { sanitizeError } from "@/lib/ai/redact";
+import { getJobById } from "@/lib/db/jobs";
+import { requireUserId } from "@/lib/security/auth-request";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await requireUserId(req);
+    if (userId instanceof NextResponse) return userId;
+
     const { id } = await params;
     if (!id) {
       return NextResponse.json(
         { success: false, error: "Job ID is required" },
         { status: 400 }
+      );
+    }
+
+    const owned = await getJobById(id, userId);
+    if (!owned) {
+      return NextResponse.json(
+        { success: false, error: "Job posting not found" },
+        { status: 404 }
       );
     }
 

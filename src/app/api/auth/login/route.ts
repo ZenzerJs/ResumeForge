@@ -1,0 +1,59 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { normalizeEmail, verifyPassword } from "@/lib/security/passwords";
+import {
+  buildSessionCookie,
+  createSessionToken,
+  getAppAccessSecret,
+} from "@/lib/security/session";
+
+const LoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1).max(200),
+});
+
+export async function POST(request: Request) {
+  if (!getAppAccessSecret()) {
+    return NextResponse.json(
+      { success: false, error: "Server is missing APP_ACCESS_SECRET" },
+      { status: 503 }
+    );
+  }
+
+  let raw: unknown = {};
+  const contentType = request.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    raw = await request.json().catch(() => ({}));
+  } else {
+    const form = await request.formData().catch(() => null);
+    raw = {
+      email: String(form?.get("email") || ""),
+      password: String(form?.get("password") || ""),
+    };
+  }
+
+  const parsed = LoginSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ success: false, error: "Invalid email or password" }, { status: 401 });
+  }
+
+  const email = normalizeEmail(parsed.data.email);
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
+    return NextResponse.json({ success: false, error: "Invalid email or password" }, { status: 401 });
+  }
+
+  const token = await createSessionToken(user.id);
+  if (!token) {
+    return NextResponse.json({ success: false, error: "Unable to create session" }, { status: 500 });
+  }
+
+  const secure = new URL(request.url).protocol === "https:";
+  const response = NextResponse.json({
+    success: true,
+    data: { id: user.id, email: user.email },
+  });
+  response.headers.set("Set-Cookie", buildSessionCookie(token, secure));
+  return response;
+}

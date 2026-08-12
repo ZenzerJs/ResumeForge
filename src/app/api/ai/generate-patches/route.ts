@@ -3,9 +3,10 @@ import { z } from "zod";
 import { ProviderConfigSchema } from "@/lib/ai/types";
 import { generatePatchProposals } from "@/lib/ai/gateway";
 import { PatchResponseSchema, verifyEvidenceCitations } from "@/lib/ai/patch-schema";
-import { getMasterResume, saveMasterResume } from "@/lib/db/resumes";
+import { getMasterResume } from "@/lib/db/resumes";
 import { getEvidenceItems } from "@/lib/db/evidence";
 import { sanitizeError } from "@/lib/ai/redact";
+import { requireUserId } from "@/lib/security/auth-request";
 
 const GeneratePatchesRequestSchema = z.object({
   providerConfig: ProviderConfigSchema,
@@ -36,6 +37,9 @@ const GeneratePatchesRequestSchema = z.object({
  */
 export async function POST(request: Request) {
   try {
+    const userId = await requireUserId(request);
+    if (userId instanceof NextResponse) return userId;
+
     const body = await request.json();
     const parseResult = GeneratePatchesRequestSchema.safeParse(body);
 
@@ -48,20 +52,16 @@ export async function POST(request: Request) {
 
     const { providerConfig, jobRequirements, tailorFeedback } = parseResult.data;
 
-    // Fetch master resume (READ-ONLY — Amendment 3)
-    let masterResume = await getMasterResume();
+    const masterResume = await getMasterResume(userId);
     if (!masterResume) {
-      const defaultSource = `#let resume-section(title) = [ === #title ]\n#resume-section("Skills")\nLanguages: TypeScript, Node.js, Python, PostgreSQL, Docker, Kubernetes\n#resume-section("Experience")\n*Senior Software Engineer* (2020 - Present)\n- Built microservices using Go, Python, and PostgreSQL.\n- Deployed containerized applications with Docker and Kubernetes.\n`;
-      const saveRes = await saveMasterResume({
-        title: "Master Resume",
-        typstSource: defaultSource,
-        confirmOverwrite: true,
-      });
-      masterResume = saveRes.data;
+      return NextResponse.json(
+        { success: false, error: "Master resume not found. Save a master resume before generating patches." },
+        { status: 404 }
+      );
     }
 
     // Fetch active evidence items (exclude archived)
-    const allEvidence = await getEvidenceItems();
+    const allEvidence = await getEvidenceItems(undefined, userId);
     let activeEvidence = allEvidence.filter((e) => e.status !== "archived");
 
     if (activeEvidence.length === 0) {
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
     // Generate patches via BYOK AI Gateway
     const result = await generatePatchProposals({
       providerConfig,
-      masterTypst: masterResume!.typstSource,
+      masterTypst: masterResume.typstSource,
       jobRequirements,
       evidenceItems: activeEvidence,
       tailorFeedback,
@@ -141,7 +141,9 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: `AI returned a response that did not match the required patch schema. This can happen if the model doesn't support structured JSON output. Try a different model or provider. Details: ${err instanceof Error ? err.message : String(err)}`,
+          error: sanitizeError(
+            `AI returned a response that did not match the required patch schema. This can happen if the model doesn't support structured JSON output. Try a different model or provider. Details: ${err instanceof Error ? err.message : String(err)}`
+          ),
         },
         { status: 422 }
       );
@@ -160,7 +162,7 @@ export async function POST(request: Request) {
         verified: verificationResult.verified,
         rejected: verificationResult.rejected,
         gaps: verificationResult.gaps,
-        masterResumeId: masterResume!.id,
+        masterResumeId: masterResume.id,
       },
     });
   } catch (err) {

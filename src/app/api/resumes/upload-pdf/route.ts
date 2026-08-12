@@ -5,9 +5,20 @@ import { convertPdfTextToTypst } from "@/lib/ai/gateway";
 import { ProviderConfig, ProviderConfigSchema } from "@/lib/ai/types";
 import { sanitizeTypstSource } from "@/lib/typst/sanitizer";
 import { ensureTypstLinks } from "@/lib/typst/ensure-links";
+import { sanitizeError } from "@/lib/ai/redact";
+import { requireUserId } from "@/lib/security/auth-request";
+
+const MAX_PDF_BYTES = 10 * 1024 * 1024;
+
+function isPdfMagic(buffer: Buffer): boolean {
+  return buffer.subarray(0, 5).toString("utf8") === "%PDF-";
+}
 
 export async function POST(request: Request) {
   try {
+    const userId = await requireUserId(request);
+    if (userId instanceof NextResponse) return userId;
+
     const contentType = request.headers.get("content-type") || "";
 
     let buffer: Buffer | null = null;
@@ -23,6 +34,13 @@ export async function POST(request: Request) {
         return NextResponse.json(
           { success: false, error: "No PDF file provided in formData 'file' field" },
           { status: 400 }
+        );
+      }
+
+      if (file.size > MAX_PDF_BYTES) {
+        return NextResponse.json(
+          { success: false, error: "PDF exceeds the 10 MB upload limit" },
+          { status: 413 }
         );
       }
 
@@ -61,7 +79,13 @@ export async function POST(request: Request) {
       if (body.pdfBase64) {
         const base64Data = body.pdfBase64.replace(/^data:application\/pdf;base64,/, "");
         buffer = Buffer.from(base64Data, "base64");
-      } else if (body.rawText) {
+      } else if (typeof body.rawText === "string") {
+        if (body.rawText.length > 200_000) {
+          return NextResponse.json(
+            { success: false, error: "rawText exceeds the 200 KB limit" },
+            { status: 413 }
+          );
+        }
         rawTextFromPayload = body.rawText;
       }
     }
@@ -85,6 +109,18 @@ export async function POST(request: Request) {
     let pageCount = 1;
 
     if (buffer) {
+      if (buffer.length > MAX_PDF_BYTES) {
+        return NextResponse.json(
+          { success: false, error: "PDF exceeds the 10 MB upload limit" },
+          { status: 413 }
+        );
+      }
+      if (!isPdfMagic(buffer)) {
+        return NextResponse.json(
+          { success: false, error: "File is not a valid PDF" },
+          { status: 400 }
+        );
+      }
       const parsedPdf = await parsePdfBuffer(buffer);
       if (!parsedPdf.text || parsedPdf.text.trim().length === 0) {
         return NextResponse.json(
@@ -160,6 +196,7 @@ export async function POST(request: Request) {
       title,
       typstSource,
       isMaster: false,
+      userId,
     });
 
     return NextResponse.json(
@@ -178,7 +215,7 @@ export async function POST(request: Request) {
       {
         success: false,
         error: "Failed to parse and upload PDF resume",
-        message: String(err),
+        message: sanitizeError(err),
       },
       { status: 500 }
     );

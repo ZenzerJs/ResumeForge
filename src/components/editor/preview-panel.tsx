@@ -2,9 +2,14 @@
 
 import React, { useState } from "react";
 import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2, BarChart3, Sparkles } from "lucide-react";
+import dynamic from "next/dynamic";
 import { compileTypstToPdf } from "@/lib/typst/compiler";
-import { AtsScorePanel } from "@/components/tailor/ats-score-panel";
 import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
+
+const AtsScorePanel = dynamic(
+  () => import("@/components/tailor/ats-score-panel").then((m) => ({ default: m.AtsScorePanel })),
+  { ssr: false }
+);
 
 interface PreviewPanelProps {
   svg: string | null;
@@ -218,7 +223,7 @@ export function PreviewPanel({
 
         {/* Paper Sheet Preview Container */}
         {svg ? (
-          <div className="w-full max-w-[850px] rounded-sm bg-white p-4 sm:p-8 shadow-md border border-slate-200 transition-all">
+          <div className="w-full max-w-[850px] rounded-sm bg-white p-4 sm:p-8 shadow-md border border-slate-200">
             <div
               data-testid="typst-preview-svg"
               className="typst-preview-svg w-full overflow-hidden [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-w-full"

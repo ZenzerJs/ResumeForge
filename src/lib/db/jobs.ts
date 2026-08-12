@@ -1,5 +1,11 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { JobRequirements, JobRequirementsSchema } from "@/lib/jd-parser/types";
+import { extractPostingDateFromNotes, isPlaceholderDescription } from "@/lib/ingestion/helpers";
+import {
+  filterByPostedWithin,
+  type PostedWithin,
+} from "@/lib/jobs/posted-within";
 
 export type JobStatus = "SAVED" | "APPLIED" | "INTERVIEWING" | "OFFER" | "REJECTED" | "ARCHIVED";
 
@@ -12,6 +18,7 @@ export interface CreateJobInput {
   status?: JobStatus;
   appliedAt?: Date | string | null;
   notes?: string | null;
+  userId?: string;
 }
 
 export interface UpdateJobInput {
@@ -39,6 +46,7 @@ export async function createJob(input: CreateJobInput) {
       status: input.status || "SAVED",
       appliedAt: input.appliedAt ? new Date(input.appliedAt) : null,
       notes: input.notes || null,
+      userId: input.userId,
     },
     include: {
       variants: {
@@ -56,8 +64,10 @@ export async function createJob(input: CreateJobInput) {
   };
 }
 
-export async function updateJob(id: string, input: UpdateJobInput) {
-  const existing = await prisma.job.findUnique({ where: { id } });
+export async function updateJob(id: string, input: UpdateJobInput, userId?: string) {
+  const existing = await prisma.job.findFirst({
+    where: { id, ...(userId ? { userId } : {}) },
+  });
   if (!existing) return null;
 
   const dataToUpdate: Record<string, unknown> = {};
@@ -99,17 +109,20 @@ export async function updateJob(id: string, input: UpdateJobInput) {
   };
 }
 
-export async function getJobs() {
+const jobListInclude = {
+  variants: {
+    select: { id: true, variantTitle: true, status: true, createdAt: true },
+  },
+  coverLetters: {
+    select: { id: true, title: true, status: true, createdAt: true },
+  },
+} as const;
+
+export async function getJobs(userId?: string) {
   const jobs = await prisma.job.findMany({
+    where: userId ? { userId } : undefined,
     orderBy: { createdAt: "desc" },
-    include: {
-      variants: {
-        select: { id: true, variantTitle: true, status: true, createdAt: true },
-      },
-      coverLetters: {
-        select: { id: true, title: true, status: true, createdAt: true },
-      },
-    },
+    include: jobListInclude,
   });
 
   return jobs.map((job) => ({
@@ -118,9 +131,77 @@ export async function getJobs() {
   }));
 }
 
-export async function getJobById(id: string) {
-  const job = await prisma.job.findUnique({
-    where: { id },
+export interface JobListQuery {
+  page?: number;
+  limit?: number;
+  q?: string;
+  status?: JobStatus | JobStatus[] | "ALL";
+  postedWithin?: PostedWithin;
+  userId?: string;
+}
+
+export async function getJobsList(query: JobListQuery = {}) {
+  const page = Math.max(1, query.page ?? 1);
+  const limit = Math.min(100, Math.max(1, query.limit ?? 40));
+  const where: Prisma.JobWhereInput = {};
+  if (query.userId) where.userId = query.userId;
+
+  if (query.status && query.status !== "ALL") {
+    const statuses = Array.isArray(query.status) ? query.status : [query.status];
+    where.status = { in: statuses };
+  }
+
+  if (query.q?.trim()) {
+    const q = query.q.trim();
+    where.OR = [
+      { company: { contains: q, mode: "insensitive" } },
+      { roleTitle: { contains: q, mode: "insensitive" } },
+      { notes: { contains: q, mode: "insensitive" } },
+      { rawDescription: { contains: q, mode: "insensitive" } },
+    ];
+  }
+
+  const jobs = await prisma.job.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    include: jobListInclude,
+  });
+
+  const mapped = jobs.map((job) => {
+    const { rawDescription, ...rest } = job;
+    return {
+      ...rest,
+      extractedRequirements: parseRequirementsJson(job.extractedRequirements),
+      isPlaceholder: isPlaceholderDescription(rawDescription),
+    };
+  });
+
+  const postedWithin = query.postedWithin ?? "all";
+  const filtered =
+    postedWithin === "all"
+      ? mapped
+      : filterByPostedWithin(
+          mapped,
+          postedWithin,
+          (j) => {
+            const raw = extractPostingDateFromNotes(j.notes)?.trim() || null;
+            if (!raw || /^apply$/i.test(raw)) return null;
+            return raw;
+          },
+          (j) => j.createdAt
+        );
+
+  const total = filtered.length;
+  const start = (page - 1) * limit;
+  return {
+    data: filtered.slice(start, start + limit),
+    meta: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+  };
+}
+
+export async function getJobById(id: string, userId?: string) {
+  const job = await prisma.job.findFirst({
+    where: { id, ...(userId ? { userId } : {}) },
     include: {
       variants: {
         select: { id: true, variantTitle: true, status: true, createdAt: true },
@@ -137,6 +218,15 @@ export async function getJobById(id: string) {
     ...job,
     extractedRequirements: parseRequirementsJson(job.extractedRequirements),
   };
+}
+
+export async function deleteJob(id: string, userId?: string) {
+  const existing = await prisma.job.findFirst({
+    where: { id, ...(userId ? { userId } : {}) },
+  });
+  if (!existing) return null;
+  await prisma.job.delete({ where: { id } });
+  return existing;
 }
 
 function parseRequirementsJson(jsonStr: string): JobRequirements {

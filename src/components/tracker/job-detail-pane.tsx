@@ -27,7 +27,7 @@ import {
 } from "@/lib/jobs/evidence-match-checklist";
 import type { EvidenceItemWithBullets } from "@/lib/matching/matcher";
 import type { JobItem } from "@/components/tracker/job-types";
-import { cn } from "@/lib/utils";
+import { isSafeHref } from "@/lib/security/safe-fetch";
 
 const STATUS_LABELS: Record<JobStatus, string> = {
   SAVED: "Saved",
@@ -73,14 +73,35 @@ export function JobDetailPane({
 }: JobDetailPaneProps) {
   const [evidence, setEvidence] = useState<EvidenceItemWithBullets[]>([]);
   const [evidenceLoaded, setEvidenceLoaded] = useState(false);
+  const [detailJob, setDetailJob] = useState<JobItem>(job);
 
-  const location = extractLocationFromNotes(job.notes);
-  const applyUrl = extractApplyUrlFromNotes(job.notes);
-  const datePosted = extractPostingDateFromNotes(job.notes);
-  const salary = extractSalaryFromNotes(job.notes);
-  const isPlaceholder = isPlaceholderDescription(job.rawDescription);
-  const companyInitial = job.company ? job.company[0].toUpperCase() : "J";
-  const hasCoverLetter = Boolean(job.coverLetters && job.coverLetters.length > 0);
+  useEffect(() => {
+    setDetailJob(job);
+    if (job.rawDescription) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/jobs/${job.id}`);
+        const json = await res.json();
+        if (!cancelled && res.ok && json.success) {
+          setDetailJob({ ...job, ...json.data });
+        }
+      } catch {
+        // keep slim list row
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [job]);
+
+  const location = extractLocationFromNotes(detailJob.notes);
+  const applyUrl = extractApplyUrlFromNotes(detailJob.notes);
+  const datePosted = extractPostingDateFromNotes(detailJob.notes);
+  const salary = extractSalaryFromNotes(detailJob.notes);
+  const isPlaceholder = isPlaceholderDescription(detailJob.rawDescription);
+  const companyInitial = detailJob.company ? detailJob.company[0].toUpperCase() : "J";
+  const hasCoverLetter = Boolean(detailJob.coverLetters && detailJob.coverLetters.length > 0);
 
   useEffect(() => {
     let cancelled = false;
@@ -173,18 +194,18 @@ export function JobDetailPane({
                   href={`/tailor?jobId=${job.id}&tab=cover-letter`}
                   data-testid={coverTestId}
                   onClick={() => sessionStorage.setItem("resumeforge_active_job_id", job.id)}
-                  className="px-4 py-2 rounded bg-transparent border border-outline text-on-surface font-section-label text-xs hover:border-primary hover:text-primary transition-all flex items-center gap-2"
+                  className="px-4 py-2 rounded bg-transparent border border-outline text-on-surface font-section-label text-xs hover:border-primary hover:text-primary transition-colors flex items-center gap-2"
                 >
                   <FileText className="w-4 h-4" />
                   {hasCoverLetter ? "Open Cover Letter" : "Generate Cover Letter"}
                 </Link>
 
-                {applyUrl && applyUrl.startsWith("http") ? (
+                {isSafeHref(applyUrl) ? (
                   <a
                     href={applyUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-4 py-2 rounded bg-surface-variant border border-transparent text-on-surface font-section-label text-xs hover:border-outline-variant transition-all flex items-center gap-2"
+                    className="px-4 py-2 rounded bg-surface-variant border border-transparent text-on-surface font-section-label text-xs hover:border-outline-variant transition-colors flex items-center gap-2"
                   >
                     Open Posting <ExternalLink className="w-4 h-4" />
                   </a>
@@ -272,19 +293,23 @@ export function JobDetailPane({
                 <h3 className="font-section-label text-xs text-on-surface-variant mb-3 border-b border-outline-variant/50 pb-2 uppercase tracking-widest">
                   NOTES
                 </h3>
+                <label htmlFor={`notes-${job.id}`} className="sr-only">
+                  Job notes
+                </label>
                 <textarea
+                  id={`notes-${job.id}`}
                   data-testid={`notes-textarea-${job.id}`}
                   value={notesValue}
                   onChange={(e) => onNotesChange(job.id, e.target.value)}
-                  className="w-full bg-background border border-outline-variant rounded p-3 text-sm font-mono-data text-on-surface focus:border-primary focus:ring-1 focus:ring-primary transition-all resize-y min-h-[120px] mb-3"
-                  placeholder="Add custom notes here..."
+                  className="w-full bg-background border border-outline-variant rounded p-3 text-sm font-mono-data text-on-surface outline-none focus-visible:ring-2 focus-visible:ring-primary transition-colors resize-y min-h-[120px] mb-3"
+                  placeholder="Add custom notes here…"
                 />
                 <button
                   type="button"
                   data-testid={`notes-save-btn-${job.id}`}
                   disabled={isSavingNotes}
                   onClick={() => onSaveNotes(job.id)}
-                  className="px-3 py-1.5 rounded bg-surface-variant border border-outline text-on-surface text-xs font-mono-data self-start hover:border-primary hover:text-primary transition-all flex items-center gap-1 disabled:opacity-50"
+                  className="px-3 py-1.5 rounded bg-surface-variant border border-outline text-on-surface text-xs font-mono-data self-start hover:border-primary hover:text-primary transition-colors flex items-center gap-1 disabled:opacity-50 min-h-11"
                 >
                   {isSavingNotes ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -327,7 +352,7 @@ export function JobDetailPane({
               )}
 
               <div className="prose prose-invert max-w-none font-body-regular text-sm text-on-surface/90 space-y-4 overflow-y-auto pr-2 whitespace-pre-wrap leading-relaxed max-h-[600px]">
-                {job.rawDescription}
+                {detailJob.rawDescription}
               </div>
             </div>
           </div>

@@ -1,12 +1,21 @@
 import { NextResponse } from "next/server";
 import { getCoverLetterById, updateCoverLetter, deleteCoverLetter } from "@/lib/db/cover-letters";
 import { sanitizeError } from "@/lib/ai/redact";
+import { getRequestUserId, requireUserId } from "@/lib/security/auth-request";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getRequestUserId(request);
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, error: "Cover letter not found" },
+        { status: 404 }
+      );
+    }
+
     const { id } = await params;
     if (!id || typeof id !== "string" || id.trim().length === 0) {
       return NextResponse.json(
@@ -15,7 +24,7 @@ export async function GET(
       );
     }
 
-    const coverLetter = await getCoverLetterById(id);
+    const coverLetter = await getCoverLetterById(id, userId);
     if (!coverLetter) {
       return NextResponse.json(
         { success: false, error: "Cover letter not found" },
@@ -41,10 +50,20 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const body = await request.json();
+    const userId = await requireUserId(request);
+    if (userId instanceof NextResponse) return userId;
 
-    const updated = await updateCoverLetter(id, body);
+    const { id } = await params;
+    const existing = await getCoverLetterById(id, userId);
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: "Cover letter not found" },
+        { status: 404 }
+      );
+    }
+
+    const body = await request.json();
+    const updated = await updateCoverLetter(id, body, userId);
     return NextResponse.json({ success: true, data: updated });
   } catch (err) {
     return NextResponse.json(
@@ -63,8 +82,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await requireUserId(request);
+    if (userId instanceof NextResponse) return userId;
+
     const { id } = await params;
-    await deleteCoverLetter(id);
+    const existing = await getCoverLetterById(id, userId);
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: "Cover letter not found" },
+        { status: 404 }
+      );
+    }
+
+    await deleteCoverLetter(id, userId);
     return NextResponse.json({ success: true, message: "Cover letter deleted successfully" });
   } catch (err) {
     return NextResponse.json(

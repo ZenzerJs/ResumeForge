@@ -11,6 +11,7 @@ export interface CreateCoverLetterInput {
   fullMarkdown: string;
   evidenceCitations?: string[]; // array of evidenceIds
   status?: "DRAFT" | "FINAL";
+  userId?: string;
 }
 
 export interface UpdateCoverLetterInput {
@@ -29,8 +30,8 @@ export interface UpdateCoverLetterInput {
  */
 export async function createCoverLetter(input: CreateCoverLetterInput) {
   // Verify job exists
-  const job = await prisma.job.findUnique({
-    where: { id: input.jobId },
+  const job = await prisma.job.findFirst({
+    where: { id: input.jobId, ...(input.userId ? { userId: input.userId } : {}) },
   });
 
   if (!job) {
@@ -81,9 +82,9 @@ export async function createCoverLetter(input: CreateCoverLetterInput) {
 /**
  * Fetches all cover letters for a specific job ID.
  */
-export async function getCoverLettersByJobId(jobId: string) {
+export async function getCoverLettersByJobId(jobId: string, userId?: string) {
   const letters = await prisma.coverLetter.findMany({
-    where: { jobId },
+    where: { jobId, ...(userId ? { job: { userId } } : {}) },
     orderBy: { createdAt: "desc" },
     include: {
       job: {
@@ -108,8 +109,9 @@ export async function getCoverLettersByJobId(jobId: string) {
 /**
  * Fetches all cover letters in the database.
  */
-export async function getCoverLetters() {
+export async function getCoverLetters(userId?: string) {
   const letters = await prisma.coverLetter.findMany({
+    where: userId ? { job: { userId } } : undefined,
     orderBy: { createdAt: "desc" },
     include: {
       job: {
@@ -134,9 +136,9 @@ export async function getCoverLetters() {
 /**
  * Fetches a single CoverLetter by ID.
  */
-export async function getCoverLetterById(id: string) {
-  const letter = await prisma.coverLetter.findUnique({
-    where: { id },
+export async function getCoverLetterById(id: string, userId?: string) {
+  const letter = await prisma.coverLetter.findFirst({
+    where: { id, ...(userId ? { job: { userId } } : {}) },
     include: {
       job: {
         select: {
@@ -161,8 +163,10 @@ export async function getCoverLetterById(id: string) {
 /**
  * Updates an existing CoverLetter record.
  */
-export async function updateCoverLetter(id: string, input: UpdateCoverLetterInput) {
-  const existing = await prisma.coverLetter.findUnique({ where: { id } });
+export async function updateCoverLetter(id: string, input: UpdateCoverLetterInput, userId?: string) {
+  const existing = await prisma.coverLetter.findFirst({
+    where: { id, ...(userId ? { job: { userId } } : {}) },
+  });
   if (!existing) {
     throw new Error(`CoverLetter not found: ${id}`);
   }
@@ -202,7 +206,13 @@ export async function updateCoverLetter(id: string, input: UpdateCoverLetterInpu
 /**
  * Deletes a CoverLetter record by ID.
  */
-export async function deleteCoverLetter(id: string) {
+export async function deleteCoverLetter(id: string, userId?: string) {
+  const existing = await prisma.coverLetter.findFirst({
+    where: { id, ...(userId ? { job: { userId } } : {}) },
+  });
+  if (!existing) {
+    throw new Error(`CoverLetter not found: ${id}`);
+  }
   return await prisma.coverLetter.delete({
     where: { id },
   });

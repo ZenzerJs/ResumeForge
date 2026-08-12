@@ -1,5 +1,9 @@
 import type { ExtractedPdfLink } from "@/lib/pdf/parser";
 
+function escapeTypstUrl(url: string): string {
+  return url.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
 function escapeTypstLabel(text: string): string {
   return text
     .replace(/\\/g, "\\\\")
@@ -21,7 +25,7 @@ export function ensureTypstLinks(source: string, links: ExtractedPdfLink[]): str
   if (missing.length === 0) return source;
 
   const rendered = missing
-    .map((l) => `#link("${l.url}")[${escapeTypstLabel(l.label || l.url)}]`)
+    .map((l) => `#link("${escapeTypstUrl(l.url)}")[${escapeTypstLabel(l.label || l.url)}]`)
     .join(" #sym.dot ");
 
   const injection = `\n#v(2pt)\n#align(center)[#text(size: 9pt, fill: rgb("#475569"))[${rendered}]]\n`;

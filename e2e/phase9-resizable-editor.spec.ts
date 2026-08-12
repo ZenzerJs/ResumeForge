@@ -59,6 +59,7 @@ test.describe("Task 9.2 — Resizable & Collapsible Editor Panels E2E Tests", ()
 
     // Expand sidebar again
     const expandBtn = page.locator('[data-testid="expand-ai-sidebar-btn"]');
+    await expandBtn.scrollIntoViewIfNeeded();
     await expandBtn.click();
     await page.waitForTimeout(300);
 

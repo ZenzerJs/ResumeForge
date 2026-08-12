@@ -3,22 +3,24 @@ import { createJob } from "@/lib/db/jobs";
 import { createCoverLetter, getCoverLettersByJobId } from "@/lib/db/cover-letters";
 import { GET as getCoverLettersRoute, POST as createCoverLetterRoute } from "@/app/api/cover-letters/route";
 import { GET as getCoverLetterByIdRoute } from "@/app/api/cover-letters/[id]/route";
-import { NextRequest } from "next/server";
+import { authedNextRequest, createTestUser } from "./helpers/auth";
 
 describe("Cover Letter Database & API Integration Tests (Phase 5)", () => {
   let jobId: string;
   let testCoverLetterId: string;
+  let cookie: string;
 
   beforeEach(async () => {
-    // Seed test job
+    const auth = await createTestUser();
+    cookie = auth.cookie;
     const job = await createJob({
       company: "Stripe",
       roleTitle: "Staff Software Engineer",
       rawDescription: "Build global payment infrastructure using Node.js and TypeScript.",
+      userId: auth.user.id,
     });
     jobId = job.id;
 
-    // Seed test cover letter
     const letter = await createCoverLetter({
       jobId,
       title: "Stripe Staff Role Cover Letter",
@@ -32,6 +34,7 @@ describe("Cover Letter Database & API Integration Tests (Phase 5)", () => {
       fullMarkdown: "# Cover Letter\n\nDear Stripe Hiring Team,\n...",
       evidenceCitations: ["exp-101", "bullet-202"],
       status: "DRAFT",
+      userId: auth.user.id,
     });
     testCoverLetterId = letter.id;
   });
@@ -48,7 +51,7 @@ describe("Cover Letter Database & API Integration Tests (Phase 5)", () => {
   });
 
   it("2. GET /api/cover-letters?jobId= returns list of cover letters for specified job", async () => {
-    const req = new NextRequest(`http://localhost:3000/api/cover-letters?jobId=${jobId}`);
+    const req = authedNextRequest(`http://localhost:3000/api/cover-letters?jobId=${jobId}`, {}, cookie);
     const res = await getCoverLettersRoute(req);
     const json = await res.json();
 
@@ -60,7 +63,7 @@ describe("Cover Letter Database & API Integration Tests (Phase 5)", () => {
   });
 
   it("3. GET /api/cover-letters/[id] returns single cover letter data", async () => {
-    const req = new NextRequest(`http://localhost:3000/api/cover-letters/${testCoverLetterId}`);
+    const req = authedNextRequest(`http://localhost:3000/api/cover-letters/${testCoverLetterId}`, {}, cookie);
     const res = await getCoverLetterByIdRoute(req, { params: Promise.resolve({ id: testCoverLetterId }) });
     const json = await res.json();
 
@@ -72,7 +75,7 @@ describe("Cover Letter Database & API Integration Tests (Phase 5)", () => {
 
   it("4. GET /api/cover-letters/[id] returns 404 for missing cover letter ID", async () => {
     const missingId = "missing-cover-letter-uuid-999";
-    const req = new NextRequest(`http://localhost:3000/api/cover-letters/${missingId}`);
+    const req = authedNextRequest(`http://localhost:3000/api/cover-letters/${missingId}`, {}, cookie);
     const res = await getCoverLetterByIdRoute(req, { params: Promise.resolve({ id: missingId }) });
     const json = await res.json();
 
@@ -82,10 +85,14 @@ describe("Cover Letter Database & API Integration Tests (Phase 5)", () => {
   });
 
   it("5. POST /api/cover-letters rejects invalid payload with 400 Bad Request", async () => {
-    const req = new NextRequest("http://localhost:3000/api/cover-letters", {
-      method: "POST",
-      body: JSON.stringify({ title: "Incomplete Payload" }),
-    });
+    const req = authedNextRequest(
+      "http://localhost:3000/api/cover-letters",
+      {
+        method: "POST",
+        body: JSON.stringify({ title: "Incomplete Payload" }),
+      },
+      cookie
+    );
     const res = await createCoverLetterRoute(req);
     const json = await res.json();
 

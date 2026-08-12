@@ -6,10 +6,13 @@ import {
 import { extractEvidenceFromMaster } from "@/lib/ai/gateway";
 import { persistDraftEvidenceFromExtract } from "@/lib/ai/evidence-persist";
 import { sanitizeError } from "@/lib/ai/redact";
-import type { ProviderConfig } from "@/lib/ai/types";
+import { requireUserId } from "@/lib/security/auth-request";
 
 export async function POST(request: Request) {
   try {
+    const userId = await requireUserId(request);
+    if (userId instanceof NextResponse) return userId;
+
     const body = await request.json();
     const parseResult = ExtractEvidenceRequestSchema.safeParse(body);
 
@@ -24,10 +27,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const { typstSource } = parseResult.data;
-    const providerConfig: ProviderConfig = body.providerConfig || {};
+    const { typstSource, providerConfig } = parseResult.data;
 
-    if (!providerConfig.provider || !providerConfig.apiKey) {
+    if (!providerConfig?.provider || (!providerConfig.apiKey && providerConfig.provider !== "custom")) {
       return NextResponse.json(
         {
           success: false,
@@ -80,7 +82,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const persistResult = await persistDraftEvidenceFromExtract(schemaValidation.data);
+    const persistResult = await persistDraftEvidenceFromExtract(schemaValidation.data, userId);
 
     return NextResponse.json({
       success: true,
@@ -95,7 +97,7 @@ export async function POST(request: Request) {
       {
         success: false,
         error: "Internal server error during evidence extract.",
-        message: sanitizeError(String(err)),
+        message: sanitizeError(err),
       },
       { status: 500 }
     );

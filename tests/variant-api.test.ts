@@ -4,42 +4,43 @@ import { GET as getVariantByIdRoute } from "@/app/api/variants/[id]/route";
 import { createResume } from "@/lib/db/resumes";
 import { createJob } from "@/lib/db/jobs";
 import { createVariant } from "@/lib/db/variants";
-import { NextRequest } from "next/server";
+import { authedNextRequest, createTestUser } from "./helpers/auth";
 
 describe("ResumeVariant Retrieval API Integration Tests (Task A)", () => {
   let masterResumeId: string;
-  let jobId: string;
   let testVariantId: string;
+  let cookie: string;
 
   beforeEach(async () => {
-    // Seed test master resume
+    const auth = await createTestUser();
+    cookie = auth.cookie;
     const master = await createResume({
       title: "Test Master Resume",
       typstSource: "= Test Master Typst",
       isMaster: true,
+      userId: auth.user.id,
     });
     masterResumeId = master.id;
 
-    // Seed test job
     const job = await createJob({
       company: "Acme Corp",
       roleTitle: "Backend Developer",
       rawDescription: "Need Node.js and PostgreSQL skills.",
+      userId: auth.user.id,
     });
-    jobId = job.id;
 
-    // Seed test variant
     const variant = await createVariant({
       masterResumeId,
-      jobId,
+      jobId: job.id,
       variantTitle: "Acme Backend Tailored Variant",
       typstContent: "= Acme Tailored Typst Content",
+      userId: auth.user.id,
     });
     testVariantId = variant.id;
   });
 
   it("GET /api/variants returns 200 with list of variants including job metadata", async () => {
-    const res = await getVariantsRoute();
+    const res = await getVariantsRoute(authedNextRequest("http://localhost:3000/api/variants", {}, cookie));
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -55,7 +56,7 @@ describe("ResumeVariant Retrieval API Integration Tests (Task A)", () => {
   });
 
   it("GET /api/variants/[id] returns 200 with variant data when ID exists", async () => {
-    const req = new NextRequest(`http://localhost:3000/api/variants/${testVariantId}`);
+    const req = authedNextRequest(`http://localhost:3000/api/variants/${testVariantId}`, {}, cookie);
     const res = await getVariantByIdRoute(req, { params: Promise.resolve({ id: testVariantId }) });
     const json = await res.json();
 
@@ -69,7 +70,7 @@ describe("ResumeVariant Retrieval API Integration Tests (Task A)", () => {
 
   it("GET /api/variants/[id] returns safe 404 when variant ID does not exist", async () => {
     const nonExistentId = "non-existent-variant-uuid-9999";
-    const req = new NextRequest(`http://localhost:3000/api/variants/${nonExistentId}`);
+    const req = authedNextRequest(`http://localhost:3000/api/variants/${nonExistentId}`, {}, cookie);
     const res = await getVariantByIdRoute(req, { params: Promise.resolve({ id: nonExistentId }) });
     const json = await res.json();
 
@@ -79,7 +80,7 @@ describe("ResumeVariant Retrieval API Integration Tests (Task A)", () => {
   });
 
   it("GET /api/variants/[id] returns safe 400 when ID is whitespace or malformed", async () => {
-    const req = new NextRequest("http://localhost:3000/api/variants/%20");
+    const req = authedNextRequest("http://localhost:3000/api/variants/%20", {}, cookie);
     const res = await getVariantByIdRoute(req, { params: Promise.resolve({ id: "   " }) });
     const json = await res.json();
 

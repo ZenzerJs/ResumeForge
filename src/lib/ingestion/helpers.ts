@@ -3,7 +3,7 @@
  * apply URL extraction, and Tier 1 placeholder detection.
  */
 
-export function isPlaceholderDescription(rawDescription: string): boolean {
+export function isPlaceholderDescription(rawDescription?: string | null): boolean {
   if (!rawDescription || !rawDescription.trim()) return true;
   const lower = rawDescription.toLowerCase().trim();
   return (

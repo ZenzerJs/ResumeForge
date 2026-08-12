@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { saveMasterResume, getMasterResume } from "@/lib/db/resumes";
 import { sanitizeError } from "@/lib/ai/redact";
+import { requireUserId } from "@/lib/security/auth-request";
 
 const SaveMasterSchema = z.object({
   id: z.string().optional(),
@@ -12,6 +13,9 @@ const SaveMasterSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const userId = await requireUserId(request);
+    if (userId instanceof NextResponse) return userId;
+
     const body = await request.json();
     const parseResult = SaveMasterSchema.safeParse(body);
 
@@ -27,7 +31,7 @@ export async function POST(request: Request) {
     }
 
     const { id, title, typstSource, confirmOverwrite } = parseResult.data;
-    const existingMaster = await getMasterResume();
+    const existingMaster = await getMasterResume(userId);
 
     if (existingMaster && confirmOverwrite !== true) {
       return NextResponse.json(
@@ -44,6 +48,7 @@ export async function POST(request: Request) {
       title,
       typstSource,
       confirmOverwrite: true,
+      userId,
     });
 
     return NextResponse.json({

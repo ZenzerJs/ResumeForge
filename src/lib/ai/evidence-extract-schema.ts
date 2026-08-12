@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ProviderConfigSchema } from "@/lib/ai/types";
 
 export const EvidenceExtractBulletSchema = z.object({
   text: z.string().min(1),
@@ -26,15 +27,8 @@ export type EvidenceExtractItem = z.infer<typeof EvidenceExtractItemSchema>;
 export type EvidenceExtractResponse = z.infer<typeof EvidenceExtractResponseSchema>;
 
 export const ExtractEvidenceRequestSchema = z.object({
-  typstSource: z.string().min(1, "typstSource is required"),
-  providerConfig: z
-    .object({
-      provider: z.enum(["openai", "anthropic", "gemini", "custom"]),
-      apiKey: z.string().min(1),
-      baseUrl: z.string().optional(),
-      model: z.string().optional(),
-    })
-    .optional(),
+  typstSource: z.string().min(1, "typstSource is required").max(200_000),
+  providerConfig: ProviderConfigSchema.optional(),
 });
 
 export type ExtractEvidenceRequest = z.infer<typeof ExtractEvidenceRequestSchema>;

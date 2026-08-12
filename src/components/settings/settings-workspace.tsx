@@ -135,12 +135,12 @@ export function SettingsWorkspace() {
 
   return (
     <AppShell variant="settings" className="overflow-y-auto">
-      <main className="mx-auto w-full max-w-3xl flex-1 p-6 md:p-8">
+      <div className="mx-auto w-full max-w-3xl flex-1 p-6 md:p-8">
         <div className="space-y-6">
           <PageHeader
             eyebrow="Control room"
             title="AI Provider Gateway Settings — Bring-Your-Own-Key (BYOK) AI Configuration"
-            description="Configure your preferred LLM provider or local OpenAI-compatible endpoint. API keys are stored in browser localStorage for local single-user convenience and never saved in SQLite."
+            description="Configure your preferred LLM provider or local OpenAI-compatible endpoint. API keys stay in this browser and are never written to the database."
           />
 
           <Surface variant="primary" className="p-6 space-y-6">
@@ -153,7 +153,7 @@ export function SettingsWorkspace() {
                 id="provider-select"
                 value={provider}
                 onChange={handleProviderChange}
-                className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
               >
                 <option value="openai">OpenAI (Direct API)</option>
                 <option value="anthropic">Anthropic (Direct API)</option>
@@ -194,7 +194,7 @@ export function SettingsWorkspace() {
                       ? "AIzaSy..."
                       : "Optional API Key for custom endpoint"
                   }
-                  className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                  className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-mono"
                 />
               </div>
               {apiKey && (
@@ -217,7 +217,7 @@ export function SettingsWorkspace() {
                   value={baseUrl}
                   onChange={handleBaseUrlChange}
                   placeholder={provider === "custom" ? "http://localhost:8000" : "https://api.openai.com"}
-                  className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                  className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-mono"
                 />
               </div>
             )}
@@ -241,7 +241,7 @@ export function SettingsWorkspace() {
                     ? "gemini-2.5-flash, gemini-1.5-pro…"
                     : "llama3, mistral, codellama…"
                 }
-                className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-mono"
               />
               <p className="mt-1.5 text-[11px] text-slate-500">
                 For custom/local endpoints (Ollama, LM Studio, FreeLLMAPI): specify the exact model name your server exposes.
@@ -299,7 +299,7 @@ export function SettingsWorkspace() {
             )}
           </Surface>
         </div>
-      </main>
+      </div>
     </AppShell>
   );
 }

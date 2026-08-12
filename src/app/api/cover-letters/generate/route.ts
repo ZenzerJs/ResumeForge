@@ -8,10 +8,14 @@ import { getEvidenceItems } from "@/lib/db/evidence";
 import { createCoverLetter } from "@/lib/db/cover-letters";
 import { getMasterResume } from "@/lib/db/resumes";
 import { sanitizeError } from "@/lib/ai/redact";
-import { ProviderConfig } from "@/lib/ai/types";
+import { ProviderConfigSchema } from "@/lib/ai/types";
+import { requireUserId } from "@/lib/security/auth-request";
 
 export async function POST(req: NextRequest) {
   try {
+    const userId = await requireUserId(req);
+    if (userId instanceof NextResponse) return userId;
+
     const body = await req.json();
 
     const { jobId, variantId, providerConfig: rawProviderConfig } = body;
@@ -24,8 +28,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify job exists
-    const job = await prisma.job.findUnique({
-      where: { id: jobId },
+    const job = await prisma.job.findFirst({
+      where: { id: jobId, userId },
     });
 
     if (!job) {
@@ -48,9 +52,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Validate provider configuration
-    const providerConfig: ProviderConfig = rawProviderConfig || body.provider || {};
-    if (!providerConfig.provider || !providerConfig.apiKey) {
+    const parsedConfig = ProviderConfigSchema.safeParse(rawProviderConfig || body.provider);
+    if (
+      !parsedConfig.success ||
+      !parsedConfig.data.provider ||
+      (!parsedConfig.data.apiKey && parsedConfig.data.provider !== "custom")
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -59,9 +66,10 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    const providerConfig = parsedConfig.data;
 
     // Gather active evidence items
-    const evidenceItems = await getEvidenceItems();
+    const evidenceItems = await getEvidenceItems(undefined, userId);
     const activeEvidenceItems = evidenceItems.filter((e) => e.status !== "archived");
 
     const activeEvidenceIds: string[] = [];
@@ -93,7 +101,7 @@ export async function POST(req: NextRequest) {
       activeRoleProfile: body.activeRoleProfile || "Full-stack",
     };
 
-    const master = await getMasterResume();
+    const master = await getMasterResume(userId);
 
     // Call BYOK AI Gateway
     const gatewayResult = await generateCoverLetter(
@@ -173,6 +181,7 @@ export async function POST(req: NextRequest) {
       fullMarkdown: coverLetterData.fullMarkdown,
       evidenceCitations: coverLetterData.evidenceCitations,
       status: "DRAFT",
+      userId,
     });
 
     return NextResponse.json({

@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   Loader2,
   RefreshCw,
+  X,
 } from "lucide-react";
 import { AppShell } from "@/components/design-system/app-shell";
 import { PageHeader } from "@/components/design-system/page-header";
@@ -20,6 +21,7 @@ import { StatusPill } from "@/components/design-system/status-pill";
 import { CommandButton } from "@/components/design-system/command-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrackerSubNav } from "@/components/tracker/tracker-sub-nav";
+import { isSafeHref } from "@/lib/security/safe-fetch";
 import {
   isPostedWithinParam,
   type PostedWithin,
@@ -61,17 +63,23 @@ export function DiscoverFeed() {
   const [jobs, setJobs] = useState<DiscoveredJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "closed">("open");
   const [postedWithin, setPostedWithin] = useState<PostedWithin>("all");
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(searchQuery.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
   const fetchDiscoveredJobs = useCallback(async () => {
     try {
       setIsLoading(true);
       const params = new URLSearchParams({
-        search: searchQuery,
+        search: debouncedSearch,
         filter: statusFilter,
         postedWithin,
       });
@@ -85,7 +93,7 @@ export function DiscoverFeed() {
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, statusFilter, postedWithin]);
+  }, [debouncedSearch, statusFilter, postedWithin]);
 
   useEffect(() => {
     fetchDiscoveredJobs();
@@ -151,7 +159,7 @@ export function DiscoverFeed() {
         }
       />
 
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 md:p-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 md:p-8">
         <PageHeader
           eyebrow="Browse listings"
           title="Internship Feed"
@@ -160,17 +168,22 @@ export function DiscoverFeed() {
         />
 
         {notification ? (
-          <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-medium text-emerald-400">
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-medium text-emerald-400"
+          >
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
               <span>{notification}</span>
             </div>
             <button
               type="button"
+              aria-label="Dismiss notification"
               onClick={() => setNotification(null)}
-              className="text-slate-400 hover:text-white"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-white focus-visible:ring-2 focus-visible:ring-amber-500/60"
             >
-              ✕
+              <X className="h-4 w-4" aria-hidden />
             </button>
           </div>
         ) : null}
@@ -178,13 +191,17 @@ export function DiscoverFeed() {
         <div className="flex flex-col gap-3 rounded-xl border border-slate-800/80 bg-rf-surface p-4">
           <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
             <div className="relative max-w-md flex-1">
+              <label htmlFor="discover-search-input" className="sr-only">
+                Filter by company, role, or location
+              </label>
               <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
               <input
+                id="discover-search-input"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Filter by company, role title, or location..."
-                className="h-8 w-full rounded-md border border-slate-800 bg-rf-bg pl-9 pr-3 text-xs text-rf-cloud placeholder:text-slate-500 transition-colors focus:border-amber-500 focus:outline-none"
+                className="h-11 w-full rounded-md border border-slate-800 bg-rf-bg pl-9 pr-3 text-xs text-rf-cloud placeholder:text-slate-500 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
                 data-testid="discover-search-input"
               />
             </div>
@@ -298,7 +315,7 @@ export function DiscoverFeed() {
                 </div>
 
                 <div className="flex items-center justify-between border-t border-slate-800 pt-3 text-xs">
-                  {j.applyUrl && !j.isClosed ? (
+                  {isSafeHref(j.applyUrl) && !j.isClosed ? (
                     <a
                       href={j.applyUrl}
                       target="_blank"
@@ -333,7 +350,7 @@ export function DiscoverFeed() {
             ))}
           </div>
         )}
-      </main>
+      </div>
     </AppShell>
   );
 }

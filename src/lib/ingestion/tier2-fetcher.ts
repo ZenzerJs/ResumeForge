@@ -9,6 +9,7 @@
 import { prisma } from "@/lib/prisma";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
 import { extractApplyUrlFromNotes, isPlaceholderDescription } from "@/lib/ingestion/helpers";
+import { isSafeHref, safeFetch, UnsafeUrlError } from "@/lib/security/safe-fetch";
 
 export interface ExtractResultSuccess {
   success: true;
@@ -120,7 +121,7 @@ export function validateExtractedTextQuality(text: string): boolean {
  * Extracts full job description text from posting URL using JSON-LD schema or main HTML body parsing.
  */
 export async function extractFullTextFromUrl(url: string): Promise<ExtractResult> {
-  if (!url || !url.startsWith("http")) {
+  if (!url || !isSafeHref(url)) {
     return {
       success: false,
       reason: "NO_APPLY_URL",
@@ -128,20 +129,14 @@ export async function extractFullTextFromUrl(url: string): Promise<ExtractResult
     };
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
-
   try {
-    const res = await fetch(url, {
-      signal: controller.signal,
+    const res = await safeFetch(url, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
     });
-
-    clearTimeout(timeoutId);
 
     if (!res.ok) {
       return {
@@ -207,9 +202,16 @@ export async function extractFullTextFromUrl(url: string): Promise<ExtractResult
       message:
         "Could not extract usable job description text automatically (page may require JavaScript rendering or logins).",
     };
-  } catch (err: any) {
-    clearTimeout(timeoutId);
-    if (err.name === "AbortError") {
+  } catch (err: unknown) {
+    if (err instanceof UnsafeUrlError) {
+      return {
+        success: false,
+        reason: "NO_APPLY_URL",
+        message: err.message,
+      };
+    }
+    const name = err instanceof Error ? err.name : "";
+    if (name === "AbortError") {
       return {
         success: false,
         reason: "FETCH_TIMEOUT",
@@ -219,7 +221,7 @@ export async function extractFullTextFromUrl(url: string): Promise<ExtractResult
     return {
       success: false,
       reason: "HTTP_ERROR",
-      message: err.message || "Failed to reach job posting URL.",
+      message: err instanceof Error ? err.message : "Failed to reach job posting URL.",
     };
   }
 }

@@ -1,4 +1,4 @@
-import { $typst } from "@myriaddreamin/typst.ts";
+import { $typst, loadFonts } from "@myriaddreamin/typst.ts";
 
 export interface CompileSuccessResult {
   success: true;
@@ -56,6 +56,12 @@ async function ensureTypstInitialized() {
     try {
       $typst.setCompilerInitOptions({
         getModule: () => "/wasm/typst_ts_web_compiler_bg.wasm",
+        beforeBuild: [
+          loadFonts([], {
+            assets: ["text"],
+            assetUrlPrefix: "/fonts/typst/",
+          }),
+        ],
       });
       $typst.setRendererInitOptions({
         getModule: () => "/wasm/typst_ts_renderer_bg.wasm",

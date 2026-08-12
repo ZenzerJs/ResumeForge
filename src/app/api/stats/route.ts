@@ -1,44 +1,16 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getDashboardStats, emptyGuestStats } from "@/lib/db/stats";
 import { sanitizeError } from "@/lib/ai/redact";
+import { getRequestUserId } from "@/lib/security/auth-request";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const [
-      masterResume,
-      evidenceCount,
-      verifiedEvidenceCount,
-      jobsCount,
-      appliedJobsCount,
-      variantsCount,
-      coverLettersCount,
-    ] = await Promise.all([
-      prisma.resume.findFirst({ where: { isMaster: true } }),
-      prisma.evidenceItem.count({ where: { status: { not: "archived" } } }),
-      prisma.evidenceItem.count({ where: { status: "verified" } }),
-      prisma.job.count(),
-      prisma.job.count({ where: { status: "APPLIED" } }),
-      prisma.resumeVariant.count(),
-      prisma.coverLetter.count(),
-    ]);
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        hasMasterResume: Boolean(masterResume),
-        masterResumeTitle: masterResume?.title ?? null,
-        evidenceCount,
-        verifiedEvidenceCount,
-        jobsCount,
-        appliedJobsCount,
-        variantsCount,
-        coverLettersCount,
-      },
-    });
+    const userId = await getRequestUserId(request);
+    const data = userId ? await getDashboardStats(userId) : emptyGuestStats();
+    return NextResponse.json({ success: true, data, guest: !userId });
   } catch (err: unknown) {
-    const errorMessage = sanitizeError(err);
     return NextResponse.json(
-      { success: false, error: errorMessage },
+      { success: false, error: sanitizeError(err) },
       { status: 500 }
     );
   }

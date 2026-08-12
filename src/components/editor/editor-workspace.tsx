@@ -2,10 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
-import { CodeEditor } from "./code-editor";
-import { PreviewPanel } from "./preview-panel";
-import { AiSidebar } from "./ai-sidebar";
 import { compileTypstToSvg } from "@/lib/typst/compiler";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { usePanelRef } from "react-resizable-panels";
@@ -40,6 +38,19 @@ import { AppShell } from "@/components/design-system/app-shell";
 import { EditorWorkspaceSkeleton } from "@/components/editor/editor-workspace-skeleton";
 
 const STORAGE_KEY = "resumeforge_typst_source";
+const COMPILE_DEBOUNCE_MS = 400;
+const SOURCE_PERSIST_MS = 500;
+
+const CodeEditor = dynamic(() => import("./code-editor").then((m) => ({ default: m.CodeEditor })), {
+  ssr: false,
+});
+const PreviewPanel = dynamic(
+  () => import("./preview-panel").then((m) => ({ default: m.PreviewPanel })),
+  { ssr: false }
+);
+const AiSidebar = dynamic(() => import("./ai-sidebar").then((m) => ({ default: m.AiSidebar })), {
+  ssr: false,
+});
 
 export type DocumentType = "MASTER_RESUME" | "RESUME_VARIANT" | "LOCAL_FALLBACK";
 
@@ -55,6 +66,7 @@ export function EditorWorkspace() {
   const resumeIdParam = searchParams.get("resumeId");
 
   const [source, setSource] = useState<string>("");
+  const [baselineSource, setBaselineSource] = useState<string>("");
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<{ message: string; line?: number; column?: number } | null>(null);
   const [isCompiling, setIsCompiling] = useState<boolean>(false);
@@ -117,6 +129,8 @@ export function EditorWorkspace() {
   const [isAiCollapsed, setIsAiCollapsed] = useState<boolean>(DEFAULT_EDITOR_LAYOUT.isAiCollapsed);
   const [isLayoutReady, setIsLayoutReady] = useState(false);
   const isAiCollapsedRef = useRef<boolean>(isAiCollapsed);
+  const skipResizePersistRef = useRef(false);
+  const suppressResizePersistUntilRef = useRef(0);
 
   useEffect(() => {
     const persisted = parsePersistedLayout(
@@ -125,6 +139,8 @@ export function EditorWorkspace() {
     setLayout(persisted.sizes);
     setIsAiCollapsed(persisted.isAiCollapsed);
     isAiCollapsedRef.current = persisted.isAiCollapsed;
+    // Ignore spurious onResize while the panel group mounts / restores collapse.
+    suppressResizePersistUntilRef.current = Date.now() + 750;
     setIsLayoutReady(true);
   }, []);
 
@@ -140,6 +156,7 @@ export function EditorWorkspace() {
   // Collapse panel on mount if layout was persisted as collapsed
   useEffect(() => {
     if (!isLayoutReady || !isAiCollapsed) return;
+    suppressResizePersistUntilRef.current = Date.now() + 750;
     const timer = setTimeout(() => {
       aiPanelRef.current?.collapse();
     }, 50);
@@ -160,12 +177,15 @@ export function EditorWorkspace() {
 
   const handleLayoutChange = (layoutMap: Record<string, number>) => {
     setLayout(layoutMap);
+    if (Date.now() < suppressResizePersistUntilRef.current) return;
     persistLayoutState(layoutMap, isAiCollapsedRef.current);
   };
 
   const toggleAiSidebarCollapse = () => {
     const panel = aiPanelRef.current;
     if (!panel) return;
+    skipResizePersistRef.current = true;
+    suppressResizePersistUntilRef.current = Date.now() + 500;
     if (panel.isCollapsed()) {
       panel.expand();
       updateAiCollapsedState(false);
@@ -175,6 +195,9 @@ export function EditorWorkspace() {
       updateAiCollapsedState(true);
       persistLayoutState(layout, true);
     }
+    window.setTimeout(() => {
+      skipResizePersistRef.current = false;
+    }, 500);
   };
 
   // Load initial starter template fallback
@@ -287,15 +310,38 @@ export function EditorWorkspace() {
   }, [variantIdParam, resumeIdParam, loadStarterTemplate]);
 
   useEffect(() => {
+    if (isLoadingDocument) return;
+    setBaselineSource(source);
+    // Capture the loaded buffer once loading completes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoadingDocument]);
+
+  useEffect(() => {
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (source !== baselineSource) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [source, baselineSource]);
+
+  useEffect(() => {
     loadCanonicalDocument();
   }, [loadCanonicalDocument]);
 
-  // Compile Typst whenever source changes
+  const compileGeneration = useRef(0);
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const runCompile = useCallback(async (codeToCompile: string) => {
     if (!codeToCompile || codeToCompile.trim().length === 0) return;
+    const generation = ++compileGeneration.current;
     setIsCompiling(true);
 
     const result = await compileTypstToSvg(codeToCompile);
+    if (generation !== compileGeneration.current) return;
+
     setIsCompiling(false);
 
     if (result.success) {
@@ -307,9 +353,11 @@ export function EditorWorkspace() {
   }, []);
 
   useEffect(() => {
-    if (source) {
-      runCompile(source);
-    }
+    if (!source) return;
+    const timer = window.setTimeout(() => {
+      void runCompile(source);
+    }, COMPILE_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
   }, [source, runCompile]);
 
   // Task 9.3: Ctrl+S / Cmd+S save & instant recompile handler
@@ -346,9 +394,11 @@ export function EditorWorkspace() {
 
   const handleSourceChange = (newVal: string) => {
     setSource(newVal);
-    if (typeof window !== "undefined") {
+    if (typeof window === "undefined") return;
+    if (persistTimer.current) clearTimeout(persistTimer.current);
+    persistTimer.current = setTimeout(() => {
       localStorage.setItem(STORAGE_KEY, newVal);
-    }
+    }, SOURCE_PERSIST_MS);
   };
 
   const handleTriggerRepair = useCallback(
@@ -440,7 +490,10 @@ export function EditorWorkspace() {
   };
 
   const handleConfirmSaveAsMaster = async () => {
-    if (!source || source.trim().length === 0) return;
+    if (!source || source.trim().length === 0) {
+      setDocumentError("Resume source is still loading. Try saving again in a moment.");
+      return;
+    }
     const shouldExtractEvidence = draftEvidenceFromMaster;
     try {
       setIsSavingMaster(true);
@@ -461,6 +514,7 @@ export function EditorWorkspace() {
 
       if (res.ok && json.success) {
         setSaveSuccess(true);
+        setBaselineSource(source);
         if (json.snapshotId) {
           setLastSnapshotId(json.snapshotId);
         }
@@ -475,6 +529,8 @@ export function EditorWorkspace() {
         if (shouldExtractEvidence) {
           await runEvidenceExtractAfterSave(source);
         }
+      } else {
+        setDocumentError(json.error || "Failed to save Master Resume.");
       }
     } catch (err) {
       console.error("Failed to save master resume:", err);
@@ -506,6 +562,7 @@ export function EditorWorkspace() {
       if (res.ok && json.success) {
         const restoredSource = json.data.typstSource;
         setSource(restoredSource);
+        setBaselineSource(restoredSource);
         if (typeof window !== "undefined") {
           localStorage.setItem(STORAGE_KEY, restoredSource);
         }
@@ -584,9 +641,9 @@ export function EditorWorkspace() {
               type="button"
               size="sm"
               onClick={handleSaveAsMaster}
-              disabled={isSavingMaster}
+              disabled={isSavingMaster || isLoadingDocument}
               data-testid="save-as-master-btn"
-              className="text-xs font-semibold gap-1.5 transition-all"
+              className="text-xs font-semibold gap-1.5 transition-colors"
               style={{
                 background: saveSuccess
                   ? "linear-gradient(135deg, #10B981, #059669)"
@@ -614,7 +671,7 @@ export function EditorWorkspace() {
                 variant="outline"
                 onClick={toggleAiSidebarCollapse}
                 data-testid="expand-ai-sidebar-btn"
-                className="h-8 gap-1.5 text-xs hidden lg:flex border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                className="h-8 shrink-0 gap-1.5 text-xs hidden lg:inline-flex border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
                 title="Expand AI Sidebar"
               >
                 <Bot className="h-3.5 w-3.5 text-amber-400" />
@@ -710,7 +767,7 @@ export function EditorWorkspace() {
           <button
             type="button"
             onClick={handleDismissConversionBanner}
-            className="p-1 text-amber-300 hover:text-white transition"
+            className="p-2 text-amber-300 hover:text-white transition min-h-11 min-w-11 inline-flex items-center justify-center"
             title="Dismiss banner"
             data-testid="dismiss-conversion-banner-btn"
           >
@@ -731,7 +788,7 @@ export function EditorWorkspace() {
           <button
             type="button"
             onClick={handleDismissConversionBanner}
-            className="p-1 text-emerald-300 hover:text-white transition"
+            className="p-2 text-emerald-300 hover:text-white transition min-h-11 min-w-11 inline-flex items-center justify-center"
             title="Dismiss banner"
             data-testid="dismiss-conversion-banner-btn"
           >
@@ -796,7 +853,7 @@ export function EditorWorkspace() {
       {showSaveConfirm && (
         <div
           data-testid="save-master-confirm-modal"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
         >
           <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-start justify-between">
@@ -870,7 +927,7 @@ export function EditorWorkspace() {
       )}
 
       {/* Main Workspace Body */}
-      <main className="flex flex-1 min-h-0 overflow-hidden bg-background p-2 md:p-3">
+      <div className="flex flex-1 min-h-0 overflow-hidden bg-background p-2 md:p-3">
         {/* Desktop 3-Panel Resizable Layout (>= lg screens) — client-only to avoid SSR style hydration mismatch */}
         {isLayoutReady ? (
         <ResizablePanelGroup
@@ -886,9 +943,11 @@ export function EditorWorkspace() {
             defaultSize={layout["panel-code"] ?? 45}
             minSize={20}
             className="h-full overflow-hidden"
-            data-testid="editor-code-panel"
+            data-testid="panel-code"
           >
-            <CodeEditor value={source} onChange={handleSourceChange} />
+            <div className="h-full min-h-0">
+              <CodeEditor value={source} onChange={handleSourceChange} />
+            </div>
           </ResizablePanel>
 
           <ResizableHandle withHandle />
@@ -899,16 +958,18 @@ export function EditorWorkspace() {
             defaultSize={layout["panel-preview"] ?? 35}
             minSize={25}
             className="h-full overflow-hidden"
-            data-testid="editor-preview-panel"
+            data-testid="panel-preview"
           >
-            <PreviewPanel
-              svg={svg}
-              error={error}
-              source={source}
-              isCompiling={isCompiling}
-              onResetTemplate={handleResetTemplate}
-              onTriggerRepair={handleTriggerRepair}
-            />
+            <div className="h-full min-h-0">
+              <PreviewPanel
+                svg={svg}
+                error={error}
+                source={source}
+                isCompiling={isCompiling}
+                onResetTemplate={handleResetTemplate}
+                onTriggerRepair={handleTriggerRepair}
+              />
+            </div>
           </ResizablePanel>
 
           <ResizableHandle withHandle />
@@ -922,6 +983,8 @@ export function EditorWorkspace() {
             collapsible={true}
             collapsedSize={0}
             onResize={(size) => {
+              if (skipResizePersistRef.current) return;
+              if (Date.now() < suppressResizePersistUntilRef.current) return;
               const isCurrentlyCollapsed = size.asPercentage <= 2;
               if (isCurrentlyCollapsed !== isAiCollapsedRef.current) {
                 updateAiCollapsedState(isCurrentlyCollapsed);
@@ -929,8 +992,9 @@ export function EditorWorkspace() {
               }
             }}
             className="h-full overflow-hidden"
-            data-testid="editor-ai-panel"
+            data-testid="panel-ai"
           >
+            <div className="h-full min-h-0">
             <AiSidebar
               source={source}
               onApplyToBuffer={handleApplyRepair}
@@ -939,6 +1003,7 @@ export function EditorWorkspace() {
               repairContext={repairContext}
               onDismissRepair={() => setRepairContext(null)}
             />
+            </div>
           </ResizablePanel>
         </ResizablePanelGroup>
         ) : (
@@ -979,7 +1044,7 @@ export function EditorWorkspace() {
             </div>
           )}
         </div>
-      </main>
+      </div>
     </AppShell>
   );
 }

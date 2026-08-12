@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { POST } from "@/app/api/ai/qualitative-review/route";
-import { NextRequest } from "next/server";
 import { evaluateAtsScore } from "@/lib/ats-evaluator/evaluator";
+import { authedNextRequest, createTestUser } from "./helpers/auth";
 
 describe("Anti-Auto-Trigger & Qualitative Review API Tests", () => {
   it("asserts deterministic score computation makes ZERO calls to qualitative AI API", () => {
@@ -22,14 +22,15 @@ describe("Anti-Auto-Trigger & Qualitative Review API Tests", () => {
   });
 
   it("returns 400 rejection when mandatory fields are missing from request payload", async () => {
-    const req = new NextRequest("http://localhost:3000/api/ai/qualitative-review", {
+    const { cookie } = await createTestUser();
+    const req = authedNextRequest("http://localhost:3000/api/ai/qualitative-review", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         providerConfig: { provider: "openai" },
         // missing typstContent and jobRequirements
       }),
-    });
+    }, cookie);
 
     const res = await POST(req);
     const json = await res.json();

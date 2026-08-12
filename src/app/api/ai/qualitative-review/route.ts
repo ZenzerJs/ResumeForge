@@ -5,6 +5,7 @@ import { extractJsonObject, normalizeQualitativeReviewPayload } from "@/lib/ai/j
 import { ProviderConfigSchema } from "@/lib/ai/types";
 import { sanitizeError } from "@/lib/ai/redact";
 import { z } from "zod";
+import { requireUserId } from "@/lib/security/auth-request";
 
 const QualitativeReviewApiInputSchema = z.object({
   providerConfig: ProviderConfigSchema,
@@ -31,6 +32,9 @@ const QualitativeReviewApiInputSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const gated = await requireUserId(req);
+    if (gated instanceof NextResponse) return gated;
+
     const body = await req.json();
     const parseResult = QualitativeReviewApiInputSchema.safeParse(body);
 

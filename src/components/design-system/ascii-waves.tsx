@@ -97,6 +97,7 @@ export function AsciiWaves({
       window.addEventListener("pointerleave", onPointerLeave);
     }
 
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const cell = Math.max(8, elementSize);
     const start = performance.now();
 
@@ -167,7 +168,9 @@ export function AsciiWaves({
       }
 
       ctx.globalAlpha = 1;
-      animationFrameId = requestAnimationFrame(draw);
+      if (!prefersReduced) {
+        animationFrameId = requestAnimationFrame(draw);
+      }
     };
 
     animationFrameId = requestAnimationFrame(draw);
@@ -199,6 +202,7 @@ export function AsciiWaves({
     <canvas
       ref={canvasRef}
       aria-hidden
+      data-testid="ascii-waves-canvas"
       className={`pointer-events-none absolute inset-0 h-full w-full ${className}`}
     />
   );

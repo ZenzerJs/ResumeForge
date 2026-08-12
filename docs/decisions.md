@@ -263,6 +263,56 @@ We implement a **Unified Master AI System Prompt Engine**:
 - **Positive**: Maintains 100% backward compatibility with all existing provider adapters and Zod validation schemas.
 - **Negative**: Adds a small static overhead (~350 tokens) to system prompt payloads, well within all LLM context window limits.
 
+---
+
+## ADR-013: Hosted Single-User Gate, Postgres, and SSRF Controls
+
+- **Date**: 2026-08-12
+- **Status**: Approved (overrides ADR-002 and ADR-005 for public hosting)
+- **Supersedes for hosted deploys**: ADR-002 (SQLite) and ADR-005 (no auth / local-first only)
+
+### Context
+A public Render/Vercel deployment cannot use SQLite on ephemeral disks, and unauthenticated APIs would expose PII, job data, and BYOK-proxied AI spend. Clerk/OAuth multi-user is out of scope for this personal hosted tool.
+
+### Decision
+1. **Postgres** via Prisma (`provider = "postgresql"`). Local development uses `docker-compose.yml`. Hosted deploys use Render Postgres or Neon.
+2. **Single-user password gate**: HttpOnly `rf_session` cookie signed with `APP_ACCESS_SECRET`. Next.js middleware covers app and `/api/*` except `/login`, `/api/auth/*`, icons, `/wasm/*`, and static assets. Mutation requests require a matching Origin/Referer.
+3. **Fail-closed secrets**: `JOB_SYNC_SECRET` must be set or Pitt CSC sync returns 401. `APP_ACCESS_SECRET` missing returns 503/redirect.
+4. **SSRF**: Server-side fetches (bulk-import, tier-2 apply URLs, custom AI `baseUrl`) go through `safeFetch` (HTTPS-only except localhost in non-production, private/metadata host block, `redirect: "manual"`, import host allowlist).
+5. **BYOK on HTTPS**: Keys remain in `localStorage` and POST bodies to the same origin. CSP and redaction reduce XSS/leak risk; this is an accepted trade-off versus OS keychain for V1 hosted.
+
+### Consequences
+- **Positive**: Resume/PII survive deploys; anonymous internet cannot mutate data or drain AI credits without the password.
+- **Negative**: Operators must run Postgres and set secrets. Local SQLite `dev.db` is no longer the runtime store.
+- **Negative**: BYOK keys are still XSS-reachable in the browser; CSP is the primary mitigation until a vault/keychain migration.
+
+---
+
+## ADR-014: Guest Sessions with Optional Email/Password Accounts
+
+- **Date**: 2026-08-12
+- **Status**: Approved (overrides ADR-013 password gate for pages)
+- **Supersedes for product access**: ADR-013 item 2 (single-user workspace password on all pages)
+
+### Context
+A hosted password wall blocked anyone without `APP_ACCESS_SECRET` and made the product look like a private workspace. Users should be able to try the editor without signing up. Saved resumes, evidence, and jobs must not land in a shared database for anonymous visitors.
+
+### Decision
+1. **Pages are public.** Middleware no longer redirects unauthenticated browsers to `/login`. Missing `APP_ACCESS_SECRET` does not lock the site.
+2. **Guest work is local-only.** Persist APIs require a signed-in `User`. Guests receive `401` `{ code: "GUEST_READ_ONLY" }` on save mutations. List GETs return empty `{ data: [], guest: true }`.
+3. **Optional accounts.** Email + password signup/login (`scrypt` hash) create a `User` row. Session cookie `rf_session` is `uid=...|exp=....hmac` signed with `APP_ACCESS_SECRET` (cookie signing key only — not a login password).
+4. **Data scoping.** `Resume`, `EvidenceItem`, and `Job` have optional `userId`. API routes always pass the session user id. Direct DB helpers used by unit tests may omit it.
+5. **Shared discovery feed.** `DiscoveredJob` stays global. Promoting a discovered job into the tracker requires auth and writes `userId`.
+6. **Stateless tools stay public.** JD extract, ATS evaluate with body `typstContent`, AI test-connection, and Typst repair do not require a session.
+
+### Consequences
+- **Positive**: Anyone can use the editor; signed-in users keep private Postgres data.
+- **Negative**: Signup/login still need `APP_ACCESS_SECRET` to mint cookies. Guest work is lost if the browser storage is cleared.
+- **Negative**: Clerk/OAuth remains out of scope.
+
+---
+
+
 
 
 

@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sanitizeError } from "@/lib/ai/redact";
+import { requireUserId } from "@/lib/security/auth-request";
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    const userId = await requireUserId(request);
+    if (userId instanceof NextResponse) return userId;
+
     await prisma.resume.updateMany({
-      where: { isMaster: true },
-      data: { isMaster: false },
+      where: { isMaster: true, userId },
+      data: { isMaster: false, isProtected: false },
     });
 
     return NextResponse.json({
@@ -14,7 +19,7 @@ export async function POST() {
     });
   } catch (err) {
     return NextResponse.json(
-      { success: false, error: "Failed to clear master resume", message: String(err) },
+      { success: false, error: "Failed to clear master resume", message: sanitizeError(err) },
       { status: 500 }
     );
   }

@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -17,8 +17,22 @@ model SystemInfo {
   updatedAt     DateTime @updatedAt
 }
 
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  resumes        Resume[]
+  evidenceItems  EvidenceItem[]
+  jobs           Job[]
+}
+
 model Resume {
   id          String   @id @default(uuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   title       String
   typstSource String
   isMaster    Boolean  @default(false)
@@ -28,10 +42,14 @@ model Resume {
 
   variants    ResumeVariant[]
   history     MasterHistory[]
+
+  @@index([userId])
 }
 
 model EvidenceItem {
   id              String   @id @default(uuid())
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   type            String   // experience | project | skill | education | award | metric
   title           String
   organization    String?
@@ -43,6 +61,8 @@ model EvidenceItem {
   updatedAt       DateTime @updatedAt
 
   bullets         Bullet[]
+
+  @@index([userId])
 }
 
 model Bullet {
@@ -60,6 +80,8 @@ model Bullet {
 
 model Job {
   id                    String          @id @default(uuid())
+  userId                String?
+  user                  User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
   company               String?
   roleTitle             String?
   rawDescription        String
@@ -72,6 +94,8 @@ model Job {
 
   variants              ResumeVariant[]
   coverLetters          CoverLetter[]
+
+  @@index([userId])
 }
 
 // Phase 4.2: Job-specific tailored resume variant

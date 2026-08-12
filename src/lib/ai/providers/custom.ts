@@ -3,6 +3,11 @@ import { sanitizeError } from "../redact";
 import { stripCodeFences } from "../utils";
 import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from "../repair-schema";
 import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
+import { safeFetch } from "@/lib/security/safe-fetch";
+
+async function customFetch(url: string, init?: RequestInit): Promise<Response> {
+  return safeFetch(url, init ?? {}, { allowLocalhost: process.env.NODE_ENV !== "production" });
+}
 
 /**
  * Custom OpenAI-Compatible Endpoint Adapter
@@ -26,14 +31,14 @@ export async function testCustomConnection(config: ProviderConfig): Promise<Test
     // Attempt /models or /v1/models
     const targetUrl = baseUrl.endsWith("/v1") ? `${baseUrl}/models` : `${baseUrl}/v1/models`;
 
-    let res = await fetch(targetUrl, {
+    let res = await customFetch(targetUrl, {
       method: "GET",
       headers,
     });
 
     // Fallback: try raw /models if /v1/models returns 404
     if (res.status === 404 && !baseUrl.endsWith("/v1")) {
-      res = await fetch(`${baseUrl}/models`, {
+      res = await customFetch(`${baseUrl}/models`, {
         method: "GET",
         headers,
       });
@@ -107,7 +112,7 @@ export async function generateCustomPatches(
       headers["Authorization"] = `Bearer ${apiKey}`;
     }
 
-    const res = await fetch(completionsUrl, {
+    const res = await customFetch(completionsUrl, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -169,7 +174,7 @@ export async function generateCustomQualitativeReview(
       headers["Authorization"] = `Bearer ${apiKey}`;
     }
 
-    const res = await fetch(completionsUrl, {
+    const res = await customFetch(completionsUrl, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -231,7 +236,7 @@ export async function generateCustomCoverLetter(
       headers["Authorization"] = `Bearer ${apiKey}`;
     }
 
-    const res = await fetch(completionsUrl, {
+    const res = await customFetch(completionsUrl, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -293,7 +298,7 @@ export async function convertCustomPdfTextToTypst(
       headers["Authorization"] = `Bearer ${apiKey}`;
     }
 
-    const res = await fetch(completionsUrl, {
+    const res = await customFetch(completionsUrl, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -352,7 +357,7 @@ export async function repairTypstWithCustom(
 
     const completionsUrl = baseUrl.endsWith("/v1") ? `${baseUrl}/chat/completions` : `${baseUrl}/v1/chat/completions`;
 
-    const res = await fetch(completionsUrl, {
+    const res = await customFetch(completionsUrl, {
       method: "POST",
       headers,
       body: JSON.stringify({

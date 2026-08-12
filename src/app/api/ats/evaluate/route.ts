@@ -7,9 +7,12 @@ import { AtsEvaluateInputSchema, RoleProfile } from "@/lib/ats-evaluator/types";
 import { JobRequirements } from "@/lib/jd-parser/types";
 import { getMasterResume } from "@/lib/db/resumes";
 import { getEvidenceItems } from "@/lib/db/evidence";
+import { sanitizeError } from "@/lib/ai/redact";
+import { getRequestUserId } from "@/lib/security/auth-request";
 
 export async function POST(req: NextRequest) {
   try {
+    const userId = await getRequestUserId(req);
     const body = await req.json();
     const parseResult = AtsEvaluateInputSchema.safeParse(body);
 
@@ -35,8 +38,8 @@ export async function POST(req: NextRequest) {
     let rawDescription = "";
 
     if (input.variantId) {
-      const variant = await prisma.resumeVariant.findUnique({
-        where: { id: input.variantId },
+      const variant = await prisma.resumeVariant.findFirst({
+        where: { id: input.variantId, ...(userId ? { job: { userId } } : { id: "__guest__" }) },
         include: { job: true },
       });
 
@@ -65,7 +68,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (input.jobId && !requirements.requiredSkills.length && !requirements.preferredSkills.length) {
-      const job = await prisma.job.findUnique({ where: { id: input.jobId } });
+      const job = userId
+        ? await prisma.job.findFirst({ where: { id: input.jobId, userId } })
+        : null;
       if (job) {
         if (!roleTitle) roleTitle = job.roleTitle || undefined;
         rawDescription = job.rawDescription || "";
@@ -81,7 +86,7 @@ export async function POST(req: NextRequest) {
 
     // Prefer the saved master resume when explicitly requested.
     if (input.useMasterResume) {
-      const master = await getMasterResume();
+      const master = userId ? await getMasterResume(userId) : null;
       if (master?.typstSource?.trim()) {
         typstContent = master.typstSource;
       }
@@ -98,7 +103,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (input.includeEvidenceBank) {
-      const evidenceItems = await getEvidenceItems();
+      const evidenceItems = userId ? await getEvidenceItems(undefined, userId) : [];
       typstContent = augmentTypstWithEvidenceBank(typstContent, evidenceItems);
     }
 
@@ -115,7 +120,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: `Server error during ATS evaluation: ${err instanceof Error ? err.message : String(err)}`,
+        error: sanitizeError(
+          `Server error during ATS evaluation: ${err instanceof Error ? err.message : String(err)}`
+        ),
       },
       { status: 500 }
     );

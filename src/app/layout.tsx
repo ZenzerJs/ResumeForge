@@ -1,19 +1,24 @@
 import type { Metadata, Viewport } from "next";
-import { Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const hankenGrotesk = Hanken_Grotesk({
-  subsets: ["latin"],
+const hankenGrotesk = localFont({
+  src: [
+    { path: "./fonts/HankenGrotesk-400.ttf", weight: "400", style: "normal" },
+    { path: "./fonts/HankenGrotesk-600.ttf", weight: "600", style: "normal" },
+    { path: "./fonts/HankenGrotesk-700.ttf", weight: "700", style: "normal" },
+  ],
   variable: "--font-hanken",
   display: "swap",
-  weight: ["400", "500", "600", "700", "800"],
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
+const jetbrainsMono = localFont({
+  src: [
+    { path: "./fonts/JetBrainsMono-400.ttf", weight: "400", style: "normal" },
+    { path: "./fonts/JetBrainsMono-600.ttf", weight: "600", style: "normal" },
+  ],
   variable: "--font-mono",
   display: "swap",
-  weight: ["400", "600"],
 });
 
 const defaultUrl = process.env.NEXT_PUBLIC_APP_URL || "https://resumeforge.app";
@@ -21,27 +26,27 @@ const defaultUrl = process.env.NEXT_PUBLIC_APP_URL || "https://resumeforge.app";
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: {
-    default: "ResumeForge — Local-First AI Resume Workspace",
+    default: "ResumeForge — AI Resume Workspace",
     template: "%s | ResumeForge",
   },
   description:
-    "Craft truthful, job-specific resume variants from one protected master resume. Evidence-grounded, zero-hallucination AI with live Typst WASM preview.",
+    "Craft truthful, job-specific resume variants from one protected master resume. Use as a guest, or sign in to save. Evidence-grounded, zero-hallucination AI with live Typst WASM preview.",
   keywords: [
     "Resume",
     "Typst",
     "AI Resume Tailoring",
     "ATS Score",
     "Cover Letter Generator",
-    "Local-First Workspace",
+    "Guest Resume Editor",
     "Evidence Bank",
   ],
   authors: [{ name: "ResumeForge Team" }],
   creator: "ResumeForge",
   publisher: "ResumeForge",
   openGraph: {
-    title: "ResumeForge — Local-First AI Resume Workspace",
+    title: "ResumeForge — AI Resume Workspace",
     description:
-      "Craft truthful, job-specific resume variants from one protected master resume. Evidence-grounded, zero-hallucination AI.",
+      "Craft truthful, job-specific resume variants from one protected master resume. Use as a guest, or sign in to save.",
     url: defaultUrl,
     siteName: "ResumeForge",
     locale: "en_US",
@@ -49,7 +54,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "ResumeForge — Local-First AI Resume Workspace",
+    title: "ResumeForge — AI Resume Workspace",
     description:
       "Craft truthful, job-specific resume variants from one protected master resume. Evidence-grounded AI with Typst WASM compilation.",
   },
@@ -72,18 +77,19 @@ export default function RootLayout({
     <html
       lang="en"
       className={`dark ${hankenGrotesk.variable} ${jetbrainsMono.variable}`}
+      style={{ colorScheme: "dark" }}
       suppressHydrationWarning
     >
-      <head>
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
-        />
-      </head>
       <body
         className="bg-background text-on-surface font-body-regular antialiased min-h-screen"
         suppressHydrationWarning
       >
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-[#ff8c00] focus:px-4 focus:py-2 focus:text-black focus:font-semibold"
+        >
+          Skip to content
+        </a>
         {children}
       </body>
     </html>

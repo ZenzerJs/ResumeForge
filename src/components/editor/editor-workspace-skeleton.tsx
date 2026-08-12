@@ -112,7 +112,7 @@ export function EditorWorkspaceSkeleton({
         </header>
       ) : null}
 
-      <main className="flex min-h-0 flex-1 gap-1.5 overflow-hidden p-2 md:p-3">
+      <div className="flex min-h-0 flex-1 gap-1.5 overflow-hidden p-2 md:p-3">
         {/* Panel 1 — Typst Source Editor */}
         <section className="flex min-w-0 flex-[1.15] flex-col overflow-hidden rounded-md border border-slate-800 bg-slate-900 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-2.5">
@@ -228,7 +228,7 @@ export function EditorWorkspaceSkeleton({
             </div>
           </div>
         </section>
-      </main>
+      </div>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { buildEvidenceExtractSystemPrompt } from "@/lib/ai/evidence-prompt";
 import { persistDraftEvidenceFromExtract } from "@/lib/ai/evidence-persist";
 import { createEvidenceItem, getEvidenceItems } from "@/lib/db/evidence";
 import { POST as extractEvidenceRoute } from "@/app/api/ai/extract-evidence/route";
+import { authedRequest, createTestUser } from "./helpers/auth";
 
 beforeEach(async () => {
   await prisma.bullet.deleteMany();
@@ -110,12 +111,17 @@ describe("Evidence extract schema & persist", () => {
   });
 
   it("POST /api/ai/extract-evidence returns 400 without provider", async () => {
+    const { cookie } = await createTestUser();
     const res = await extractEvidenceRoute(
-      new Request("http://localhost/api/ai/extract-evidence", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ typstSource: "= Resume\nHello" }),
-      })
+      authedRequest(
+        "http://localhost/api/ai/extract-evidence",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ typstSource: "= Resume\nHello" }),
+        },
+        cookie
+      )
     );
     expect(res.status).toBe(400);
     const json = await res.json();
@@ -154,19 +160,24 @@ describe("Evidence extract schema & persist", () => {
       )
     );
 
+    const { cookie } = await createTestUser();
     const res = await extractEvidenceRoute(
-      new Request("http://localhost/api/ai/extract-evidence", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          typstSource: "= Resume\n== Experience\nBackend Engineer at Nova Labs",
-          providerConfig: {
-            provider: "openai",
-            apiKey: "sk-proj-valid-test-key-12345",
-            model: "gpt-4o",
-          },
-        }),
-      })
+      authedRequest(
+        "http://localhost/api/ai/extract-evidence",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            typstSource: "= Resume\n== Experience\nBackend Engineer at Nova Labs",
+            providerConfig: {
+              provider: "openai",
+              apiKey: "sk-proj-valid-test-key-12345",
+              model: "gpt-4o",
+            },
+          }),
+        },
+        cookie
+      )
     );
 
     expect(res.status).toBe(200);

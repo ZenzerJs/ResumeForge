@@ -7,8 +7,8 @@ describe("ResumeForge Phase 0 Environment Smoke Test", () => {
   });
 
   it("verifies product identity constant", () => {
-    const appTitle = "ResumeForge — local-first AI resume workspace";
+    const appTitle = "ResumeForge — password-gated AI resume workspace";
     expect(appTitle).toContain("ResumeForge");
-    expect(appTitle).toContain("local-first");
+    expect(appTitle).toContain("password-gated");
   });
 });
