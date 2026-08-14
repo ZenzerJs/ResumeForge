@@ -14,11 +14,14 @@ jobs:
           curl -s https://raw.githubusercontent.com/SimplifyJobs/Summer2027-Internships/dev/README.md > raw_feed.md
 
       - name: Push to ResumeForge Sync API
-        env:                    # ✅ Fixed - indented under the step
+        env:
           APP_SYNC_URL: ${{ secrets.APP_SYNC_URL }}
           JOB_SYNC_SECRET: ${{ secrets.JOB_SYNC_SECRET }}
         run: |
           set -euo pipefail
+
+          : "${APP_SYNC_URL:?APP_SYNC_URL secret is missing or empty}"
+          : "${JOB_SYNC_SECRET:?JOB_SYNC_SECRET secret is missing or empty}"
 
           jq -Rs '{rawMarkdown: ., jobType: "Internship"}' raw_feed.md > payload.json
 
