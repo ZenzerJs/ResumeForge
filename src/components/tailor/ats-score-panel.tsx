@@ -202,35 +202,34 @@ export function AtsScorePanel({
 
   return (
     <div
-      className={`bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg space-y-6 ${className}`}
+      className={`@container bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg space-y-6 min-w-0 ${className}`}
       data-testid="ats-score-panel"
     >
-      {/* Header & Overall Match Meter */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-800 pb-6">
-        <div>
-          <h2 className="text-base font-semibold text-white flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-amber-400" />
-            ATS Quality Score
-            <span className="text-xs font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-0.5 rounded-full">
+      {/* Header & Overall Match Meter — stacked in the Tailor sidebar */}
+      <div className="flex flex-col gap-4 border-b border-slate-800 pb-6">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-white flex flex-wrap items-center gap-2">
+            <BarChart3 className="h-5 w-5 shrink-0 text-amber-400" />
+            <span>ATS Quality Score</span>
+            <span className="text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full whitespace-nowrap">
               Deterministic Engine
             </span>
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-400 mt-1 leading-relaxed">
             Rule-based evaluation of tailored ResumeVariant against job description & role overlay
           </p>
         </div>
 
-        {/* Overall Score Meter & AI Feedback Action */}
         {result && (
-          <div className="flex flex-wrap items-center gap-4 shrink-0">
+          <div className="flex flex-col @md:flex-row @md:items-stretch gap-3 min-w-0">
             <div
               data-testid="overall-score-badge"
-              className={`px-5 py-3 rounded-2xl border flex flex-col items-center justify-center ${scoreColor}`}
+              className={`px-4 py-3 rounded-2xl border flex flex-col items-start justify-center min-w-0 ${scoreColor}`}
             >
-              <span className="text-xs uppercase tracking-wider font-semibold opacity-80">
+              <span className="text-[10px] uppercase tracking-wider font-semibold opacity-80">
                 Overall Match
               </span>
-              <div className="text-3xl font-extrabold tracking-tight font-mono">
+              <div className="text-3xl font-extrabold tracking-tight font-mono leading-tight">
                 {result.overallScore} <span className="text-sm font-normal text-slate-400">/ 100</span>
               </div>
             </div>
@@ -240,7 +239,7 @@ export function AtsScorePanel({
               onClick={handleFetchQualitativeReview}
               disabled={isLoadingQualitative || !result}
               data-testid="get-ai-feedback-btn"
-              className="px-4 py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-semibold text-xs rounded-xl flex items-center gap-2 shadow-lg shadow-amber-600/20 transition shrink-0"
+              className="px-4 py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-600/20 transition @md:shrink-0"
             >
               {isLoadingQualitative ? (
                 <>
@@ -296,15 +295,15 @@ export function AtsScorePanel({
 
       {/* 4 Rubric Category Breakdown Cards */}
       {result && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="category-breakdown-grid">
+        <div className="grid grid-cols-1 gap-3" data-testid="category-breakdown-grid">
           {/* Category 1: Base Resume Health (30 pts) */}
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-                <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                Base Resume Health
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 min-w-0">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+              <span className="text-xs font-semibold text-white flex items-center gap-1.5 min-w-0">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400" />
+                <span className="break-words">Base Resume Health</span>
               </span>
-              <span className="text-xs font-mono font-bold text-slate-200">
+              <span className="text-xs font-mono font-bold text-slate-200 shrink-0">
                 {result.baseHealth.score} / {result.baseHealth.maxScore} pts
               </span>
             </div>
@@ -314,7 +313,7 @@ export function AtsScorePanel({
                 style={{ width: `${result.baseHealth.percentage}%` }}
               />
             </div>
-            <ul className="text-xs space-y-1 text-slate-300 font-mono">
+            <ul className="text-xs space-y-1.5 text-slate-300 leading-relaxed break-words">
               {result.baseHealth.findings.map((f, idx) => (
                 <li
                   key={`base-${idx}`}
@@ -333,13 +332,13 @@ export function AtsScorePanel({
           </div>
 
           {/* Category 2: Required Role Match (40 pts) */}
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-                <Briefcase className="h-4 w-4 text-amber-400" />
-                Required Role Match
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 min-w-0">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+              <span className="text-xs font-semibold text-white flex items-center gap-1.5 min-w-0">
+                <Briefcase className="h-4 w-4 shrink-0 text-amber-400" />
+                <span className="break-words">Required Role Match</span>
               </span>
-              <span className="text-xs font-mono font-bold text-slate-200">
+              <span className="text-xs font-mono font-bold text-slate-200 shrink-0">
                 {result.requiredMatch.score} / {result.requiredMatch.maxScore} pts
               </span>
             </div>
@@ -349,7 +348,7 @@ export function AtsScorePanel({
                 style={{ width: `${result.requiredMatch.percentage}%` }}
               />
             </div>
-            <ul className="text-xs space-y-1 text-slate-300 font-mono">
+            <ul className="text-xs space-y-1.5 text-slate-300 leading-relaxed break-words">
               {result.requiredMatch.findings.slice(0, 5).map((f, idx) => (
                 <li key={`req-${idx}`}>{f}</li>
               ))}
@@ -357,13 +356,13 @@ export function AtsScorePanel({
           </div>
 
           {/* Category 3: Preferred Match (15 pts) */}
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-amber-400" />
-                Preferred Match
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 min-w-0">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+              <span className="text-xs font-semibold text-white flex items-center gap-1.5 min-w-0">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-amber-400" />
+                <span className="break-words">Preferred Match</span>
               </span>
-              <span className="text-xs font-mono font-bold text-slate-200">
+              <span className="text-xs font-mono font-bold text-slate-200 shrink-0">
                 {result.preferredMatch.score} / {result.preferredMatch.maxScore} pts
               </span>
             </div>
@@ -373,7 +372,7 @@ export function AtsScorePanel({
                 style={{ width: `${result.preferredMatch.percentage}%` }}
               />
             </div>
-            <ul className="text-xs space-y-1 text-slate-300 font-mono">
+            <ul className="text-xs space-y-1.5 text-slate-300 leading-relaxed break-words">
               {result.preferredMatch.findings.slice(0, 5).map((f, idx) => (
                 <li key={`pref-${idx}`}>{f}</li>
               ))}
@@ -381,13 +380,13 @@ export function AtsScorePanel({
           </div>
 
           {/* Category 4: Role-Relevant Evidence (15 pts) */}
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-                <Layers className="h-4 w-4 text-purple-400" />
-                Role-Relevant Evidence ({result.selectedProfile})
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 min-w-0">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+              <span className="text-xs font-semibold text-white flex items-center gap-1.5 min-w-0">
+                <Layers className="h-4 w-4 shrink-0 text-purple-400" />
+                <span className="break-words">Role-Relevant Evidence ({result.selectedProfile})</span>
               </span>
-              <span className="text-xs font-mono font-bold text-slate-200">
+              <span className="text-xs font-mono font-bold text-slate-200 shrink-0">
                 {result.roleEvidence.score} / {result.roleEvidence.maxScore} pts
               </span>
             </div>
@@ -397,7 +396,7 @@ export function AtsScorePanel({
                 style={{ width: `${result.roleEvidence.percentage}%` }}
               />
             </div>
-            <ul className="text-xs space-y-1 text-slate-300 font-mono">
+            <ul className="text-xs space-y-1.5 text-slate-300 leading-relaxed break-words">
               {result.roleEvidence.findings.map((f, idx) => (
                 <li key={`role-${idx}`}>{f}</li>
               ))}
@@ -413,29 +412,31 @@ export function AtsScorePanel({
             <CheckCircle2 className="h-4 w-4 text-amber-400" />
             Skill Demonstration Status Tracing ({result.skillEvaluations.length} skills)
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" data-testid="skill-evaluations-list">
+          <div className="grid grid-cols-1 gap-2" data-testid="skill-evaluations-list">
             {result.skillEvaluations.map((se, idx) => {
               const badge = STATUS_BADGES[se.status];
               return (
                 <div
                   key={`se-${idx}`}
                   data-testid="skill-evaluation-item"
-                  className="bg-slate-950 border border-slate-800 rounded-lg p-2.5 flex items-center justify-between gap-3 text-xs"
+                  className="bg-slate-950 border border-slate-800 rounded-lg p-3 flex flex-col items-start gap-2 text-xs min-w-0"
                 >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-100">{se.skill}</span>
+                  <div className="min-w-0 w-full">
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                      <span className="font-semibold text-slate-100 break-words">{se.skill}</span>
                       <span className="text-[10px] text-slate-500 uppercase font-mono">
                         ({se.category})
                       </span>
                     </div>
                     {se.matchedContext && (
-                      <p className="text-[11px] text-slate-400 mt-0.5">{se.matchedContext}</p>
+                      <p className="text-[11px] text-slate-400 mt-1 leading-relaxed break-words">
+                        {se.matchedContext}
+                      </p>
                     )}
                   </div>
                   <span
                     data-testid={`status-badge-${se.skill}`}
-                    className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-semibold border flex items-center gap-1 ${badge.bg} ${badge.text} ${badge.border}`}
+                    className={`w-fit max-w-full px-2 py-0.5 rounded text-[10px] font-semibold border inline-flex items-center gap-1 whitespace-normal ${badge.bg} ${badge.text} ${badge.border}`}
                   >
                     <span>{badge.icon}</span> {badge.label}
                   </span>
@@ -456,11 +457,11 @@ export function AtsScorePanel({
           <p className="text-xs text-slate-400">
             Recommendations point to real, verifiable evidence additions or formatting improvements. No keyword stuffing or hidden text.
           </p>
-          <ul className="space-y-1.5 text-xs text-amber-200/90 font-mono">
+          <ul className="space-y-2 text-xs text-amber-200/90 leading-relaxed">
             {result.gaps.map((gap, idx) => (
-              <li key={`gap-${idx}`} className="flex items-start gap-2">
+              <li key={`gap-${idx}`} className="flex items-start gap-2 min-w-0">
                 <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-400" />
-                <span>{gap}</span>
+                <span className="min-w-0 break-words">{gap}</span>
               </li>
             ))}
           </ul>

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { POST as syncHandler } from "@/app/api/jobs/sync-pittcsc/route";
 import { POST as promoteHandler } from "@/app/api/jobs/promote-discovered/route";
 import { GET as getDiscoveredHandler } from "@/app/api/jobs/discovered/route";
@@ -6,6 +6,10 @@ import { prisma } from "@/lib/prisma";
 import { authedRequest, createTestUser } from "./helpers/auth";
 
 describe("Pitt CSC / Simplify Ingestion & Promotion API", () => {
+  beforeAll(async () => {
+    await prisma.discoveredJob.deleteMany({ where: { company: "Stripe" } });
+  });
+
   it("syncs GFM markdown table into DiscoveredJob records", async () => {
     const sampleMarkdown = `
 | Company | Role | Location | Application Link | Date Posted |

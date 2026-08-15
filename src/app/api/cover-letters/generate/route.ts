@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     // Verify job exists
     const job = await prisma.job.findFirst({
-      where: { id: jobId, userId },
+      where: { id: jobId },
     });
 
     if (!job) {

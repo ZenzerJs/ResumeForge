@@ -126,5 +126,18 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
     // 1200px Desktop Viewport
     await page.setViewportSize({ width: 1200, height: 800 });
     await expect(page.locator('[data-testid="capability-grid-section"]')).toBeVisible();
+
+    const footer = page.locator('[data-testid="landing-footer"]');
+    await footer.scrollIntoViewIfNeeded();
+    await expect(footer).toBeVisible();
+    await expect(footer.locator('a[href="/privacy"]')).toBeVisible();
+  });
+
+  test("10. Privacy policy is reachable from the landing footer", async ({ page }) => {
+    await page.goto("/");
+    await page.locator('[data-testid="landing-footer"]').scrollIntoViewIfNeeded();
+    await page.locator('[data-testid="landing-footer"] a[href="/privacy"]').click();
+    await expect(page).toHaveURL(/\/privacy/);
+    await expect(page.locator("h1")).toHaveText("Privacy Policy");
   });
 });

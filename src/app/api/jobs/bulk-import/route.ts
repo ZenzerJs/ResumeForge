@@ -11,8 +11,8 @@ const BulkImportSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const userId = await requireUserId(request);
-    if (userId instanceof NextResponse) return userId;
+    const gated = await requireUserId(request);
+    if (gated instanceof NextResponse) return gated;
 
     let body = {};
     try {
@@ -38,7 +38,6 @@ export async function POST(request: Request) {
     const result = await importTier1Jobs({
       sourceUrl: sourceUrl || DEFAULT_SIMPLIFY_SOURCE_URL,
       tableMarkdown,
-      userId,
     });
 
     return NextResponse.json({

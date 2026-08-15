@@ -45,20 +45,20 @@ describe("getJobsList location and workplace filters", () => {
     });
     createdIds.push(chicago.id, remote.id, hybrid.id);
 
-    const byCity = await getJobsList({ userId, location: "Chicago" });
+    const byCity = await getJobsList({ q: "LocFilter", location: "Chicago" });
     expect(byCity.data.map((j) => j.company)).toEqual(["LocFilter Chicago Co"]);
 
-    const byRemote = await getJobsList({ userId, workplace: "remote" });
+    const byRemote = await getJobsList({ q: "LocFilter", workplace: "remote" });
     expect(byRemote.data.map((j) => j.company)).toEqual(["LocFilter Remote Co"]);
 
-    const byHybrid = await getJobsList({ userId, workplace: "hybrid" });
+    const byHybrid = await getJobsList({ q: "LocFilter", workplace: "hybrid" });
     expect(byHybrid.data.map((j) => j.company)).toEqual(["LocFilter Hybrid Co"]);
 
-    const byOnsite = await getJobsList({ userId, workplace: "onsite" });
+    const byOnsite = await getJobsList({ q: "LocFilter", workplace: "onsite" });
     expect(byOnsite.data.map((j) => j.company)).toEqual(["LocFilter Chicago Co"]);
   });
 
   afterAll(async () => {
-    await Promise.all(createdIds.map((id) => deleteJob(id, userId)));
+    await Promise.all(createdIds.map((id) => deleteJob(id)));
   });
 });

@@ -48,6 +48,40 @@ export function formatCanonicalJobDescription(fields: CanonicalJdFields): string
   return `${lines.join("\n").trim()}\n`;
 }
 
+const META_LINE = /^(Company|Location|Salary|Posted)\s*:/i;
+
+export type JobDescriptionBlock =
+  | { type: "title"; text: string }
+  | { type: "heading"; level: 2 | 3; text: string }
+  | { type: "meta"; items: Array<{ label: string; value: string }> }
+  | { type: "paragraph"; text: string }
+  | { type: "list"; items: string[] };
+
+export function isAtsWidgetNoise(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (/^\{\s*"widget"\s*:/.test(trimmed) || /"externalSpa"\s*:/.test(trimmed)) {
+    try {
+      const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+      return Boolean(parsed && typeof parsed === "object" && (parsed.widget || parsed.externalSpa));
+    } catch {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function stripAtsWidgetJson(text: string): string {
+  return text.replace(/\{[^{}]*"(?:widget|externalSpa)"[^{}]*\}/g, " ").replace(/[ \t]+\n/g, "\n");
+}
+
+function headingPrefixForTag(tag: string): string {
+  const level = Number(tag.slice(1));
+  if (level <= 1) return "# ";
+  if (level === 2) return "## ";
+  return "### ";
+}
+
 function decodeHtmlEntities(text: string): string {
   return text
     .replace(/&amp;/g, "&")
@@ -85,8 +119,10 @@ export function convertHtmlToCleanMarkdown(htmlContent: string): string {
   text = text.replace(/<script[\s\S]*?<\/script>/gi, "");
   text = text.replace(/<style[\s\S]*?<\/style>/gi, "");
   text = text.replace(/<a\b[^>]*>([\s\S]*?)<\/a>/gi, "$1");
-  text = text.replace(/<\/?(?:strong|b|em|i|span|font)[^>]*>/gi, "");
-  text = text.replace(/<h[1-6][^>]*>\s*/gi, "\n\n");
+  text = text.replace(/<(?:strong|b)[^>]*>([\s\S]*?)<\/(?:strong|b)>/gi, "**$1**");
+  text = text.replace(/<(?:em|i)[^>]*>([\s\S]*?)<\/(?:em|i)>/gi, "*$1*");
+  text = text.replace(/<\/?(?:span|font)[^>]*>/gi, "");
+  text = text.replace(/<h([1-6])[^>]*>\s*/gi, (_match, level: string) => `\n\n${headingPrefixForTag(`h${level}`)}`);
   text = text.replace(/<\/h[1-6]>/gi, "\n\n");
   text = text.replace(/<li[^>]*>\s*/gi, "\n- ");
   text = text.replace(/<\/li>/gi, "\n");
@@ -95,11 +131,12 @@ export function convertHtmlToCleanMarkdown(htmlContent: string): string {
   text = text.replace(/<\/?(?:p|div|section|article|tr|blockquote)[^>]*>/gi, "\n");
   text = text.replace(/<[^>]+>/g, " ");
   text = decodeHtmlEntities(text);
+  text = stripAtsWidgetJson(text);
 
   const lines = text
     .split("\n")
     .map((line) => line.replace(/[ \t]+/g, " ").trim())
-    .filter((line) => line.length > 0);
+    .filter((line) => line.length > 0 && !isAtsWidgetNoise(line));
 
   const blocks: string[] = [];
   let listBuf: string[] = [];
@@ -110,7 +147,7 @@ export function convertHtmlToCleanMarkdown(htmlContent: string): string {
     }
   };
   for (const line of lines) {
-    if (line.startsWith("- ")) {
+    if (line.startsWith("- ") || /^\d+\.\s/.test(line)) {
       listBuf.push(line);
     } else {
       flushList();
@@ -119,4 +156,57 @@ export function convertHtmlToCleanMarkdown(htmlContent: string): string {
   }
   flushList();
   return blocks.join("\n\n");
+}
+
+export function parseJobDescriptionMarkdown(markdown: string): JobDescriptionBlock[] {
+  const cleaned = convertHtmlToCleanMarkdown(markdown);
+  if (!cleaned.trim()) return [];
+
+  const rawBlocks = cleaned.split(/\n{2,}/);
+  const parsed: JobDescriptionBlock[] = [];
+
+  const flushMeta = (items: Array<{ label: string; value: string }>) => {
+    if (items.length > 0) parsed.push({ type: "meta", items: [...items] });
+    items.length = 0;
+  };
+
+  const metaBuf: Array<{ label: string; value: string }> = [];
+
+  for (const raw of rawBlocks) {
+    const block = raw.trim();
+    if (!block || isAtsWidgetNoise(block)) continue;
+
+    const heading = block.match(/^(#{1,3})\s+(.+)$/);
+    if (heading && !block.includes("\n")) {
+      flushMeta(metaBuf);
+      const level = heading[1].length;
+      const text = heading[2].trim();
+      if (level === 1) parsed.push({ type: "title", text });
+      else parsed.push({ type: "heading", level: level === 2 ? 2 : 3, text });
+      continue;
+    }
+
+    const listLines = block.split("\n").filter((line) => line.startsWith("- ") || /^\d+\.\s/.test(line));
+    if (listLines.length > 0 && listLines.length === block.split("\n").length) {
+      flushMeta(metaBuf);
+      parsed.push({
+        type: "list",
+        items: listLines.map((line) => line.replace(/^(?:- |\d+\.\s)/, "").trim()),
+      });
+      continue;
+    }
+
+    const metaMatch = block.match(META_LINE);
+    if (metaMatch && !block.includes("\n")) {
+      const value = block.slice(block.indexOf(":") + 1).trim();
+      metaBuf.push({ label: metaMatch[1], value });
+      continue;
+    }
+
+    flushMeta(metaBuf);
+    parsed.push({ type: "paragraph", text: block });
+  }
+
+  flushMeta(metaBuf);
+  return parsed;
 }

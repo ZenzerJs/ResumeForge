@@ -1,10 +1,19 @@
 "use client";
 
 import React, { useState } from "react";
-import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2, BarChart3, Sparkles } from "lucide-react";
+import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2, BarChart3, Sparkles, FileText, ChevronDown } from "lucide-react";
 import dynamic from "next/dynamic";
 import { compileTypstToPdf } from "@/lib/typst/compiler";
+import { generateAtsDocx } from "@/lib/export/docx";
+import { assertCanExport } from "@/lib/guardrail/policy";
+import { ResumeFacts } from "@/lib/facts/types";
 import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const AtsScorePanel = dynamic(
   () => import("@/components/tailor/ats-score-panel").then((m) => ({ default: m.AtsScorePanel })),
@@ -17,6 +26,7 @@ interface PreviewPanelProps {
   source: string;
   isCompiling: boolean;
   onResetTemplate: () => void;
+  masterFacts?: ResumeFacts | null;
   extractedRequirements?: {
     requiredSkills: string[];
     preferredSkills: string[];
@@ -37,6 +47,7 @@ export function PreviewPanel({
   source,
   isCompiling,
   onResetTemplate,
+  masterFacts,
   extractedRequirements,
   roleTitle,
   onTriggerRepair,
@@ -56,8 +67,10 @@ export function PreviewPanel({
       setIsExporting(true);
       setExportError(null);
 
+      // Phase 11.2 Mechanical Guardrail Gate
+      assertCanExport(source, masterFacts);
+
       const pdfBytes = await compileTypstToPdf(source);
-      // Create blob and trigger browser file download
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -69,6 +82,33 @@ export function PreviewPanel({
       URL.revokeObjectURL(url);
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "Failed to export PDF");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportDocx = async () => {
+    try {
+      setIsExporting(true);
+      setExportError(null);
+
+      // Phase 11.2 Mechanical Guardrail Gate
+      assertCanExport(source, masterFacts);
+
+      const docxBytes = await generateAtsDocx(source, { facts: masterFacts || undefined });
+      const blob = new Blob([docxBytes.buffer as ArrayBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "resume.docx";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Failed to export DOCX");
     } finally {
       setIsExporting(false);
     }
@@ -106,19 +146,42 @@ export function PreviewPanel({
             Reset Template
           </button>
 
-          <button
-            type="button"
-            onClick={handleExportPdf}
-            disabled={isExporting || Boolean(error)}
-            className="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1 text-xs font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {isExporting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Download className="h-3.5 w-3.5" />
-            )}
-            Export PDF
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                disabled={isExporting || Boolean(error)}
+                data-testid="export-dropdown-btn"
+                className="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1 text-xs font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isExporting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
+                )}
+                Export
+                <ChevronDown className="h-3 w-3 opacity-80" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem
+                onClick={handleExportPdf}
+                data-testid="export-pdf-menu-item"
+                className="cursor-pointer text-xs flex items-center gap-2"
+              >
+                <Download className="size-3.5 text-indigo-500" />
+                <span>PDF (WASM)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportDocx}
+                data-testid="export-docx-menu-item"
+                className="cursor-pointer text-xs flex items-center gap-2"
+              >
+                <FileText className="size-3.5 text-blue-500" />
+                <span>DOCX (ATS)</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

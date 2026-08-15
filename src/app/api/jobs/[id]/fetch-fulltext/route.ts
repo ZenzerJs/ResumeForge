@@ -20,7 +20,7 @@ export async function POST(
       );
     }
 
-    const owned = await getJobById(id, userId);
+    const owned = await getJobById(id);
     if (!owned) {
       return NextResponse.json(
         { success: false, error: "Job posting not found" },

@@ -36,6 +36,7 @@ This document specifies the domain data model for ResumeForge. Phase 2 implement
 - **`typstSource`** (String): Full Typst markup source code.
 - **`isMaster`** (Boolean, default `false`): Flag indicating if this record is the current active Master Resume.
 - **`isProtected`** (Boolean, default `true`): Prevents accidental deletion.
+- **`factSnapshot`** (Json, Optional): Phase 11 deterministic fact snapshot (`ResumeFacts`, version 1) freezing employers, titles, date ranges, metrics, and skills at save time.
 - **`createdAt`** (DateTime): Timestamp of creation.
 - **`updatedAt`** (DateTime): Timestamp of last update.
 

@@ -4,12 +4,46 @@ This document records completed project milestones, current state, known limitat
 
 ---
 
-## Current Status: Guest Sessions + Optional Accounts
+## Current Status: Phase 11 — Evidence-Grounded Engine, Guardrails & Adaptive AI Assistant
+
+- **Completed Date**: 2026-08-14
+- **Status Summary**: Complete implementation of Phase 11. Fact snapshot engine freezes master facts on Postgres Json column (`Resume.factSnapshot` & `ResumeVariant.factSnapshot`). Mechanical fail-closed guardrail diffs candidate Typst against master facts (blocking hard violations on employer, title, date, metric, evidence citations). Clean ATS single-column DOCX generator with direct downloads. Confirm-before-master fact freezing dialog. 5-step one-click apply sheet in tracker feed. Allowlisted model tool executor with guardrail gates. Portaled tri-mode `AiAssistantWindow` with RAF dragging/resizing and streaming markdown rendering.
+
+### Phase 11 Deliverables
+1. **Fact Snapshot Engine (`src/lib/facts/`)**:
+   - `types.ts`, `normalize.ts`, `extract.ts`: Canonical string, employer, job title, date range, and metric tokenization pipeline.
+   - `prisma/schema.prisma`: `factSnapshot Json?` on `Resume` and `ResumeVariant`.
+   - Snapshot freezing on `saveMasterResume` and copy to variants for audit trail.
+2. **Mechanical Guardrail Engine (`src/lib/guardrail/`)**:
+   - `check.ts`, `policy.ts`, `types.ts`: Deterministic diff checker against master fact baseline.
+   - Fail-closed retry policy (1x retry on violation, fallback to master baseline on failure).
+   - Hard violation gate blocking PDF/DOCX export, patch applications, and master overwrite.
+   - `src/components/ui/guardrail-feedback.tsx`: Audit table with severity badges and violation details.
+3. **Clean ATS DOCX Generator (`src/lib/export/docx.ts`)**:
+   - Single-column semantic DOCX generator using `docx`.
+   - Export dropdown in preview panel (`PDF (WASM)` | `DOCX (ATS)`).
+4. **Confirm-Before-Master Flow (`src/components/editor/confirm-master-dialog.tsx`)**:
+   - Interactive preview of extracted employers, titles, metrics, and skills before freezing master baseline.
+5. **One-Click Apply Pipeline (`src/components/tracker/apply-sheet.tsx`)**:
+   - 5-step pipeline: `Job -> Tailor -> Guardrail Audit -> ATS Score -> Downloads & Direct Link`.
+6. **Model Tool Protocol (`src/lib/ai/tools/`)**:
+   - Allowlisted executor for `get_resume_facts`, `run_guardrail`, `get_ats_score`, `get_job`, `search_saved_jobs`, `apply_patches`, `export_docx`.
+7. **Adaptive AI Assistant Window (`src/components/editor/ai-assistant-window.tsx` & `ai-markdown-renderer.tsx`)**:
+   - Portaled container to `document.body` with tri-mode (`docked`, `floating`, `maximized`).
+   - High-FPS RAF dragging and resizing with `localStorage` geometry persistence.
+   - Streaming markdown rendering with code block copying and sanitization.
+
+---
+
+## Previous Status: Guest Sessions + Optional Accounts
 
 - **Completed Date**: 2026-08-12
-- **Status Summary**: The app is usable without signing up. Guest work stays in the browser. Email/password accounts persist resumes, evidence, and jobs to Postgres scoped by `userId`.
+- **Status Summary**: The app is usable without signing up. Guest work stays in the browser. Email/password accounts persist resumes and evidence to Postgres scoped by `userId`. Jobs and full descriptions are a shared catalog readable by guests and every account.
 
-### Follow-up (2026-08-12): Restore landing chrome + usernames
+### Follow-up (2026-08-12): Shared job catalog, private evidence
+- Jobs and full descriptions are a global catalog. Guests and every account can read them. Creating/updating/deleting still requires sign-in.
+- Evidence Bank, resumes, variants, and cover letters stay scoped to the signed-in user. Guests get empty lists and cannot save.
+- Deleting a user no longer cascade-deletes catalog jobs (`Job.userId` is `ON DELETE SET NULL`). Cover letters store `userId` so they stay private even without a variant.
 - Landing atmosphere layers, capability marquee, proof-card badges, and footer links restored. Landing `main` no longer uses `overflow-hidden` (that was clipping sections below the fold).
 - Accounts have a unique `username`. Nav shows `@username` instead of the full email. Settings includes Sign In / Sign Up / Sign Out and username editing.
 
@@ -17,7 +51,7 @@ This document records completed project milestones, current state, known limitat
 - `User` model and optional `userId` on `Resume`, `EvidenceItem`, and `Job`.
 - Signup/login/me/logout; session cookie carries `userId`.
 - Public pages; CSRF and rate limits unchanged. Missing `APP_ACCESS_SECRET` no longer locks browsing.
-- Persist APIs return `401 GUEST_READ_ONLY` for guests; list GETs return empty data.
+- Persist APIs return `401 GUEST_READ_ONLY` for guests; resume/evidence list GETs return empty data. Job list GETs return the shared catalog.
 - Sign In / Sign Up nav, guest banner, login+signup page, Continue as guest.
 - ADR-014 overrides ADR-013’s page-level password gate.
 

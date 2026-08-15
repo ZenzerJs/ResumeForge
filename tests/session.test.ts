@@ -24,6 +24,7 @@ describe("session helpers", () => {
     expect(isPublicPath("/wasm/typst_ts_web_compiler_bg.wasm")).toBe(true);
     expect(isPublicPath("/fonts/typst/NewCM10-Regular.otf")).toBe(true);
     expect(isPublicPath("/login")).toBe(true);
+    expect(isPublicPath("/privacy")).toBe(true);
     expect(isPublicPath("/api/jobs")).toBe(false);
   });
 

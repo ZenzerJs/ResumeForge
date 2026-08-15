@@ -23,6 +23,7 @@ export interface CreateJobInput {
   status?: JobStatus;
   appliedAt?: Date | string | null;
   notes?: string | null;
+  /** Ignored. Jobs are a shared catalog, not owned by a user. */
   userId?: string;
 }
 
@@ -51,7 +52,6 @@ export async function createJob(input: CreateJobInput) {
       status: input.status || "SAVED",
       appliedAt: input.appliedAt ? new Date(input.appliedAt) : null,
       notes: input.notes || null,
-      userId: input.userId,
     },
     include: {
       variants: {
@@ -69,9 +69,9 @@ export async function createJob(input: CreateJobInput) {
   };
 }
 
-export async function updateJob(id: string, input: UpdateJobInput, userId?: string) {
+export async function updateJob(id: string, input: UpdateJobInput, viewerUserId?: string | null) {
   const existing = await prisma.job.findFirst({
-    where: { id, ...(userId ? { userId } : {}) },
+    where: { id },
   });
   if (!existing) return null;
 
@@ -98,14 +98,7 @@ export async function updateJob(id: string, input: UpdateJobInput, userId?: stri
   const updated = await prisma.job.update({
     where: { id },
     data: dataToUpdate,
-    include: {
-      variants: {
-        select: { id: true, variantTitle: true, status: true, createdAt: true },
-      },
-      coverLetters: {
-        select: { id: true, title: true, status: true, createdAt: true },
-      },
-    },
+    include: jobIncludeForViewer(viewerUserId),
   });
 
   return {
@@ -123,9 +116,32 @@ const jobListInclude = {
   },
 } as const;
 
-export async function getJobs(userId?: string) {
+function jobIncludeForViewer(viewerUserId?: string | null): Prisma.JobInclude {
+  if (viewerUserId === undefined) {
+    return jobListInclude;
+  }
+  const hide = { id: "__none__" };
+  return {
+    variants: {
+      where: viewerUserId ? { masterResume: { userId: viewerUserId } } : hide,
+      select: { id: true, variantTitle: true, status: true, createdAt: true },
+    },
+    coverLetters: {
+      where: viewerUserId
+        ? {
+            OR: [
+              { userId: viewerUserId },
+              { variant: { masterResume: { userId: viewerUserId } } },
+            ],
+          }
+        : hide,
+      select: { id: true, title: true, status: true, createdAt: true },
+    },
+  };
+}
+
+export async function getJobs() {
   const jobs = await prisma.job.findMany({
-    where: userId ? { userId } : undefined,
     orderBy: { createdAt: "desc" },
     include: jobListInclude,
   });
@@ -146,14 +162,14 @@ export interface JobListQuery {
   workplace?: WorkplaceFilter;
   status?: JobStatus | JobStatus[] | "ALL";
   postedWithin?: PostedWithin;
-  userId?: string;
+  /** Viewer id — scopes nested variants/cover letters, not the job catalog. */
+  userId?: string | null;
 }
 
 export async function getJobsList(query: JobListQuery = {}) {
   const page = Math.max(1, query.page ?? 1);
   const limit = Math.min(100, Math.max(1, query.limit ?? 40));
   const where: Prisma.JobWhereInput = {};
-  if (query.userId) where.userId = query.userId;
 
   if (query.status && query.status !== "ALL") {
     const statuses = Array.isArray(query.status) ? query.status : [query.status];
@@ -189,7 +205,7 @@ export async function getJobsList(query: JobListQuery = {}) {
   const jobs = await prisma.job.findMany({
     where,
     orderBy: { createdAt: "desc" },
-    include: jobListInclude,
+    include: jobIncludeForViewer(query.userId),
   });
 
   const mapped = jobs.map((job) => {
@@ -230,17 +246,10 @@ export async function getJobsList(query: JobListQuery = {}) {
   };
 }
 
-export async function getJobById(id: string, userId?: string) {
+export async function getJobById(id: string, viewerUserId?: string | null) {
   const job = await prisma.job.findFirst({
-    where: { id, ...(userId ? { userId } : {}) },
-    include: {
-      variants: {
-        select: { id: true, variantTitle: true, status: true, createdAt: true },
-      },
-      coverLetters: {
-        select: { id: true, title: true, status: true, createdAt: true },
-      },
-    },
+    where: { id },
+    include: jobIncludeForViewer(viewerUserId),
   });
 
   if (!job) return null;
@@ -251,9 +260,9 @@ export async function getJobById(id: string, userId?: string) {
   };
 }
 
-export async function deleteJob(id: string, userId?: string) {
+export async function deleteJob(id: string) {
   const existing = await prisma.job.findFirst({
-    where: { id, ...(userId ? { userId } : {}) },
+    where: { id },
   });
   if (!existing) return null;
   await prisma.job.delete({ where: { id } });

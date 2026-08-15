@@ -6,8 +6,8 @@ import { requireUserId } from "@/lib/security/auth-request";
 
 export async function POST(req: Request) {
   try {
-    const userId = await requireUserId(req);
-    if (userId instanceof NextResponse) return userId;
+    const gated = await requireUserId(req);
+    if (gated instanceof NextResponse) return gated;
 
     const { discoveredJobId } = await req.json();
 
@@ -31,7 +31,6 @@ export async function POST(req: Request) {
         rawDescription: `${discovered.roleTitle} at ${discovered.company} (${discovered.location}).${isSafeHref(discovered.applyUrl) ? ` Application Link: ${discovered.applyUrl}` : ""}`,
         source: "pittcsc_auto",
         status: "SAVED",
-        userId,
       },
     });
 

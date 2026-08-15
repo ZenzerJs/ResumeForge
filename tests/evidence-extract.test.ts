@@ -68,6 +68,8 @@ describe("Evidence extract schema & persist", () => {
     expect(prompt).toContain("MASTER RESUME → EVIDENCE BANK DRAFT EXTRACT");
     expect(prompt).toContain("ZERO HALLUCINATION");
     expect(prompt).toContain("skippedSections");
+    expect(prompt).toContain("NOT A COVER LETTER");
+    expect(prompt).not.toContain("TAILORED COVER LETTER SPECIALIST");
   });
 
   it("persistDraftEvidenceFromExtract creates drafts and skips verified duplicates", async () => {
@@ -187,5 +189,33 @@ describe("Evidence extract schema & persist", () => {
 
     const drafts = await getEvidenceItems("draft");
     expect(drafts.some((d) => d.title === "Backend Engineer")).toBe(true);
+  });
+
+  it("extractEvidenceFromMaster sends the evidence extract prompt, not the cover-letter prompt", async () => {
+    const fetchMock = vi.spyOn(global, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: JSON.stringify({ items: [], skippedSections: [] }) } }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+
+    const { extractEvidenceFromMaster } = await import("@/lib/ai/gateway");
+    await extractEvidenceFromMaster(
+      { provider: "openai", apiKey: "sk-proj-valid-test-key-12345", model: "gpt-4o" },
+      "= Resume\nHello"
+    );
+
+    expect(fetchMock).toHaveBeenCalled();
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body));
+    const system = body.messages.find((m: { role: string }) => m.role === "system")?.content ?? "";
+    const user = body.messages.find((m: { role: string }) => m.role === "user")?.content ?? "";
+    expect(system).toContain("MASTER RESUME → EVIDENCE BANK DRAFT EXTRACT");
+    expect(system).toContain("NOT A COVER LETTER");
+    expect(system).not.toContain("TAILORED COVER LETTER SPECIALIST");
+    expect(user).toContain("Extract draft Evidence Bank items");
+    expect(user).not.toContain("Write a professional, evidence-grounded cover letter");
   });
 });

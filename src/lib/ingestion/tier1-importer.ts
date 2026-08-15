@@ -251,7 +251,6 @@ export async function importTier1Jobs(input: ImportTier1Input = {}): Promise<Imp
   let skippedCount = 0;
 
   const existingJobs = await prisma.job.findMany({
-    where: input.userId ? { userId: input.userId } : undefined,
     select: { company: true, roleTitle: true, notes: true },
   });
 
@@ -270,7 +269,6 @@ export async function importTier1Jobs(input: ImportTier1Input = {}): Promise<Imp
     source: string;
     notes: string;
     extractedRequirements: string;
-    userId?: string;
   }> = [];
 
   for (const row of parsedRows) {
@@ -311,7 +309,6 @@ export async function importTier1Jobs(input: ImportTier1Input = {}): Promise<Imp
         preferredSkills: [],
         domainTerms: [],
       }),
-      ...(input.userId ? { userId: input.userId } : {}),
     });
   }
 

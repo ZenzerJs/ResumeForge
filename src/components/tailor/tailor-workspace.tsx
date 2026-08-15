@@ -523,7 +523,7 @@ export function TailorWorkspace() {
         )}
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-          <div className="xl:col-span-8 flex flex-col gap-6">
+          <div className="xl:col-span-7 flex flex-col gap-6 min-w-0">
             <section className="glass-panel rounded-lg p-5 glow-effect transition-shadow">
               <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800/60">
                 <Briefcase className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
@@ -725,9 +725,9 @@ export function TailorWorkspace() {
             </section>
           </div>
 
-          <div className="xl:col-span-4 flex flex-col gap-6">
+          <div className="xl:col-span-5 flex flex-col gap-6 min-w-0">
             {extractedRequirements && (activeVariantContent || masterTypstSource) ? (
-              <section className="glass-panel rounded-lg p-5 overflow-hidden">
+              <section className="glass-panel rounded-lg p-5 min-w-0">
                 <AtsScorePanel
                   typstContent={activeVariantContent || masterTypstSource}
                   extractedRequirements={extractedRequirements}

@@ -13,6 +13,7 @@ import { isSafeHref, safeFetch, UnsafeUrlError } from "@/lib/security/safe-fetch
 import {
   formatCanonicalJobDescription,
   convertHtmlToCleanMarkdown,
+  isAtsWidgetNoise,
   type CanonicalJdFields,
 } from "@/lib/ingestion/jd-format";
 
@@ -93,7 +94,10 @@ export function validateExtractedTextQuality(text: string): boolean {
   ];
 
   const matchedCount = substanceKeywords.filter((kw) => lower.includes(kw)).length;
-  return matchedCount >= 2;
+  if (matchedCount < 2) return false;
+  if (isAtsWidgetNoise(text.trim())) return false;
+  if (/"widget"\s*:\s*"redirect"/i.test(text) && text.length < 600) return false;
+  return true;
 }
 
 export function greenhouseApiUrlFromPosting(pageUrl: string): string | null {

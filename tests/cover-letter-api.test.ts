@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { createJob } from "@/lib/db/jobs";
+import { createResume } from "@/lib/db/resumes";
+import { createVariant } from "@/lib/db/variants";
 import { createCoverLetter, getCoverLettersByJobId } from "@/lib/db/cover-letters";
 import { GET as getCoverLettersRoute, POST as createCoverLetterRoute } from "@/app/api/cover-letters/route";
 import { GET as getCoverLetterByIdRoute } from "@/app/api/cover-letters/[id]/route";
@@ -13,6 +15,12 @@ describe("Cover Letter Database & API Integration Tests (Phase 5)", () => {
   beforeEach(async () => {
     const auth = await createTestUser();
     cookie = auth.cookie;
+    const master = await createResume({
+      title: "Cover Letter Test Master",
+      typstSource: "= Cover Letter Test Master",
+      isMaster: true,
+      userId: auth.user.id,
+    });
     const job = await createJob({
       company: "Stripe",
       roleTitle: "Staff Software Engineer",
@@ -20,9 +28,17 @@ describe("Cover Letter Database & API Integration Tests (Phase 5)", () => {
       userId: auth.user.id,
     });
     jobId = job.id;
+    const variant = await createVariant({
+      masterResumeId: master.id,
+      jobId,
+      variantTitle: "Stripe tailored variant",
+      typstContent: "= Stripe variant",
+      userId: auth.user.id,
+    });
 
     const letter = await createCoverLetter({
       jobId,
+      variantId: variant.id,
       title: "Stripe Staff Role Cover Letter",
       salutation: "Dear Stripe Hiring Team,",
       openingParagraph: "I am writing to express my strong enthusiasm for the Staff Software Engineer position at Stripe.",

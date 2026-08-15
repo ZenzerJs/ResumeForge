@@ -12,7 +12,6 @@ export interface DashboardStats {
 }
 
 export async function getDashboardStats(userId?: string): Promise<DashboardStats> {
-  const owner = userId ? { userId } : {};
   const [
     masterResume,
     evidenceCount,
@@ -22,17 +21,27 @@ export async function getDashboardStats(userId?: string): Promise<DashboardStats
     variantsCount,
     coverLettersCount,
   ] = await Promise.all([
-    prisma.resume.findFirst({ where: { isMaster: true, ...owner }, select: { title: true } }),
-    prisma.evidenceItem.count({ where: { status: { not: "archived" }, ...owner } }),
-    prisma.evidenceItem.count({ where: { status: "verified", ...owner } }),
-    prisma.job.count({ where: owner }),
-    prisma.job.count({ where: { status: "APPLIED", ...owner } }),
+    userId
+      ? prisma.resume.findFirst({ where: { isMaster: true, userId }, select: { title: true } })
+      : Promise.resolve(null),
+    userId
+      ? prisma.evidenceItem.count({ where: { status: { not: "archived" }, userId } })
+      : Promise.resolve(0),
+    userId
+      ? prisma.evidenceItem.count({ where: { status: "verified", userId } })
+      : Promise.resolve(0),
+    prisma.job.count(),
+    prisma.job.count({ where: { status: "APPLIED" } }),
     userId
       ? prisma.resumeVariant.count({ where: { masterResume: { userId } } })
-      : prisma.resumeVariant.count(),
+      : Promise.resolve(0),
     userId
-      ? prisma.coverLetter.count({ where: { job: { userId } } })
-      : prisma.coverLetter.count(),
+      ? prisma.coverLetter.count({
+          where: {
+            OR: [{ userId }, { variant: { masterResume: { userId } } }],
+          },
+        })
+      : Promise.resolve(0),
   ]);
 
   return {

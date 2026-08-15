@@ -249,7 +249,7 @@ export function QualitativeReviewPanel({
           <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
             Category Observations & Nuance
           </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             {result.categoryFeedbacks.map((cf, idx) => (
               <div
                 key={`cf-${idx}`}

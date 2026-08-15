@@ -21,6 +21,12 @@ import {
 import { QualitativeCategoryFeedback, BulletFeedback } from "@/lib/ai/qualitative-schema";
 import { TypstRepairProposal } from "@/lib/ai/repair-schema";
 import { compileTypstToSvg } from "@/lib/typst/compiler";
+import { ResumeFacts } from "@/lib/facts/types";
+import { checkGuardrail } from "@/lib/guardrail/check";
+import { assertCanApplyPatches } from "@/lib/guardrail/policy";
+import { GuardrailResult } from "@/lib/guardrail/types";
+import { GuardrailFeedback } from "@/components/ui/guardrail-feedback";
+import { AiMarkdownRenderer } from "@/components/editor/ai-markdown-renderer";
 
 interface AiSidebarProps {
   /** Current Typst source in the editor buffer */
@@ -31,6 +37,8 @@ interface AiSidebarProps {
   onToggleCollapse?: () => void;
   /** Collapsed state boolean */
   isCollapsed?: boolean;
+  /** Frozen master facts snapshot for guardrail checking */
+  masterFacts?: ResumeFacts | null;
   /** Task 10.5: Active compile error repair context */
   repairContext?: {
     compileError: string;
@@ -90,6 +98,7 @@ export function AiSidebar({
   onApplyToBuffer,
   onToggleCollapse,
   isCollapsed,
+  masterFacts,
   repairContext,
   onDismissRepair,
 }: AiSidebarProps) {
@@ -102,6 +111,7 @@ export function AiSidebar({
   const [noKeyError, setNoKeyError] = useState(false);
   const [suggestions, setSuggestions] = useState<PatchSuggestion[]>([]);
   const [gaps, setGaps] = useState<GapItem[]>([]);
+  const [guardrailResult, setGuardrailResult] = useState<GuardrailResult | null>(null);
   const [acceptedIds, setAcceptedIds] = useState<Set<string>>(new Set());
   const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set());
   const [showGaps, setShowGaps] = useState(false);
@@ -117,64 +127,70 @@ export function AiSidebar({
     timestamp: number;
   } | null>(null);
 
+  // Auto-fill from localStorage if review feedback exists
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const activeJobId = urlJobId || sessionStorage.getItem("resumeforge_active_job_id") || "default";
-    const stored = sessionStorage.getItem(`resumeforge_tailor_feedback_${activeJobId}`);
-    if (stored) {
-      try {
+    try {
+      const stored = sessionStorage.getItem("resumeforge_tailor_feedback");
+      if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed && parsed.overviewCommentary) {
+        if (parsed?.overviewCommentary && Array.isArray(parsed?.nextStepsAdvice)) {
           setSeededFeedback(parsed);
-          sessionStorage.removeItem(`resumeforge_tailor_feedback_${activeJobId}`);
         }
-      } catch {
-        // ignore
       }
+    } catch {
+      // ignore
     }
-  }, [urlJobId]);
+  }, []);
 
   const handleDismissSeededFeedback = () => {
     setSeededFeedback(null);
     if (typeof window !== "undefined") {
-      const activeJobId = urlJobId || sessionStorage.getItem("resumeforge_active_job_id") || "default";
-      sessionStorage.removeItem(`resumeforge_tailor_feedback_${activeJobId}`);
+      sessionStorage.removeItem("resumeforge_tailor_feedback");
     }
   };
 
-  // Auto-populate from active job in sessionStorage
+  // Fetch job description if jobId in URL or active in sessionStorage
   useEffect(() => {
-    const activeJobId = sessionStorage.getItem("resumeforge_active_job_id");
-    if (!activeJobId) return;
-    fetch(`/api/jobs/${activeJobId}`)
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.success && json.data?.rawDescription) {
+    const targetJobId = urlJobId || sessionStorage.getItem("resumeforge_active_job_id");
+    if (!targetJobId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/jobs/${targetJobId}`);
+        const json = await res.json();
+        if (!cancelled && res.ok && json.success && json.data?.rawDescription) {
           setJdText(json.data.rawDescription);
         }
-      })
-      .catch(() => {});
-  }, []);
+      } catch {
+        // ignore
+      }
+    })();
 
-  const handleGenerate = useCallback(async () => {
-    setError(null);
-    setNoKeyError(false);
+    return () => {
+      cancelled = true;
+    };
+  }, [urlJobId]);
 
+  const handleTailor = useCallback(async () => {
     if (!jdText.trim()) {
-      setError("Paste a job description first.");
+      setError("Please enter a job description to tailor against.");
       return;
     }
 
     const aiSettings = loadAiSettings();
     if (!aiSettings) {
       setNoKeyError(true);
-      setError("No AI provider configured. Go to Settings to add your API key.");
+      setError("AI provider not configured. Please enter your API key in Settings.");
       return;
     }
 
     setIsGenerating(true);
+    setError(null);
+    setNoKeyError(false);
     setSuggestions([]);
     setGaps([]);
+    setGuardrailResult(null);
     setAcceptedIds(new Set());
     setRejectedIds(new Set());
     setHasApplied(false);
@@ -231,14 +247,21 @@ export function AiSidebar({
         return;
       }
 
-      setSuggestions(patchJson.data.verified || []);
+      const verifiedPatches = patchJson.data.verified || [];
+      setSuggestions(verifiedPatches);
       setGaps(patchJson.data.gaps || []);
+
+      // Step 3: Phase 11.2 Guardrail verification against frozen master facts
+      if (masterFacts) {
+        const gResult = checkGuardrail(source, masterFacts, { patches: verifiedPatches });
+        setGuardrailResult(gResult);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unexpected error during generation.");
     } finally {
       setIsGenerating(false);
     }
-  }, [jdText, seededFeedback]);
+  }, [jdText, masterFacts, seededFeedback, source]);
 
   const handleAccept = (id: string) => {
     setAcceptedIds((prev) => {
@@ -267,6 +290,17 @@ export function AiSidebar({
   };
 
   const handleApplyAccepted = () => {
+    // Phase 11.2: Enforce guardrail safety gate
+    if (masterFacts) {
+      const acceptedList = suggestions.filter((s) => acceptedIds.has(s.id));
+      try {
+        assertCanApplyPatches(source, masterFacts, acceptedList);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Cannot apply patches: guardrail check failed.");
+        return;
+      }
+    }
+
     // Apply all accepted patches to the buffer by simple string replacement
     let updatedSource = source;
     for (const patch of suggestions) {
@@ -645,7 +679,7 @@ export function AiSidebar({
         {/* Generate button */}
         <button
           type="button"
-          onClick={handleGenerate}
+          onClick={handleTailor}
           disabled={isGenerating || !jdText.trim()}
           className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-semibold text-xs py-2.5 rounded-lg shadow shadow-amber-500/20 transition"
         >
@@ -661,6 +695,13 @@ export function AiSidebar({
             </>
           )}
         </button>
+
+        {/* Phase 11.2 Mechanical Guardrail Feedback */}
+        {guardrailResult && (
+          <div className="pt-2">
+            <GuardrailFeedback result={guardrailResult} />
+          </div>
+        )}
 
         {/* Suggestions list */}
         {suggestions.length > 0 && (
@@ -731,7 +772,7 @@ export function AiSidebar({
                     </div>
                   )}
 
-                  <p className="text-slate-500 text-[10px] leading-relaxed">{s.rationale}</p>
+                  <AiMarkdownRenderer content={s.rationale} className="text-slate-400 text-[11px]" />
 
                   {!isAccepted && !isRejected && (
                     <div className="flex gap-1.5 pt-1">

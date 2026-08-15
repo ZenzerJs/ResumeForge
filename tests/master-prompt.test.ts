@@ -75,5 +75,7 @@ describe("Task 9.4 — Unified Master AI System Prompt Unit Tests", () => {
     expect(prompt).toContain('"skippedSections"');
     expect(prompt).toContain("ZERO HALLUCINATION");
     expect(prompt).toContain("draft");
+    expect(prompt).toContain("NOT A COVER LETTER");
+    expect(prompt).not.toContain("TAILORED COVER LETTER SPECIALIST");
   });
 });

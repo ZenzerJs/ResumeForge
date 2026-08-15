@@ -20,15 +20,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getRequestUserId(request);
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: "Job posting not found" },
-        { status: 404 }
-      );
-    }
+    const viewerUserId = await getRequestUserId(request);
     const { id } = await params;
-    const job = await getJobById(id, userId);
+    const job = await getJobById(id, viewerUserId);
 
     if (!job) {
       return NextResponse.json(
@@ -95,7 +89,7 @@ export async function DELETE(
     if (userId instanceof NextResponse) return userId;
 
     const { id } = await params;
-    const deleted = await deleteJob(id, userId);
+    const deleted = await deleteJob(id);
     if (!deleted) {
       return NextResponse.json(
         { success: false, error: "Job posting not found" },

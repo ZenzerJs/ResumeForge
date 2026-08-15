@@ -28,18 +28,20 @@ model User {
   resumes        Resume[]
   evidenceItems  EvidenceItem[]
   jobs           Job[]
+  coverLetters   CoverLetter[]
 }
 
 model Resume {
-  id          String   @id @default(uuid())
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String
-  typstSource String
-  isMaster    Boolean  @default(false)
-  isProtected Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String
+  typstSource  String
+  isMaster     Boolean  @default(false)
+  isProtected  Boolean  @default(true)
+  factSnapshot Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   variants    ResumeVariant[]
   history     MasterHistory[]
@@ -82,7 +84,7 @@ model Bullet {
 model Job {
   id                    String          @id @default(uuid())
   userId                String?
-  user                  User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                  User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
   company               String?
   roleTitle             String?
   rawDescription        String
@@ -109,6 +111,7 @@ model ResumeVariant {
   variantTitle    String
   typstContent    String
   status          String        @default("DRAFT") // DRAFT | REVIEWED | EXPORTED
+  factSnapshot    Json?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -136,6 +139,8 @@ model Patch {
 // Phase 5: Evidence-grounded tailored cover letter
 model CoverLetter {
   id                String         @id @default(uuid())
+  userId            String?
+  user              User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
   jobId             String
   job               Job            @relation(fields: [jobId], references: [id], onDelete: Cascade)
   variantId         String?
@@ -150,6 +155,8 @@ model CoverLetter {
   status            String         @default("DRAFT") // DRAFT | FINAL
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
+
+  @@index([userId])
 }
 
 // Pitt CSC / Simplify Summer 2026 Ingestion Feed

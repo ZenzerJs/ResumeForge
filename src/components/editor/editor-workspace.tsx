@@ -41,6 +41,10 @@ const STORAGE_KEY = "resumeforge_typst_source";
 const COMPILE_DEBOUNCE_MS = 400;
 const SOURCE_PERSIST_MS = 500;
 
+import { ConfirmMasterDialog } from "./confirm-master-dialog";
+import { ResumeFacts } from "@/lib/facts/types";
+import { extractResumeFacts } from "@/lib/facts/extract";
+
 const CodeEditor = dynamic(() => import("./code-editor").then((m) => ({ default: m.CodeEditor })), {
   ssr: false,
 });
@@ -94,6 +98,8 @@ export function EditorWorkspace() {
   const [draftEvidenceFromMaster, setDraftEvidenceFromMaster] = useState<boolean>(true);
   const [evidenceExtractToast, setEvidenceExtractToast] = useState<string | null>(null);
   const [isExtractingEvidence, setIsExtractingEvidence] = useState<boolean>(false);
+  // Phase 11: Master Fact Snapshot state
+  const [masterFacts, setMasterFacts] = useState<ResumeFacts | null>(null);
 
   // Task B1: Canonical Document Loading & Metadata State
   const [isLoadingDocument, setIsLoadingDocument] = useState<boolean>(true);
@@ -849,163 +855,98 @@ export function EditorWorkspace() {
         </div>
       )}
 
-      {/* Task 7.9: Confirmation Modal for Save as Master */}
-      {showSaveConfirm && (
-        <div
-          data-testid="save-master-confirm-modal"
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-        >
-          <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2 text-white font-semibold text-base">
-                <AlertTriangle className="h-5 w-5 text-amber-400" />
-                Confirm Overwrite Master Resume
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowSaveConfirm(false)}
-                className="text-slate-500 hover:text-slate-300"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Saving will overwrite your persisted <strong className="text-white">Master Resume</strong> with the current editor buffer content.
-            </p>
-            <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg text-[11px] text-amber-300/90 space-y-1">
-              <p className="font-semibold text-amber-300">✓ Automatic Pre-Save Snapshot</p>
-              <p className="text-slate-400">
-                A snapshot of your current Master Resume will be recorded in database history before overwriting, allowing instant Undo.
-              </p>
-            </div>
-
-            <label
-              className="flex items-start gap-2.5 p-3 bg-slate-950 border border-slate-800 rounded-lg cursor-pointer"
-              data-testid="draft-evidence-checkbox-label"
-            >
-              <input
-                type="checkbox"
-                checked={draftEvidenceFromMaster}
-                onChange={(e) => setDraftEvidenceFromMaster(e.target.checked)}
-                data-testid="extract-evidence-checkbox"
-                className="mt-0.5 h-3.5 w-3.5 rounded border-slate-600 bg-slate-900 text-amber-500 focus:ring-amber-500/40"
-              />
-              <span className="text-[11px] text-slate-300 leading-relaxed">
-                <span className="font-semibold text-slate-100">Draft Evidence Bank from this resume</span>
-                <span className="block text-slate-500 mt-0.5">
-                  Creates unverified draft items for Library review. Never auto-verifies.
-                </span>
-              </span>
-            </label>
-
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowSaveConfirm(false)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmSaveAsMaster}
-                disabled={isSavingMaster || isExtractingEvidence}
-                data-testid="confirm-save-master-btn"
-                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-lg shadow-amber-500/20 transition"
-              >
-                {isSavingMaster || isExtractingEvidence ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                Confirm Overwrite &amp; Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Phase 11: Confirm-Before-Master Fact Freezing Dialog */}
+      <ConfirmMasterDialog
+        open={showSaveConfirm}
+        onOpenChange={setShowSaveConfirm}
+        typstSource={source}
+        title={docMetadata.title}
+        onConfirm={handleConfirmSaveAsMaster}
+        isSaving={isSavingMaster}
+      />
 
       {/* Main Workspace Body */}
       <div className="flex flex-1 min-h-0 overflow-hidden bg-background p-2 md:p-3">
         {/* Desktop 3-Panel Resizable Layout (>= lg screens) — client-only to avoid SSR style hydration mismatch */}
         {isLayoutReady ? (
-        <ResizablePanelGroup
-          id="editor-resizable-panel-group"
-          orientation="horizontal"
-          onLayoutChange={handleLayoutChange}
-          className="hidden lg:flex h-full w-full gap-1.5"
-          data-testid="editor-resizable-panel-group"
-        >
-          {/* Panel 1: CodeMirror Editor */}
-          <ResizablePanel
-            id="panel-code"
-            defaultSize={layout["panel-code"] ?? 45}
-            minSize={20}
-            className="h-full overflow-hidden"
-            data-testid="panel-code"
+          <ResizablePanelGroup
+            id="editor-resizable-panel-group"
+            orientation="horizontal"
+            onLayoutChange={handleLayoutChange}
+            className="hidden lg:flex h-full w-full gap-1.5"
+            data-testid="editor-resizable-panel-group"
           >
-            <div className="h-full min-h-0">
-              <CodeEditor value={source} onChange={handleSourceChange} />
-            </div>
-          </ResizablePanel>
+            {/* Panel 1: CodeMirror Editor */}
+            <ResizablePanel
+              id="panel-code"
+              defaultSize={layout["panel-code"] ?? 45}
+              minSize={20}
+              className="h-full overflow-hidden"
+              data-testid="panel-code"
+            >
+              <div className="h-full min-h-0">
+                <CodeEditor value={source} onChange={handleSourceChange} />
+              </div>
+            </ResizablePanel>
 
-          <ResizableHandle withHandle />
+            <ResizableHandle withHandle />
 
-          {/* Panel 2: Live Preview */}
-          <ResizablePanel
-            id="panel-preview"
-            defaultSize={layout["panel-preview"] ?? 35}
-            minSize={25}
-            className="h-full overflow-hidden"
-            data-testid="panel-preview"
-          >
-            <div className="h-full min-h-0">
-              <PreviewPanel
-                svg={svg}
-                error={error}
+            {/* Panel 2: Live Preview */}
+            <ResizablePanel
+              id="panel-preview"
+              defaultSize={layout["panel-preview"] ?? 35}
+              minSize={25}
+              className="h-full overflow-hidden"
+              data-testid="panel-preview"
+            >
+              <div className="h-full min-h-0">
+                <PreviewPanel
+                  svg={svg}
+                  error={error}
+                  source={source}
+                  isCompiling={isCompiling}
+                  masterFacts={masterFacts}
+                  onResetTemplate={handleResetTemplate}
+                  onTriggerRepair={handleTriggerRepair}
+                />
+              </div>
+            </ResizablePanel>
+
+            <ResizableHandle withHandle />
+
+            {/* Panel 3: AI Sidebar (Collapsible) */}
+            <ResizablePanel
+              id="panel-ai"
+              panelRef={aiPanelRef}
+              defaultSize={isAiCollapsed ? 0 : (layout["panel-ai"] ?? 20)}
+              minSize={15}
+              collapsible={true}
+              collapsedSize={0}
+              onResize={(size) => {
+                if (skipResizePersistRef.current) return;
+                if (Date.now() < suppressResizePersistUntilRef.current) return;
+                const isCurrentlyCollapsed = size.asPercentage <= 2;
+                if (isCurrentlyCollapsed !== isAiCollapsedRef.current) {
+                  updateAiCollapsedState(isCurrentlyCollapsed);
+                  persistLayoutState(layout, isCurrentlyCollapsed);
+                }
+              }}
+              className="h-full overflow-hidden"
+              data-testid="panel-ai"
+            >
+              <div className="h-full min-h-0">
+              <AiSidebar
                 source={source}
-                isCompiling={isCompiling}
-                onResetTemplate={handleResetTemplate}
-                onTriggerRepair={handleTriggerRepair}
+                onApplyToBuffer={handleApplyRepair}
+                isCollapsed={isAiCollapsed}
+                masterFacts={masterFacts}
+                onToggleCollapse={toggleAiSidebarCollapse}
+                repairContext={repairContext}
+                onDismissRepair={() => setRepairContext(null)}
               />
-            </div>
-          </ResizablePanel>
-
-          <ResizableHandle withHandle />
-
-          {/* Panel 3: AI Sidebar (Collapsible) */}
-          <ResizablePanel
-            id="panel-ai"
-            panelRef={aiPanelRef}
-            defaultSize={isAiCollapsed ? 0 : (layout["panel-ai"] ?? 20)}
-            minSize={15}
-            collapsible={true}
-            collapsedSize={0}
-            onResize={(size) => {
-              if (skipResizePersistRef.current) return;
-              if (Date.now() < suppressResizePersistUntilRef.current) return;
-              const isCurrentlyCollapsed = size.asPercentage <= 2;
-              if (isCurrentlyCollapsed !== isAiCollapsedRef.current) {
-                updateAiCollapsedState(isCurrentlyCollapsed);
-                persistLayoutState(layout, isCurrentlyCollapsed);
-              }
-            }}
-            className="h-full overflow-hidden"
-            data-testid="panel-ai"
-          >
-            <div className="h-full min-h-0">
-            <AiSidebar
-              source={source}
-              onApplyToBuffer={handleApplyRepair}
-              isCollapsed={isAiCollapsed}
-              onToggleCollapse={toggleAiSidebarCollapse}
-              repairContext={repairContext}
-              onDismissRepair={() => setRepairContext(null)}
-            />
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         ) : (
           <div
             className="hidden lg:flex h-full w-full"
@@ -1028,6 +969,7 @@ export function EditorWorkspace() {
                 error={error}
                 source={source}
                 isCompiling={isCompiling}
+                masterFacts={masterFacts}
                 onResetTemplate={handleResetTemplate}
                 onTriggerRepair={handleTriggerRepair}
               />
@@ -1038,6 +980,7 @@ export function EditorWorkspace() {
               <AiSidebar
                 source={source}
                 onApplyToBuffer={handleApplyRepair}
+                masterFacts={masterFacts}
                 repairContext={repairContext}
                 onDismissRepair={() => setRepairContext(null)}
               />

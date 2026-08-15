@@ -10,7 +10,7 @@ interface LandingAtmosphereProps {
 export function LandingAtmosphere({ shouldReduceMotion = false }: LandingAtmosphereProps) {
   return (
     <div
-      className="pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[#0b1326]"
+      className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-[#0b1326]"
       aria-hidden="true"
       data-testid="landing-atmosphere"
     >

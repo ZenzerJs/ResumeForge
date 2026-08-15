@@ -12,7 +12,7 @@ const CAPABILITY_ITEMS = [
 
 export function CapabilityMarquee() {
   return (
-    <section className="w-full border-y border-slate-800/80 bg-slate-950/60 py-4 overflow-hidden relative" data-testid="capability-marquee-container">
+    <section className="relative w-full min-w-0 max-w-full overflow-hidden border-y border-slate-800/80 bg-slate-950/60 py-4" data-testid="capability-marquee-container">
       {/* Horizontal Gradient Fades */}
       <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-slate-950 to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-slate-950 to-transparent z-10 pointer-events-none" />

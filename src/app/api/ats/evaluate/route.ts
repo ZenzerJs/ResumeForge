@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
     if (input.variantId) {
       const variant = await prisma.resumeVariant.findFirst({
-        where: { id: input.variantId, ...(userId ? { job: { userId } } : { id: "__guest__" }) },
+        where: { id: input.variantId, ...(userId ? { masterResume: { userId } } : { id: "__guest__" }) },
         include: { job: true },
       });
 
@@ -68,9 +68,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (input.jobId && !requirements.requiredSkills.length && !requirements.preferredSkills.length) {
-      const job = userId
-        ? await prisma.job.findFirst({ where: { id: input.jobId, userId } })
-        : null;
+      const job = await prisma.job.findFirst({ where: { id: input.jobId } });
       if (job) {
         if (!roleTitle) roleTitle = job.roleTitle || undefined;
         rawDescription = job.rawDescription || "";

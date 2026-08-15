@@ -119,6 +119,7 @@ export function buildClearedSessionCookie(): string {
 export function isPublicPath(pathname: string): boolean {
   if (
     pathname === "/login" ||
+    pathname === "/privacy" ||
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/wasm/") ||

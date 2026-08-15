@@ -58,6 +58,19 @@ Resumes contain PII. LLM API keys have monetary value. The hosted threat model a
 - `PUT /api/resumes/[id]` and `updateResume` reject protected records with **403**. Edits must go through **Save as Master** (`confirmOverwrite`).
 - Public `POST /api/resumes` cannot set `isMaster`.
 - `POST /api/ai/generate-patches` returns **404** when no master exists (it does not auto-create one).
+
+---
+
+## 6. Mechanical Guardrail & AI Evidence Grounding (Phase 11)
+
+- **Deterministic Fact Snapshots**: When Master Resumes are saved or confirmed, an immutable `factSnapshot` (version: 1) extracts and freezes verified employers, titles, date ranges, metrics, and skills.
+- **Fail-Closed Patch Evaluation**: Proposed AI tailoring diffs are diffed mechanically against the frozen master fact snapshot.
+  - **HARD Violations** (`employer`, `title`, `date`, `metric`, hallucinated `evidenceIds`) hard-block patch application (`apply_patches`), Master overwrite, and document export (`assertCanExport`).
+  - **SOFT Violations** (`skill`) generate visual audit warnings in `GuardrailFeedback` while permitting export.
+  - **Automatic 1x Retry Loop**: If initial AI patch generation produces hallucinations, a retry attempt is dispatched with explicit violation feedback. If the second attempt still fails, the engine **fails closed** to the verified clean master baseline.
+- **Confirm-Before-Master Flow**: Master saves and uploads require explicit user fact confirmation to prevent poisoned baseline records.
+- **Client-Side WASM Typst Sandboxing**: Typst document compilation (`compileTypstToPdf`, `compileTypstToSvg`) runs client-side in browser WebAssembly without sending raw document content to third-party rendering APIs.
+
 - AI writes go to `ResumeVariant` records, never the protected master row.
 
 ---

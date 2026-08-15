@@ -286,7 +286,7 @@ export async function repairTypstSource(
 
 /**
  * Extract draft Evidence Bank items from Master Typst via BYOK provider.
- * Reuses JSON chat completion adapters (same shape as cover letter / patches).
+ * Uses generic JSON chat adapters (patch completions), never cover-letter prompts.
  */
 export async function extractEvidenceFromMaster(
   providerConfig: ProviderConfig,
@@ -307,13 +307,13 @@ export async function extractEvidenceFromMaster(
   try {
     switch (config.provider) {
       case "openai":
-        return await generateOpenAICoverLetter(config, systemPrompt, userPrompt);
+        return await generateOpenAIPatches(config, systemPrompt, userPrompt);
       case "anthropic":
-        return await generateAnthropicCoverLetter(config, systemPrompt, userPrompt);
+        return await generateAnthropicPatches(config, systemPrompt, userPrompt);
       case "gemini":
-        return await generateGeminiCoverLetter(config, systemPrompt, userPrompt);
+        return await generateGeminiPatches(config, systemPrompt, userPrompt);
       case "custom":
-        return await generateCustomCoverLetter(config, systemPrompt, userPrompt);
+        return await generateCustomPatches(config, systemPrompt, userPrompt);
       default:
         return {
           success: false,

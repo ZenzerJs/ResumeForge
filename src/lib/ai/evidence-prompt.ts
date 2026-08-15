@@ -18,6 +18,7 @@ Your task is to extract structured Evidence Bank draft items from a candidate's 
 4. **STRUCTURE**: Prefer \`experience\` / \`project\` items with bullet arrays. Standalone skill lists may become \`type: "skill"\` items and/or tags on related experience.
 5. **SKIP**: Contact headers, pure hobbies without career signal, and decorative layout-only content → list names in \`skippedSections\`.
 6. **JSON ONLY**: Return a single JSON object matching the schema below. No markdown fences.
+7. **NOT A COVER LETTER**: This task extracts Evidence Bank drafts. Do NOT write a cover letter. Do NOT return \`salutation\`, \`openingParagraph\`, \`bodyParagraphs\`, \`fullMarkdown\`, or \`evidenceCitations\`. Return ONLY \`items\` and \`skippedSections\`.
 
 ## OUTPUT JSON SCHEMA
 
@@ -60,5 +61,6 @@ ${typstSource}
 2. Produce one evidence item per role/project/education entry when possible.
 3. Copy bullet substance faithfully; attach technologies mentioned in each bullet.
 4. List skipped non-evidence sections in skippedSections.
-5. Return JSON only matching the system schema.`;
+5. Return JSON only matching the system schema (\`items\` + \`skippedSections\`).
+6. Do not generate a cover letter.`;
 }

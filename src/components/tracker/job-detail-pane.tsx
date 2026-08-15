@@ -33,7 +33,9 @@ import {
 import type { EvidenceItemWithBullets } from "@/lib/matching/matcher";
 import type { JobItem } from "@/components/tracker/job-types";
 import { isSafeHref } from "@/lib/security/safe-fetch";
-import { convertHtmlToCleanMarkdown } from "@/lib/ingestion/jd-format";
+import { JobDescriptionMarkdown } from "@/components/tracker/job-description-markdown";
+import { ApplySheet } from "@/components/tracker/apply-sheet";
+import { ShieldCheck } from "lucide-react";
 
 const STATUS_LABELS: Record<JobStatus, string> = {
   SAVED: "Saved",
@@ -80,6 +82,7 @@ export function JobDetailPane({
   const [evidence, setEvidence] = useState<EvidenceItemWithBullets[]>([]);
   const [evidenceLoaded, setEvidenceLoaded] = useState(false);
   const [detailJob, setDetailJob] = useState<JobItem>(job);
+  const [applySheetOpen, setApplySheetOpen] = useState(false);
 
   useEffect(() => {
     setDetailJob(job);
@@ -107,7 +110,11 @@ export function JobDetailPane({
   const salary = extractSalaryFromNotes(detailJob.notes, detailJob.rawDescription);
   const isPlaceholder = isPlaceholderDescription(detailJob.rawDescription);
   const companyInitial = detailJob.company ? detailJob.company[0].toUpperCase() : "J";
-  const hasCoverLetter = Boolean(detailJob.coverLetters && detailJob.coverLetters.length > 0);
+
+  const checklist: EvidenceMatchChecklist = useMemo(
+    () => buildEvidenceMatchChecklist(detailJob.extractedRequirements, evidence),
+    [detailJob.extractedRequirements, evidence]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -129,14 +136,10 @@ export function JobDetailPane({
     };
   }, []);
 
-  const checklist: EvidenceMatchChecklist = useMemo(
-    () => buildEvidenceMatchChecklist(job.extractedRequirements, evidence),
-    [job.extractedRequirements, evidence],
-  );
-
-  const coverTestId = hasCoverLetter
-    ? `open-cover-letter-btn-${job.id}`
-    : `generate-cover-letter-btn-${job.id}`;
+  const hasVariant = (detailJob.variants?.length ?? 0) > 0;
+  const hasCoverLetter = (detailJob.coverLetters?.length ?? 0) > 0;
+  const tailorTestId = hasVariant ? "tailor-resume-btn-existing" : "tailor-resume-btn";
+  const coverTestId = hasCoverLetter ? "open-cover-letter-btn" : "generate-cover-letter-btn";
 
   const content = (
     <div className={isSheet ? "p-margin-desktop" : "relative z-10 min-h-0 flex-1 overflow-y-auto p-margin-desktop"}>
@@ -187,6 +190,16 @@ export function JobDetailPane({
 
               {/* Primary Actions */}
               <div className="flex flex-wrap gap-3 items-center">
+                <button
+                  type="button"
+                  onClick={() => setApplySheetOpen(true)}
+                  data-testid="one-click-apply-btn"
+                  className="px-4 py-2 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-section-label text-xs font-bold transition-colors flex items-center gap-2 shadow-sm"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  1-Click Apply
+                </button>
+
                 <Link
                   href={`/tailor?jobId=${job.id}`}
                   onClick={() => sessionStorage.setItem("resumeforge_active_job_id", job.id)}
@@ -358,8 +371,8 @@ export function JobDetailPane({
                 <p className="mb-2 text-xs italic text-primary/90">{tier2Notice}</p>
               )}
 
-              <div className="prose prose-invert max-w-none font-body-regular text-sm text-on-surface/90 space-y-4 pr-2 whitespace-pre-wrap leading-relaxed">
-                {convertHtmlToCleanMarkdown(detailJob.rawDescription ?? "")}
+              <div className="pr-2">
+                <JobDescriptionMarkdown markdown={detailJob.rawDescription ?? ""} />
               </div>
             </div>
           </div>
@@ -370,20 +383,26 @@ export function JobDetailPane({
 
   if (isSheet) {
     return (
-      <div
-        className="fixed inset-0 z-50 flex flex-col bg-background overflow-y-auto"
-        data-testid="job-detail-sheet"
-        role="dialog"
-        aria-modal="true"
-      >
-        {content}
-      </div>
+      <>
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-background overflow-y-auto"
+          data-testid="job-detail-sheet"
+          role="dialog"
+          aria-modal="true"
+        >
+          {content}
+        </div>
+        <ApplySheet open={applySheetOpen} onOpenChange={setApplySheetOpen} job={detailJob as any} />
+      </>
     );
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background/50 relative" data-testid="job-detail-pane">
-      {content}
-    </div>
+    <>
+      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background/50 relative" data-testid="job-detail-pane">
+        {content}
+      </div>
+      <ApplySheet open={applySheetOpen} onOpenChange={setApplySheetOpen} job={detailJob as any} />
+    </>
   );
 }

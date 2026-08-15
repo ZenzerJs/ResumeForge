@@ -130,12 +130,12 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
   };
 
   return (
-    <div className="bg-[#0b1326] text-slate-100 font-body-regular min-h-screen flex flex-col antialiased selection:bg-[#ff8c00]/30 selection:text-[#ff8c00] leading-[1.6] relative">
+    <div className="bg-[#0b1326] text-slate-100 font-body-regular min-h-dvh min-w-0 flex flex-col overflow-x-hidden antialiased selection:bg-[#ff8c00]/30 selection:text-[#ff8c00] leading-[1.6] relative">
       <LandingAtmosphere shouldReduceMotion={reduceMotion} />
 
       <TopNav />
 
-      <main id="main-content" className="flex-grow pt-[calc(6rem+env(safe-area-inset-top))] pb-16 flex flex-col relative z-10 overflow-visible">
+      <main id="main-content" className="flex-grow min-w-0 pt-[calc(6rem+env(safe-area-inset-top))] pb-16 flex flex-col relative z-10 overflow-visible">
         {/* Notification Toast */}
         <AnimatePresence>
           {notification && (

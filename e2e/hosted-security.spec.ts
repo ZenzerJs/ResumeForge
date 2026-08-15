@@ -1,14 +1,14 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("hosted auth and a11y gates", () => {
-  test("guest GET /api/jobs returns empty data", async ({ browser, baseURL }) => {
+  test("guest GET /api/jobs returns the shared catalog", async ({ browser, baseURL }) => {
     const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const page = await context.newPage();
     const res = await page.request.get(`${baseURL}/api/jobs`);
     expect(res.status()).toBe(200);
     const json = await res.json();
     expect(json.success).toBe(true);
-    expect(json.data).toEqual([]);
+    expect(Array.isArray(json.data)).toBe(true);
     expect(json.guest).toBe(true);
     await context.close();
   });

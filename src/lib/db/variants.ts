@@ -38,7 +38,7 @@ export async function createVariant(input: CreateVariantInput) {
 
   // Verify job exists
   const job = await prisma.job.findFirst({
-    where: { id: input.jobId, ...(input.userId ? { userId: input.userId } : {}) },
+    where: { id: input.jobId },
   });
 
   if (!job) {
@@ -51,6 +51,7 @@ export async function createVariant(input: CreateVariantInput) {
       jobId: input.jobId,
       variantTitle: input.variantTitle,
       typstContent: input.typstContent,
+      factSnapshot: masterResume.factSnapshot as any,
       status: "DRAFT",
     },
   });
@@ -99,7 +100,7 @@ export async function getVariantById(variantId: string, userId?: string) {
   return await prisma.resumeVariant.findFirst({
     where: {
       id: variantId,
-      ...(userId ? { job: { userId } } : {}),
+      ...(userId ? { masterResume: { userId } } : {}),
     },
     include: {
       patches: {
@@ -124,7 +125,7 @@ export async function getVariantsByJobId(jobId: string) {
  */
 export async function getVariants(userId?: string) {
   return await prisma.resumeVariant.findMany({
-    where: userId ? { job: { userId } } : undefined,
+    where: userId ? { masterResume: { userId } } : undefined,
     orderBy: { createdAt: "desc" },
     include: {
       job: {

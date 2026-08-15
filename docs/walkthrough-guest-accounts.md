@@ -53,7 +53,8 @@ ADR-014 in `docs/decisions.md` records this and **overrides ADR-013’s page-lev
 - **Create account** or **Sign In** with email + password (`/login`, or `/login?mode=signup`).
 - Password is hashed with **scrypt**. Email is unique.
 - Session cookie `rf_session` is HttpOnly, SameSite=Lax, HMAC-signed.
-- Resumes, evidence, and jobs are stored in Postgres and **scoped to that user**.
+- Resumes and evidence are stored in Postgres and **scoped to that user**.
+- Jobs and full job descriptions are a **shared catalog** readable by guests and every account.
 - Nav shows the user’s email and **Sign Out**.
 - Sign Out clears the cookie and reloads `/` as a guest.
 
@@ -62,9 +63,10 @@ ADR-014 in `docs/decisions.md` records this and **overrides ADR-013’s page-lev
 | Data | Guest | Signed-in |
 |---|---|---|
 | Editor Typst buffer | localStorage | localStorage + optional Save as Master |
-| Resume / Evidence / Job rows | not written | owned by `userId` |
+| Resume / Evidence rows | not written | owned by `userId` |
+| Job catalog + descriptions | readable (global) | readable (global); writes require auth |
 | Discovered job feed | readable (global) | readable (global) |
-| Promote discovered job into tracker | 401 | creates a Job with `userId` |
+| Promote discovered job into tracker | 401 | creates a shared Job (no owner) |
 
 `APP_ACCESS_SECRET` is **only the cookie signing key**, not a login password. Guests can browse even if it is missing. Signup/login return 503 without it, because a session cookie cannot be minted.
 
@@ -107,11 +109,12 @@ middleware.ts
   └─ Rate limits: auth, AI, heavy (PDF / bulk-import)
 
 API
-  ├─ getRequestUserId() → null  → GET lists empty, mutations 401 GUEST_READ_ONLY
-  └─ requireUserId()    → uuid  → DB calls pass userId; ownership 404 if not owned
+  ├─ getRequestUserId() → null  → resume/evidence lists empty; jobs catalog readable; mutations 401 GUEST_READ_ONLY
+  └─ requireUserId()    → uuid  → evidence/resumes pass userId; jobs writes go to the shared catalog
 
 Postgres (Prisma)
-  User 1──* Resume | EvidenceItem | Job
+  User 1──* Resume | EvidenceItem
+  Job catalog is global (optional leftover userId, ON DELETE SET NULL)
   DiscoveredJob stays global
 ```
 
@@ -138,7 +141,8 @@ scrypt:<salt-base64url>:<hash-base64url>
 ### 4.1 Database
 
 - New `User` model: `id`, `email` (unique), `passwordHash`, timestamps.
-- Optional `userId` on `Resume`, `EvidenceItem`, `Job` with indexes and `ON DELETE CASCADE`.
+- Optional `userId` on `Resume` and `EvidenceItem` with indexes and `ON DELETE CASCADE`.
+- Optional leftover `userId` on `Job` with `ON DELETE SET NULL` so deleting a user does not remove catalog jobs (`prisma/migrations/20260813010000_shared_job_catalog/migration.sql`).
 - Migration: `prisma/migrations/20260812200000_guest_accounts/migration.sql`
 - Applied locally with `npx prisma migrate deploy` against Docker Postgres (`postgresql://resumeforge:resumeforge@localhost:5432/resumeforge`).
 
@@ -162,21 +166,22 @@ The same commit also includes the earlier Postgres cutover (`20260812180000_post
 
 ### 4.4 Persist APIs (require sign-in)
 
-Mutations use `requireUserId`. List GETs use `getRequestUserId` and return empty for guests. By-id reads/writes check ownership (`userId` match) and 404 if not owned.
+Mutations use `requireUserId`. Resume/evidence/variant/cover-letter list GETs use `getRequestUserId` and return empty for guests. Job list and by-id GETs return the shared catalog (nested variants/cover letters stay viewer-owned). Evidence by-id reads/writes check ownership (`userId` match) and 404 if not owned.
 
 Covered routes include:
 
-- Resumes: list/create, get/put by id, save-master, undo-master, clear-master, upload-pdf
-- Evidence: list/create, get/put/delete by id
-- Jobs: list/create, get/patch/delete by id, bulk-import, promote-discovered, fetch-fulltext
-- Variants and cover letters (via related job/master `userId`)
+- Resumes: list/create, get/put by id, save-master, undo-master, clear-master, upload-pdf (private)
+- Evidence: list/create, get/put/delete by id (private)
+- Jobs: list/get by id are shared; create/patch/delete/bulk-import/promote-discovered/fetch-fulltext still require auth
+- Variants and cover letters (via master resume `userId`, not job owner)
 - AI that needs saved master/evidence: generate-patches, apply-patches, extract-evidence, generate-cover-letter, qualitative-review
-- Stats: signed-in dashboard counts, or `emptyGuestStats()`
+- Stats: global job counts; evidence/resume/variant counts stay user-scoped (0 for guests)
 
 Protected master `PUT /api/resumes/[id]` still returns **403** for authenticated owners. Overwrite still goes through **Save as Master**.
 
 ### 4.5 Public / guest-safe APIs
 
+- `GET /api/jobs` and `GET /api/jobs/[id]` (shared catalog + full descriptions)
 - `POST /api/jobs/extract` (stateless JD parse)
 - `POST /api/jobs/match` (empty evidence bank for guests)
 - `POST /api/ats/evaluate` when Typst is in the body
@@ -190,7 +195,7 @@ Protected master `PUT /api/resumes/[id]` still returns **403** for authenticated
 - Top nav: guest → Sign In / Sign Up; authed → email + Sign Out
 - Sign Out: `POST /api/auth/logout` then `window.location.assign("/")` so auth chrome actually refreshes (client `router.replace("/")` on the same path left stale “signed in” UI)
 - Guest banner in `AppShell`
-- Home page reads the session cookie server-side and loads that user’s stats or empty guest stats
+- Home page reads the session cookie server-side and loads shared job counts plus that user’s private evidence/resume stats
 - Metadata no longer says “password-gated”
 
 ### 4.7 Hosted / local ops (also in this commit)

@@ -25,15 +25,7 @@ function parseStatusParam(raw: string | null): JobStatus | JobStatus[] | "ALL" |
 
 export async function GET(request: Request) {
   try {
-    const userId = await getRequestUserId(request);
-    if (!userId) {
-      return NextResponse.json({
-        success: true,
-        data: [],
-        guest: true,
-        meta: { page: 1, limit: 40, total: 0, totalPages: 1 },
-      });
-    }
+    const viewerUserId = await getRequestUserId(request);
     const url = new URL(request.url);
     const page = Number(url.searchParams.get("page") || "1");
     const limit = Number(url.searchParams.get("limit") || "40");
@@ -49,9 +41,14 @@ export async function GET(request: Request) {
       workplace: isWorkplaceFilter(workplaceRaw) ? workplaceRaw : "all",
       status: parseStatusParam(url.searchParams.get("status")),
       postedWithin: isPostedWithinParam(postedRaw) ? postedRaw : "all",
-      userId,
+      userId: viewerUserId,
     });
-    return NextResponse.json({ success: true, data: result.data, meta: result.meta });
+    return NextResponse.json({
+      success: true,
+      data: result.data,
+      meta: result.meta,
+      guest: !viewerUserId,
+    });
   } catch (err) {
     return NextResponse.json(
       { success: false, error: "Failed to fetch jobs", message: sanitizeError(err) },
@@ -62,8 +59,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const userId = await requireUserId(request);
-    if (userId instanceof NextResponse) return userId;
+    const gated = await requireUserId(request);
+    if (gated instanceof NextResponse) return gated;
 
     const body = await request.json();
     const validation = CreateJobSchema.safeParse(body);
@@ -79,7 +76,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const job = await createJob({ ...validation.data, userId });
+    const job = await createJob({ ...validation.data });
     return NextResponse.json({ success: true, data: job }, { status: 201 });
   } catch (err) {
     return NextResponse.json(

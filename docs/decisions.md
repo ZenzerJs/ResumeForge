@@ -295,19 +295,19 @@ A public Render/Vercel deployment cannot use SQLite on ephemeral disks, and unau
 - **Supersedes for product access**: ADR-013 item 2 (single-user workspace password on all pages)
 
 ### Context
-A hosted password wall blocked anyone without `APP_ACCESS_SECRET` and made the product look like a private workspace. Users should be able to try the editor without signing up. Saved resumes, evidence, and jobs must not land in a shared database for anonymous visitors.
+A hosted password wall blocked anyone without `APP_ACCESS_SECRET` and made the product look like a private workspace. Users should be able to try the editor without signing up. Saved resumes and evidence must not land in a shared database for anonymous visitors. Job postings and their descriptions should be a shared catalog everyone can browse.
 
 ### Decision
 1. **Pages are public.** Middleware no longer redirects unauthenticated browsers to `/login`. Missing `APP_ACCESS_SECRET` does not lock the site.
-2. **Guest work is local-only.** Persist APIs require a signed-in `User`. Guests receive `401` `{ code: "GUEST_READ_ONLY" }` on save mutations. List GETs return empty `{ data: [], guest: true }`.
+2. **Guest work is local-only for personal materials.** Resume, evidence, variant, and cover-letter persist APIs require a signed-in `User`. Guests receive `401` `{ code: "GUEST_READ_ONLY" }` on those save mutations. Resume/evidence/variant/cover-letter list GETs return empty `{ data: [], guest: true }`.
 3. **Optional accounts.** Email + password signup/login (`scrypt` hash) create a `User` row. Session cookie `rf_session` is `uid=...|exp=....hmac` signed with `APP_ACCESS_SECRET` (cookie signing key only — not a login password).
-4. **Data scoping.** `Resume`, `EvidenceItem`, and `Job` have optional `userId`. API routes always pass the session user id. Direct DB helpers used by unit tests may omit it.
-5. **Shared discovery feed.** `DiscoveredJob` stays global. Promoting a discovered job into the tracker requires auth and writes `userId`.
+4. **Data scoping.** `Resume` and `EvidenceItem` are owned by `userId`. The `Job` catalog (including `rawDescription`) is shared across guests and accounts. Nested variants and cover letters stay private via the owning master resume's `userId`.
+5. **Shared job catalog.** Creating, updating, or deleting jobs still requires sign-in (spam control). Guests can read the catalog and full descriptions. Promoting a discovered job writes a shared Job row with no owner. Deleting a user sets `Job.userId` to null instead of cascade-deleting catalog rows.
 6. **Stateless tools stay public.** JD extract, ATS evaluate with body `typstContent`, AI test-connection, and Typst repair do not require a session.
 
 ### Consequences
-- **Positive**: Anyone can use the editor; signed-in users keep private Postgres data.
-- **Negative**: Signup/login still need `APP_ACCESS_SECRET` to mint cookies. Guest work is lost if the browser storage is cleared.
+- **Positive**: Anyone can browse the job tracker; signed-in users keep private evidence and resumes.
+- **Negative**: Signup/login still need `APP_ACCESS_SECRET` to mint cookies. Guest editor work is lost if the browser storage is cleared. Job application status on a catalog row is currently shared.
 - **Negative**: Clerk/OAuth remains out of scope.
 
 ---

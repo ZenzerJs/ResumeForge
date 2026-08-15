@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ProtectedResumeError } from "@/lib/security/protected-resume";
+import { extractResumeFacts } from "@/lib/facts/extract";
 
 export interface CreateResumeInput {
   title?: string;
@@ -29,12 +30,19 @@ export async function createResume(input: CreateResumeInput) {
         data: { isMaster: false },
       });
 
+      const evidence = await (tx as any).evidenceItem.findMany({
+        where: { status: "verified", ...(input.userId ? { userId: input.userId } : {}) },
+        include: { bullets: true },
+      });
+      const factSnapshot = extractResumeFacts(input.typstSource, evidence);
+
       return await tx.resume.create({
         data: {
           title: input.title || "Master Resume",
           typstSource: input.typstSource,
           isMaster: true,
           isProtected: true,
+          factSnapshot: factSnapshot as any,
           userId: input.userId,
         },
       });
@@ -71,6 +79,12 @@ export async function updateResume(id: string, input: UpdateResumeInput) {
         data: { isMaster: false },
       });
 
+      const evidence = await (tx as any).evidenceItem.findMany({
+        where: { status: "verified", ...(existing.userId ? { userId: existing.userId } : {}) },
+        include: { bullets: true },
+      });
+      const factSnapshot = extractResumeFacts(input.typstSource || existing.typstSource, evidence);
+
       return await tx.resume.update({
         where: { id },
         data: {
@@ -78,6 +92,7 @@ export async function updateResume(id: string, input: UpdateResumeInput) {
           typstSource: input.typstSource,
           isMaster: true,
           isProtected: true,
+          factSnapshot: factSnapshot as any,
         },
       });
     });
@@ -102,13 +117,19 @@ export async function getResumes(userId?: string) {
 
 export async function getMasterResume(userId?: string) {
   return await prisma.resume.findFirst({
-    where: { isMaster: true, ...(userId ? { userId } : {}) },
+    where: {
+      isMaster: true,
+      ...(userId ? { userId } : {}),
+    },
   });
 }
 
 export async function getResumeById(id: string, userId?: string) {
   return await prisma.resume.findFirst({
-    where: { id, ...(userId ? { userId } : {}) },
+    where: {
+      id,
+      ...(userId ? { userId } : {}),
+    },
   });
 }
 
@@ -153,6 +174,12 @@ export async function saveMasterResume(input: SaveMasterInput): Promise<SaveMast
     let master: any;
     const ownerFilter = input.userId ? { userId: input.userId } : {};
 
+    const evidence = await (tx as any).evidenceItem.findMany({
+      where: { status: "verified", ...ownerFilter },
+      include: { bullets: true },
+    });
+    const factSnapshot = extractResumeFacts(input.typstSource, evidence);
+
     if (targetId && currentMaster) {
       await tx.resume.updateMany({
         where: { isMaster: true, ...ownerFilter, NOT: { id: targetId } },
@@ -166,6 +193,7 @@ export async function saveMasterResume(input: SaveMasterInput): Promise<SaveMast
           typstSource: input.typstSource,
           isMaster: true,
           isProtected: true,
+          factSnapshot: factSnapshot as any,
           ...(input.userId ? { userId: input.userId } : {}),
         },
       });
@@ -181,6 +209,7 @@ export async function saveMasterResume(input: SaveMasterInput): Promise<SaveMast
           typstSource: input.typstSource,
           isMaster: true,
           isProtected: true,
+          factSnapshot: factSnapshot as any,
           userId: input.userId,
         },
       });
