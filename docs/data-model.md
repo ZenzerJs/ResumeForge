@@ -96,9 +96,38 @@ This document specifies the domain data model for ResumeForge. Phase 2 implement
 - **`confidence`** (Float): AI confidence score 0.0–1.0.
 - **`status`** (String): `PENDING`, `ACCEPTED`, `REJECTED`, `REJECTED_CITATION`.
 
-### 7. `CoverLetter` (Optional Tailored Artifact — Future Phase)
+### 7. `CoverLetter` (Optional Tailored Artifact — Phase 8.5 Implementation)
 - **`id`** (String, PK): Unique identifier.
-- **`variantId`** (String, FK): Associated resume variant.
+- **`userId`** (String, FK): User owner ID.
 - **`jobId`** (String, FK): Target job posting.
-- **`content`** (String): Cover letter text/Typst content.
-- **`createdAt`** (DateTime): Creation timestamp.
+- **`variantId`** (String, FK): Associated resume variant.
+- **`title`** (String): Cover letter title.
+- **`fullMarkdown`** (String): Rendered letter body.
+- **`evidenceCitations`** (String, JSON): Array of cited `evidenceIds`.
+- **`status`** (String): `DRAFT`, `FINAL`.
+
+### 8. `IngestedJob` (Public Connector Ingestion — Phase 12 Implementation)
+- **`id`** (String, PK): CUID identifier.
+- **`fingerprint`** (String, Unique): SHA-256 hash of `norm_company:norm_title:canonical_url`.
+- **`externalId`** (String): Provider external identifier.
+- **`source`** (Enum `JobSource`): `GREENHOUSE`, `LEVER`, `ASHBY`, `ADZUNA_CA`, `JOBICY`, `REMOTIVE`, `REMOTEOK`, `MANUAL`.
+- **`companyName`** (String, Indexed): Employer name.
+- **`title`** (String): Job position title.
+- **`location`** (String): Geographic or remote location string.
+- **`workplaceType`** (Enum `WorkplaceType`): `REMOTE`, `HYBRID`, `ON_SITE`, `UNSPECIFIED`.
+- **`isCanadianEligible`** (Boolean, Indexed): Canadian work eligibility flag.
+- **`description`** (String): Clean plain text for ATS scoring & AI tailoring context.
+- **`descriptionHtml`** (String): Sanitized safe HTML for UI preview.
+- **`applyUrl`** (String): Canonical direct apply URL.
+- **`postedAt`** (DateTime, Optional): Date posted.
+- **`salaryMin` / `salaryMax` / `salaryCurrency`**: Compensation fields.
+- **`trackedJobId`** (String, Optional FK): Relation to promoted `Job` row.
+
+### 9. `ConnectorSyncLog` (Sync Telemetry — Phase 12 Implementation)
+- **`id`** (String, PK): CUID identifier.
+- **`source`** (Enum `JobSource`): Ingestion connector source.
+- **`status`** (String): `SUCCESS`, `FAILED`, `RATE_LIMITED`.
+- **`jobsFound`** (Int): Total listings discovered.
+- **`jobsInserted`** (Int): New listings inserted.
+- **`errorMessage`** (String, Optional): Failure detail.
+- **`executedAt`** (DateTime): Execution timestamp.

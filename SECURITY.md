@@ -75,7 +75,20 @@ Resumes contain PII. LLM API keys have monetary value. The hosted threat model a
 
 ---
 
-## 6. Upload Limits and Security Headers
+## 7. Job Ingestion Connectors & SSRF Firewall (Phase 12)
+
+- **Zero Scraping & Zero Automated Submissions**: ResumeForge does not use headless browsers (Puppeteer/Playwright) or DOM scrapers. All ingestion connects strictly to public REST APIs and syndication feeds. It never auto-submits applications.
+- **SSRF Network Hardening**: `safeFetch` enforces:
+  - HTTPS protocol only (disallowing `http://`, `file://`, etc.).
+  - Hostname allowlist: `boards-api.greenhouse.io`, `api.lever.co`, `api.ashbyhq.com`, `api.adzuna.com`, `jobicy.com`, `remotive.com`, `remoteok.com`.
+  - IP range check (`ipaddr.js`): Rejects all private (`10.0.0.0/8`, `192.168.0.0/16`, `172.16.0.0/12`), loopback (`127.0.0.0/8`), link-local (`169.254.0.0/16`), unique local, and carrier-grade NAT destinations.
+  - Manual redirects (`redirect: "manual"`) to prevent open redirect SSRF bypass.
+- **HTML Sanitization**: All ingested descriptions pass through `sanitize-html`, stripping scripts, iframes, and inline event handlers before database storage.
+- **Master Fact Snapshot Isolation**: Ingested jobs are external read-only listings. They never mutate or poison the master `ResumeFacts` snapshot.
+
+---
+
+## 8. Upload Limits and Security Headers
 
 - PDF uploads: 10 MB max and `%PDF-` magic-byte check.
 - Large string fields are Zod-capped (job descriptions, Typst source, bulk markdown).

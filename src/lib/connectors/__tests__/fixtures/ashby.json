@@ -1,0 +1,23 @@
+{
+  "success": true,
+  "jobs": [
+    {
+      "id": "ashby-job-456",
+      "title": "Machine Learning Platform Engineer",
+      "locationName": "Toronto, ON / Remote (Canada)",
+      "isRemote": true,
+      "jobUrl": "https://jobs.ashbyhq.com/cohere/ashby-job-456?ashby_jid=ashby-job-456",
+      "publishedAt": "2026-08-11T15:30:00Z",
+      "descriptionHtml": "<p>Cohere is looking for an ML Engineer.</p><ul><li>PyTorch</li><li>Large models</li></ul>",
+      "compensation": {
+        "compensationTiers": [
+          {
+            "minSalary": 140000,
+            "maxSalary": 185000,
+            "currency": "CAD"
+          }
+        ]
+      }
+    }
+  ]
+}

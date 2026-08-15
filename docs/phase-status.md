@@ -4,7 +4,39 @@ This document records completed project milestones, current state, known limitat
 
 ---
 
-## Current Status: Phase 11 — Evidence-Grounded Engine, Guardrails & Adaptive AI Assistant
+## Current Status: Phase 12 — Job Ingestion Engine & Public Connectors
+
+- **Completed Date**: 2026-08-14
+- **Status Summary**: Implemented resilient, local-first job ingestion engine for Canadian and remote tech roles without headless scraping or auto-apply automation. Connects directly to 7 public REST APIs and syndication feeds (Greenhouse, Lever, Ashby, Adzuna CA, Jobicy, Remotive, RemoteOK). Hardened against SSRF via hostname allowlist and DNS IP validation (`ipaddr.js`). Deduplicates via URL canonicalization and SHA-256 fingerprinting. Sanitizes HTML and plain text via `sanitize-html`. Integrates with the Phase 11.5 Apply Sheet and database tracking pipeline.
+
+### Phase 12 Deliverables
+1. **SSRF Firewall & HTTP Dispatcher (`src/lib/connectors/http.ts`)**:
+   - Protocol check (`https:` only), 7-host allowlist, direct and resolved IP range validation (`ipaddr.js`), `redirect: "manual"`, and timeout aborts.
+2. **7 Public API / Feed Connectors (`src/lib/connectors/providers/`)**:
+   - `GreenhouseConnector`: Curated Canadian tech boards (Shopify, Wealthsimple, 1Password, Ada, Clio, Bench, KOHO, RelationalAI).
+   - `LeverConnector`: Curated tech postings (Certn, Tulip, Symend, League, Properly).
+   - `AshbyConnector`: Curated tech boards with compensation parsing (Cohere, Dropbox, Linear, Deel, Ramp).
+   - `AdzunaCaConnector`: Canada tech search with optional BYOK `ADZUNA_APP_ID`/`ADZUNA_APP_KEY`.
+   - `JobicyConnector`: Canada remote dev feed.
+   - `RemotiveConnector`: Software development remote feed.
+   - `RemoteOkConnector`: Developer tech tag filtering.
+3. **Deduplication & Sanitization (`src/lib/connectors/dedupe.ts`, `sanitize.ts`)**:
+   - Strip tracking query params (`utm_*`, `ref`, `gh_jid`, `lever-source`, `ashby_jid`).
+   - Deterministic SHA-256 fingerprinting on `norm_company:norm_title:canonical_url`.
+   - HTML sanitization allowing safe tags while stripping scripts and event handlers.
+4. **Ingestion Orchestrator & Database Models (`src/lib/connectors/orchestrator.ts`)**:
+   - Models: `IngestedJob`, `ConnectorSyncLog`, `WorkplaceType`, `JobSource`.
+   - Parallel `Promise.allSettled` sync runner with batch upserts and telemetry logging.
+   - Promotion helper `promoteIngestedJobToTrackedJob` to link with Phase 11.5 Apply Sheet.
+5. **API Endpoints (`src/app/api/connectors/`)**:
+   - `POST /api/connectors/sync`: Manual / cron sync trigger.
+   - `GET /api/connectors/status`: Health, telemetry, and log metrics.
+   - `GET /api/connectors/jobs`: Filtered search across ingested jobs.
+   - `POST /api/connectors/promote`: Promote ingested job to tracked job.
+
+---
+
+## Previous Status: Phase 11 — Evidence-Grounded Engine, Guardrails & Adaptive AI Assistant
 
 - **Completed Date**: 2026-08-14
 - **Status Summary**: Complete implementation of Phase 11. Fact snapshot engine freezes master facts on Postgres Json column (`Resume.factSnapshot` & `ResumeVariant.factSnapshot`). Mechanical fail-closed guardrail diffs candidate Typst against master facts (blocking hard violations on employer, title, date, metric, evidence citations). Clean ATS single-column DOCX generator with direct downloads. Confirm-before-master fact freezing dialog. 5-step one-click apply sheet in tracker feed. Allowlisted model tool executor with guardrail gates. Portaled tri-mode `AiAssistantWindow` with RAF dragging/resizing and streaming markdown rendering.

@@ -97,8 +97,68 @@ model Job {
 
   variants              ResumeVariant[]
   coverLetters          CoverLetter[]
+  ingestedJob           IngestedJob?
 
   @@index([userId])
+}
+
+enum WorkplaceType {
+  REMOTE
+  HYBRID
+  ON_SITE
+  UNSPECIFIED
+}
+
+enum JobSource {
+  GREENHOUSE
+  LEVER
+  ASHBY
+  ADZUNA_CA
+  JOBICY
+  REMOTIVE
+  REMOTEOK
+  MANUAL
+}
+
+model IngestedJob {
+  id                 String        @id @default(cuid())
+  fingerprint        String        @unique // SHA-256(normalized_company + normalized_title + canonical_url)
+  externalId         String
+  source             JobSource
+  companyName        String
+  title              String
+  location           String
+  workplaceType      WorkplaceType @default(UNSPECIFIED)
+  isCanadianEligible Boolean       @default(true)
+  description        String        // Plain text for AI context & ATS analysis
+  descriptionHtml    String        // Sanitized safe HTML for rendering
+  applyUrl           String
+  postedAt           DateTime?
+  salaryMin          Int?
+  salaryMax          Int?
+  salaryCurrency     String?       @default("CAD")
+  rawMetadata        Json?
+
+  // Link to Phase 11 Tracker
+  trackedJobId       String?       @unique
+  trackedJob         Job?          @relation(fields: [trackedJobId], references: [id], onDelete: SetNull)
+
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([source, createdAt])
+  @@index([companyName])
+  @@index([isCanadianEligible])
+}
+
+model ConnectorSyncLog {
+  id           String    @id @default(cuid())
+  source       JobSource
+  status       String    // "SUCCESS" | "FAILED" | "RATE_LIMITED"
+  jobsFound    Int       @default(0)
+  jobsInserted Int       @default(0)
+  errorMessage String?
+  executedAt   DateTime  @default(now())
 }
 
 // Phase 4.2: Job-specific tailored resume variant

@@ -27,7 +27,11 @@ export async function middleware(request: NextRequest) {
     if (!rateLimit(clientKey(request, "ai"), 20, 60_000)) {
       return NextResponse.json({ success: false, error: "Too many AI requests" }, { status: 429 });
     }
-  } else if (pathname === "/api/jobs/bulk-import" || pathname === "/api/resumes/upload-pdf") {
+  } else if (
+    pathname === "/api/jobs/bulk-import" ||
+    pathname === "/api/resumes/upload-pdf" ||
+    pathname === "/api/connectors/sync"
+  ) {
     if (!rateLimit(clientKey(request, "heavy"), 10, 60_000)) {
       return NextResponse.json({ success: false, error: "Too many requests" }, { status: 429 });
     }

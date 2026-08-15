@@ -1,0 +1,16 @@
+[
+  {
+    "id": "lever-uuid-987",
+    "text": "Full Stack Engineer",
+    "createdAt": 1723456789000,
+    "hostedUrl": "https://jobs.lever.co/certn/lever-uuid-987?lever-source=feed",
+    "categories": {
+      "location": "Vancouver, BC, Canada",
+      "commitment": "Full Time",
+      "team": "Engineering",
+      "workplaceType": "remote"
+    },
+    "description": "<p>Certn is looking for a Full Stack Engineer.</p>",
+    "additional": "<p>Competitive benefits and remote work flexibility.</p>"
+  }
+]
