@@ -9,7 +9,7 @@ export default defineConfig({
   reporter: "list",
   globalSetup: "./e2e/global-setup.ts",
   use: {
-    baseURL: "http://localhost:3005",
+    baseURL: "http://127.0.0.1:3005",
     trace: "on-first-retry",
     storageState: "e2e/.auth/user.json",
   },
@@ -20,9 +20,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run start -- -p 3005",
-    url: "http://localhost:3005",
-    reuseExistingServer: false,
+    command: "npm run start -- -H 127.0.0.1 -p 3005",
+    url: "http://127.0.0.1:3005",
+    reuseExistingServer: true,
     timeout: 120000,
     env: {
       ...process.env,

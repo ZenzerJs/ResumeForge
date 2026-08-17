@@ -162,6 +162,101 @@ export async function executeServerTool(
         };
       }
 
+      case "search_evidence": {
+        const params = (await import("./definitions")).SearchEvidenceParamsSchema.parse(rawParams);
+        const whereClause: any = { ...(userId ? { userId } : {}) };
+        if (params.status && params.status !== "all") {
+          whereClause.status = params.status;
+        }
+
+        const items = await prisma.evidenceItem.findMany({
+          where: whereClause,
+          include: { bullets: true },
+        });
+
+        const queryTokens = params.query.toLowerCase().split(/\s+/).filter(Boolean);
+        const scoredItems = items.map((item) => {
+          let score = 0;
+          let parsedTags: string[] = [];
+          try {
+            parsedTags = JSON.parse(item.tags || "[]");
+          } catch {
+            parsedTags = [];
+          }
+
+          const searchCorpus = [
+            item.title,
+            item.organization || "",
+            item.verifiedSummary,
+            ...parsedTags,
+            ...item.bullets.map((b) => `${b.text} ${b.technologies} ${b.roleAffinity}`),
+          ]
+            .join(" ")
+            .toLowerCase();
+
+          for (const token of queryTokens) {
+            if (searchCorpus.includes(token)) {
+              score += 2;
+            }
+          }
+
+          if (params.tags && params.tags.length > 0) {
+            const hasTag = params.tags.some((tag) =>
+              parsedTags.some((t) => t.toLowerCase() === tag.toLowerCase())
+            );
+            if (hasTag) score += 3;
+          }
+
+          return { item, score };
+        });
+
+        const ranked = scoredItems
+          .filter((si) => si.score > 0 || queryTokens.length === 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, params.limit)
+          .map((si) => si.item);
+
+        return {
+          tool: toolName,
+          success: true,
+          data: {
+            count: ranked.length,
+            results: ranked,
+          },
+        };
+      }
+
+      case "inspect_layout_budget": {
+        const params = (await import("./definitions")).InspectLayoutBudgetParamsSchema.parse(rawParams);
+        const lines = params.typstSource.split("\n");
+        const nonEmptyLines = lines.filter((l) => l.trim().length > 0);
+        const totalChars = params.typstSource.length;
+        const bulletLines = lines.filter((l) => l.trim().startsWith("-") || l.trim().startsWith("•"));
+
+        // Approximate Typst layout budget (standard 10pt letter page fits ~55 lines or ~3200 chars)
+        const estimatedPages = Math.max(1, Math.ceil(nonEmptyLines.length / 55));
+        const pageLimit = params.pageLimit || 1;
+        const exceedsLimit = estimatedPages > pageLimit;
+
+        return {
+          tool: toolName,
+          success: true,
+          data: {
+            lineCount: lines.length,
+            nonEmptyLineCount: nonEmptyLines.length,
+            characterCount: totalChars,
+            bulletCount: bulletLines.length,
+            estimatedPages,
+            pageLimit,
+            exceedsLimit,
+            status: exceedsLimit ? "OVERFLOW" : "WITHIN_BUDGET",
+            recommendation: exceedsLimit
+              ? `Estimated ${estimatedPages} pages exceeds limit of ${pageLimit}. Recommend trimming ${nonEmptyLines.length - 55 * pageLimit} lines.`
+              : `Within budget (${nonEmptyLines.length}/55 lines for single page layout).`,
+          },
+        };
+      }
+
       default:
         return {
           tool: toolName,

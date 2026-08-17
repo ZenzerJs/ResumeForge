@@ -42,11 +42,11 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
             className={linkClass(isFeed)}
             data-testid="tracker-tab-feed"
           >
-            <Compass className="mr-1 h-3.5 w-3.5" />
-            Feed
+            <Compass className="mr-1 h-3.5 w-3.5 text-amber-400" />
+            Discover / Feed
           </Link>
           <Link href="/tracker" className={linkClass(isAll)} data-testid="tracker-tab-all">
-            All
+            All Applications
           </Link>
           <Link
             href="/tracker/applied"

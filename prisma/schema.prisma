@@ -93,6 +93,9 @@ model Job {
   status                String          @default("SAVED") // SAVED | APPLIED | INTERVIEWING | OFFER | REJECTED | ARCHIVED
   appliedAt             DateTime?
   notes                 String?
+  normalized            Json?
+  formattedJd           Json?
+  extractFailure        String?
   createdAt             DateTime        @default(now())
 
   variants              ResumeVariant[]
@@ -138,6 +141,11 @@ model IngestedJob {
   salaryMax          Int?
   salaryCurrency     String?       @default("CAD")
   rawMetadata        Json?
+  lat                Float?
+  lng                Float?
+  cityNorm           String?
+  normalized         Json?
+  formattedJd        Json?
 
   // Link to Phase 11 Tracker
   trackedJobId       String?       @unique

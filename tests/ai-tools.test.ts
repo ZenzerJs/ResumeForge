@@ -74,9 +74,50 @@ describe("AI Model Tool Protocol & Executor", () => {
     expect(result.data.updatedTypst).toContain("Reduced latency by 45ms.");
   });
 
+  it("executes inspect_layout_budget detecting page limits and overflow", async () => {
+    // 1-page sample source within budget
+    const compactSource = Array.from({ length: 35 }, (_, i) => `- Built feature ${i + 1} with high reliability.`).join("\n");
+    const compactResult = await executeServerTool("inspect_layout_budget", {
+      typstSource: compactSource,
+      pageLimit: 1,
+    });
+
+    expect(compactResult.success).toBe(true);
+    expect(compactResult.data.estimatedPages).toBe(1);
+    expect(compactResult.data.exceedsLimit).toBe(false);
+    expect(compactResult.data.status).toBe("WITHIN_BUDGET");
+
+    // Overflow source exceeding 1-page budget
+    const overflowSource = Array.from({ length: 120 }, (_, i) => `- Built feature ${i + 1} with high reliability.`).join("\n");
+    const overflowResult = await executeServerTool("inspect_layout_budget", {
+      typstSource: overflowSource,
+      pageLimit: 1,
+    });
+
+    expect(overflowResult.success).toBe(true);
+    expect(overflowResult.data.estimatedPages).toBeGreaterThan(1);
+    expect(overflowResult.data.exceedsLimit).toBe(true);
+    expect(overflowResult.data.status).toBe("OVERFLOW");
+    expect(overflowResult.data.recommendation).toContain("Recommend trimming");
+  });
+
+  it("executes search_evidence with parameter validation", async () => {
+    const result = await executeServerTool("search_evidence", {
+      query: "database postgresql performance",
+      tags: ["database", "backend"],
+      limit: 5,
+      status: "all",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data).toBeDefined();
+    expect(Array.isArray(result.data.results)).toBe(true);
+  });
+
   it("rejects unsupported tools gracefully", async () => {
     const result = await executeServerTool("invalid_tool" as any, {});
     expect(result.success).toBe(false);
     expect(result.error).toContain("Unsupported tool");
   });
 });
+

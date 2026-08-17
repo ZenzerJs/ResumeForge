@@ -45,6 +45,7 @@ test.describe("Task 9.2 — Resizable & Collapsible Editor Panels E2E Tests", ()
   });
 
   test("3. Verify AI sidebar input state and JD text remain intact across collapse and expand cycles", async ({ page }) => {
+    await page.locator('[data-testid="ai-tab-tailor"]').click();
     const jdTextarea = page.locator('textarea[placeholder*="Paste the job posting here"]');
     await expect(jdTextarea).toBeVisible();
 

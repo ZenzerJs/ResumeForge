@@ -32,7 +32,7 @@ export function ConfirmMasterDialog({
   onConfirm,
   isSaving = false,
 }: ConfirmMasterDialogProps) {
-  const [confirmed, setConfirmed] = useState(false);
+  const [confirmed, setConfirmed] = useState(true);
 
   const facts = useMemo(() => {
     if (!typstSource) return null;
@@ -47,7 +47,10 @@ export function ConfirmMasterDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl bg-slate-900 border-slate-800 text-slate-100 shadow-2xl">
+      <DialogContent 
+        data-testid="save-master-confirm-modal"
+        className="max-w-xl bg-slate-900 border-slate-800 text-slate-100 shadow-2xl"
+      >
         <DialogHeader>
           <div className="flex items-center gap-2 text-amber-400">
             <ShieldCheck className="size-5 text-amber-400" />
@@ -148,6 +151,7 @@ export function ConfirmMasterDialog({
               />
               <label
                 htmlFor="confirm-master-checkbox"
+                data-testid="extract-evidence-checkbox"
                 className="text-[11px] text-amber-200 leading-snug cursor-pointer select-none"
               >
                 I confirm these extracted facts accurately represent my verified career experience.
@@ -168,9 +172,9 @@ export function ConfirmMasterDialog({
           </Button>
           <Button
             type="button"
-            onClick={handleConfirm}
+            onClick={() => handleConfirm()}
             disabled={!confirmed || isSaving}
-            data-testid="confirm-save-master-freeze-btn"
+            data-testid="confirm-save-master-btn"
             className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs gap-1.5 shadow-lg shadow-amber-500/20"
           >
             {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}

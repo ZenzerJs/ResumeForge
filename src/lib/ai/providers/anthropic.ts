@@ -3,6 +3,7 @@ import { sanitizeError } from "../redact";
 import { stripCodeFences } from "../utils";
 import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from "../repair-schema";
 import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
+import type { ChatCompletionResult } from "./custom";
 
 export async function testAnthropicConnection(config: ProviderConfig): Promise<TestConnectionResult> {
   const apiKey = config.apiKey?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
@@ -368,5 +369,86 @@ export async function repairTypstWithAnthropic(
       error: sanitizeError(`Anthropic repair failed: ${err instanceof Error ? err.message : String(err)}`),
     };
   }
+}
+
+/**
+ * Multi-turn chat completion via Anthropic Messages API with tool_use support.
+ */
+export async function chatAnthropic(
+  config: ProviderConfig,
+  messages: Array<{ role: string; content: string }>,
+  tools: any[],
+): Promise<ChatCompletionResult> {
+  const apiKey = config.apiKey?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
+  const baseUrl = (config.baseUrl?.trim() || process.env.ANTHROPIC_BASE_URL?.trim() || "https://api.anthropic.com").replace(/\/+$/, "");
+  const model = config.model?.trim() || "claude-sonnet-4-20250514";
+
+  if (!apiKey) {
+    throw new Error("Anthropic API key is missing.");
+  }
+
+  // Extract system message and convert remaining messages to Anthropic format
+  const systemMsg = messages.find((m) => m.role === "system");
+  const chatMessages = messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({
+      role: m.role === "assistant" ? "assistant" : "user",
+      content: m.content,
+    }));
+
+  // Convert OpenAI tool schemas to Anthropic format
+  const anthropicTools = tools.map((t: any) => ({
+    name: t.function?.name || t.name,
+    description: t.function?.description || t.description || "",
+    input_schema: t.function?.parameters || t.parameters || { type: "object", properties: {} },
+  }));
+
+  const body: any = {
+    model,
+    messages: chatMessages,
+    max_tokens: 4096,
+    temperature: 0.4,
+  };
+  if (systemMsg) body.system = systemMsg.content;
+  if (anthropicTools.length > 0) body.tools = anthropicTools;
+
+  const res = await fetch(`${baseUrl}/v1/messages`, {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(120_000),
+  });
+
+  if (!res.ok) {
+    let errBody = "";
+    try {
+      const json = await res.json();
+      errBody = json.error?.message || JSON.stringify(json);
+    } catch {
+      errBody = res.statusText;
+    }
+    throw new Error(sanitizeError(`Anthropic chat failed (${res.status}): ${errBody}`));
+  }
+
+  const data = await res.json();
+  const content = data.content
+    ?.filter((b: any) => b.type === "text")
+    .map((b: any) => b.text)
+    .join("") || "";
+
+  const toolUseBlocks = data.content?.filter((b: any) => b.type === "tool_use") || [];
+
+  return {
+    content,
+    toolCalls: toolUseBlocks.map((b: any) => ({
+      id: b.id || crypto.randomUUID(),
+      name: b.name,
+      arguments: JSON.stringify(b.input || {}),
+    })),
+  };
 }
 

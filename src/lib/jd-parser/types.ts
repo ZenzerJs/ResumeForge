@@ -6,6 +6,7 @@ export const JobRequirementsSchema = z.object({
   domainTerms: z.array(z.string()).default([]),
   roleTitle: z.string().optional(),
   company: z.string().optional(),
+  location: z.string().optional(),
 });
 
 export type JobRequirements = z.infer<typeof JobRequirementsSchema>;

@@ -4,7 +4,176 @@ This document records completed project milestones, current state, known limitat
 
 ---
 
+## Phase Update: Workstream 5 (WS5) — Tailor Information Architecture: Overview vs Job Info Views
+
+- **Completed Date**: 2026-08-17
+- **Status Summary**: Implemented segmented tab navigation in Tailor workspace (`Overview & Materials` vs `Job Info & Requirements`), two-way view transitions (`Edit Job & Reqs →` / `← Back to Overview`), automatic transition to overview upon job save, URL search param deep-linking (`?tab=overview`), and state/ATS score evaluation preservation.
+
+### Completed Work
+- Enhanced `src/components/tailor/tailor-workspace.tsx` with segmented tabbar, Overview panel (`PatchDiffReview`, `CoverLetterPanel`, role summary), and Job Info panel (inputs, raw JD textarea, extracted requirements checklist).
+- Added unit tests in `tests/tailor-tab-views.test.ts` and Playwright E2E in `e2e/ws5-tailor-tab-views.spec.ts`.
+- Verified entire application test suite (80/80 Playwright tests passing, 355/355 Vitest unit tests passing).
+
+### Verification Tests Executed
+- `npm run lint` — Pass (0 errors)
+- `npm run typecheck` — Pass (0 errors)
+- `npm run test` — Pass (355/355 tests in 73 files)
+- `npm run build` — Pass (46 pages rendered)
+- `npx playwright test` — Pass (80/80 tests across 27 spec files)
+
+---
+
+## Phase Update: Workstream 4 (WS4) — Tailor Auto-Rescan & Target Role Profile Swap
+
+- **Completed Date**: 2026-08-17
+- **Status Summary**: Implemented Target Role Profile switcher dropdown in Tailor header supporting 6 canonical ATS archetypes (`Full-stack`, `Backend`, `AI/LLM`, `ML`, `Frontend`, `Data/Platform`), dynamic two-way ATS score re-weighting without modifying resume text, and debounced auto-rescan trigger on JD changes with a live scanning indicator.
+
+### Completed Work
+- Enhanced `src/components/tailor/tailor-workspace.tsx` with header Role Profile Switcher, `selectedRoleProfile` state, and auto-rescan `useEffect` debounce.
+- Wired live synchronization with `src/components/tailor/ats-score-panel.tsx` for instant score updates.
+- Added unit tests in `tests/tailor-role-swap.test.ts` and E2E in `e2e/ws4-role-swap-rescan.spec.ts`.
+
+### Verification Tests Executed
+- `npm run lint` — Pass (0 errors)
+- `npm run typecheck` — Pass (0 errors)
+- `npm run test` — Pass (353/353 tests)
+- `npm run build` — Pass (46 pages rendered)
+- `npx playwright test` — Pass (78/78 tests across 25 spec files)
+
+### Suggested Next Task
+- **WS5 (P1)**: Tailor Information Architecture — Overview vs Job Info Views: Tabbed navigation in Tailor workspace separating high-level strategic overview (ATS score gauge, top evidence matches, generated cover letter) from comprehensive job info view (full JD markup, extracted requirements checklist, and raw text).
+
+---
+
+## Phase Update: Workstream 3 (WS3) — Evidence Compatibility Filter & Badges
+
+- **Completed Date**: 2026-08-17
+- **Status Summary**: Implemented deterministic fast in-memory evidence compatibility calculation, synonym matching, candidate evidence resolution, `minScore` API query filtering, Match Tier selector dropdown (`50%+`, `70%+`, `80%+`), and color-coded `% Match` & skill counter badges in Discover feed.
+
+### Completed Work
+- Created `src/lib/scoring/compatibility-engine.ts` with `calculateJobCompatibility`, synonym mapping, and tier assignment.
+- Updated `GET /api/connectors/jobs` to fetch candidate Evidence Bank items and compute per-job compatibility and `minScore` filtering.
+- Enhanced `src/components/tracker/discover-feed.tsx` with Match Tier filter dropdown, `% Match` badge pills, and matched skill / evidence item counter chips.
+- Added unit tests in `tests/compatibility-engine.test.ts` and E2E in `e2e/ws3-compatibility.spec.ts`.
+
+### Verification Tests Executed
+- `npm run lint` — Pass (0 errors)
+- `npm run typecheck` — Pass (0 errors)
+- `npm run test` — Pass (350/350 tests)
+- `npm run build` — Pass (46 pages rendered)
+- `npx playwright test` — Pass (77/77 tests across 19 spec files)
+
+### Suggested Next Task
+- **WS4 (P1)**: Tailor Auto-Rescan & Target Role Profile Swap: Profile switcher dropdown in Tailor header (`Full-stack`, `Backend`, `AI/LLM`, `ML`, `Frontend`, `Data/Platform`), instant dynamic re-weighting of ATS score breakdown without losing edited text, and auto-rescan trigger debounce when resume text or target JD changes.
+
+---
+
+## Phase Update: Workstream 2 (WS2) — Discover Filters, Geocoding, Radius & Blended Sorting
+
+- **Completed Date**: 2026-08-16
+- **Status Summary**: Implemented Canadian city geocoding coordinates for 10 tech hubs, Haversine great-circle distance radius filtering, multi-factor blended match scoring (ATS qualification match 55% + recency 20% + location 15% + salary transparency 10%), expanded `GET /api/connectors/jobs` query filters, and interactive Discover toolbar with `% Match` color badges.
+
+### Completed Work
+- Created `src/lib/geo/geocoding.ts` with Canadian tech hub coordinates and Haversine formula (`haversineDistanceKm`, `isWithinRadiusKm`).
+- Created `src/lib/scoring/blended-sort.ts` with `calculateBlendedScore`, `calculateRecencyScore`, `calculateLocationScore`, and `calculateSalaryScore`.
+- Updated `GET /api/connectors/jobs` to support `city`, `radiusKm`, `minSalary`, `minScore`, and `sort` (`blended`, `newest`, `ats`, `salary`).
+- Enhanced `src/components/tracker/discover-feed.tsx` with Canadian city selector, distance radius slider/select, salary filter, sort order dropdown, and color-coded `% Match` card badges.
+- Added unit tests in `tests/geocoding-radius.test.ts`, `tests/blended-scoring.test.ts` and E2E in `e2e/ws2-discover-filters.spec.ts`.
+
+### Verification Tests Executed
+- `npm run lint` — Pass (0 errors)
+- `npm run typecheck` — Pass (0 errors)
+- `npm run test` — Pass (347/347 tests)
+- `npm run build` — Pass (46 pages rendered)
+- `npx playwright test` — Pass (76/76 tests across 18 spec files)
+
+### Suggested Next Task
+- **WS3 (P1)**: Evidence Compatibility Filter & Badges: Fast in-memory compatibility score against active Master Resume + Evidence Bank, `% Match` color badges on discover feed and job detail drawer, and compatibility score filter (`50%+`, `70%+`, `80%+`).
+
+---
+
+## Phase Update: Workstream 1 (WS1) — Job Ingestion Failure Taxonomy & Universal Normalizer
+
+- **Completed Date**: 2026-08-16
+- **Status Summary**: Implemented 13-reason failure taxonomy (`ExtractFailureCode`), strict policy compliance checker (`checkHostPolicy` blocking LinkedIn/Indeed search scraping per TOS), Ashby public JSON board API, Universal Job Normalizer (`NormalizedJob` with Canadian city geocoding and boilerplate stripping), and AI JD Formatter (`FormattedJdSchema` and prompt).
+
+### Completed Work
+- Defined 13-case `ExtractFailureCode` and diagnostic telemetry interface in `src/lib/ingestion/types.ts`.
+- Implemented `checkHostPolicy` and Ashby JSON board API in `src/lib/ingestion/tier2-fetcher.ts`.
+- Created `normalizeJob`, Canadian geo coordinate mapper, and `stripBoilerplate` in `src/lib/ingestion/normalize-job.ts`.
+- Created `FormattedJdSchema`, `buildJdFormatSystemPrompt`, and `formatJobDescriptionWithAi` in `src/lib/ai/`.
+- Updated `POST /api/jobs/extract` to return normalized data, typed 422 errors, and optional AI formatting.
+- Updated `prisma/schema.prisma` with `normalized`, `formattedJd`, `extractFailure`, `lat`, `lng`, `cityNorm`.
+- Added unit tests in `tests/ingestion-failure-taxonomy.test.ts`, `tests/normalize-job.test.ts`, `tests/jd-format.test.ts` and E2E in `e2e/ws1-ingestion.spec.ts`.
+
+### Verification Tests Executed
+- `npm run lint` — Pass (0 errors)
+- `npm run typecheck` — Pass (0 errors)
+- `npm run test` — Pass (339/339 tests)
+- `npm run build` — Pass (46 pages rendered)
+- `npx playwright test` — Pass (75/75 tests across 17 spec files)
+
+### Suggested Next Task
+- **WS2 (P1)**: Discover Page Filter Panel, Canadian City Geocoding, Distance Radius Filter (Haversine formula), and Blended Match Scoring (recency + ATS match).
+
+---
+
+## Phase Update: Workstream 0 (WS0) — UX Bug Fixes & Staged AI Feedback
+
+- **Completed Date**: 2026-08-16
+- **Status Summary**: Resolved P0 UX layout and visual bugs: flex column editor layout (fixed top nav overflow/clipping), accessible multi-stage `AiProgress` feedback component (queued -> connecting -> extracting -> matching -> writing -> verifying -> done), and seamless landing capability marquee infinite loop.
+
+### Completed Work
+- Fixed editor layout by removing nested `h-screen` in `src/app/editor/page.tsx` and removing redundant `h-dvh` on `AppShell` invocation in `src/components/editor/editor-workspace.tsx`.
+- Updated `src/components/editor/editor-workspace-skeleton.tsx` to use `h-dvh max-h-dvh` preventing initial layout shift.
+- Created `src/components/ui/ai-progress.tsx` with 8 named lifecycle stages, live timer, accessible `aria-live="polite"`, compact and full card view modes.
+- Replaced spinner-only states with `AiProgress` in `src/components/editor/ai-sidebar.tsx` and `src/components/tailor/tailor-workspace.tsx`.
+- Refactored `src/components/landing/capability-marquee.tsx` into dual matching subtracks and updated `src/app/globals.css` for seamless `-50%` infinite loop with reduced motion support.
+- Added unit tests in `tests/ai-progress.test.ts` and Playwright E2E tests in `e2e/ws0-ux-bugs.spec.ts`.
+
+### Verification Tests Executed
+- `npm run lint` — Pass (0 errors)
+- `npm run typecheck` — Pass (0 errors)
+- `npm run test` — Pass (320/320 tests)
+- `npm run build` — Pass (46 pages rendered)
+- `npx playwright test` — Pass (73/73 tests across 16 spec files)
+
+### Suggested Next Task
+- **WS1 (P1)**: Ingestion failure taxonomy (`ExtractFailureCode`), policy-compliant adapter pipeline (ATS JSON, robots check, user paste fallback), `NormalizedJob` transformer, and structured AI JD Formatter.
+
+---
+
+## Phase Update: Conversational Career Assistant (AI Sidebar Chat)
+
+- **Completed Date**: 2026-08-14
+- **Status Summary**: Expanded the editor AI sidebar into Chat | Tailor. Chat is a BYOK multi-turn career assistant with SSE streaming and read-only tool calling. Existing JD tailoring remains on the Tailor tab.
+
+### Completed Work
+- Chat system prompt composed on master guardrails (`src/lib/ai/chat-prompt.ts`).
+- `POST /api/ai/chat` SSE route with tool loop (`executeServerTool`, `CHAT_TOOLS` only).
+- Provider `chat*` adapters + `sendChatCompletion` gateway dispatcher.
+- `ChatPanel` UI with quick actions, tool badges, sessionStorage history.
+- Header badge: `Master Resume` (no duplicated title).
+
+### Verification Tests Executed
+- `npm run lint` — Pass
+- `npm run typecheck` — Pass
+- `npm run test` — Pass (316/316)
+- `npm run build` — Pass
+- `npx playwright test` — Pass (71/71 after Chat-tab E2E fixes)
+
+### Known Limitations
+- Collect-then-SSE (not token streaming from providers).
+- Chat history is session-scoped.
+- Mutation tools stay on Tailor.
+
+### Suggested Next Task
+- Native provider streaming and tool-result message formats.
+
+---
+
 ## Current Status: Phase 12 — Job Ingestion Engine & Public Connectors
+
 
 - **Completed Date**: 2026-08-14
 - **Status Summary**: Implemented resilient, local-first job ingestion engine for Canadian and remote tech roles without headless scraping or auto-apply automation. Connects directly to 7 public REST APIs and syndication feeds (Greenhouse, Lever, Ashby, Adzuna CA, Jobicy, Remotive, RemoteOK). Hardened against SSRF via hostname allowlist and DNS IP validation (`ipaddr.js`). Deduplicates via URL canonicalization and SHA-256 fingerprinting. Sanitizes HTML and plain text via `sanitize-html`. Integrates with the Phase 11.5 Apply Sheet and database tracking pipeline.

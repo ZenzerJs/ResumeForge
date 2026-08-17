@@ -63,7 +63,7 @@ export function EditorWorkspaceSkeleton({
     <div
       className={cn(
         "flex flex-col overflow-hidden bg-[#0B0F17] text-slate-100",
-        showNav ? "h-screen max-h-screen" : "h-full",
+        showNav ? "h-dvh max-h-dvh" : "h-full",
         className
       )}
       data-testid="editor-workspace-skeleton"

@@ -37,7 +37,11 @@ test.describe("Phase 3 Job Description Parser & Evidence Matcher E2E Tests", () 
     expect(jobsJson.success).toBe(true);
     expect(jobsJson.data.length).toBeGreaterThan(0);
 
-    const savedJob = jobsJson.data[0];
+    const savedJob =
+      jobsJson.data.find(
+        (j: { roleTitle?: string; company?: string }) =>
+          j.roleTitle === "Senior Backend Engineer" || j.company === "Acme Cloud Corp"
+      ) || jobsJson.data[0];
     expect(savedJob.rawDescription).toBeUndefined();
     const detailRes = await request.get(`/api/jobs/${savedJob.id}`);
     const detailJson = await detailRes.json();

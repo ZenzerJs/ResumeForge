@@ -3,6 +3,7 @@ import { sanitizeError } from "../redact";
 import { stripCodeFences } from "../utils";
 import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from "../repair-schema";
 import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
+import type { ChatCompletionResult } from "./custom";
 
 function geminiHeaders(apiKey: string): HeadersInit {
   return {
@@ -371,5 +372,82 @@ export async function repairTypstWithGemini(
       error: sanitizeError(`Gemini repair failed: ${err instanceof Error ? err.message : String(err)}`),
     };
   }
+}
+
+/**
+ * Multi-turn chat completion via Gemini generateContent with function calling.
+ */
+export async function chatGemini(
+  config: ProviderConfig,
+  messages: Array<{ role: string; content: string }>,
+  tools: any[],
+): Promise<ChatCompletionResult> {
+  const apiKey = config.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
+  const baseUrl = (config.baseUrl?.trim() || process.env.GEMINI_BASE_URL?.trim() || "https://generativelanguage.googleapis.com").replace(/\/+$/, "");
+  const model = config.model?.trim() || "gemini-2.0-flash";
+
+  if (!apiKey) {
+    throw new Error("Gemini API key is missing.");
+  }
+
+  // Extract system message and convert to Gemini contents format
+  const systemMsg = messages.find((m) => m.role === "system");
+  const contents = messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
+
+  // Convert OpenAI tool schemas to Gemini functionDeclarations
+  const functionDeclarations = tools.map((t: any) => ({
+    name: t.function?.name || t.name,
+    description: t.function?.description || t.description || "",
+    parameters: t.function?.parameters || t.parameters || { type: "object", properties: {} },
+  }));
+
+  const body: any = { contents, generationConfig: { temperature: 0.4 } };
+  if (systemMsg) {
+    body.system_instruction = { parts: [{ text: systemMsg.content }] };
+  }
+  if (functionDeclarations.length > 0) {
+    body.tools = [{ functionDeclarations }];
+  }
+
+  const res = await fetch(
+    `${baseUrl}/v1beta/models/${model}:generateContent`,
+    {
+      method: "POST",
+      headers: geminiHeaders(apiKey),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(120_000),
+    }
+  );
+
+  if (!res.ok) {
+    let errBody = "";
+    try {
+      const json = await res.json();
+      errBody = json.error?.message || JSON.stringify(json);
+    } catch {
+      errBody = res.statusText;
+    }
+    throw new Error(sanitizeError(`Gemini chat failed (${res.status}): ${errBody}`));
+  }
+
+  const data = await res.json();
+  const parts = data.candidates?.[0]?.content?.parts || [];
+
+  const textParts = parts.filter((p: any) => p.text).map((p: any) => p.text);
+  const functionCallParts = parts.filter((p: any) => p.functionCall);
+
+  return {
+    content: textParts.join(""),
+    toolCalls: functionCallParts.map((p: any) => ({
+      id: crypto.randomUUID(),
+      name: p.functionCall.name,
+      arguments: JSON.stringify(p.functionCall.args || {}),
+    })),
+  };
 }
 

@@ -72,6 +72,29 @@ const WORKPLACE_OPTIONS: { value: WorkplaceFilter; label: string }[] = [
   { value: "onsite", label: "On-site" },
 ];
 
+const CANADIAN_CITIES: { value: string; label: string }[] = [
+  { value: "ALL", label: "All Locations" },
+  { value: "toronto", label: "Toronto, ON" },
+  { value: "vancouver", label: "Vancouver, BC" },
+  { value: "montreal", label: "Montreal, QC" },
+  { value: "ottawa", label: "Ottawa, ON" },
+  { value: "calgary", label: "Calgary, AB" },
+  { value: "waterloo", label: "Waterloo / Kitchener, ON" },
+  { value: "edmonton", label: "Edmonton, AB" },
+  { value: "victoria", label: "Victoria, BC" },
+  { value: "halifax", label: "Halifax, NS" },
+  { value: "quebec", label: "Quebec City, QC" },
+];
+
+const MIN_SALARY_OPTIONS: { value: string; label: string }[] = [
+  { value: "0", label: "Any Salary" },
+  { value: "60000", label: "$60k+" },
+  { value: "80000", label: "$80k+" },
+  { value: "100000", label: "$100k+" },
+  { value: "120000", label: "$120k+" },
+  { value: "150000", label: "$150k+" },
+];
+
 const FILTER_CONTROL =
   "min-h-11 rounded-md border border-slate-700 bg-rf-elevated px-2.5 text-[12.5px] text-rf-cloud placeholder-slate-500 transition-colors duration-150 focus:border-amber-500/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60";
 
@@ -103,6 +126,8 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
   const [debouncedLocation, setDebouncedLocation] = useState("");
+  const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
+  const [minSalary, setMinSalary] = useState("0");
   const [workplace, setWorkplace] = useState<WorkplaceFilter>("all");
   const [statusFilter, setStatusFilter] = useState<JobStatus | "ALL">("ALL");
   const [postedWithin, setPostedWithin] = useState<PostedWithin>("all");
@@ -289,22 +314,36 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const handleRefreshFromSource = async () => {
     try {
       setIsImporting(true);
-      setImportNotice(null);
-      const res = await fetch("/api/jobs/bulk-import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      const json = await res.json();
+      setImportNotice("Syncing live feeds from public connectors & source listings...");
 
-      if (res.ok && json.success) {
-        setImportNotice(
-          `Imported ${json.createdCount} new jobs (${json.skippedCount} existing skipped).`,
-        );
-        fetchJobs();
-        setTimeout(() => setImportNotice(null), 5000);
-      } else {
-        setImportNotice(json.error || "Failed to refresh jobs from source.");
+      const [bulkRes, syncRes] = await Promise.allSettled([
+        fetch("/api/jobs/bulk-import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }),
+        fetch("/api/connectors/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }),
+      ]);
+
+      let message = "Refresh complete.";
+      if (bulkRes.status === "fulfilled" && bulkRes.value.ok) {
+        const bulkJson = await bulkRes.value.json();
+        if (bulkJson.success) {
+          message = `Imported ${bulkJson.createdCount} new jobs (${bulkJson.skippedCount} existing skipped).`;
+        }
       }
+      if (syncRes.status === "fulfilled" && syncRes.value.ok) {
+        const syncJson = await syncRes.value.json();
+        if (syncJson.success && syncJson.data?.summary) {
+          message += ` Synced ${syncJson.data.summary.totalFound} jobs across ${syncJson.data.summary.providerCount} connectors.`;
+        }
+      }
+
+      setImportNotice(message);
+      fetchJobs();
+      setTimeout(() => setImportNotice(null), 6000);
     } catch (err) {
       console.error("Failed to refresh jobs from source:", err);
       setImportNotice("Network error refreshing jobs.");
@@ -436,11 +475,38 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             id="tracker-location-filter"
             data-testid="tracker-location-filter"
             type="search"
-            placeholder="Location"
+            placeholder="Location (e.g. Toronto)"
             value={locationQuery}
-            onChange={(e) => setLocationQuery(e.target.value)}
+            onChange={(e) => {
+              setLocationQuery(e.target.value);
+              setIsLocationDropdownOpen(true);
+            }}
+            onFocus={() => setIsLocationDropdownOpen(true)}
+            onBlur={() => setTimeout(() => setIsLocationDropdownOpen(false), 250)}
             className={`${FILTER_CONTROL} w-full py-0 pl-8 pr-3`}
           />
+          {isLocationDropdownOpen && (
+            <div className="absolute left-0 top-full z-50 mt-1 max-h-56 w-56 overflow-auto rounded-lg border border-slate-700 bg-slate-900 p-1 shadow-2xl">
+              {CANADIAN_CITIES.filter(
+                (c) =>
+                  c.label.toLowerCase().includes(locationQuery.toLowerCase()) ||
+                  c.value.toLowerCase().includes(locationQuery.toLowerCase())
+              ).map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  onMouseDown={() => {
+                    setLocationQuery(c.value === "ALL" ? "" : c.label);
+                    setIsLocationDropdownOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left text-xs text-slate-300 transition hover:bg-amber-500/15 hover:text-amber-300"
+                >
+                  <MapPin className="h-3 w-3 shrink-0 text-slate-500" />
+                  <span>{c.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <label htmlFor="tracker-posted-select" className="sr-only">

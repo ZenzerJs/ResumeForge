@@ -32,6 +32,8 @@
 *.sqlite-journal
 /prisma/*.db
 /prisma/*.sqlite
+/.pgdata/
+/.agents/brain/
 
 # Generated document exports & user data
 /*.pdf

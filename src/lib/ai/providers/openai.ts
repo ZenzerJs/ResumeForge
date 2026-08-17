@@ -3,6 +3,7 @@ import { sanitizeError } from "../redact";
 import { stripCodeFences } from "../utils";
 import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from "../repair-schema";
 import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
+import type { ChatCompletionResult } from "./custom";
 
 export async function testOpenAIConnection(config: ProviderConfig): Promise<TestConnectionResult> {
   const apiKey = config.apiKey?.trim() || process.env.OPENAI_API_KEY?.trim();
@@ -367,5 +368,63 @@ export async function repairTypstWithOpenAI(
       error: sanitizeError(`OpenAI repair failed: ${err instanceof Error ? err.message : String(err)}`),
     };
   }
+}
+
+/**
+ * Multi-turn chat completion via OpenAI with tool/function calling support.
+ */
+export async function chatOpenAI(
+  config: ProviderConfig,
+  messages: Array<{ role: string; content: string }>,
+  tools: any[],
+): Promise<ChatCompletionResult> {
+  const apiKey = config.apiKey?.trim() || process.env.OPENAI_API_KEY?.trim();
+  const baseUrl = (config.baseUrl?.trim() || process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com").replace(/\/+$/, "");
+  const model = config.model?.trim() || "gpt-4o-mini";
+
+  if (!apiKey) {
+    throw new Error("OpenAI API key is missing.");
+  }
+
+  const body: any = { model, messages, temperature: 0.4 };
+  if (tools.length > 0) {
+    body.tools = tools;
+    body.tool_choice = "auto";
+  }
+
+  const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(120_000),
+  });
+
+  if (!res.ok) {
+    let errBody = "";
+    try {
+      const json = await res.json();
+      errBody = json.error?.message || JSON.stringify(json);
+    } catch {
+      errBody = res.statusText;
+    }
+    throw new Error(sanitizeError(`OpenAI chat failed (${res.status}): ${errBody}`));
+  }
+
+  const data = await res.json();
+  const choice = data.choices?.[0]?.message;
+  const content = choice?.content || "";
+  const rawToolCalls = choice?.tool_calls || [];
+
+  return {
+    content,
+    toolCalls: rawToolCalls.map((tc: any) => ({
+      id: tc.id || crypto.randomUUID(),
+      name: tc.function?.name || tc.name || "unknown",
+      arguments: typeof tc.function?.arguments === "string" ? tc.function.arguments : JSON.stringify(tc.function?.arguments || {}),
+    })),
+  };
 }
 

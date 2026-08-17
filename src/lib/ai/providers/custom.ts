@@ -6,7 +6,74 @@ import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../rep
 import { safeFetch } from "@/lib/security/safe-fetch";
 
 async function customFetch(url: string, init?: RequestInit): Promise<Response> {
-  return safeFetch(url, init ?? {}, { allowLocalhost: process.env.NODE_ENV !== "production" });
+  return safeFetch(url, init ?? {}, {
+    allowLocalhost: process.env.NODE_ENV !== "production",
+    timeoutMs: 120_000,
+  });
+}
+
+export interface ChatCompletionResult {
+  content: string;
+  toolCalls: Array<{ id: string; name: string; arguments: string }>;
+}
+
+/**
+ * Multi-turn chat completion via a Custom OpenAI-compatible endpoint.
+ * Supports function/tool calling in OpenAI format.
+ */
+export async function chatCustom(
+  config: ProviderConfig,
+  messages: Array<{ role: string; content: string }>,
+  tools: any[],
+): Promise<ChatCompletionResult> {
+  const apiKey = config.apiKey?.trim() || process.env.CUSTOM_OPENAI_API_KEY?.trim();
+  const baseUrlRaw = config.baseUrl?.trim() || process.env.CUSTOM_OPENAI_BASE_URL?.trim() || "http://localhost:8000";
+  const baseUrl = baseUrlRaw.replace(/\/+$/, "");
+  const model = config.model?.trim() || "default";
+
+  const completionsUrl = baseUrl.endsWith("/v1")
+    ? `${baseUrl}/chat/completions`
+    : `${baseUrl}/v1/chat/completions`;
+
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+
+  const body: any = { model, messages, temperature: 0.4 };
+  if (tools.length > 0) {
+    body.tools = tools;
+    body.tool_choice = "auto";
+  }
+
+  const res = await customFetch(completionsUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    let errBody = "";
+    try {
+      const json = await res.json();
+      errBody = json.error?.message || JSON.stringify(json);
+    } catch {
+      errBody = res.statusText;
+    }
+    throw new Error(sanitizeError(`Custom endpoint chat failed (${res.status}): ${errBody}`));
+  }
+
+  const data = await res.json();
+  const choice = data.choices?.[0]?.message;
+  const content = choice?.content || "";
+  const rawToolCalls = choice?.tool_calls || [];
+
+  return {
+    content,
+    toolCalls: rawToolCalls.map((tc: any) => ({
+      id: tc.id || crypto.randomUUID(),
+      name: tc.function?.name || tc.name || "unknown",
+      arguments: typeof tc.function?.arguments === "string" ? tc.function.arguments : JSON.stringify(tc.function?.arguments || {}),
+    })),
+  };
 }
 
 /**

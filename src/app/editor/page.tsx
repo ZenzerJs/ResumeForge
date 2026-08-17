@@ -9,10 +9,8 @@ export const metadata = {
 
 export default function EditorPage() {
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      <Suspense fallback={<EditorWorkspaceSkeleton />}>
-        <EditorWorkspace />
-      </Suspense>
-    </div>
+    <Suspense fallback={<EditorWorkspaceSkeleton />}>
+      <EditorWorkspace />
+    </Suspense>
   );
 }

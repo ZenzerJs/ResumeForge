@@ -18,6 +18,7 @@ import {
   Code2,
   Eye,
   Bot,
+  MessageSquare,
   Save,
   BookOpen,
   Check,
@@ -42,6 +43,7 @@ const COMPILE_DEBOUNCE_MS = 400;
 const SOURCE_PERSIST_MS = 500;
 
 import { ConfirmMasterDialog } from "./confirm-master-dialog";
+import { AiAssistantWindow } from "./ai-assistant-window";
 import { ResumeFacts } from "@/lib/facts/types";
 import { extractResumeFacts } from "@/lib/facts/extract";
 
@@ -133,6 +135,8 @@ export function EditorWorkspace() {
   const aiPanelRef = usePanelRef();
   const [layout, setLayout] = useState<Record<string, number>>(DEFAULT_EDITOR_LAYOUT.sizes);
   const [isAiCollapsed, setIsAiCollapsed] = useState<boolean>(DEFAULT_EDITOR_LAYOUT.isAiCollapsed);
+  const [isAiPoppedOut, setIsAiPoppedOut] = useState<boolean>(false);
+  const [aiMode, setAiMode] = useState<"chat" | "tailor">("chat");
   const [isLayoutReady, setIsLayoutReady] = useState(false);
   const isAiCollapsedRef = useRef<boolean>(isAiCollapsed);
   const skipResizePersistRef = useRef(false);
@@ -145,6 +149,16 @@ export function EditorWorkspace() {
     setLayout(persisted.sizes);
     setIsAiCollapsed(persisted.isAiCollapsed);
     isAiCollapsedRef.current = persisted.isAiCollapsed;
+
+    try {
+      const popped = localStorage.getItem("resumeforge_ai_popped_out");
+      if (popped === "true") {
+        setIsAiPoppedOut(true);
+      }
+    } catch {
+      // ignore
+    }
+
     // Ignore spurious onResize while the panel group mounts / restores collapse.
     suppressResizePersistUntilRef.current = Date.now() + 750;
     setIsLayoutReady(true);
@@ -159,15 +173,17 @@ export function EditorWorkspace() {
     isAiCollapsedRef.current = collapsed;
   }, []);
 
-  // Collapse panel on mount if layout was persisted as collapsed
+  // Collapse panel on mount if layout was persisted as collapsed or popped out
   useEffect(() => {
-    if (!isLayoutReady || !isAiCollapsed) return;
-    suppressResizePersistUntilRef.current = Date.now() + 750;
-    const timer = setTimeout(() => {
-      aiPanelRef.current?.collapse();
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [aiPanelRef, isAiCollapsed, isLayoutReady]);
+    if (!isLayoutReady) return;
+    if (isAiCollapsed || isAiPoppedOut) {
+      suppressResizePersistUntilRef.current = Date.now() + 750;
+      const timer = setTimeout(() => {
+        aiPanelRef.current?.collapse();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [aiPanelRef, isAiCollapsed, isAiPoppedOut, isLayoutReady]);
 
   const persistLayoutState = (sizes: Record<string, number>, collapsed: boolean) => {
     if (typeof window === "undefined") return;
@@ -181,11 +197,44 @@ export function EditorWorkspace() {
     }
   };
 
-  const handleLayoutChange = (layoutMap: Record<string, number>) => {
+  const handleLayoutChange = useCallback((layoutData: any) => {
+    let layoutMap: Record<string, number>;
+    if (Array.isArray(layoutData)) {
+      layoutMap = {
+        "panel-code": layoutData[0] ?? 45,
+        "panel-preview": layoutData[1] ?? 35,
+        "panel-ai": layoutData[2] ?? 20,
+      };
+    } else if (layoutData && typeof layoutData === "object") {
+      layoutMap = layoutData;
+    } else {
+      return;
+    }
     setLayout(layoutMap);
     if (Date.now() < suppressResizePersistUntilRef.current) return;
     persistLayoutState(layoutMap, isAiCollapsedRef.current);
-  };
+  }, []);
+
+  const handleToggleAiPopOut = useCallback(() => {
+    setIsAiPoppedOut((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("resumeforge_ai_popped_out", String(next));
+        } catch {
+          // ignore
+        }
+      }
+      if (next) {
+        aiPanelRef.current?.collapse();
+        updateAiCollapsedState(true);
+      } else {
+        aiPanelRef.current?.expand();
+        updateAiCollapsedState(false);
+      }
+      return next;
+    });
+  }, [aiPanelRef, updateAiCollapsedState]);
 
   const toggleAiSidebarCollapse = () => {
     const panel = aiPanelRef.current;
@@ -433,6 +482,7 @@ export function EditorWorkspace() {
   };
 
   const handleSaveAsMaster = async () => {
+    setShowSaveConfirm(true);
     // Default checkbox: checked when Evidence Bank is empty; otherwise unchecked
     try {
       const res = await fetch("/api/evidence");
@@ -443,7 +493,6 @@ export function EditorWorkspace() {
     } catch {
       setDraftEvidenceFromMaster(true);
     }
-    setShowSaveConfirm(true);
   };
 
   const runEvidenceExtractAfterSave = async (typstSource: string) => {
@@ -587,7 +636,6 @@ export function EditorWorkspace() {
     <AppShell
       variant="editor"
       isCompiling={isCompiling}
-      className="h-dvh overflow-hidden"
       badge={
           <div className="hidden sm:flex items-center gap-2" data-testid="document-type-badge">
             {docMetadata.type === "MASTER_RESUME" && (
@@ -596,7 +644,7 @@ export function EditorWorkspace() {
                 className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-950/60 text-amber-300 border border-amber-800/60 flex items-center gap-1.5 shadow-sm"
               >
                 <ShieldCheck className="h-3.5 w-3.5 text-amber-400" />
-                Master Resume ({docMetadata.title})
+                Master Resume
               </span>
             )}
             {docMetadata.type === "RESUME_VARIANT" && (
@@ -670,20 +718,42 @@ export function EditorWorkspace() {
               {saveSuccess ? "Saved as Master!" : "Save as Master Resume"}
             </Button>
 
-            {isAiCollapsed && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={toggleAiSidebarCollapse}
-                data-testid="expand-ai-sidebar-btn"
-                className="h-8 shrink-0 gap-1.5 text-xs hidden lg:inline-flex border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
-                title="Expand AI Sidebar"
-              >
-                <Bot className="h-3.5 w-3.5 text-amber-400" />
-                <span>AI Assistant</span>
-              </Button>
-            )}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (isAiPoppedOut) {
+                  handleToggleAiPopOut();
+                } else if (isAiCollapsed) {
+                  toggleAiSidebarCollapse();
+                } else {
+                  handleToggleAiPopOut();
+                }
+              }}
+              data-testid={isAiCollapsed ? "expand-ai-sidebar-btn" : "toggle-ai-assistant-btn"}
+              className={cn(
+                "h-8 shrink-0 gap-1.5 text-xs hidden lg:inline-flex transition-all",
+                isAiPoppedOut || !isAiCollapsed
+                  ? "border-amber-500/50 bg-amber-500/20 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.2)]"
+                  : "border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-amber-400"
+              )}
+              title={
+                isAiPoppedOut
+                  ? "AI Assistant is popped out in floating window (Click to dock)"
+                  : isAiCollapsed
+                  ? "Expand AI Assistant"
+                  : "Pop out AI Assistant into floating window"
+              }
+            >
+              <Bot className="h-3.5 w-3.5 text-amber-400" />
+              <span>AI Assistant</span>
+              {isAiPoppedOut && (
+                <span className="text-[9px] bg-amber-500/30 px-1 py-0.5 rounded font-mono text-amber-200">
+                  POP-OUT
+                </span>
+              )}
+            </Button>
 
             {/* Mobile Tab Selectors (< lg screens) */}
             <div
@@ -721,8 +791,12 @@ export function EditorWorkspace() {
               className="h-8 px-2 text-xs"
               aria-selected={activeTab === "ai"}
             >
-              <Bot className="h-3.5 w-3.5" />
-              AI
+              {aiMode === "chat" ? (
+                <MessageSquare className="h-3.5 w-3.5" />
+              ) : (
+                <Bot className="h-3.5 w-3.5" />
+              )}
+              {aiMode === "chat" ? "Chat" : "Tailor"}
             </Button>
             </div>
           </div>
@@ -873,7 +947,7 @@ export function EditorWorkspace() {
             id="editor-resizable-panel-group"
             orientation="horizontal"
             onLayoutChange={handleLayoutChange}
-            className="hidden lg:flex h-full w-full gap-1.5"
+            className="hidden lg:flex h-full w-full"
             data-testid="editor-resizable-panel-group"
           >
             {/* Panel 1: CodeMirror Editor */}
@@ -918,14 +992,15 @@ export function EditorWorkspace() {
             <ResizablePanel
               id="panel-ai"
               panelRef={aiPanelRef}
-              defaultSize={isAiCollapsed ? 0 : (layout["panel-ai"] ?? 20)}
+              defaultSize={isAiCollapsed || isAiPoppedOut ? 0 : (layout["panel-ai"] ?? 20)}
               minSize={15}
               collapsible={true}
               collapsedSize={0}
               onResize={(size) => {
                 if (skipResizePersistRef.current) return;
                 if (Date.now() < suppressResizePersistUntilRef.current) return;
-                const isCurrentlyCollapsed = size.asPercentage <= 2;
+                const sizeNum = typeof size === "number" ? size : (size as any)?.asPercentage ?? 20;
+                const isCurrentlyCollapsed = sizeNum <= 2;
                 if (isCurrentlyCollapsed !== isAiCollapsedRef.current) {
                   updateAiCollapsedState(isCurrentlyCollapsed);
                   persistLayoutState(layout, isCurrentlyCollapsed);
@@ -935,15 +1010,18 @@ export function EditorWorkspace() {
               data-testid="panel-ai"
             >
               <div className="h-full min-h-0">
-              <AiSidebar
-                source={source}
-                onApplyToBuffer={handleApplyRepair}
-                isCollapsed={isAiCollapsed}
-                masterFacts={masterFacts}
-                onToggleCollapse={toggleAiSidebarCollapse}
-                repairContext={repairContext}
-                onDismissRepair={() => setRepairContext(null)}
-              />
+                <AiSidebar
+                  source={source}
+                  onApplyToBuffer={handleApplyRepair}
+                  isCollapsed={isAiCollapsed}
+                  isPoppedOut={false}
+                  onPopOut={handleToggleAiPopOut}
+                  masterFacts={masterFacts}
+                  onToggleCollapse={toggleAiSidebarCollapse}
+                  repairContext={repairContext}
+                  onDismissRepair={() => setRepairContext(null)}
+                  onModeChange={setAiMode}
+                />
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>
@@ -983,11 +1061,48 @@ export function EditorWorkspace() {
                 masterFacts={masterFacts}
                 repairContext={repairContext}
                 onDismissRepair={() => setRepairContext(null)}
+                onModeChange={setAiMode}
               />
             </div>
           )}
         </div>
       </div>
+
+      {/* Floating Portaled AI Assistant Window */}
+      {isAiPoppedOut && (
+        <AiAssistantWindow
+          open={isAiPoppedOut}
+          onOpenChange={(open) => {
+            setIsAiPoppedOut(open);
+            if (typeof window !== "undefined") {
+              try {
+                localStorage.setItem("resumeforge_ai_popped_out", String(open));
+              } catch {
+                // ignore
+              }
+            }
+            if (!open) {
+              aiPanelRef.current?.expand();
+              updateAiCollapsedState(false);
+            }
+          }}
+          title={aiMode === "chat" ? "AI Chat" : "AI Tailor"}
+        >
+          <div className="h-full w-full">
+            <AiSidebar
+              source={source}
+              onApplyToBuffer={handleApplyRepair}
+              isCollapsed={false}
+              isPoppedOut={true}
+              onPopOut={handleToggleAiPopOut}
+              masterFacts={masterFacts}
+              repairContext={repairContext}
+              onDismissRepair={() => setRepairContext(null)}
+              onModeChange={setAiMode}
+            />
+          </div>
+        </AiAssistantWindow>
+      )}
     </AppShell>
   );
 }

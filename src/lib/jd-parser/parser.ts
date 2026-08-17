@@ -84,18 +84,31 @@ export function parseJobDescription(rawText: string): JobRequirements {
   );
   const domainTerms = Array.from(domainTermsSet);
 
-  // Attempt role title extraction from header lines
+  // Attempt role title, company, and location extraction from header lines
   const roleTitle = extractRoleTitle(lines);
+  const company = extractCompany(lines);
+  const location = extractLocation(lines);
 
   return JobRequirementsSchema.parse({
     requiredSkills,
     preferredSkills,
     domainTerms,
     roleTitle,
+    company,
+    location,
   });
 }
 
 function extractRoleTitle(lines: string[]): string | undefined {
+  // First check explicit Title: / Role: / Position: header lines in first 15 lines
+  for (const line of lines.slice(0, 15)) {
+    const trimmed = line.trim();
+    const titleMatch = trimmed.match(/^(?:title|role|position|job title):\s*(.+)$/i);
+    if (titleMatch && titleMatch[1].trim()) {
+      return titleMatch[1].trim();
+    }
+  }
+
   const rolePatterns = [
     /(?:software|senior|staff|lead|principal|junior)?\s*(?:engineer|developer|architect|data scientist)\b/i,
     /(?:frontend|back-end|backend|fullstack|full-stack|ai\/ml|data|devops)\s*(?:engineer|developer|lead)?\b/i,
@@ -107,6 +120,28 @@ function extractRoleTitle(lines: string[]): string | undefined {
       if (pattern.test(trimmed) && trimmed.length < 80) {
         return trimmed;
       }
+    }
+  }
+  return undefined;
+}
+
+function extractCompany(lines: string[]): string | undefined {
+  for (const line of lines.slice(0, 15)) {
+    const trimmed = line.trim();
+    const match = trimmed.match(/^(?:company|organization|employer|company name):\s*(.+)$/i);
+    if (match && match[1].trim()) {
+      return match[1].trim();
+    }
+  }
+  return undefined;
+}
+
+function extractLocation(lines: string[]): string | undefined {
+  for (const line of lines.slice(0, 15)) {
+    const trimmed = line.trim();
+    const match = trimmed.match(/^(?:location|place|job location|office location):\s*(.+)$/i);
+    if (match && match[1].trim()) {
+      return match[1].trim();
     }
   }
   return undefined;

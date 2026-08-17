@@ -211,6 +211,20 @@ export async function promoteIngestedJobToTrackedJob(
     return ingested.trackedJob;
   }
 
+  // Format rich notes with Location, Workplace, Apply Link, and Salary so TrackerFeed helpers parse them
+  const notesParts = [
+    `Ingested from ${ingested.source}`,
+    ingested.location ? `Location: ${ingested.location}` : null,
+    ingested.workplaceType && ingested.workplaceType !== "UNSPECIFIED"
+      ? `Workplace: ${ingested.workplaceType.toLowerCase()}`
+      : null,
+    ingested.applyUrl ? `Apply Link: ${ingested.applyUrl}` : null,
+    ingested.postedAt ? `Posted: ${new Date(ingested.postedAt).toLocaleDateString()}` : null,
+    ingested.salaryMin || ingested.salaryMax
+      ? `Salary: ${ingested.salaryCurrency || "CAD"} ${ingested.salaryMin ? `$${ingested.salaryMin.toLocaleString()}` : ""}${ingested.salaryMin && ingested.salaryMax ? " - " : ""}${ingested.salaryMax ? `$${ingested.salaryMax.toLocaleString()}` : ""}`
+      : null,
+  ].filter(Boolean);
+
   // Create corresponding Job record
   const createdJob = await prisma.job.create({
     data: {
@@ -220,7 +234,7 @@ export async function promoteIngestedJobToTrackedJob(
       rawDescription: ingested.description,
       source: ingested.source.toLowerCase(),
       status: "SAVED",
-      notes: `Ingested from ${ingested.source}. Apply: ${ingested.applyUrl}`,
+      notes: notesParts.join(" | "),
     },
   });
 

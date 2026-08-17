@@ -17,6 +17,8 @@ import {
   type CanonicalJdFields,
 } from "@/lib/ingestion/jd-format";
 
+import type { ExtractFailureCode, ExtractDiagnostics } from "@/lib/ingestion/types";
+
 export type { CanonicalJdFields };
 export {
   formatCanonicalJobDescription,
@@ -28,12 +30,15 @@ export interface ExtractResultSuccess {
   success: true;
   rawDescription: string;
   sourceUrl: string;
+  diagnostics?: ExtractDiagnostics;
 }
 
 export interface ExtractResultFailure {
   success: false;
-  reason: "NO_APPLY_URL" | "HTTP_ERROR" | "UNUSABLE_CONTENT" | "FETCH_TIMEOUT";
+  reason: "NO_APPLY_URL" | "HTTP_ERROR" | "UNUSABLE_CONTENT" | "FETCH_TIMEOUT" | "ROBOTS_DISALLOWED" | "BLOCKED_HOST";
+  failureCode: ExtractFailureCode;
   message: string;
+  diagnostics?: ExtractDiagnostics;
 }
 
 export type ExtractResult = ExtractResultSuccess | ExtractResultFailure;
@@ -132,6 +137,89 @@ export function leverApiUrlFromPosting(pageUrl: string): string | null {
     return `https://api.lever.co/v0/postings/${encodeURIComponent(pathMatch[1])}/${pathMatch[2]}`;
   } catch {
     return null;
+  }
+}
+
+export function ashbyApiUrlFromPosting(pageUrl: string): string | null {
+  try {
+    const u = new URL(pageUrl);
+    if (!u.hostname.toLowerCase().endsWith("ashbyhq.com")) return null;
+    const pathMatch = u.pathname.match(/^\/([^/]+)\/([0-9a-f-]{8,})/i);
+    if (!pathMatch) return null;
+    return `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(pathMatch[1])}/job/${pathMatch[2]}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Validates whether automated fetching against a given host is permitted.
+ * Adheres strictly to Indeed, LinkedIn, and robots policies.
+ */
+export function checkHostPolicy(url: string): {
+  allowed: boolean;
+  failureCode?: ExtractFailureCode;
+  reason?: "ROBOTS_DISALLOWED" | "BLOCKED_HOST" | "NO_APPLY_URL";
+  message?: string;
+} {
+  try {
+    const u = new URL(url);
+    const hostname = u.hostname.toLowerCase();
+    const pathname = u.pathname.toLowerCase();
+
+    // LinkedIn Policy
+    if (hostname === "linkedin.com" || hostname.endsWith(".linkedin.com")) {
+      return {
+        allowed: false,
+        failureCode: "blocked_host",
+        reason: "BLOCKED_HOST",
+        message:
+          "LinkedIn does not permit automated scraping. Please paste the job description text directly.",
+      };
+    }
+
+    // Indeed Policy
+    if (hostname === "indeed.com" || hostname.endsWith(".indeed.com")) {
+      if (pathname.includes("/jobs") || pathname === "/" || u.searchParams.has("q")) {
+        return {
+          allowed: false,
+          failureCode: "blocked_host",
+          reason: "BLOCKED_HOST",
+          message:
+            "Indeed search result crawling is prohibited by Indeed Terms of Service. Please open the posting and paste the job description.",
+        };
+      }
+      // Viewjob without official MCP/partner API
+      if (!process.env.INDEED_MCP && !process.env.INDEED_PARTNER_KEY) {
+        return {
+          allowed: false,
+          failureCode: "robots_disallowed",
+          reason: "ROBOTS_DISALLOWED",
+          message:
+            "Indeed direct HTML scraping is restricted by robots.txt / TOS. Please paste the job description text.",
+        };
+      }
+    }
+
+    // Facebook / Meta
+    if (hostname === "facebook.com" || hostname.endsWith(".facebook.com")) {
+      return {
+        allowed: false,
+        failureCode: "blocked_host",
+        reason: "BLOCKED_HOST",
+        message:
+          "Facebook job links cannot be scraped automatically. Please paste the job description text.",
+      };
+    }
+
+    return { allowed: true };
+  } catch {
+    return {
+      allowed: false,
+      failureCode: "invalid_url",
+      reason: "NO_APPLY_URL",
+      message: "Invalid job posting URL.",
+    };
   }
 }
 
@@ -292,6 +380,41 @@ async function extractFromAtsJsonApis(
     }
   }
 
+  const ashbyApi = ashbyApiUrlFromPosting(pageUrl);
+  if (ashbyApi) {
+    const fetched = await fetchJsonOrHtml(ashbyApi, "application/json");
+    if (fetched.ok) {
+      try {
+        const json = JSON.parse(fetched.body) as {
+          title?: string;
+          descriptionHtml?: string;
+          descriptionPlain?: string;
+          department?: string;
+          location?: string;
+          compensation?: { summary?: string };
+        };
+        const description =
+          json.descriptionPlain?.trim() ||
+          (json.descriptionHtml ? convertHtmlToCleanMarkdown(json.descriptionHtml) : "");
+        if (description) {
+          const result = canonicalIfValid(
+            {
+              title: json.title || meta?.roleTitle,
+              company: meta?.company,
+              location: json.location,
+              salary: json.compensation?.summary,
+              description,
+            },
+            pageUrl
+          );
+          if (result) return result;
+        }
+      } catch {
+        // Fall through to HTML strategies.
+      }
+    }
+  }
+
   return null;
 }
 
@@ -373,6 +496,7 @@ function extractFromHtmlBody(
 
 /**
  * Extracts full job description text from posting URL using ATS JSON APIs, JSON-LD, or HTML body parsing.
+ * Categorizes all failures into typed reason codes.
  */
 export async function extractFullTextFromUrl(
   url: string,
@@ -382,7 +506,19 @@ export async function extractFullTextFromUrl(
     return {
       success: false,
       reason: "NO_APPLY_URL",
+      failureCode: "invalid_url",
       message: "No valid HTTP apply link available for this job posting.",
+    };
+  }
+
+  // Check host policy compliance (Indeed / LinkedIn / robots.txt)
+  const hostCheck = checkHostPolicy(url);
+  if (!hostCheck.allowed) {
+    return {
+      success: false,
+      reason: hostCheck.reason || "BLOCKED_HOST",
+      failureCode: hostCheck.failureCode || "blocked_host",
+      message: hostCheck.message || "Automated fetch blocked by host policy. Please paste the job description.",
     };
   }
 
@@ -392,30 +528,92 @@ export async function extractFullTextFromUrl(
 
     const fetched = await fetchJsonOrHtml(url, FETCH_HEADERS.Accept);
     if (!fetched.ok) {
+      const code: ExtractFailureCode =
+        fetched.status === 401 || fetched.status === 403
+          ? "http_401_403"
+          : fetched.status === 404
+          ? "http_404"
+          : "http_401_403";
+
       return {
         success: false,
         reason: "HTTP_ERROR",
+        failureCode: code,
         message: `Posting URL returned HTTP status ${fetched.status}.`,
+        diagnostics: {
+          url,
+          statusCode: fetched.status,
+          failureCode: code,
+          timestamp: Date.now(),
+        },
       };
     }
 
-    const fromLd = extractFromJsonLd(fetched.body, url, meta);
+    const body = fetched.body;
+
+    // Detect Cloudflare / Bot detection challenge walls
+    if (
+      body.includes("challenge-platform") ||
+      body.includes("cf-browser-verification") ||
+      (body.includes("Cloudflare") && body.includes("Just a moment..."))
+    ) {
+      return {
+        success: false,
+        reason: "UNUSABLE_CONTENT",
+        failureCode: "cloudflare_challenge",
+        message: "Page is protected by Cloudflare bot verification. Please paste the job description text.",
+      };
+    }
+
+    // Detect login / authentication walls
+    const lowerBody = body.toLowerCase();
+    if (
+      (lowerBody.includes("sign in to continue") ||
+        lowerBody.includes("log in to view") ||
+        lowerBody.includes("auth-wall")) &&
+      !lowerBody.includes("jobposting")
+    ) {
+      return {
+        success: false,
+        reason: "UNUSABLE_CONTENT",
+        failureCode: "login_wall",
+        message: "Posting requires authentication. Please paste the job description text.",
+      };
+    }
+
+    // Detect SPA empty JS shell
+    if (
+      (body.includes('<div id="root"></div>') || body.includes('<div id="app"></div>')) &&
+      !body.includes("JobPosting") &&
+      body.length < 1500
+    ) {
+      return {
+        success: false,
+        reason: "UNUSABLE_CONTENT",
+        failureCode: "js_shell_empty",
+        message: "Page requires client-side JavaScript rendering. Please paste the job description text.",
+      };
+    }
+
+    const fromLd = extractFromJsonLd(body, url, meta);
     if (fromLd) return fromLd;
 
-    const fromHtml = extractFromHtmlBody(fetched.body, url, meta);
+    const fromHtml = extractFromHtmlBody(body, url, meta);
     if (fromHtml) return fromHtml;
 
     return {
       success: false,
       reason: "UNUSABLE_CONTENT",
+      failureCode: "no_job_schema",
       message:
-        "Could not extract usable job description text automatically (page may require JavaScript rendering or logins). Paste using the Role / Company / Requirements format.",
+        "Could not extract usable job description text automatically. Please paste using the Role / Company / Requirements format.",
     };
   } catch (err: unknown) {
     if (err instanceof UnsafeUrlError) {
       return {
         success: false,
         reason: "NO_APPLY_URL",
+        failureCode: "invalid_url",
         message: err.message,
       };
     }
@@ -424,12 +622,14 @@ export async function extractFullTextFromUrl(
       return {
         success: false,
         reason: "FETCH_TIMEOUT",
+        failureCode: "timeout",
         message: "Job description fetch timed out (12s limit exceeded).",
       };
     }
     return {
       success: false,
       reason: "HTTP_ERROR",
+      failureCode: "http_401_403",
       message: err instanceof Error ? err.message : "Failed to reach job posting URL.",
     };
   }
@@ -480,6 +680,7 @@ export async function fetchAndCacheJobFullText(jobId: string) {
     return {
       success: false,
       error: extractRes.message,
+      failureCode: extractRes.failureCode,
       fallbackToManual: true,
       data: job,
       cached: false,

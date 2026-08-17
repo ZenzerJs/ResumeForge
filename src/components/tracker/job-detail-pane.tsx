@@ -211,7 +211,7 @@ export function JobDetailPane({
 
                 <Link
                   href={`/tailor?jobId=${job.id}&tab=cover-letter`}
-                  data-testid={coverTestId}
+                  data-testid={`${coverTestId}-${job.id}`}
                   onClick={() => sessionStorage.setItem("resumeforge_active_job_id", job.id)}
                   className="px-4 py-2 rounded bg-transparent border border-outline text-on-surface font-section-label text-xs hover:border-primary hover:text-primary transition-colors flex items-center gap-2"
                 >

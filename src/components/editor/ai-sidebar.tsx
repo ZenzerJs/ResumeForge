@@ -17,6 +17,8 @@ import {
   Wand2,
   PanelRightClose,
   PanelRightOpen,
+  ExternalLink,
+  Dock,
 } from "lucide-react";
 import { QualitativeCategoryFeedback, BulletFeedback } from "@/lib/ai/qualitative-schema";
 import { TypstRepairProposal } from "@/lib/ai/repair-schema";
@@ -27,6 +29,8 @@ import { assertCanApplyPatches } from "@/lib/guardrail/policy";
 import { GuardrailResult } from "@/lib/guardrail/types";
 import { GuardrailFeedback } from "@/components/ui/guardrail-feedback";
 import { AiMarkdownRenderer } from "@/components/editor/ai-markdown-renderer";
+import { ChatPanel } from "@/components/editor/chat-panel";
+import { AiProgress, type AiJobStage } from "@/components/ui/ai-progress";
 
 interface AiSidebarProps {
   /** Current Typst source in the editor buffer */
@@ -37,6 +41,10 @@ interface AiSidebarProps {
   onToggleCollapse?: () => void;
   /** Collapsed state boolean */
   isCollapsed?: boolean;
+  /** Optional callback to pop out or dock floating window */
+  onPopOut?: () => void;
+  /** Whether the sidebar is currently in popped-out floating mode */
+  isPoppedOut?: boolean;
   /** Frozen master facts snapshot for guardrail checking */
   masterFacts?: ResumeFacts | null;
   /** Task 10.5: Active compile error repair context */
@@ -48,6 +56,8 @@ interface AiSidebarProps {
   } | null;
   /** Callback to clear/dismiss repair mode */
   onDismissRepair?: () => void;
+  /** Notify parent when Chat vs Tailor tab changes */
+  onModeChange?: (mode: "chat" | "tailor") => void;
 }
 
 interface ProviderSettings {
@@ -98,15 +108,25 @@ export function AiSidebar({
   onApplyToBuffer,
   onToggleCollapse,
   isCollapsed,
+  onPopOut,
+  isPoppedOut,
   masterFacts,
   repairContext,
   onDismissRepair,
+  onModeChange,
 }: AiSidebarProps) {
   const searchParams = useSearchParams();
   const urlJobId = searchParams ? searchParams.get("jobId") : null;
+  const [mode, setMode] = useState<"chat" | "tailor">("chat");
+
+  const handleModeChange = (next: "chat" | "tailor") => {
+    setMode(next);
+    onModeChange?.(next);
+  };
 
   const [jdText, setJdText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [tailorStage, setTailorStage] = useState<AiJobStage>("done");
   const [error, setError] = useState<string | null>(null);
   const [noKeyError, setNoKeyError] = useState(false);
   const [suggestions, setSuggestions] = useState<PatchSuggestion[]>([]);
@@ -127,46 +147,44 @@ export function AiSidebar({
     timestamp: number;
   } | null>(null);
 
-  // Auto-fill from localStorage if review feedback exists
+  // Read seeded feedback on initial mount or when jobId changes
   useEffect(() => {
+    if (!urlJobId || typeof window === "undefined") return;
     try {
-      const stored = sessionStorage.getItem("resumeforge_tailor_feedback");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed?.overviewCommentary && Array.isArray(parsed?.nextStepsAdvice)) {
+      const raw = sessionStorage.getItem(`resumeforge_tailor_feedback_${urlJobId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.jobId === urlJobId) {
           setSeededFeedback(parsed);
         }
       }
     } catch {
-      // ignore
+      // sessionStorage unavailable or invalid
     }
-  }, []);
+  }, [urlJobId]);
 
   const handleDismissSeededFeedback = () => {
     setSeededFeedback(null);
-    if (typeof window !== "undefined") {
-      sessionStorage.removeItem("resumeforge_tailor_feedback");
+    if (urlJobId && typeof window === "undefined") return;
+    try {
+      sessionStorage.removeItem(`resumeforge_tailor_feedback_${urlJobId}`);
+    } catch {
+      // ignore
     }
   };
 
-  // Fetch job description if jobId in URL or active in sessionStorage
+  // Preload JD if available from URL jobId
   useEffect(() => {
-    const targetJobId = urlJobId || sessionStorage.getItem("resumeforge_active_job_id");
-    if (!targetJobId) return;
-
+    if (!urlJobId) return;
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/jobs/${targetJobId}`);
-        const json = await res.json();
-        if (!cancelled && res.ok && json.success && json.data?.rawDescription) {
+    fetch(`/api/jobs/${urlJobId}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (!cancelled && json.success && json.data?.rawDescription) {
           setJdText(json.data.rawDescription);
         }
-      } catch {
-        // ignore
-      }
-    })();
-
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -186,6 +204,7 @@ export function AiSidebar({
     }
 
     setIsGenerating(true);
+    setTailorStage("connecting");
     setError(null);
     setNoKeyError(false);
     setSuggestions([]);
@@ -197,6 +216,7 @@ export function AiSidebar({
 
     try {
       // Step 1: Extract requirements from JD text
+      setTailorStage("extracting");
       const extractRes = await fetch("/api/jobs/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -205,13 +225,16 @@ export function AiSidebar({
       const extractJson = await extractRes.json();
 
       if (!extractRes.ok || !extractJson.success) {
-        setError(extractJson.error || "Failed to extract job requirements.");
+        const errMsg = extractJson.error || "Failed to extract job requirements.";
+        setError(errMsg);
+        setTailorStage("error");
         return;
       }
 
       const jobRequirements = extractJson.data;
 
       // Step 2: Generate patches against master resume
+      setTailorStage("writing");
       const patchRes = await fetch("/api/ai/generate-patches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -241,12 +264,14 @@ export function AiSidebar({
       if (!patchRes.ok || !patchJson.success) {
         const errMsg = patchJson.error || "AI generation failed.";
         setError(errMsg);
+        setTailorStage("error");
         if (errMsg.toLowerCase().includes("api key") || errMsg.toLowerCase().includes("provider")) {
           setNoKeyError(true);
         }
         return;
       }
 
+      setTailorStage("verifying");
       const verifiedPatches = patchJson.data.verified || [];
       setSuggestions(verifiedPatches);
       setGaps(patchJson.data.gaps || []);
@@ -256,8 +281,10 @@ export function AiSidebar({
         const gResult = checkGuardrail(source, masterFacts, { patches: verifiedPatches });
         setGuardrailResult(gResult);
       }
+      setTailorStage("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unexpected error during generation.");
+      setTailorStage("error");
     } finally {
       setIsGenerating(false);
     }
@@ -318,6 +345,7 @@ export function AiSidebar({
 
   // Task 10.5: Typst Repair Assist state
   const [isRepairing, setIsRepairing] = useState(false);
+  const [repairStage, setRepairStage] = useState<AiJobStage>("done");
   const [repairProposal, setRepairProposal] = useState<TypstRepairProposal | null>(null);
   const [repairError, setRepairError] = useState<string | null>(null);
   const [preValidationValid, setPreValidationValid] = useState<boolean | null>(null);
@@ -328,6 +356,7 @@ export function AiSidebar({
   useEffect(() => {
     setRepairProposal(null);
     setRepairError(null);
+    setRepairStage("done");
     setPreValidationValid(null);
     setPreValidationError(null);
     setRepairApplied(false);
@@ -337,6 +366,7 @@ export function AiSidebar({
   const handleGenerateRepair = async () => {
     if (!repairContext) return;
     setIsRepairing(true);
+    setRepairStage("connecting");
     setRepairError(null);
     setRepairProposal(null);
     setPreValidationValid(null);
@@ -347,6 +377,7 @@ export function AiSidebar({
     try {
       const providerConfig = loadAiSettings();
 
+      setRepairStage("writing");
       const res = await fetch("/api/ai/repair-typst", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -366,6 +397,7 @@ export function AiSidebar({
         setRepairProposal(prop);
 
         // Pre-validate replacementSource on client with WASM Typst compiler
+        setRepairStage("verifying");
         const valResult = await compileTypstToSvg(prop.replacementSource);
         if (!valResult.success) {
           setPreValidationValid(false);
@@ -374,11 +406,16 @@ export function AiSidebar({
           setPreValidationValid(true);
           setPreValidationError(null);
         }
+        setRepairStage("done");
       } else {
-        setRepairError(json.error || "Failed to generate Typst repair proposal");
+        const errMsg = json.error || "Failed to generate Typst repair proposal";
+        setRepairError(errMsg);
+        setRepairStage("error");
       }
     } catch (err) {
-      setRepairError(err instanceof Error ? err.message : "Error generating repair");
+      const errMsg = err instanceof Error ? err.message : "Error generating repair";
+      setRepairError(errMsg);
+      setRepairStage("error");
     } finally {
       setIsRepairing(false);
     }
@@ -396,7 +433,7 @@ export function AiSidebar({
       <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
         <span className="flex items-center gap-2 text-xs font-semibold text-slate-200">
           <Wand2 className="h-4 w-4 text-amber-400" />
-          {repairContext ? "Typst Repair Assist" : "AI Tailoring Assistant"}
+          {repairContext ? "Typst Repair Assist" : mode === "chat" ? "AI Chat" : "AI Tailor"}
         </span>
         <div className="flex items-center gap-2">
           {repairContext && onDismissRepair && (
@@ -417,6 +454,21 @@ export function AiSidebar({
             <Settings className="h-3 w-3" />
             Settings
           </Link>
+          {onPopOut && (
+            <button
+              type="button"
+              onClick={onPopOut}
+              className="p-1 rounded text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition"
+              title={isPoppedOut ? "Dock back to sidebar" : "Pop out into floating window"}
+              data-testid="popout-ai-window-btn"
+            >
+              {isPoppedOut ? (
+                <Dock className="h-3.5 w-3.5 text-amber-400" />
+              ) : (
+                <ExternalLink className="h-3.5 w-3.5" />
+              )}
+            </button>
+          )}
           {onToggleCollapse && (
             <button
               type="button"
@@ -435,6 +487,47 @@ export function AiSidebar({
         </div>
       </div>
 
+      {!repairContext && (
+        <div
+          className="flex items-center gap-1 border-b border-slate-800 px-3 py-2"
+          role="tablist"
+          aria-label="AI assistant modes"
+          data-testid="ai-mode-tabs"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "chat"}
+            data-testid="ai-tab-chat"
+            onClick={() => handleModeChange("chat")}
+            className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+              mode === "chat"
+                ? "bg-amber-500 text-slate-950"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+            }`}
+          >
+            Chat
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "tailor"}
+            data-testid="ai-tab-tailor"
+            onClick={() => handleModeChange("tailor")}
+            className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+              mode === "tailor"
+                ? "bg-amber-500 text-slate-950"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+            }`}
+          >
+            Tailor
+          </button>
+        </div>
+      )}
+
+      {mode === "chat" && !repairContext ? (
+        <ChatPanel typstSource={source} />
+      ) : (
       <div className="flex flex-1 min-h-0 flex-col overflow-y-auto p-4 gap-4">
         {/* Task 10.5: Typst Repair Assist Mode Card */}
         {repairContext && (
@@ -464,9 +557,14 @@ export function AiSidebar({
               )}
             </div>
 
-            {repairError && (
-              <div className="p-2 rounded bg-red-950/50 border border-red-800 text-red-300 text-[11px]">
-                {repairError}
+            {(isRepairing || repairError || (repairStage !== "done" && repairStage !== "queued")) && (
+              <div className="pt-1">
+                <AiProgress
+                  stage={repairStage}
+                  stages={["connecting", "writing", "verifying", "done"]}
+                  error={repairError}
+                  onDismissError={() => setRepairError(null)}
+                />
               </div>
             )}
 
@@ -475,7 +573,7 @@ export function AiSidebar({
                 type="button"
                 disabled={isRepairing}
                 onClick={handleGenerateRepair}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs shadow transition cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-slate-950 font-bold text-xs shadow transition cursor-pointer"
                 data-testid="generate-repair-btn"
               >
                 {isRepairing ? (
@@ -652,27 +750,23 @@ export function AiSidebar({
           />
         </div>
 
-        {/* Error banner */}
-        {error && (
-          <div
-            className={`p-3 rounded-lg flex items-start gap-2 text-xs border ${
-              noKeyError
-                ? "bg-amber-950/50 border-amber-800/60 text-amber-300"
-                : "bg-red-950/50 border-red-800/50 text-red-300"
-            }`}
-          >
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <span>{error}</span>
-              {noKeyError && (
-                <Link
-                  href="/settings"
-                  className="block underline underline-offset-2 text-amber-400 hover:text-amber-300 font-medium"
-                >
-                  → Configure your API key in Settings
-                </Link>
-              )}
-            </div>
+        {/* Staged AI Progress Feedback */}
+        {(isGenerating || (tailorStage !== "done" && tailorStage !== "queued") || error) && (
+          <div className="pt-1">
+            <AiProgress
+              stage={tailorStage}
+              stages={["connecting", "extracting", "writing", "verifying", "done"]}
+              error={error}
+              onDismissError={() => setError(null)}
+            />
+            {noKeyError && (
+              <Link
+                href="/settings"
+                className="mt-2 block underline underline-offset-2 text-amber-400 hover:text-amber-300 text-xs font-medium"
+              >
+                → Configure your API key in Settings
+              </Link>
+            )}
           </div>
         )}
 
@@ -856,6 +950,7 @@ export function AiSidebar({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

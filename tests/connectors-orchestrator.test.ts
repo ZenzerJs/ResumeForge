@@ -120,6 +120,9 @@ describe("Phase 12 Orchestrator & Promotion Pipeline", () => {
     expect(tracked.company).toBe("Cohere");
     expect(tracked.roleTitle).toBe("AI Infrastructure Engineer");
     expect(tracked.status).toBe("SAVED");
+    expect(tracked.notes).toContain("Location: Toronto, ON");
+    expect(tracked.notes).toContain("Workplace: remote");
+    expect(tracked.notes).toContain("Apply Link: https://jobs.ashbyhq.com/cohere/123");
 
     // Check linked relation
     const updatedIngested = await prisma.ingestedJob.findUnique({

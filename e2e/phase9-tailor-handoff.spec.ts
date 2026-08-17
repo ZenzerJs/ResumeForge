@@ -60,6 +60,8 @@ test.describe("Task 9.6 — Tailor AI Feedback -> Editor Handoff E2E Tests", () 
     // Verify navigation landed on /editor with active jobId query parameter
     await expect(page).toHaveURL(/\/editor/);
 
+    await page.locator('[data-testid="ai-tab-tailor"]').click();
+
     // Verify seeded feedback banner appears in AI sidebar
     const banner = page.locator('[data-testid="seeded-feedback-banner"]');
     await expect(banner).toBeVisible({ timeout: 10000 });

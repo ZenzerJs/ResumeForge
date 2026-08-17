@@ -15,6 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { JobRequirements } from "@/lib/jd-parser/types";
+import { RoleProfile, ROLE_PROFILES } from "@/lib/ats-evaluator/types";
 import { PatchDiffReview } from "./patch-diff-review";
 import { AtsScorePanel } from "./ats-score-panel";
 import { CoverLetterPanel } from "./cover-letter-panel";
@@ -23,6 +24,7 @@ import { AppShell } from "@/components/design-system/app-shell";
 import { PageSkeleton } from "@/components/design-system/page-skeleton";
 import { isPlaceholderDescription } from "@/lib/ingestion/helpers";
 import { JD_PASTE_TEMPLATE, convertHtmlToCleanMarkdown } from "@/lib/ingestion/jd-format";
+import { AiProgress, type AiJobStage } from "@/components/ui/ai-progress";
 
 interface RankedMatch {
   id: string;
@@ -94,6 +96,11 @@ export function TailorWorkspace() {
     company: "Nova Labs",
   });
 
+  const [selectedRoleProfile, setSelectedRoleProfile] = useState<RoleProfile>("Backend");
+  const [activeTab, setActiveTab] = useState<"overview" | "job-info">(
+    searchParams.get("tab") === "overview" ? "overview" : "job-info"
+  );
+  const [isAutoScanning, setIsAutoScanning] = useState(false);
   const [matches, setMatches] = useState<RankedMatch[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isMatching, setIsMatching] = useState(false);
@@ -101,6 +108,7 @@ export function TailorWorkspace() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [isGeneratingPatches, setIsGeneratingPatches] = useState(false);
+  const [patchStage, setPatchStage] = useState<AiJobStage>("done");
   const [patchVerified, setPatchVerified] = useState<PatchProposal[]>([]);
   const [patchRejected, setPatchRejected] = useState<RejectedPatch[]>([]);
   const [patchGaps, setPatchGaps] = useState<Gap[]>([]);
@@ -263,6 +271,7 @@ export function TailorWorkspace() {
   const handleGeneratePatches = async () => {
     if (!extractedRequirements) {
       setPatchError("Please extract requirements from a job description first.");
+      setPatchStage("error");
       return;
     }
 
@@ -276,10 +285,12 @@ export function TailorWorkspace() {
 
     if (!aiSettings?.provider || !aiSettings?.apiKey) {
       setPatchError("No AI provider configured. Please configure your API key in Settings.");
+      setPatchStage("error");
       return;
     }
 
     setIsGeneratingPatches(true);
+    setPatchStage("connecting");
     setPatchError(null);
     setPatchVerified([]);
     setPatchRejected([]);
@@ -289,10 +300,12 @@ export function TailorWorkspace() {
       const jobId = await ensureJobSaved();
       if (!jobId) {
         setPatchError("Failed to save job posting before patch generation.");
+        setPatchStage("error");
         setIsGeneratingPatches(false);
         return;
       }
 
+      setPatchStage("writing");
       const res = await fetch("/api/ai/generate-patches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -317,16 +330,20 @@ export function TailorWorkspace() {
 
       if (!res.ok || !json.success) {
         setPatchError(json.error || "Failed to generate patches.");
+        setPatchStage("error");
         setIsGeneratingPatches(false);
         return;
       }
 
+      setPatchStage("verifying");
       setPatchVerified(json.data.verified || []);
       setPatchRejected(json.data.rejected || []);
       setPatchGaps(json.data.gaps || []);
       setMasterResumeId(json.data.masterResumeId || null);
+      setPatchStage("done");
     } catch (err) {
       setPatchError(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      setPatchStage("error");
     } finally {
       setIsGeneratingPatches(false);
     }
@@ -375,6 +392,7 @@ export function TailorWorkspace() {
     const id = await ensureJobSaved({ forceUpdate: true });
     if (id) {
       setSaveStatus("Job posting saved successfully!");
+      setActiveTab("overview");
     } else {
       setErrorMessage("Failed to save job posting.");
     }
@@ -444,6 +462,37 @@ export function TailorWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawDescription, company, roleTitle, extractedRequirements]);
 
+  // Auto-rescan debounce when rawDescription changes
+  useEffect(() => {
+    if (!rawDescription.trim() || rawDescription.length < 50) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        setIsAutoScanning(true);
+        const res = await fetch("/api/jobs/extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rawDescription }),
+        });
+        const json = await res.json();
+        if (res.ok && json.success && json.data) {
+          setExtractedRequirements(json.data);
+          if (json.data.roleTitle && !roleTitle) {
+            setRoleTitle(json.data.roleTitle);
+          }
+          await fetchMatches(json.data);
+        }
+      } catch (err) {
+        console.error("Auto-rescan error:", err);
+      } finally {
+        setIsAutoScanning(false);
+      }
+    }, 1200);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawDescription]);
+
   // Refresh matches when requirements present on mount
   useEffect(() => {
     if (extractedRequirements) {
@@ -461,21 +510,56 @@ export function TailorWorkspace() {
       <div className="relative z-10 flex-1 pt-8 pb-12 px-4 md:px-8 max-w-7xl mx-auto w-full">
         <div className="flex justify-between items-end mb-8 gap-4 flex-wrap">
           <div>
-            <h1 className="font-page-title text-4xl font-extrabold text-[#ff8c00] tracking-tighter mb-1">Tailor</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="font-page-title text-4xl font-extrabold text-[#ff8c00] tracking-tighter mb-1">Tailor</h1>
+              {isAutoScanning && (
+                <span
+                  data-testid="auto-scanning-indicator"
+                  className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-mono text-amber-300 animate-pulse"
+                >
+                  <Loader2 className="h-3 w-3 animate-spin" /> Auto-rescanning...
+                </span>
+              )}
+            </div>
             <p className="font-body-regular text-slate-400 text-sm">
               Analyze job requirements and forge targeted materials from your master resume + Evidence Bank.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleGeneratePatches}
-            disabled={isGeneratingPatches}
-            data-testid="generate-patches-btn"
-            className="bg-[#ff8c00] text-black font-bold px-6 py-2.5 rounded font-mono text-xs uppercase hover:shadow-[0_0_15px_rgba(255,140,0,0.4)] transition-shadow flex items-center gap-2"
-          >
-            {isGeneratingPatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            Generate AI Patches
-          </button>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-[#060e20] px-3 py-1.5">
+              <label
+                htmlFor="tailor-role-profile-select"
+                className="font-mono text-xs text-slate-400 font-medium whitespace-nowrap"
+              >
+                Target Profile:
+              </label>
+              <select
+                id="tailor-role-profile-select"
+                value={selectedRoleProfile}
+                onChange={(e) => setSelectedRoleProfile(e.target.value as RoleProfile)}
+                className="bg-transparent font-mono text-xs font-semibold text-amber-400 outline-none cursor-pointer"
+                data-testid="tailor-role-profile-select"
+              >
+                {ROLE_PROFILES.map((p) => (
+                  <option key={p} value={p} className="bg-slate-900 text-slate-200">
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGeneratePatches}
+              disabled={isGeneratingPatches}
+              data-testid="generate-patches-btn"
+              className="bg-[#ff8c00] text-black font-bold px-6 py-2.5 rounded font-mono text-xs uppercase hover:shadow-[0_0_15px_rgba(255,140,0,0.4)] transition-shadow flex items-center gap-2"
+            >
+              {isGeneratingPatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              Generate AI Patches
+            </button>
+          </div>
         </div>
 
         {(jobIdParam || savedJobId) && (
@@ -487,16 +571,25 @@ export function TailorWorkspace() {
           </div>
         )}
 
-        {(errorMessage || patchError || saveStatus) && (
+        {(isGeneratingPatches || (patchStage !== "done" && patchStage !== "queued") || patchError) && (
+          <div className="mb-4">
+            <AiProgress
+              stage={patchStage}
+              stages={["connecting", "writing", "verifying", "done"]}
+              error={patchError}
+              onDismissError={() => {
+                setPatchError(null);
+                setPatchStage("done");
+              }}
+            />
+          </div>
+        )}
+
+        {(errorMessage || saveStatus) && (
           <div className="mb-4 space-y-2">
             {errorMessage && (
               <div className="rounded-lg border border-red-800/60 bg-red-950/40 px-3 py-2 text-xs text-red-300 flex items-center gap-2">
                 <AlertTriangle className="h-3.5 w-3.5" /> {errorMessage}
-              </div>
-            )}
-            {patchError && (
-              <div className="rounded-lg border border-red-800/60 bg-red-950/40 px-3 py-2 text-xs text-red-300 flex items-center gap-2">
-                <AlertTriangle className="h-3.5 w-3.5" /> {patchError}
               </div>
             )}
             {saveStatus && (
@@ -522,207 +615,317 @@ export function TailorWorkspace() {
           </div>
         )}
 
+        {/* Tab Navigation */}
+        <div className="flex items-center gap-2 border-b border-slate-800 pb-3 mb-6" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "overview"}
+            onClick={() => setActiveTab("overview")}
+            data-testid="tailor-tab-overview"
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-mono font-semibold transition ${
+              activeTab === "overview"
+                ? "bg-amber-500/15 border border-amber-500/40 text-amber-300 shadow-sm"
+                : "border border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-white"
+            }`}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Overview & Materials
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "job-info"}
+            onClick={() => setActiveTab("job-info")}
+            data-testid="tailor-tab-job-info"
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-mono font-semibold transition ${
+              activeTab === "job-info"
+                ? "bg-amber-500/15 border border-amber-500/40 text-amber-300 shadow-sm"
+                : "border border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-white"
+            }`}
+          >
+            <Briefcase className="h-3.5 w-3.5" />
+            Job Info & Requirements
+          </button>
+        </div>
+
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
           <div className="xl:col-span-7 flex flex-col gap-6 min-w-0">
-            <section className="glass-panel rounded-lg p-5 glow-effect transition-shadow">
-              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800/60">
-                <Briefcase className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
-                <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">Target Job Posting</h2>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label htmlFor="tailor-company" className="block font-mono text-xs text-slate-400 mb-1">Company</label>
-                  <input
-                    id="tailor-company"
-                    name="company"
-                    type="text"
-                    autoComplete="organization"
-                    value={company}
-                    onChange={(e) => setCompany(e.target.value)}
-                    className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="tailor-role" className="block font-mono text-xs text-slate-400 mb-1">Role</label>
-                  <input
-                    id="tailor-role"
-                    name="role"
-                    type="text"
-                    autoComplete="off"
-                    value={roleTitle}
-                    onChange={(e) => setRoleTitle(e.target.value)}
-                    className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block font-mono text-xs text-slate-400 mb-1 flex justify-between">
-                  <span>Raw Description</span>
-                  <button
-                    type="button"
-                    onClick={handleExtract}
-                    disabled={isExtracting}
-                    data-testid="extract-reqs-btn"
-                    className="text-xs text-[#4edea3] hover:underline font-mono"
-                  >
-                    {isExtracting ? "Scanning..." : "Extract Requirements"}
-                  </button>
-                </label>
-                <textarea
-                  value={rawDescription}
-                  onChange={(e) => setRawDescription(e.target.value)}
-                  rows={8}
-                  data-testid="jd-textarea"
-                  aria-label="Job description"
-                  placeholder={JD_PASTE_TEMPLATE}
-                  className="w-full bg-[#060e20] text-slate-200 font-mono text-xs p-4 rounded border border-slate-800 focus:border-[#ff8c00] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 resize-none leading-relaxed"
-                />
-                {tier2Status?.type === "error" ? (
-                  <pre className="mt-2 whitespace-pre-wrap rounded border border-slate-800 bg-[#060e20] p-3 font-mono text-[10px] leading-relaxed text-slate-500">
-                    {JD_PASTE_TEMPLATE}
-                  </pre>
-                ) : null}
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    data-testid="sample-backend-btn"
-                    onClick={() => {
-                      setCompany("Nova Labs");
-                      setRoleTitle("Senior Backend Engineer");
-                      setRawDescription(SAMPLE_BACKEND_JD);
-                    }}
-                    className="text-[10px] font-mono px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-white"
-                  >
-                    Sample Backend JD
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="sample-frontend-btn"
-                    onClick={() => {
-                      setCompany("WebCraft Systems");
-                      setRoleTitle("Frontend Engineer");
-                      setRawDescription(SAMPLE_FRONTEND_JD);
-                    }}
-                    className="text-[10px] font-mono px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-white"
-                  >
-                    Sample Frontend JD
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="save-job-btn"
-                    onClick={() => void handleSaveJob()}
-                    className="text-[10px] font-mono px-2 py-1 rounded border border-emerald-700/60 text-emerald-300 hover:text-white"
-                  >
-                    Save Job
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            <section className="glass-panel rounded-lg p-5 glow-effect transition-shadow">
-              <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
-                <div className="flex items-center gap-2">
-                  <ClipboardCheck className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
-                  <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">Extracted Requirements</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleExtract}
-                  className="text-[#4edea3] text-xs hover:underline font-mono"
-                >
-                  {isExtracting ? "Scanning..." : isMatching ? "Matching..." : "Re-Scan"}
-                </button>
-              </div>
-
-              {extractedRequirements && (
-                <>
-                  <div className="mb-4">
-                    <h3 className="font-mono text-xs text-slate-400 mb-2">Required Skills</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {extractedRequirements.requiredSkills.map((skill) => {
-                        const covered = skillIsCovered(skill);
-                        return (
-                          <button
-                            type="button"
-                            key={skill}
-                            onClick={() => handleRemoveRequirement("required", skill)}
-                            title="Click to remove"
-                            data-testid={`req-skill-${skill}`}
-                            className={`px-2.5 py-1 bg-[#171f33] rounded text-xs font-mono border flex items-center gap-1.5 ${
-                              covered ? "border-[#4edea3]/40 text-slate-300" : "border-red-500/40 text-slate-300"
-                            }`}
-                          >
-                            {covered ? (
-                              <CheckCircle2 className="h-3.5 w-3.5 text-[#4edea3] shrink-0" aria-hidden />
-                            ) : (
-                              <XCircle className="h-3.5 w-3.5 text-red-400 shrink-0" aria-hidden />
-                            )}
-                            {skill}
-                            <span data-testid={`remove-term-${skill}`} className="inline-flex">
-                              <X className="h-3 w-3 opacity-50" />
-                            </span>
-                          </button>
-                        );
-                      })}
+            {activeTab === "overview" ? (
+              <>
+                {/* Overview Summary Card */}
+                <section className="glass-panel rounded-lg p-5 glow-effect transition-shadow" data-testid="tailor-overview-panel">
+                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
+                    <div className="flex items-center gap-2">
+                      <Briefcase className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
+                      <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">
+                        Target Role: {roleTitle || "Untitled Role"}
+                      </h2>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("job-info")}
+                      data-testid="edit-job-info-btn"
+                      className="text-xs text-amber-400 hover:underline font-mono"
+                    >
+                      Edit Job &amp; Reqs →
+                    </button>
                   </div>
 
+                  <div className="flex flex-col gap-3">
+                    <div className="text-xs text-slate-300">
+                      <span className="text-slate-500 font-mono">Company:</span> {company || "Unspecified"}
+                    </div>
+
+                    {extractedRequirements && extractedRequirements.requiredSkills.length > 0 && (
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] text-slate-500 font-mono uppercase tracking-wider">
+                          Key Required Skills:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {extractedRequirements.requiredSkills.slice(0, 8).map((skill) => {
+                            const covered = skillIsCovered(skill);
+                            return (
+                              <span
+                                key={skill}
+                                className={`px-2 py-0.5 rounded text-[11px] font-mono border flex items-center gap-1 ${
+                                  covered
+                                    ? "bg-emerald-950/40 border-emerald-800/60 text-emerald-300"
+                                    : "bg-slate-900 border-slate-700 text-slate-400"
+                                }`}
+                              >
+                                {covered ? (
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                                ) : (
+                                  <XCircle className="h-3 w-3 text-slate-500" />
+                                )}
+                                {skill}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                {(patchVerified.length > 0 || patchRejected.length > 0 || patchGaps.length > 0) &&
+                  masterResumeId &&
+                  savedJobId && (
+                    <PatchDiffReview
+                      verified={patchVerified}
+                      rejected={patchRejected}
+                      gaps={patchGaps}
+                      masterResumeId={masterResumeId}
+                      masterTypstSource={masterTypstSource || activeVariantContent}
+                      jobId={savedJobId}
+                      onApplySuccess={(_variantId, mergedContent) => {
+                        setActiveVariantContent(mergedContent);
+                        setSaveStatus("Tailored variant applied — ATS will re-score against updated content.");
+                      }}
+                    />
+                  )}
+
+                <section className="glass-panel rounded-lg p-5 flex flex-col glow-effect transition-shadow">
+                  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800/60">
+                    <FileText className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
+                    <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">
+                      Generated Cover Letter
+                    </h2>
+                  </div>
+                  {savedJobId ? (
+                    <CoverLetterPanel
+                      jobId={savedJobId}
+                      company={company}
+                      roleTitle={roleTitle}
+                      rawDescription={rawDescription}
+                      extractedRequirements={extractedRequirements || undefined}
+                    />
+                  ) : (
+                    <p className="text-xs text-slate-400">
+                      Paste a job description to create a saved job, then generate an evidence-grounded cover letter.
+                    </p>
+                  )}
+                </section>
+              </>
+            ) : (
+              <>
+                {/* Job Info & Requirements View */}
+                <section className="glass-panel rounded-lg p-5 glow-effect transition-shadow" data-testid="tailor-job-info-panel">
+                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
+                    <div className="flex items-center gap-2">
+                      <Briefcase className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
+                      <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">Target Job Posting</h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("overview")}
+                      data-testid="back-to-overview-btn"
+                      className="text-xs text-amber-400 hover:underline font-mono"
+                    >
+                      ← Back to Overview
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label htmlFor="tailor-company" className="block font-mono text-xs text-slate-400 mb-1">Company</label>
+                      <input
+                        id="tailor-company"
+                        name="company"
+                        type="text"
+                        autoComplete="organization"
+                        value={company}
+                        onChange={(e) => setCompany(e.target.value)}
+                        className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="tailor-role" className="block font-mono text-xs text-slate-400 mb-1">Role</label>
+                      <input
+                        id="tailor-role"
+                        name="role"
+                        type="text"
+                        autoComplete="off"
+                        value={roleTitle}
+                        onChange={(e) => setRoleTitle(e.target.value)}
+                        className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                      />
+                    </div>
+                  </div>
                   <div>
-                    <h3 className="font-mono text-xs text-slate-400 mb-2">Preferred Skills</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {extractedRequirements.preferredSkills.map((skill) => (
-                        <button
-                          type="button"
-                          key={skill}
-                          onClick={() => handleRemoveRequirement("preferred", skill)}
-                          className="px-2.5 py-1 bg-[#171f33] rounded text-xs font-mono border border-slate-700 text-slate-400 flex items-center gap-1"
-                        >
-                          {skill}
-                          <X className="h-3 w-3 opacity-50" />
-                        </button>
-                      ))}
+                    <label className="block font-mono text-xs text-slate-400 mb-1 flex justify-between">
+                      <span>Raw Description</span>
+                      <button
+                        type="button"
+                        onClick={handleExtract}
+                        disabled={isExtracting}
+                        data-testid="extract-reqs-btn"
+                        className="text-xs text-[#4edea3] hover:underline font-mono"
+                      >
+                        {isExtracting ? "Scanning..." : "Extract Requirements"}
+                      </button>
+                    </label>
+                    <textarea
+                      value={rawDescription}
+                      onChange={(e) => setRawDescription(e.target.value)}
+                      rows={8}
+                      data-testid="jd-textarea"
+                      aria-label="Job description"
+                      placeholder={JD_PASTE_TEMPLATE}
+                      className="w-full bg-[#060e20] text-slate-200 font-mono text-xs p-4 rounded border border-slate-800 focus:border-[#ff8c00] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 resize-none leading-relaxed"
+                    />
+                    {tier2Status?.type === "error" ? (
+                      <pre className="mt-2 whitespace-pre-wrap rounded border border-slate-800 bg-[#060e20] p-3 font-mono text-[10px] leading-relaxed text-slate-500">
+                        {JD_PASTE_TEMPLATE}
+                      </pre>
+                    ) : null}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        data-testid="sample-backend-btn"
+                        onClick={() => {
+                          setCompany("Nova Labs");
+                          setRoleTitle("Senior Backend Engineer");
+                          setRawDescription(SAMPLE_BACKEND_JD);
+                        }}
+                        className="text-[10px] font-mono px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-white"
+                      >
+                        Sample Backend JD
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="sample-frontend-btn"
+                        onClick={() => {
+                          setCompany("WebCraft Systems");
+                          setRoleTitle("Frontend Engineer");
+                          setRawDescription(SAMPLE_FRONTEND_JD);
+                        }}
+                        className="text-[10px] font-mono px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-white"
+                      >
+                        Sample Frontend JD
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="save-job-btn"
+                        onClick={() => void handleSaveJob()}
+                        className="text-[10px] font-mono px-2 py-1 rounded border border-emerald-700/60 text-emerald-300 hover:text-white"
+                      >
+                        Save Job
+                      </button>
                     </div>
                   </div>
-                </>
-              )}
-            </section>
+                </section>
 
-            {(patchVerified.length > 0 || patchRejected.length > 0 || patchGaps.length > 0) &&
-              masterResumeId &&
-              savedJobId && (
-                <PatchDiffReview
-                  verified={patchVerified}
-                  rejected={patchRejected}
-                  gaps={patchGaps}
-                  masterResumeId={masterResumeId}
-                  masterTypstSource={masterTypstSource || activeVariantContent}
-                  jobId={savedJobId}
-                  onApplySuccess={(_variantId, mergedContent) => {
-                    setActiveVariantContent(mergedContent);
-                    setSaveStatus("Tailored variant applied — ATS will re-score against updated content.");
-                  }}
-                />
-              )}
+                <section className="glass-panel rounded-lg p-5 glow-effect transition-shadow">
+                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
+                    <div className="flex items-center gap-2">
+                      <ClipboardCheck className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
+                      <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">Extracted Requirements</h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleExtract}
+                      className="text-[#4edea3] text-xs hover:underline font-mono"
+                    >
+                      {isExtracting ? "Scanning..." : isMatching ? "Matching..." : "Re-Scan"}
+                    </button>
+                  </div>
 
-            <section className="glass-panel rounded-lg p-5 flex flex-col glow-effect transition-shadow">
-              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800/60">
-                <FileText className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
-                <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">Generated Cover Letter</h2>
-              </div>
-              {savedJobId ? (
-                <CoverLetterPanel
-                  jobId={savedJobId}
-                  company={company}
-                  roleTitle={roleTitle}
-                  rawDescription={rawDescription}
-                  extractedRequirements={extractedRequirements || undefined}
-                />
-              ) : (
-                <p className="text-xs text-slate-400">
-                  Paste a job description to create a saved job, then generate an evidence-grounded cover letter.
-                </p>
-              )}
-            </section>
+                  {extractedRequirements && (
+                    <>
+                      <div className="mb-4">
+                        <h3 className="font-mono text-xs text-slate-400 mb-2">Required Skills</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {extractedRequirements.requiredSkills.map((skill) => {
+                            const covered = skillIsCovered(skill);
+                            return (
+                              <button
+                                type="button"
+                                key={skill}
+                                onClick={() => handleRemoveRequirement("required", skill)}
+                                title="Click to remove"
+                                data-testid={`req-skill-${skill}`}
+                                className={`px-2.5 py-1 bg-[#171f33] rounded text-xs font-mono border flex items-center gap-1.5 ${
+                                  covered ? "border-[#4edea3]/40 text-slate-300" : "border-red-500/40 text-slate-300"
+                                }`}
+                              >
+                                {covered ? (
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-[#4edea3] shrink-0" aria-hidden />
+                                ) : (
+                                  <XCircle className="h-3.5 w-3.5 text-red-400 shrink-0" aria-hidden />
+                                )}
+                                {skill}
+                                <span data-testid={`remove-term-${skill}`} className="inline-flex">
+                                  <X className="h-3 w-3 opacity-50" />
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="font-mono text-xs text-slate-400 mb-2">Preferred Skills</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {extractedRequirements.preferredSkills.map((skill) => (
+                            <button
+                              type="button"
+                              key={skill}
+                              onClick={() => handleRemoveRequirement("preferred", skill)}
+                              className="px-2.5 py-1 bg-[#171f33] rounded text-xs font-mono border border-slate-700 text-slate-400 flex items-center gap-1"
+                            >
+                              {skill}
+                              <X className="h-3 w-3 opacity-50" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </section>
+              </>
+            )}
           </div>
 
           <div className="xl:col-span-5 flex flex-col gap-6 min-w-0">
@@ -733,6 +936,8 @@ export function TailorWorkspace() {
                   extractedRequirements={extractedRequirements}
                   roleTitle={roleTitle}
                   rawDescription={rawDescription}
+                  initialProfile={selectedRoleProfile}
+                  onProfileChange={setSelectedRoleProfile}
                   includeEvidenceBank
                   className="!bg-transparent !border-0 !shadow-none !p-0"
                 />

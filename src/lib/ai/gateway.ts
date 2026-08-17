@@ -1,8 +1,8 @@
 import { ProviderConfig, ProviderConfigSchema, TestConnectionResult, GeneratePatchesInput, GeneratePatchesResult, EvidenceItemForPrompt, ConvertPdfInput, ConvertPdfResult } from "./types";
-import { testOpenAIConnection, generateOpenAIPatches, generateOpenAIQualitativeReview, generateOpenAICoverLetter, convertOpenAIPdfTextToTypst, repairTypstWithOpenAI } from "./providers/openai";
-import { testAnthropicConnection, generateAnthropicPatches, generateAnthropicQualitativeReview, generateAnthropicCoverLetter, convertAnthropicPdfTextToTypst, repairTypstWithAnthropic } from "./providers/anthropic";
-import { testGeminiConnection, generateGeminiPatches, generateGeminiQualitativeReview, generateGeminiCoverLetter, convertGeminiPdfTextToTypst, repairTypstWithGemini } from "./providers/gemini";
-import { testCustomConnection, generateCustomPatches, generateCustomQualitativeReview, generateCustomCoverLetter, convertCustomPdfTextToTypst, repairTypstWithCustom } from "./providers/custom";
+import { testOpenAIConnection, generateOpenAIPatches, generateOpenAIQualitativeReview, generateOpenAICoverLetter, convertOpenAIPdfTextToTypst, repairTypstWithOpenAI, chatOpenAI } from "./providers/openai";
+import { testAnthropicConnection, generateAnthropicPatches, generateAnthropicQualitativeReview, generateAnthropicCoverLetter, convertAnthropicPdfTextToTypst, repairTypstWithAnthropic, chatAnthropic } from "./providers/anthropic";
+import { testGeminiConnection, generateGeminiPatches, generateGeminiQualitativeReview, generateGeminiCoverLetter, convertGeminiPdfTextToTypst, repairTypstWithGemini, chatGemini } from "./providers/gemini";
+import { testCustomConnection, generateCustomPatches, generateCustomQualitativeReview, generateCustomCoverLetter, convertCustomPdfTextToTypst, repairTypstWithCustom, chatCustom, ChatCompletionResult } from "./providers/custom";
 import { sanitizeError } from "./redact";
 import { buildPatchSystemPrompt, buildPatchUserPrompt } from "./prompt-template";
 import { buildQualitativeReviewSystemPrompt, buildQualitativeReviewUserPrompt, QualitativeReviewPromptInput } from "./qualitative-prompt";
@@ -11,6 +11,8 @@ import { buildPdfToTypstSystemPrompt, buildPdfToTypstUserPrompt } from "./pdf-pr
 import { GenerateCoverLetterInput } from "./cover-letter-schema";
 import { TypstRepairInput, TypstRepairInputSchema, TypstRepairProposal } from "./repair-schema";
 import { buildEvidenceExtractSystemPrompt, buildEvidenceExtractUserPrompt } from "./evidence-prompt";
+import { FormattedJd, FormattedJdSchema } from "./jd-format-schema";
+import { buildJdFormatSystemPrompt, buildJdFormatUserPrompt, JdFormatPromptInput } from "./jd-format-prompt";
 import { sanitizeTypstSource } from "../typst/sanitizer";
 
 /**
@@ -329,4 +331,121 @@ export async function extractEvidenceFromMaster(
     };
   }
 }
+
+/**
+ * Multi-turn chat completion dispatcher.
+ * Collects a full provider response (MVP). The chat API route emits SSE chunks.
+ */
+export async function sendChatCompletion(
+  rawConfig: ProviderConfig,
+  messages: Array<{ role: string; content: string }>,
+  tools: unknown[] = []
+): Promise<ChatCompletionResult> {
+  const parseResult = ProviderConfigSchema.safeParse(rawConfig);
+  if (!parseResult.success) {
+    throw new Error(sanitizeError(`Invalid provider configuration: ${parseResult.error.message}`));
+  }
+
+  const config = parseResult.data;
+
+  try {
+    switch (config.provider) {
+      case "openai":
+        return await chatOpenAI(config, messages, tools);
+      case "anthropic":
+        return await chatAnthropic(config, messages, tools);
+      case "gemini":
+        return await chatGemini(config, messages, tools);
+      case "custom":
+        return await chatCustom(config, messages, tools);
+      default:
+        throw new Error(`Unsupported AI provider for chat: ${config.provider}`);
+    }
+  } catch (err) {
+    throw new Error(
+      sanitizeError(`Chat completion failed: ${err instanceof Error ? err.message : String(err)}`)
+    );
+  }
+}
+
+export interface FormatJdResult {
+  success: boolean;
+  data?: FormattedJd;
+  error?: string;
+}
+
+/**
+ * Formats a raw Job Description into structured taxonomy via BYOK AI provider.
+ */
+export async function formatJobDescriptionWithAi(
+  providerConfig: ProviderConfig,
+  input: JdFormatPromptInput
+): Promise<FormatJdResult> {
+  const parseResult = ProviderConfigSchema.safeParse(providerConfig);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: sanitizeError(`Invalid provider configuration: ${parseResult.error.message}`),
+    };
+  }
+
+  const config = parseResult.data;
+  const systemPrompt = buildJdFormatSystemPrompt();
+  const userPrompt = buildJdFormatUserPrompt(input);
+
+  try {
+    let rawResult: GeneratePatchesResult;
+    switch (config.provider) {
+      case "openai":
+        rawResult = await generateOpenAIPatches(config, systemPrompt, userPrompt);
+        break;
+      case "anthropic":
+        rawResult = await generateAnthropicPatches(config, systemPrompt, userPrompt);
+        break;
+      case "gemini":
+        rawResult = await generateGeminiPatches(config, systemPrompt, userPrompt);
+        break;
+      case "custom":
+        rawResult = await generateCustomPatches(config, systemPrompt, userPrompt);
+        break;
+      default:
+        return {
+          success: false,
+          error: `Unsupported AI provider: ${config.provider}`,
+        };
+    }
+
+    if (!rawResult.success || !rawResult.rawJson) {
+      return {
+        success: false,
+        error: rawResult.error || "Failed to generate formatted job description",
+      };
+    }
+
+    const parsedJson =
+      typeof rawResult.rawJson === "string"
+        ? JSON.parse(rawResult.rawJson)
+        : rawResult.rawJson;
+    const validated = FormattedJdSchema.safeParse(parsedJson);
+    if (!validated.success) {
+      return {
+        success: false,
+        error: `AI output failed validation: ${validated.error.issues.map((i) => i.message).join(", ")}`,
+      };
+    }
+
+    return {
+      success: true,
+      data: validated.data,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: sanitizeError(
+        `JD Formatter gateway error: ${err instanceof Error ? err.message : String(err)}`
+      ),
+    };
+  }
+}
+
 

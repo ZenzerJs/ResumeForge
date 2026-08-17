@@ -88,7 +88,12 @@ test.describe("Typst Live-Preview Workspace E2E Tests", () => {
 
     // Intercept download event
     const downloadPromise = page.waitForEvent("download");
-    await page.click("button:has-text('Export PDF')");
+    if (await page.locator("[data-testid='export-dropdown-btn']").isVisible()) {
+      await page.click("[data-testid='export-dropdown-btn']");
+      await page.click("[data-testid='export-pdf-menu-item']");
+    } else {
+      await page.click("button:has-text('Export PDF')");
+    }
     const download = await downloadPromise;
 
     expect(download.suggestedFilename()).toBe("resume.pdf");

@@ -184,19 +184,40 @@
 
   /* Marquee Ticker Animation */
   @keyframes marquee-scroll {
-    0% { transform: translateX(0%); }
-    100% { transform: translateX(-50%); }
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
   }
 
-  .animate-marquee {
+  .animate-marquee,
+  .marquee-track {
     display: flex;
     width: max-content;
-    animation: marquee-scroll 25s linear infinite;
+    animation: marquee-scroll var(--marquee-s, 28s) linear infinite;
+    will-change: transform;
   }
 
   .animate-marquee:hover,
-  .animate-marquee:focus-within {
+  .animate-marquee:focus-within,
+  .marquee-track:hover,
+  .marquee-track:focus-within {
     animation-play-state: paused;
+  }
+
+  /* Streaming Cursor Animation */
+  @keyframes cursor-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  .streaming-cursor {
+    display: inline-block;
+    width: 6px;
+    height: 14px;
+    margin-left: 3px;
+    background-color: var(--primary);
+    vertical-align: middle;
+    border-radius: 2px;
+    animation: cursor-pulse 0.8s ease-in-out infinite;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -205,11 +226,14 @@
     }
 
     .skeleton-pulse,
-    .animate-marquee {
+    .animate-marquee,
+    .marquee-track,
+    .streaming-cursor {
       animation: none !important;
     }
 
-    .animate-marquee {
+    .animate-marquee,
+    .marquee-track {
       width: 100% !important;
       flex-wrap: wrap !important;
       justify-content: center !important;
