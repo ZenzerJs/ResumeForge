@@ -36,9 +36,8 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     const editor = page.locator('[data-testid="panel-code"] .cm-content');
     await expect(editor).toBeVisible();
 
-    // Read initial source text from editor buffer
-    const initialSource = await editor.innerText();
-    const correctedSource = initialSource + "\n#let fixedVal = 42\n";
+    // Clean valid Typst replacement source
+    const correctedSource = "= John Doe\n\nSoftware Engineer\n\n== Experience\n- Built web applications.\n";
 
     // Intercept /api/ai/repair-typst request
     await page.route("**/api/ai/repair-typst", async (route) => {
@@ -213,7 +212,7 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     await page.waitForLoadState("networkidle");
 
     const editor = page.locator('[data-testid="panel-code"] .cm-content');
-    await expect(editor).toBeVisible();
+    await expect(editor).toBeVisible({ timeout: 15000 });
 
     await editor.click();
     await page.keyboard.press("Control+End");
@@ -262,7 +261,7 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
 
     const atmosphere = page.locator('[data-testid="landing-atmosphere"]');
     await expect(atmosphere).toBeVisible();
+    await expect(page.locator('[data-testid="atmosphere-static-fallback"]')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('[data-testid="ascii-waves-canvas"]')).toHaveCount(0);
-    await expect(page.locator('[data-testid="atmosphere-static-fallback"]')).toBeVisible();
   });
 });

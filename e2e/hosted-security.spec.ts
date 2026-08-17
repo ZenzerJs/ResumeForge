@@ -68,16 +68,20 @@ test.describe("hosted auth and a11y gates", () => {
     await context.close();
   });
 
-  test("mobile navigation is available at 375px", async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
+  test("mobile navigation is available at 375px", async ({ browser }) => {
+    const context = await browser.newContext({ storageState: "e2e/.auth/user.json", viewport: { width: 375, height: 812 } });
+    const page = await context.newPage();
     await page.goto("/");
     await page.getByRole("button", { name: "Open menu" }).click();
     await expect(page.getByRole("navigation", { name: "Mobile navigation" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Mobile navigation" }).getByRole("link", { name: "Editor" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Sign Out" })).toBeVisible();
+    await context.close();
   });
 
-  test("sign out clears the session and returns home", async ({ page }) => {
+  test("sign out clears the session and returns home", async ({ browser }) => {
+    const context = await browser.newContext({ storageState: "e2e/.auth/user.json" });
+    const page = await context.newPage();
     await page.goto("/");
     await page.getByRole("button", { name: "Sign Out" }).click();
     await expect(page.getByRole("link", { name: "Sign In" }).first()).toBeVisible({ timeout: 10000 });
@@ -85,23 +89,30 @@ test.describe("hosted auth and a11y gates", () => {
     expect(res.status()).toBe(200);
     const json = await res.json();
     expect(json.guest).toBe(true);
+    await context.close();
   });
 
-  test("settings page can sign out the current session", async ({ page }) => {
+  test("settings page can sign out the current session", async ({ browser }) => {
+    const context = await browser.newContext({ storageState: "e2e/.auth/user.json" });
+    const page = await context.newPage();
     await page.goto("/settings");
     await expect(page.getByTestId("account-settings")).toBeVisible();
     await expect(page.locator("#settings-username")).toBeVisible();
     await page.getByTestId("account-settings").getByRole("button", { name: "Sign Out" }).click();
     await expect(page.getByRole("link", { name: "Sign In" }).first()).toBeVisible({ timeout: 10000 });
+    await context.close();
   });
 
-  test("nav shows username instead of email", async ({ page }) => {
+  test("nav shows username instead of email", async ({ browser }) => {
+    const context = await browser.newContext({ storageState: "e2e/.auth/user.json" });
+    const page = await context.newPage();
     await page.goto("/");
     const me = await page.request.get("/api/auth/me");
     const json = await me.json();
     expect(json.data?.username).toBeTruthy();
     await expect(page.getByRole("link", { name: new RegExp(`@${json.data.username}`) })).toBeVisible();
     await expect(page.getByText("playwright@resumeforge.test")).toHaveCount(0);
+    await context.close();
   });
 
   test("protected master cannot be overwritten via PUT", async ({ request }) => {

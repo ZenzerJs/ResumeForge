@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { AsciiWaves } from "@/components/design-system/ascii-waves";
 
 interface LandingAtmosphereProps {
@@ -8,13 +8,25 @@ interface LandingAtmosphereProps {
 }
 
 export function LandingAtmosphere({ shouldReduceMotion = false }: LandingAtmosphereProps) {
+  const [internalReduced, setInternalReduced] = useState(shouldReduceMotion);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setInternalReduced(mq.matches || shouldReduceMotion);
+    const onChange = () => setInternalReduced(mq.matches || shouldReduceMotion);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [shouldReduceMotion]);
+
+  const isReduced = shouldReduceMotion || internalReduced;
+
   return (
     <div
       className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-[#0b1326]"
       aria-hidden="true"
       data-testid="landing-atmosphere"
     >
-      {shouldReduceMotion ? (
+      {isReduced ? (
         <div className="absolute inset-0 bg-[#0b1326]" data-testid="atmosphere-static-fallback" />
       ) : (
         <AsciiWaves
