@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { KeyboardShortcutsModal } from "@/components/ui/keyboard-shortcuts-modal";
 import "./globals.css";
 
 const hankenGrotesk = localFont({
@@ -91,6 +92,7 @@ export default function RootLayout({
           Skip to content
         </a>
         {children}
+        <KeyboardShortcutsModal />
       </body>
     </html>
   );

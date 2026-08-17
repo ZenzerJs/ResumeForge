@@ -114,6 +114,81 @@ export function PreviewPanel({
     }
   };
 
+  const handleExportTypst = () => {
+    try {
+      const blob = new Blob([source], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "resume.typ";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Failed to export Typst source");
+    }
+  };
+
+  const handleExportTxt = () => {
+    try {
+      const cleanTxt = source
+        .replace(/#(show|set|let)[^\n]*\n?/g, "")
+        .replace(/==+\s*(.*?)\n/g, "\n--- $1 ---\n")
+        .replace(/=+\s*(.*?)\n/g, "\n=== $1 ===\n")
+        .replace(/\[|\]/g, "")
+        .replace(/\*+/g, "")
+        .replace(/_+/g, "")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+
+      const blob = new Blob([cleanTxt], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "resume.txt";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Failed to export Text resume");
+    }
+  };
+
+  const handleExportJson = () => {
+    try {
+      const jsonResume = {
+        basics: {
+          name: "Candidate",
+          summary: "Tailored Professional Resume",
+        },
+        skills: masterFacts?.skills || [],
+        work: (masterFacts?.employers || []).map((emp, i) => ({
+          name: emp.raw,
+          position: masterFacts?.titles[i]?.raw || "Role",
+          startDate: emp.startDate,
+          endDate: emp.endDate,
+        })),
+        metrics: masterFacts?.metrics || [],
+      };
+
+      const blob = new Blob([JSON.stringify(jsonResume, null, 2)], {
+        type: "application/json;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "resume.json";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Failed to export JSON resume");
+    }
+  };
+
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-md border border-slate-200 bg-slate-100 shadow-sm">
       {/* Header Toolbar */}
@@ -163,14 +238,14 @@ export function PreviewPanel({
                 <ChevronDown className="h-3 w-3 opacity-80" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem
                 onClick={handleExportPdf}
                 data-testid="export-pdf-menu-item"
                 className="cursor-pointer text-xs flex items-center gap-2"
               >
                 <Download className="size-3.5 text-indigo-500" />
-                <span>PDF (WASM)</span>
+                <span>Compiled PDF (.pdf)</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={handleExportDocx}
@@ -178,7 +253,31 @@ export function PreviewPanel({
                 className="cursor-pointer text-xs flex items-center gap-2"
               >
                 <FileText className="size-3.5 text-blue-500" />
-                <span>DOCX (ATS)</span>
+                <span>Word ATS (.docx)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportTypst}
+                data-testid="export-typst-menu-item"
+                className="cursor-pointer text-xs flex items-center gap-2"
+              >
+                <FileText className="size-3.5 text-amber-500" />
+                <span>Typst Source (.typ)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportTxt}
+                data-testid="export-txt-menu-item"
+                className="cursor-pointer text-xs flex items-center gap-2"
+              >
+                <FileText className="size-3.5 text-emerald-500" />
+                <span>Plain Text ATS (.txt)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportJson}
+                data-testid="export-json-menu-item"
+                className="cursor-pointer text-xs flex items-center gap-2"
+              >
+                <FileText className="size-3.5 text-purple-500" />
+                <span>JSON Resume (.json)</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

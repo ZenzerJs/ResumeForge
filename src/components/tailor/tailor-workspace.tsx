@@ -25,6 +25,8 @@ import { PageSkeleton } from "@/components/design-system/page-skeleton";
 import { isPlaceholderDescription } from "@/lib/ingestion/helpers";
 import { JD_PASTE_TEMPLATE, convertHtmlToCleanMarkdown } from "@/lib/ingestion/jd-format";
 import { AiProgress, type AiJobStage } from "@/components/ui/ai-progress";
+import { QuickAddEvidenceModal } from "./quick-add-evidence-modal";
+import { Plus } from "lucide-react";
 
 interface RankedMatch {
   id: string;
@@ -96,10 +98,12 @@ export function TailorWorkspace() {
     company: "Nova Labs",
   });
 
-  const [selectedRoleProfile, setSelectedRoleProfile] = useState<RoleProfile>("Backend");
+  const [selectedRoleProfile, setSelectedRoleProfile] = useState<RoleProfile>("Full-stack");
+  const tabParam = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState<"overview" | "job-info">(
-    searchParams.get("tab") === "overview" ? "overview" : "job-info"
+    tabParam === "overview" ? "overview" : "job-info"
   );
+  const [gapSkillToResolve, setGapSkillToResolve] = useState<string | null>(null);
   const [isAutoScanning, setIsAutoScanning] = useState(false);
   const [matches, setMatches] = useState<RankedMatch[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
@@ -880,26 +884,45 @@ export function TailorWorkspace() {
                           {extractedRequirements.requiredSkills.map((skill) => {
                             const covered = skillIsCovered(skill);
                             return (
-                              <button
-                                type="button"
+                              <div
                                 key={skill}
-                                onClick={() => handleRemoveRequirement("required", skill)}
-                                title="Click to remove"
-                                data-testid={`req-skill-${skill}`}
-                                className={`px-2.5 py-1 bg-[#171f33] rounded text-xs font-mono border flex items-center gap-1.5 ${
+                                className={`flex items-center gap-1.5 px-2.5 py-1 bg-[#171f33] rounded text-xs font-mono border ${
                                   covered ? "border-[#4edea3]/40 text-slate-300" : "border-red-500/40 text-slate-300"
                                 }`}
                               >
-                                {covered ? (
-                                  <CheckCircle2 className="h-3.5 w-3.5 text-[#4edea3] shrink-0" aria-hidden />
-                                ) : (
-                                  <XCircle className="h-3.5 w-3.5 text-red-400 shrink-0" aria-hidden />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveRequirement("required", skill)}
+                                  title="Click to remove"
+                                  data-testid={`req-skill-${skill}`}
+                                  className="flex items-center gap-1.5 hover:text-white"
+                                >
+                                  {covered ? (
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-[#4edea3] shrink-0" aria-hidden />
+                                  ) : (
+                                    <XCircle className="h-3.5 w-3.5 text-red-400 shrink-0" aria-hidden />
+                                  )}
+                                  {skill}
+                                  <span data-testid={`remove-term-${skill}`} className="inline-flex">
+                                    <X className="h-3 w-3 opacity-50" />
+                                  </span>
+                                </button>
+                                {!covered && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setGapSkillToResolve(skill);
+                                    }}
+                                    data-testid={`resolve-gap-${skill}`}
+                                    className="ml-1 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300 hover:bg-amber-500/30 transition-colors flex items-center gap-0.5"
+                                    title="Add evidence for this missing skill"
+                                  >
+                                    <Plus className="h-2.5 w-2.5" />
+                                    Add
+                                  </button>
                                 )}
-                                {skill}
-                                <span data-testid={`remove-term-${skill}`} className="inline-flex">
-                                  <X className="h-3 w-3 opacity-50" />
-                                </span>
-                              </button>
+                              </div>
                             );
                           })}
                         </div>
@@ -1005,6 +1028,16 @@ export function TailorWorkspace() {
           </div>
         </div>
       </div>
+      <QuickAddEvidenceModal
+        isOpen={Boolean(gapSkillToResolve)}
+        onClose={() => setGapSkillToResolve(null)}
+        initialSkill={gapSkillToResolve || ""}
+        onEvidenceCreated={async () => {
+          if (extractedRequirements) {
+            await fetchMatches(extractedRequirements);
+          }
+        }}
+      />
     </AppShell>
   );
 }

@@ -35,7 +35,8 @@ import type { JobItem } from "@/components/tracker/job-types";
 import { isSafeHref } from "@/lib/security/safe-fetch";
 import { JobDescriptionMarkdown } from "@/components/tracker/job-description-markdown";
 import { ApplySheet } from "@/components/tracker/apply-sheet";
-import { ShieldCheck } from "lucide-react";
+import { ApplyPrepSheetModal } from "@/components/tracker/apply-prep-sheet-modal";
+import { ShieldCheck, ClipboardList } from "lucide-react";
 
 const STATUS_LABELS: Record<JobStatus, string> = {
   SAVED: "Saved",
@@ -83,6 +84,7 @@ export function JobDetailPane({
   const [evidenceLoaded, setEvidenceLoaded] = useState(false);
   const [detailJob, setDetailJob] = useState<JobItem>(job);
   const [applySheetOpen, setApplySheetOpen] = useState(false);
+  const [prepSheetOpen, setPrepSheetOpen] = useState(false);
 
   useEffect(() => {
     setDetailJob(job);
@@ -198,6 +200,16 @@ export function JobDetailPane({
                 >
                   <ShieldCheck className="w-4 h-4" />
                   1-Click Apply
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPrepSheetOpen(true)}
+                  data-testid="open-prep-sheet-btn"
+                  className="px-3.5 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-section-label text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-sm"
+                >
+                  <ClipboardList className="w-3.5 h-3.5 text-amber-400" />
+                  Prep Sheet
                 </button>
 
                 <Link
@@ -393,6 +405,19 @@ export function JobDetailPane({
           {content}
         </div>
         <ApplySheet open={applySheetOpen} onOpenChange={setApplySheetOpen} job={detailJob as any} />
+        <ApplyPrepSheetModal
+          isOpen={prepSheetOpen}
+          onClose={() => setPrepSheetOpen(false)}
+          job={{
+            company: detailJob.company || "Company",
+            title: detailJob.roleTitle || "Position",
+            applyUrl: applyUrl,
+            location: location,
+            notes: detailJob.notes,
+          }}
+          coverLetter={null}
+          matchedHighlights={evidence.flatMap((e) => e.bullets.map((b) => b.text)).slice(0, 5)}
+        />
       </>
     );
   }
@@ -403,6 +428,19 @@ export function JobDetailPane({
         {content}
       </div>
       <ApplySheet open={applySheetOpen} onOpenChange={setApplySheetOpen} job={detailJob as any} />
+      <ApplyPrepSheetModal
+        isOpen={prepSheetOpen}
+        onClose={() => setPrepSheetOpen(false)}
+        job={{
+          company: detailJob.company || "Company",
+          title: detailJob.roleTitle || "Position",
+          applyUrl: applyUrl,
+          location: location,
+          notes: detailJob.notes,
+        }}
+        coverLetter={null}
+        matchedHighlights={evidence.flatMap((e) => e.bullets.map((b) => b.text)).slice(0, 5)}
+      />
     </>
   );
 }

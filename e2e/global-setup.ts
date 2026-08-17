@@ -21,7 +21,7 @@ export default async function globalSetup(config: FullConfig) {
     if (!login.ok()) {
       await page.goto(`${baseURL}/login`);
       await page.getByLabel("Email or username").fill(EMAIL);
-      await page.getByLabel("Password").fill(PASSWORD);
+      await page.locator("input#password").fill(PASSWORD);
       await page.getByRole("button", { name: "Sign In" }).click();
       await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15000 });
     }
