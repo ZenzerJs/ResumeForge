@@ -192,15 +192,8 @@
   .marquee-track {
     display: flex;
     width: max-content;
-    animation: marquee-scroll var(--marquee-s, 28s) linear infinite;
+    animation: marquee-scroll var(--marquee-s, 36s) linear infinite;
     will-change: transform;
-  }
-
-  .animate-marquee:hover,
-  .animate-marquee:focus-within,
-  .marquee-track:hover,
-  .marquee-track:focus-within {
-    animation-play-state: paused;
   }
 
   /* Streaming Cursor Animation */

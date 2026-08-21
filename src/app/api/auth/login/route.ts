@@ -23,42 +23,55 @@ export async function POST(request: Request) {
     );
   }
 
-  let raw: unknown = {};
-  const contentType = request.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) {
-    raw = await request.json().catch(() => ({}));
-  } else {
-    const form = await request.formData().catch(() => null);
-    raw = {
-      email: String(form?.get("email") || form?.get("username") || ""),
-      password: String(form?.get("password") || ""),
-    };
+  try {
+    let raw: unknown = {};
+    const contentType = request.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      raw = await request.json().catch(() => ({}));
+    } else {
+      const form = await request.formData().catch(() => null);
+      raw = {
+        email: String(form?.get("email") || form?.get("username") || ""),
+        password: String(form?.get("password") || ""),
+      };
+    }
+
+    const parsed = LoginSchema.safeParse(raw);
+    const identifier = (parsed.data?.email || parsed.data?.username || "").trim();
+    if (!parsed.success || !identifier) {
+      return NextResponse.json({ success: false, error: "Invalid email, username, or password" }, { status: 401 });
+    }
+
+    const user = isEmailIdentifier(identifier)
+      ? await prisma.user.findUnique({ where: { email: normalizeEmail(identifier) } })
+      : await prisma.user.findUnique({ where: { username: normalizeUsername(identifier) } });
+
+    if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
+      return NextResponse.json({ success: false, error: "Invalid email, username, or password" }, { status: 401 });
+    }
+
+    const token = await createSessionToken(user.id);
+    if (!token) {
+      return NextResponse.json({ success: false, error: "Unable to create session" }, { status: 500 });
+    }
+
+    const secure = new URL(request.url).protocol === "https:";
+    const response = NextResponse.json({
+      success: true,
+      data: { id: user.id, email: user.email, username: user.username },
+    });
+    response.headers.set("Set-Cookie", buildSessionCookie(token, secure));
+    return response;
+  } catch (err) {
+    const isDbError = err instanceof Error && (err.message.includes("Can't reach database") || err.message.includes("PrismaClient"));
+    return NextResponse.json(
+      {
+        success: false,
+        error: isDbError
+          ? "Database connection failed. Please ensure PostgreSQL is running."
+          : "Sign-in request failed. Please try again.",
+      },
+      { status: 500 }
+    );
   }
-
-  const parsed = LoginSchema.safeParse(raw);
-  const identifier = (parsed.data?.email || parsed.data?.username || "").trim();
-  if (!parsed.success || !identifier) {
-    return NextResponse.json({ success: false, error: "Invalid email, username, or password" }, { status: 401 });
-  }
-
-  const user = isEmailIdentifier(identifier)
-    ? await prisma.user.findUnique({ where: { email: normalizeEmail(identifier) } })
-    : await prisma.user.findUnique({ where: { username: normalizeUsername(identifier) } });
-
-  if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
-    return NextResponse.json({ success: false, error: "Invalid email, username, or password" }, { status: 401 });
-  }
-
-  const token = await createSessionToken(user.id);
-  if (!token) {
-    return NextResponse.json({ success: false, error: "Unable to create session" }, { status: 500 });
-  }
-
-  const secure = new URL(request.url).protocol === "https:";
-  const response = NextResponse.json({
-    success: true,
-    data: { id: user.id, email: user.email, username: user.username },
-  });
-  response.headers.set("Set-Cookie", buildSessionCookie(token, secure));
-  return response;
 }

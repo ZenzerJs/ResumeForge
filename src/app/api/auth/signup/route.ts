@@ -27,56 +27,69 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = await request.json().catch(() => ({}));
-  const parsed = SignupSchema.safeParse(body);
-  if (!parsed.success) {
+  try {
+    const body = await request.json().catch(() => ({}));
+    const parsed = SignupSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid signup payload",
+          details: parsed.error.flatten().fieldErrors,
+        },
+        { status: 400 }
+      );
+    }
+
+    const email = normalizeEmail(parsed.data.email);
+    const username = parsed.data.username;
+
+    const existing = await prisma.user.findFirst({
+      where: { OR: [{ email }, { username }] },
+    });
+    if (existing?.email === email) {
+      return NextResponse.json(
+        { success: false, error: "An account with that email already exists" },
+        { status: 409 }
+      );
+    }
+    if (existing?.username === username) {
+      return NextResponse.json(
+        { success: false, error: "That username is already taken" },
+        { status: 409 }
+      );
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        email,
+        username,
+        passwordHash: await hashPassword(parsed.data.password),
+      },
+    });
+
+    const token = await createSessionToken(user.id);
+    if (!token) {
+      return NextResponse.json({ success: false, error: "Unable to create session" }, { status: 500 });
+    }
+
+    const secure = new URL(request.url).protocol === "https:";
+    const response = NextResponse.json({
+      success: true,
+      data: publicUser(user),
+    });
+    response.headers.set("Set-Cookie", buildSessionCookie(token, secure));
+    return response;
+  } catch (err) {
+    const isDbError = err instanceof Error && (err.message.includes("Can't reach database") || err.message.includes("PrismaClient"));
     return NextResponse.json(
       {
         success: false,
-        error: "Invalid signup payload",
-        details: parsed.error.flatten().fieldErrors,
+        error: isDbError
+          ? "Database connection failed. Please ensure PostgreSQL is running."
+          : "Account creation failed. Please try again.",
       },
-      { status: 400 }
+      { status: 500 }
     );
   }
-
-  const email = normalizeEmail(parsed.data.email);
-  const username = parsed.data.username;
-
-  const existing = await prisma.user.findFirst({
-    where: { OR: [{ email }, { username }] },
-  });
-  if (existing?.email === email) {
-    return NextResponse.json(
-      { success: false, error: "An account with that email already exists" },
-      { status: 409 }
-    );
-  }
-  if (existing?.username === username) {
-    return NextResponse.json(
-      { success: false, error: "That username is already taken" },
-      { status: 409 }
-    );
-  }
-
-  const user = await prisma.user.create({
-    data: {
-      email,
-      username,
-      passwordHash: await hashPassword(parsed.data.password),
-    },
-  });
-
-  const token = await createSessionToken(user.id);
-  if (!token) {
-    return NextResponse.json({ success: false, error: "Unable to create session" }, { status: 500 });
-  }
-
-  const secure = new URL(request.url).protocol === "https:";
-  const response = NextResponse.json({
-    success: true,
-    data: publicUser(user),
-  });
-  response.headers.set("Set-Cookie", buildSessionCookie(token, secure));
-  return response;
 }

@@ -140,6 +140,8 @@ export function isMutationMethod(method: string): boolean {
 }
 
 function headerHost(request: Request): string | null {
+  const fwd = (request.headers.get("x-forwarded-host") || "").split(",")[0].trim().toLowerCase();
+  if (fwd) return fwd;
   const host = (request.headers.get("host") || "").split(",")[0].trim().toLowerCase();
   if (host) return host;
   try {
@@ -162,13 +164,27 @@ export function originAllowed(request: Request): boolean {
   if (!expectedHost) return false;
 
   const origin = request.headers.get("origin");
-  if (!origin) {
-    // Same-origin navigations and some clients omit Origin.
-    const referer = request.headers.get("referer");
-    if (!referer) return true;
-    return urlHost(referer) === expectedHost;
+  const referer = request.headers.get("referer");
+
+  const targetHost = origin ? urlHost(origin) : referer ? urlHost(referer) : null;
+  if (!targetHost) return true; // Same-origin navigations or non-browser clients
+
+  if (targetHost === expectedHost) return true;
+
+  // Localhost / Loopback aliases handling (localhost:3000 vs 127.0.0.1:3000 vs 0.0.0.0:3000)
+  const isLoopback = (h: string) =>
+    h.startsWith("localhost") ||
+    h.startsWith("127.0.0.1") ||
+    h.startsWith("[::1]") ||
+    h.startsWith("0.0.0.0");
+
+  if (isLoopback(expectedHost) && isLoopback(targetHost)) {
+    const expectedPort = expectedHost.split(":")[1] || "";
+    const targetPort = targetHost.split(":")[1] || "";
+    return expectedPort === targetPort;
   }
-  return urlHost(origin) === expectedHost;
+
+  return false;
 }
 
 export { fromBase64Url };
