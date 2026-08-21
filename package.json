@@ -8,7 +8,8 @@
     "start": "next start -H 0.0.0.0",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "sync:oa": "tsx scripts/sync-oa-bank.ts"
   },
   "dependencies": {
     "@codemirror/state": "^6.7.1",

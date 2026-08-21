@@ -259,3 +259,23 @@ model MasterHistory {
   @@index([resumeId])
 }
 
+// Company-Aware Interview Question Bank (OA / Phone Screen / System Design)
+model InterviewProblem {
+  id              String    @id @default(cuid())
+  company         String    // display name, e.g. "Amazon"
+  companyKey      String    // normalized: lowercase, alphanumeric only — joins against Job.company
+  problemTitle    String
+  category        String?   @default("OA") // "OA" | "Phone Screen" | "System Design" | "Behavioral"
+  tags            String[]  @default([])
+  difficulty      String?
+  problemMarkdown String?   @db.Text
+  sourceUrl       String?
+  lastObserved    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([companyKey, problemTitle])
+  @@index([companyKey])
+}
+
+
