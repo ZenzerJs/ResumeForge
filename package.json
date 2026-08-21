@@ -9,7 +9,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "sync:oa": "tsx scripts/sync-oa-bank.ts"
+    "sync:oa": "tsx scripts/sync-oa-bank.ts",
+    "seed:intel": "tsx scripts/seed-company-intel.ts"
   },
   "dependencies": {
     "@codemirror/state": "^6.7.1",

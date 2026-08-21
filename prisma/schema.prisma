@@ -101,8 +101,11 @@ model Job {
   variants              ResumeVariant[]
   coverLetters          CoverLetter[]
   ingestedJob           IngestedJob?
+  dossierId             String?
+  dossier               CompanyDossier? @relation(fields: [dossierId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([dossierId])
 }
 
 enum WorkplaceType {
@@ -277,5 +280,24 @@ model InterviewProblem {
   @@unique([companyKey, problemTitle])
   @@index([companyKey])
 }
+
+// Company Intelligence & Culture Dossier
+model CompanyDossier {
+  id               String   @id @default(cuid())
+  companySlug      String   @unique // from normalizeCompany()
+  displayName      String
+  interviewStyle   Json?    // { format, primaryEvaluationCriteria[], roundBreakdown[], proTips[] }
+  cultureMetrics   Json?    // { workLifeBalanceRating, deploymentVelocity, remoteCulture, pros[], cons[] }
+  recentSignals    String?  @db.Text
+  referenceNotes   String?  @db.Text // raw excerpts ingested from OSS handbooks
+  processNotes     String?  @db.Text // interview-process blurb from hiring-without-whiteboards
+  isWhiteboardFree Boolean  @default(false)
+  source           String   @default("llm") // "seed" | "llm" | "seed+llm"
+  lastUpdated      DateTime @default(now())
+  jobs             Job[]
+
+  @@index([companySlug])
+}
+
 
 

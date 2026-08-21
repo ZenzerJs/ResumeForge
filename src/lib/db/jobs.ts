@@ -37,10 +37,26 @@ export interface UpdateJobInput {
   notes?: string | null;
 }
 
+import { normalizeCompany } from "@/lib/company";
+
 export async function createJob(input: CreateJobInput) {
   const reqsJson = input.extractedRequirements
     ? JSON.stringify(input.extractedRequirements)
     : JSON.stringify({ requiredSkills: [], preferredSkills: [], domainTerms: [] });
+
+  let dossierId: string | null = null;
+  if (input.company) {
+    const slug = normalizeCompany(input.company);
+    if (slug) {
+      const existingDossier = await prisma.companyDossier.findUnique({
+        where: { companySlug: slug },
+        select: { id: true },
+      });
+      if (existingDossier) {
+        dossierId = existingDossier.id;
+      }
+    }
+  }
 
   const job = await prisma.job.create({
     data: {
@@ -52,6 +68,7 @@ export async function createJob(input: CreateJobInput) {
       status: input.status || "SAVED",
       appliedAt: input.appliedAt ? new Date(input.appliedAt) : null,
       notes: input.notes || null,
+      dossierId,
     },
     include: {
       variants: {

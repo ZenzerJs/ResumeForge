@@ -19,6 +19,7 @@ import {
   HelpCircle,
   Code2,
   Terminal,
+  Building2,
 } from "lucide-react";
 import { isSafeHref } from "@/lib/security/safe-fetch";
 import {
@@ -30,6 +31,7 @@ import {
 } from "@/lib/prep/star-synthesizer";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { CompanyIntelDossierPanel } from "./company-intel-dossier-panel";
 
 export interface ApplyPrepSheetModalProps {
   isOpen: boolean;
@@ -62,7 +64,7 @@ export interface ApplyPrepSheetModalProps {
   prepResult?: StarInterviewPrepResult;
 }
 
-type PrepTab = "star" | "oa-mock" | "form" | "cover";
+type PrepTab = "star" | "oa-mock" | "intel" | "form" | "cover";
 
 export interface InterviewPrepProblem {
   id: string;
@@ -311,6 +313,20 @@ export function ApplyPrepSheetModal({
                 {oaProblems.length}
               </span>
             )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("intel")}
+            data-testid="tab-intel-culture"
+            className={cn(
+              "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5",
+              activeTab === "intel"
+                ? "bg-emerald-500 text-slate-950"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+            )}
+          >
+            <Building2 className="size-3.5" />
+            <span>Intel &amp; Culture</span>
           </button>
           <button
             type="button"
@@ -709,6 +725,13 @@ export function ApplyPrepSheetModal({
                   {mockInterviewerPrompt}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB: Intel & Culture Dossier */}
+          {activeTab === "intel" && (
+            <div className="space-y-4" data-testid="intel-culture-panel">
+              <CompanyIntelDossierPanel company={job.company} jobTitle={job.title} />
             </div>
           )}
 
