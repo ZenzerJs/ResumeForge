@@ -24,11 +24,39 @@ function renderInline(text: string): React.ReactNode {
   });
 }
 
-export function JobDescriptionMarkdown({ markdown }: { markdown: string }) {
+export function JobDescriptionMarkdown({
+  markdown,
+  hideLeadingHeader = false,
+}: {
+  markdown: string;
+  hideLeadingHeader?: boolean;
+}) {
   const blocks = parseJobDescriptionMarkdown(markdown);
 
   if (blocks.length === 0) {
     return <p className="text-sm text-on-surface-variant">No description available.</p>;
+  }
+
+  let displayBlocks = blocks;
+  if (hideLeadingHeader) {
+    let startIndex = 0;
+    while (startIndex < displayBlocks.length) {
+      const b = displayBlocks[startIndex];
+      if (
+        b.type === "title" ||
+        b.type === "meta" ||
+        (b.type === "heading" && b.level === 2 && /^job description$/i.test(b.text.trim()))
+      ) {
+        startIndex++;
+      } else {
+        break;
+      }
+    }
+    displayBlocks = displayBlocks.slice(startIndex);
+  }
+
+  if (displayBlocks.length === 0) {
+    return <p className="text-sm text-on-surface-variant">No description body available.</p>;
   }
 
   return (
@@ -36,7 +64,7 @@ export function JobDescriptionMarkdown({ markdown }: { markdown: string }) {
       data-testid="job-description-markdown"
       className="max-w-none space-y-4 font-body-regular text-sm leading-relaxed text-on-surface/90"
     >
-      {blocks.map((block, index) => {
+      {displayBlocks.map((block, index) => {
         if (block.type === "title") {
           return (
             <p

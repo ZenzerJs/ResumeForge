@@ -42,7 +42,8 @@ export async function normalizeAllJobsInDb() {
   for (const job of jobs) {
     let raw = job.rawDescription || "";
     const isPlaceholder = isTier1Placeholder(raw);
-    const isBrokenJina = /^Title:[\s\S]*?Markdown Content:\s*$/i.test(raw.trim());
+    const withoutJina = raw.replace(/^#?[^\n]*\n*Title:[\s\S]*?Markdown Content:\s*/i, "").trim();
+    const isBrokenJina = raw.includes("Markdown Content:") && withoutJina.length < 60;
 
     // 1. Re-fetch if placeholder or broken Jina shell
     if (isPlaceholder || isBrokenJina || raw.length < 250) {

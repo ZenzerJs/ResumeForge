@@ -384,7 +384,7 @@ export function JobDetailPane({
               )}
 
               <div className="pr-2">
-                <JobDescriptionMarkdown markdown={detailJob.rawDescription ?? ""} />
+                <JobDescriptionMarkdown markdown={detailJob.rawDescription ?? ""} hideLeadingHeader />
               </div>
             </div>
           </div>

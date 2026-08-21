@@ -6,13 +6,26 @@
 export function isPlaceholderDescription(rawDescription?: string | null): boolean {
   if (!rawDescription || !rawDescription.trim()) return true;
   const lower = rawDescription.toLowerCase().trim();
-  return (
+  if (
     rawDescription.startsWith("[Pending Import]") ||
     lower.includes("tier 1 bulk import") ||
     lower.includes("full job description not yet imported") ||
     lower.includes("apply at company site") ||
     lower.includes("view full details on company site")
-  );
+  ) {
+    return true;
+  }
+
+  // Detect empty Jina Reader proxy shell (Title:... URL Source:... Markdown Content:)
+  if (/^#?[^\n]*\n*Title:[\s\S]*?Markdown Content:\s*$/i.test(rawDescription.trim())) {
+    return true;
+  }
+  const withoutJina = rawDescription.replace(/^#?[^\n]*\n*Title:[\s\S]*?Markdown Content:\s*/i, "").trim();
+  if (rawDescription.includes("Markdown Content:") && withoutJina.length < 60) {
+    return true;
+  }
+
+  return false;
 }
 
 export function extractApplyUrlFromNotes(notes?: string | null): string {
