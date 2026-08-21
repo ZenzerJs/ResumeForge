@@ -34,32 +34,51 @@ export async function GET(
 
     // 1. Exact match
     let problems: any[] = [];
+    let isFallback = false;
+
     if (companyKey) {
       problems = await prisma.interviewProblem.findMany({
         where: { companyKey },
         orderBy: ORDER,
-        take: 5,
+        take: 50,
       });
 
-      // 2. Prefix fallback for variants ("Amazon Web Services" -> "amaz")
-      if (problems.length === 0 && companyKey.length >= 4) {
+      // 2. Prefix / substring match for variants (e.g. "amazonwebservices" -> "amazon")
+      if (problems.length === 0 && companyKey.length >= 3) {
         problems = await prisma.interviewProblem.findMany({
-          where: { companyKey: { contains: companyKey.slice(0, 4) } },
+          where: {
+            OR: [
+              { companyKey: { contains: companyKey.slice(0, 4) } },
+              { company: { contains: job.company || "", mode: "insensitive" } },
+            ],
+          },
           orderBy: ORDER,
-          take: 5,
+          take: 50,
         });
       }
     }
 
+    // 3. Fallback to curated popular OA problems if no specific company records
+    if (problems.length === 0) {
+      isFallback = true;
+      problems = await prisma.interviewProblem.findMany({
+        orderBy: ORDER,
+        take: 10,
+      });
+    }
+
     return NextResponse.json({
       success: true,
-      matched: problems.length > 0,
-      company: job.company || "Unknown Company",
+      matched: !isFallback && problems.length > 0,
+      isFallback,
+      company: job.company || "Target Company",
       roleTitle: job.roleTitle || "Target Role",
       problems: problems.map((p) => ({
         id: p.id,
         title: p.problemTitle,
+        company: p.company,
         category: p.category || "OA",
+        tags: p.tags || [],
         difficulty: p.difficulty || null,
         sourceUrl: p.sourceUrl || null,
         lastObserved: p.lastObserved || null,

@@ -17,6 +17,8 @@ import {
   Banknote,
   Clock,
   ChevronDown,
+  Code2,
+  Terminal,
 } from "lucide-react";
 import { JobStatus } from "@/lib/db/jobs";
 import {
@@ -137,6 +139,29 @@ export function JobDetailPane({
       cancelled = true;
     };
   }, []);
+
+  const [oaProblems, setOaProblems] = useState<Array<{ id: string; title: string; category?: string; sourceUrl?: string; difficulty?: string }>>([]);
+  const [oaMatched, setOaMatched] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!detailJob.id) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/jobs/${detailJob.id}/interview-prep`);
+        const json = await res.json();
+        if (!cancelled && res.ok && json.success) {
+          setOaProblems(json.problems || []);
+          setOaMatched(Boolean(json.matched));
+        }
+      } catch {
+        // Non-blocking
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [detailJob.id, detailJob.company]);
 
   const hasVariant = (detailJob.variants?.length ?? 0) > 0;
   const hasCoverLetter = (detailJob.coverLetters?.length ?? 0) > 0;
@@ -319,6 +344,67 @@ export function JobDetailPane({
               </details>
             </div>
 
+            {/* Technical Interview & OA Practice Problems Module */}
+            <div className="bg-surface/80 backdrop-blur-md border border-outline-variant rounded-xl p-5 shadow-[0_0_15px_rgba(255,140,0,0.05)]">
+              <div className="flex justify-between items-center mb-3 border-b border-outline-variant/50 pb-2">
+                <h3 className="font-section-label text-xs text-on-surface-variant uppercase tracking-widest flex items-center gap-1.5">
+                  <Code2 className="w-3.5 h-3.5 text-primary" />
+                  TECHNICAL INTERVIEW PREP
+                </h3>
+                {oaProblems.length > 0 && (
+                  <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                    {oaProblems.length} Problems
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  {oaMatched && oaProblems.length > 0
+                    ? `Real technical interview & online assessment problems pulled from repository for ${detailJob.company}.`
+                    : `Practice problems and technical mock interview simulator tailored to this role.`}
+                </p>
+
+                {oaProblems.length > 0 && (
+                  <div className="space-y-2">
+                    {oaProblems.slice(0, 3).map((prob, idx) => (
+                      <div
+                        key={prob.id || idx}
+                        className="flex items-center justify-between gap-2 p-2 rounded bg-surface-variant/40 border border-outline-variant text-xs"
+                      >
+                        <span className="font-medium text-on-surface truncate flex-1">{prob.title}</span>
+                        {prob.sourceUrl && isSafeHref(prob.sourceUrl) && (
+                          <a
+                            href={prob.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline shrink-0 p-1 flex items-center gap-1 text-[11px]"
+                            title="Practice problem"
+                          >
+                            <span>Practice</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setPrepSheetOpen(true)}
+                  className="w-full mt-2 py-2 px-3 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center justify-center gap-2 transition"
+                >
+                  <Terminal className="w-3.5 h-3.5" />
+                  <span>
+                    {oaProblems.length > 0
+                      ? `Open All Practice Problems (${oaProblems.length})`
+                      : "Launch Technical Prep & Mock Simulator"}
+                  </span>
+                </button>
+              </div>
+            </div>
+
             {/* Notes Module */}
             {showNotes && (
               <div className="bg-surface/80 backdrop-blur-md border border-outline-variant rounded-xl p-5 shadow-[0_0_15px_rgba(255,140,0,0.05)] flex flex-col">
@@ -409,11 +495,13 @@ export function JobDetailPane({
           isOpen={prepSheetOpen}
           onClose={() => setPrepSheetOpen(false)}
           job={{
+            id: detailJob.id,
             company: detailJob.company || "Company",
             title: detailJob.roleTitle || "Position",
             applyUrl: applyUrl,
             location: location,
             notes: detailJob.notes,
+            rawDescription: detailJob.rawDescription,
           }}
           coverLetter={null}
           matchedHighlights={evidence.flatMap((e) => e.bullets.map((b) => b.text)).slice(0, 5)}
@@ -432,11 +520,13 @@ export function JobDetailPane({
         isOpen={prepSheetOpen}
         onClose={() => setPrepSheetOpen(false)}
         job={{
+          id: detailJob.id,
           company: detailJob.company || "Company",
           title: detailJob.roleTitle || "Position",
           applyUrl: applyUrl,
           location: location,
           notes: detailJob.notes,
+          rawDescription: detailJob.rawDescription,
         }}
         coverLetter={null}
         matchedHighlights={evidence.flatMap((e) => e.bullets.map((b) => b.text)).slice(0, 5)}

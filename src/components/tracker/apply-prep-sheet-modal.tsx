@@ -20,6 +20,7 @@ import {
   Code2,
   Terminal,
   Building2,
+  Search,
 } from "lucide-react";
 import { isSafeHref } from "@/lib/security/safe-fetch";
 import {
@@ -36,6 +37,7 @@ import { CompanyIntelDossierPanel } from "./company-intel-dossier-panel";
 export interface ApplyPrepSheetModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: PrepTab;
   job: {
     id?: string;
     company: string;
@@ -64,12 +66,13 @@ export interface ApplyPrepSheetModalProps {
   prepResult?: StarInterviewPrepResult;
 }
 
-type PrepTab = "star" | "oa-mock" | "intel" | "form" | "cover";
+export type PrepTab = "oa-mock" | "star" | "intel" | "form" | "cover";
 
 export interface InterviewPrepProblem {
   id: string;
   title: string;
   category?: string;
+  tags?: string[];
   difficulty?: string | null;
   sourceUrl?: string | null;
   lastObserved?: string | null;
@@ -78,6 +81,7 @@ export interface InterviewPrepProblem {
 export function ApplyPrepSheetModal({
   isOpen,
   onClose,
+  initialTab = "oa-mock",
   job,
   coverLetter,
   matchedHighlights = [],
@@ -92,12 +96,21 @@ export function ApplyPrepSheetModal({
   evidenceItems,
   prepResult,
 }: ApplyPrepSheetModalProps) {
-  const [activeTab, setActiveTab] = useState<PrepTab>("star");
+  const [activeTab, setActiveTab] = useState<PrepTab>(initialTab);
+  const [problemSearch, setProblemSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [fallbackText, setFallbackText] = useState<string | null>(null);
   const [oaProblems, setOaProblems] = useState<InterviewPrepProblem[]>([]);
   const [isFetchingOa, setIsFetchingOa] = useState(false);
   const [oaMatched, setOaMatched] = useState(false);
+  const [isFallback, setIsFallback] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -115,6 +128,7 @@ export function ApplyPrepSheetModal({
         if (!cancelled && res.ok && json.success) {
           setOaProblems(json.problems || []);
           setOaMatched(Boolean(json.matched));
+          setIsFallback(Boolean(json.isFallback));
         }
       } catch {
         // Fallback gracefully
@@ -127,6 +141,25 @@ export function ApplyPrepSheetModal({
       cancelled = true;
     };
   }, [isOpen, job.id, job.company]);
+
+  const filteredProblems = useMemo(() => {
+    return oaProblems.filter((p) => {
+      if (categoryFilter !== "ALL") {
+        const cat = (p.category || "OA").toUpperCase();
+        if (categoryFilter === "OA" && !cat.includes("OA")) return false;
+        if (categoryFilter === "PHONE" && !cat.includes("PHONE") && !cat.includes("SCREEN")) return false;
+        if (categoryFilter === "ONSITE" && !cat.includes("ONSITE") && !cat.includes("DESIGN")) return false;
+      }
+      if (problemSearch.trim()) {
+        const q = problemSearch.toLowerCase().trim();
+        const inTitle = p.title.toLowerCase().includes(q);
+        const inCat = (p.category || "").toLowerCase().includes(q);
+        const inTags = (p.tags || []).some((t) => t.toLowerCase().includes(q));
+        if (!inTitle && !inCat && !inTags) return false;
+      }
+      return true;
+    });
+  }, [oaProblems, categoryFilter, problemSearch]);
 
   const starPrep: StarInterviewPrepResult = useMemo(() => {
     if (prepResult) return prepResult;
@@ -275,39 +308,20 @@ export function ApplyPrepSheetModal({
         </div>
 
         {/* Segmented Navigation Tabs */}
-        <div className="flex items-center gap-1 border-b border-slate-800 px-6 pt-3 pb-2 bg-slate-900/30">
-          <button
-            type="button"
-            onClick={() => setActiveTab("star")}
-            data-testid="tab-star-stories"
-            className={cn(
-              "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5",
-              activeTab === "star"
-                ? "bg-amber-500 text-slate-950"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-            )}
-          >
-            <Sparkles className="size-3.5" />
-            <span>STAR Stories &amp; Talking Points</span>
-            {starPrep.stories.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-900 text-amber-300 font-mono">
-                {starPrep.stories.length}
-              </span>
-            )}
-          </button>
+        <div className="flex items-center gap-1 border-b border-slate-800 px-6 pt-3 pb-2 bg-slate-900/30 overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab("oa-mock")}
             data-testid="tab-oa-mock"
             className={cn(
-              "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5",
+              "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 shrink-0",
               activeTab === "oa-mock"
-                ? "bg-amber-500 text-slate-950"
+                ? "bg-amber-500 text-slate-950 font-bold"
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
             )}
           >
             <Code2 className="size-3.5" />
-            <span>Company OA &amp; Mock Interview</span>
+            <span>Technical Interview &amp; Practice Problems</span>
             {oaProblems.length > 0 && (
               <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-900 text-amber-300 font-mono">
                 {oaProblems.length}
@@ -316,12 +330,31 @@ export function ApplyPrepSheetModal({
           </button>
           <button
             type="button"
+            onClick={() => setActiveTab("star")}
+            data-testid="tab-star-stories"
+            className={cn(
+              "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 shrink-0",
+              activeTab === "star"
+                ? "bg-amber-500 text-slate-950 font-bold"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+            )}
+          >
+            <Sparkles className="size-3.5" />
+            <span>STAR Behavioral Stories</span>
+            {starPrep.stories.length > 0 && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-900 text-amber-300 font-mono">
+                {starPrep.stories.length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab("intel")}
             data-testid="tab-intel-culture"
             className={cn(
-              "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5",
+              "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 shrink-0",
               activeTab === "intel"
-                ? "bg-emerald-500 text-slate-950"
+                ? "bg-emerald-500 text-slate-950 font-bold"
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
             )}
           >
@@ -333,9 +366,9 @@ export function ApplyPrepSheetModal({
             onClick={() => setActiveTab("form")}
             data-testid="tab-form-highlights"
             className={cn(
-              "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5",
+              "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 shrink-0",
               activeTab === "form"
-                ? "bg-amber-500 text-slate-950"
+                ? "bg-amber-500 text-slate-950 font-bold"
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
             )}
           >
@@ -347,9 +380,9 @@ export function ApplyPrepSheetModal({
             onClick={() => setActiveTab("cover")}
             data-testid="tab-cover-letter"
             className={cn(
-              "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5",
+              "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 shrink-0",
               activeTab === "cover"
-                ? "bg-amber-500 text-slate-950"
+                ? "bg-amber-500 text-slate-950 font-bold"
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
             )}
           >
@@ -388,7 +421,241 @@ export function ApplyPrepSheetModal({
             </div>
           )}
 
-          {/* TAB 1: STAR Stories & Talking Points */}
+          {/* TAB: Technical Interview & Practice Problems */}
+          {activeTab === "oa-mock" && (
+            <div className="space-y-6" data-testid="oa-mock-panel">
+              {/* Status Header Banner */}
+              <div
+                className={cn(
+                  "p-3.5 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs",
+                  oaMatched && oaProblems.length > 0
+                    ? "bg-emerald-950/40 border-emerald-800/60 text-emerald-300"
+                    : "bg-slate-900/80 border-slate-800 text-slate-300"
+                )}
+              >
+                <div className="flex items-start gap-2.5">
+                  <Code2 className="size-4 shrink-0 text-amber-400 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-slate-100 block">
+                      {oaMatched && oaProblems.length > 0
+                        ? `Real Interview & OA Problems for ${job.company}`
+                        : `Technical Interview Practice Problems`}
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      {oaMatched && oaProblems.length > 0
+                        ? `Loaded ${oaProblems.length} verified assessment problems pulled directly from the Tech OA repository for ${job.company}.`
+                        : `Showing curated technical interview questions from our 1,929+ problem repository.`}
+                    </span>
+                  </div>
+                </div>
+
+                {oaMatched && oaProblems.length > 0 ? (
+                  <Badge variant="outline" className="border-emerald-500/50 bg-emerald-950/60 text-emerald-300 text-[10px] shrink-0 self-start sm:self-auto">
+                    ✓ Verified {job.company} Bank ({oaProblems.length})
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="border-slate-700 bg-slate-800/80 text-slate-300 text-[10px] shrink-0 self-start sm:self-auto">
+                    Curated Tech Repository
+                  </Badge>
+                )}
+              </div>
+
+              {/* Search & Category Filter Controls */}
+              <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-2.5 size-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={problemSearch}
+                    onChange={(e) => setProblemSearch(e.target.value)}
+                    placeholder="Search practice problems by title, topic, or tag (e.g. DP, array, graph)..."
+                    className="w-full bg-slate-900/90 border border-slate-800 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                  {problemSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setProblemSearch("")}
+                      className="absolute right-2.5 top-2 text-slate-400 hover:text-white"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  {(["ALL", "OA", "PHONE", "ONSITE"] as const).map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setCategoryFilter(cat)}
+                      className={cn(
+                        "px-2.5 py-1 rounded text-[11px] font-mono transition-colors",
+                        categoryFilter === cat
+                          ? "bg-amber-500/20 border border-amber-500/60 text-amber-300 font-bold"
+                          : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200"
+                      )}
+                    >
+                      {cat === "ALL" ? "All Types" : cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* List of Recent Leaked / Observed Problems */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                    <Terminal className="h-3.5 w-3.5" /> Practice Problems ({filteredProblems.length})
+                  </h3>
+                  {filteredProblems.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        copyToClipboard(
+                          "all-oa-questions",
+                          filteredProblems
+                            .map((p) => `- ${p.title} (${p.category || "OA"})${p.sourceUrl ? ` [Link: ${p.sourceUrl}]` : ""}`)
+                            .join("\n")
+                        )
+                      }
+                      className="text-[11px] text-amber-400 hover:underline flex items-center gap-1"
+                    >
+                      {copiedKey === "all-oa-questions" ? <Check className="size-3" /> : <Copy className="size-3" />}
+                      Copy Problems List
+                    </button>
+                  )}
+                </div>
+
+                {isFetchingOa ? (
+                  <div className="p-8 text-center text-slate-400">
+                    <p>Loading real interview problems from repository...</p>
+                  </div>
+                ) : filteredProblems.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {filteredProblems.map((prob, idx) => {
+                      const dateStr = prob.lastObserved
+                        ? new Date(prob.lastObserved).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+                        : null;
+                      const practiceUrl =
+                        prob.sourceUrl && isSafeHref(prob.sourceUrl)
+                          ? prob.sourceUrl
+                          : `https://www.google.com/search?q=${encodeURIComponent(`${job.company} ${prob.title} leetcode interview problem`)}`;
+
+                      return (
+                        <div
+                          key={prob.id || idx}
+                          data-testid="oa-problem-card"
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition"
+                        >
+                          <div className="min-w-0 flex-1 space-y-1.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-bold text-slate-100 text-xs">{prob.title}</span>
+                              <Badge variant="secondary" className="bg-slate-800 text-slate-300 text-[10px]">
+                                {prob.category || "OA"}
+                              </Badge>
+                              {prob.difficulty && (
+                                <span
+                                  className={cn(
+                                    "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded",
+                                    prob.difficulty.toLowerCase().includes("easy")
+                                      ? "bg-emerald-950/80 text-emerald-400 border border-emerald-800/60"
+                                      : prob.difficulty.toLowerCase().includes("hard")
+                                      ? "bg-red-950/80 text-red-400 border border-red-800/60"
+                                      : "bg-amber-950/80 text-amber-400 border border-amber-800/60"
+                                  )}
+                                >
+                                  {prob.difficulty}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
+                              {dateStr && (
+                                <span className="font-mono text-slate-500">Observed: {dateStr}</span>
+                              )}
+                              {prob.tags && prob.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {prob.tags.map((t, i) => (
+                                    <span key={i} className="px-1.5 py-0.2 rounded bg-slate-800/80 text-[10px] text-slate-400 font-mono">
+                                      #{t}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                            <a
+                              href={practiceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold transition"
+                              title="Open problem in new tab to practice"
+                            >
+                              <span>Practice Problem</span>
+                              <ExternalLink className="size-3" />
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(`prob-${prob.id || idx}`, prob.title)}
+                              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300 transition"
+                              title="Copy problem title"
+                            >
+                              {copiedKey === `prob-${prob.id || idx}` ? (
+                                <Check className="size-3.5 text-emerald-400" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-6 rounded-lg bg-slate-900/40 border border-slate-800 text-center text-slate-400 space-y-2">
+                    <p>No practice problems matching &quot;{problemSearch}&quot;.</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProblemSearch("");
+                        setCategoryFilter("ALL");
+                      }}
+                      className="text-xs text-amber-400 hover:underline"
+                    >
+                      Clear search &amp; filters
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 2: Mock Interviewer Prompt Simulator */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5" /> Mock Interviewer Copilot Simulator Prompt
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard("mock-prompt", mockInterviewerPrompt)}
+                    className="text-[11px] text-amber-400 hover:underline flex items-center gap-1"
+                  >
+                    {copiedKey === "mock-prompt" ? <Check className="size-3" /> : <Copy className="size-3" />}
+                    Copy Full Prompt
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Copy this prompt into ChatGPT, Claude, or Gemini to run a realistic technical mock interview tailored to {job.company}&apos;s real assessment problems and your resume highlights.
+                </p>
+                <div className="max-h-72 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/90 p-3.5 font-mono text-[11px] text-slate-300 whitespace-pre-wrap leading-relaxed">
+                  {mockInterviewerPrompt}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: STAR Stories & Talking Points */}
           {activeTab === "star" && (
             <div className="space-y-6">
               {/* Section 1: STAR Stories */}
@@ -580,151 +847,6 @@ export function ApplyPrepSheetModal({
                   </div>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* TAB: Company OA & Mock Interviewer */}
-          {activeTab === "oa-mock" && (
-            <div className="space-y-6" data-testid="oa-mock-panel">
-              {/* Status Header Banner */}
-              <div
-                className={cn(
-                  "p-3.5 rounded-lg border flex items-center justify-between gap-3 text-xs",
-                  oaMatched && oaProblems.length > 0
-                    ? "bg-emerald-950/40 border-emerald-800/60 text-emerald-300"
-                    : "bg-slate-900/80 border-slate-800 text-slate-300"
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <Code2 className="size-4 shrink-0 text-amber-400" />
-                  <div>
-                    <span className="font-bold text-slate-100 block">
-                      {oaMatched && oaProblems.length > 0
-                        ? `Real Interview & OA Question Trends for ${job.company}`
-                        : `Technical Mock Interviewer Simulator for ${job.company}`}
-                    </span>
-                    <span className="text-[11px] text-slate-400">
-                      {oaMatched && oaProblems.length > 0
-                        ? `Grounded in ${oaProblems.length} real technical assessment problems recently observed for this company.`
-                        : `No leaked OA records on file. Prompt automatically falls back to core skill requirements without hallucinated claims.`}
-                    </span>
-                  </div>
-                </div>
-
-                {oaMatched && oaProblems.length > 0 && (
-                  <Badge variant="outline" className="border-emerald-500/50 bg-emerald-950/60 text-emerald-300 text-[10px]">
-                    ✓ Verified OA Bank
-                  </Badge>
-                )}
-              </div>
-
-              {/* List of Recent Leaked / Observed Problems */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                    <Terminal className="h-3.5 w-3.5" /> Known Assessment Problems ({oaProblems.length})
-                  </h3>
-                  {oaProblems.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        copyToClipboard(
-                          "all-oa-questions",
-                          oaProblems
-                            .map((p) => `- ${p.title} (${p.category || "OA"})${p.sourceUrl ? ` [Link: ${p.sourceUrl}]` : ""}`)
-                            .join("\n")
-                        )
-                      }
-                      className="text-[11px] text-amber-400 hover:underline flex items-center gap-1"
-                    >
-                      {copiedKey === "all-oa-questions" ? <Check className="size-3" /> : <Copy className="size-3" />}
-                      Copy Questions List
-                    </button>
-                  )}
-                </div>
-
-                {oaProblems.length > 0 ? (
-                  <div className="space-y-2">
-                    {oaProblems.map((prob, idx) => {
-                      const dateStr = prob.lastObserved
-                        ? new Date(prob.lastObserved).toLocaleDateString("en-US", { month: "short", year: "numeric" })
-                        : null;
-                      return (
-                        <div
-                          key={prob.id || idx}
-                          data-testid="oa-problem-card"
-                          className="flex items-center justify-between gap-3 p-3 rounded-lg bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition"
-                        >
-                          <div className="min-w-0 flex-1 space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-slate-100 text-xs truncate">{prob.title}</span>
-                              <Badge variant="secondary" className="bg-slate-800 text-slate-300 text-[10px]">
-                                {prob.category || "OA"}
-                              </Badge>
-                              {prob.difficulty && (
-                                <span className="text-[10px] font-mono text-amber-400">{prob.difficulty}</span>
-                              )}
-                            </div>
-                            {dateStr && (
-                              <span className="text-[10px] text-slate-500 font-mono">Last observed: {dateStr}</span>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            {prob.sourceUrl && isSafeHref(prob.sourceUrl) && (
-                              <a
-                                href={prob.sourceUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300 transition"
-                                title="Open practice problem link"
-                              >
-                                <ExternalLink className="size-3.5" />
-                              </a>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(`prob-${prob.id || idx}`, prob.title)}
-                              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300 transition"
-                              title="Copy problem title"
-                            >
-                              {copiedKey === `prob-${prob.id || idx}` ? (
-                                <Check className="size-3.5 text-emerald-400" />
-                              ) : (
-                                <Copy className="size-3.5" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="p-4 rounded-lg bg-slate-900/40 border border-slate-800 text-center text-slate-400">
-                    <p>No specific leaked problems on file for {job.company}. The mock interviewer prompt below exercises the job requirements as a generic fallback.</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Section 2: Mock Interviewer Prompt Simulator */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5" /> Compiled Mock Interviewer Copilot Prompt
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard("mock-prompt", mockInterviewerPrompt)}
-                    className="text-[11px] text-amber-400 hover:underline flex items-center gap-1"
-                  >
-                    {copiedKey === "mock-prompt" ? <Check className="size-3" /> : <Copy className="size-3" />}
-                    Copy Full Prompt
-                  </button>
-                </div>
-                <div className="max-h-72 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/90 p-3.5 font-mono text-[11px] text-slate-300 whitespace-pre-wrap leading-relaxed">
-                  {mockInterviewerPrompt}
-                </div>
-              </div>
             </div>
           )}
 
