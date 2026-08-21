@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "sync:oa": "tsx scripts/sync-oa-bank.ts",
-    "seed:intel": "tsx scripts/seed-company-intel.ts"
+    "seed:intel": "tsx scripts/seed-company-intel.ts",
+    "normalize:jobs": "tsx scripts/normalize-job-descriptions.ts"
   },
   "dependencies": {
     "@codemirror/state": "^6.7.1",

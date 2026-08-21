@@ -154,6 +154,22 @@ export function ashbyApiUrlFromPosting(pageUrl: string): string | null {
   }
 }
 
+export function workdayApiUrlFromPosting(pageUrl: string): string | null {
+  try {
+    const u = new URL(pageUrl);
+    if (!u.hostname.toLowerCase().includes("myworkdayjobs.com")) return null;
+    const parts = u.pathname.split("/").filter(Boolean);
+    const jobIdx = parts.indexOf("job");
+    if (jobIdx < 1 || jobIdx >= parts.length - 1) return null;
+    const site = parts[jobIdx - 1];
+    const jobSlug = parts[parts.length - 1];
+    const tenant = u.hostname.split(".")[0];
+    return `https://${u.host}/wday/cxs/${encodeURIComponent(tenant)}/${encodeURIComponent(site)}/job/${encodeURIComponent(jobSlug)}`;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Validates whether automated fetching against a given host is permitted.
  * Adheres strictly to Indeed, LinkedIn, and robots policies.
@@ -417,6 +433,40 @@ async function extractFromAtsJsonApis(
     }
   }
 
+  const workdayApi = workdayApiUrlFromPosting(pageUrl);
+  if (workdayApi) {
+    const fetched = await fetchJsonOrHtml(workdayApi, "application/json, text/plain, */*");
+    if (fetched.ok) {
+      try {
+        const json = JSON.parse(fetched.body) as {
+          jobPostingInfo?: {
+            title?: string;
+            jobDescription?: string;
+            location?: string;
+            startDate?: string;
+          };
+        };
+        const info = json.jobPostingInfo;
+        const descriptionHtml = info?.jobDescription;
+        if (typeof descriptionHtml === "string" && descriptionHtml.trim()) {
+          const description = convertHtmlToCleanMarkdown(descriptionHtml);
+          const result = canonicalIfValid(
+            {
+              title: info?.title || meta?.roleTitle,
+              company: meta?.company,
+              location: info?.location,
+              description,
+            },
+            pageUrl
+          );
+          if (result) return result;
+        }
+      } catch {
+        // Fall through to HTML strategies.
+      }
+    }
+  }
+
   return null;
 }
 
@@ -444,8 +494,10 @@ async function fetchWithJinaReader(
 
     if (res.ok) {
       const markdown = await res.text();
+      // Strip metadata header if present to check actual body content length
+      const bodyContent = markdown.replace(/^Title:[\s\S]*?Markdown Content:\s*/i, "").trim();
       if (
-        markdown.length > 150 &&
+        bodyContent.length > 100 &&
         !markdown.includes("Security check") &&
         !markdown.includes("Just a moment...") &&
         !markdown.includes("Access denied")
