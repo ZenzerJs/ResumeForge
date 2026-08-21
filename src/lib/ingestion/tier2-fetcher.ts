@@ -431,13 +431,22 @@ async function fetchWithJinaReader(
 ): Promise<ExtractResultSuccess | null> {
   try {
     const jinaUrl = `https://r.jina.ai/${url}`;
-    const fetched = await fetchJsonOrHtml(jinaUrl, "text/markdown");
-    if (fetched.ok && fetched.body) {
-      const markdown = fetched.body;
+    const res = await safeFetch(
+      jinaUrl,
+      {
+        headers: {
+          "User-Agent": "ResumeForge-Ingest/1.0",
+          Accept: "text/markdown",
+        },
+      },
+      { followRedirects: true, timeoutMs: 15000 }
+    );
+
+    if (res.ok) {
+      const markdown = await res.text();
       if (
-        markdown.length > 250 &&
+        markdown.length > 150 &&
         !markdown.includes("Security check") &&
-        !markdown.includes("Cloudflare") &&
         !markdown.includes("Just a moment...") &&
         !markdown.includes("Access denied")
       ) {
