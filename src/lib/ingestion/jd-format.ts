@@ -210,3 +210,31 @@ export function parseJobDescriptionMarkdown(markdown: string): JobDescriptionBlo
   flushMeta(metaBuf);
   return parsed;
 }
+
+/**
+ * Fast HTML cleaner that strips script/style tags, DOM boilerplate, and collapses whitespace
+ * for clean LLM parser ingestion.
+ */
+export function cleanJobHtml(raw: string): string {
+  if (!raw) return "";
+  return raw
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
+    .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, "")
+    .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, "")
+    .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, "")
+    .replace(/<aside\b[^<]*(?:(?!<\/aside>)<[^<]*)*<\/aside>/gi, "")
+    .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, "")
+    .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, "")
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Bookmarklet script for 1-click clipboard extraction of job descriptions from walled gardens (LinkedIn, Workday).
+ */
+export const BOOKMARKLET_EXTRACT_SNIPPET = `javascript:(function(){const t=window.getSelection().toString()||document.querySelector('.jobs-description__content,#job-details,.job-description,main,article')?.innerText||document.body.innerText;navigator.clipboard.writeText(t).then(()=>alert('Job description copied! Return to ResumeForge and paste.')).catch(()=>prompt('Copy job text:',t));})();`;
+

@@ -2,17 +2,24 @@
 
 import React from "react";
 import { ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle2, RotateCcw, AlertOctagon } from "lucide-react";
-import { GuardrailResult, GuardrailStatus } from "@/lib/guardrail/types";
+import { GuardrailResult, GuardrailStatus, GuardrailViolation } from "@/lib/guardrail/types";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-interface GuardrailFeedbackProps {
+export interface GuardrailFeedbackProps {
   result: GuardrailResult | null;
   className?: string;
+  onAlignWithMaster?: () => void;
+  onAlignViolation?: (v: GuardrailViolation) => void;
 }
 
-export function GuardrailFeedback({ result, className }: GuardrailFeedbackProps) {
+export function GuardrailFeedback({
+  result,
+  className,
+  onAlignWithMaster,
+  onAlignViolation,
+}: GuardrailFeedbackProps) {
   if (!result) return null;
 
   const { status, passed, violations, hasHardViolations, hasSoftViolations } = result;
@@ -66,9 +73,9 @@ export function GuardrailFeedback({ result, className }: GuardrailFeedbackProps)
           </div>
         </Alert>
       ) : hasHardViolations ? (
-        <Alert variant="destructive" className="border-red-800 bg-red-950/40">
+        <Alert variant="destructive" className="border-red-800 bg-red-950/40 space-y-3">
           <AlertOctagon className="size-4" />
-          <div>
+          <div className="w-full">
             <div className="flex items-center justify-between">
               <AlertTitle className="font-semibold text-red-200">Mechanical Guardrail Violation</AlertTitle>
               {renderBadge(status)}
@@ -84,6 +91,7 @@ export function GuardrailFeedback({ result, className }: GuardrailFeedbackProps)
                     <TableHead className="text-[11px] text-red-400 h-8">Kind</TableHead>
                     <TableHead className="text-[11px] text-red-400 h-8">Severity</TableHead>
                     <TableHead className="text-[11px] text-red-400 h-8">Message</TableHead>
+                    {onAlignViolation && <TableHead className="text-[11px] text-red-400 h-8 w-16">Action</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -96,17 +104,43 @@ export function GuardrailFeedback({ result, className }: GuardrailFeedbackProps)
                         </Badge>
                       </TableCell>
                       <TableCell className="text-red-200 py-1.5">{v.message}</TableCell>
+                      {onAlignViolation && (
+                        <TableCell className="py-1.5">
+                          <button
+                            type="button"
+                            onClick={() => onAlignViolation(v)}
+                            data-testid={`align-violation-btn-${i}`}
+                            className="text-[10px] text-amber-400 hover:underline inline-flex items-center gap-1 font-semibold cursor-pointer"
+                          >
+                            Align
+                          </button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
+
+            {onAlignWithMaster && (
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={onAlignWithMaster}
+                  data-testid="guardrail-align-btn"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-sm transition-colors cursor-pointer"
+                >
+                  <RotateCcw className="size-3.5" />
+                  <span>Align with Master Baseline</span>
+                </button>
+              </div>
+            )}
           </div>
         </Alert>
       ) : (
-        <Alert className="border-amber-800/50 bg-amber-950/20 text-amber-300">
+        <Alert className="border-amber-800/50 bg-amber-950/20 text-amber-300 space-y-2">
           <AlertTriangle className="size-4 text-amber-400" />
-          <div>
+          <div className="w-full">
             <div className="flex items-center justify-between">
               <AlertTitle className="text-amber-200 font-semibold">Guardrail Advisory</AlertTitle>
               {renderBadge(status)}
@@ -114,6 +148,20 @@ export function GuardrailFeedback({ result, className }: GuardrailFeedbackProps)
             <AlertDescription className="text-xs text-amber-300/90 mt-1">
               Soft advisories found (unverified skills). Export remains permitted.
             </AlertDescription>
+
+            {onAlignWithMaster && (
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={onAlignWithMaster}
+                  data-testid="guardrail-align-btn"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-sm transition-colors cursor-pointer"
+                >
+                  <RotateCcw className="size-3.5" />
+                  <span>Align with Master Baseline</span>
+                </button>
+              </div>
+            )}
           </div>
         </Alert>
       )}

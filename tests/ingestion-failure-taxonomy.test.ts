@@ -5,6 +5,8 @@ import {
   leverApiUrlFromPosting,
   ashbyApiUrlFromPosting,
   extractFullTextFromUrl,
+  cleanJobHtml,
+  BOOKMARKLET_EXTRACT_SNIPPET,
 } from "@/lib/ingestion/tier2-fetcher";
 import type { ExtractFailureCode } from "@/lib/ingestion/types";
 
@@ -77,5 +79,29 @@ describe("WS1.1 — Job Ingestion Failure Taxonomy & Policy Enforcement", () => 
       expect(result.failureCode).toBe("blocked_host");
       expect(result.message).toContain("paste");
     }
+  });
+
+  it("cleanJobHtml strips DOM boilerplate, scripts, and navigation", () => {
+    const raw = `
+      <html>
+        <head><script>console.log('bad')</script><style>body { color: red; }</style></head>
+        <body>
+          <header><nav>Navigation Link</nav></header>
+          <main>
+            <h1>Staff Systems Engineer</h1>
+            <p>We are seeking an engineer with experience in distributed systems &amp; Go.</p>
+            <svg><path d="M0 0"/></svg>
+          </main>
+          <footer>Copyright 2026</footer>
+        </body>
+      </html>
+    `;
+    const cleaned = cleanJobHtml(raw);
+    expect(cleaned).toContain("Staff Systems Engineer");
+    expect(cleaned).toContain("distributed systems &amp; Go");
+    expect(cleaned).not.toContain("<script>");
+    expect(cleaned).not.toContain("Navigation Link");
+    expect(cleaned).not.toContain("Copyright 2026");
+    expect(BOOKMARKLET_EXTRACT_SNIPPET).toContain("javascript:");
   });
 });

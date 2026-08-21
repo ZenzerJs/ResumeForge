@@ -1,0 +1,26 @@
+{
+  "id": "e674b011-85fa-4c48-b4b3-b45f1b6238ab",
+  "text": "Senior Full Stack Engineer",
+  "categories": {
+    "team": "Product Engineering",
+    "department": "Engineering",
+    "location": "Toronto, ON (Remote)",
+    "commitment": "Full-Time"
+  },
+  "descriptionPlain": "We are looking for a Senior Full Stack Engineer to accelerate our product roadmap.",
+  "lists": [
+    {
+      "text": "Key Responsibilities",
+      "content": "<ul><li>Architect resilient client-side web applications using React, Next.js, and TypeScript.</li><li>Build robust GraphQL and REST API endpoints in Node.js and PostgreSQL.</li></ul>"
+    },
+    {
+      "text": "Requirements",
+      "content": "<ul><li>5+ years of software development experience with modern web stacks.</li><li>Deep proficiency in React, TypeScript, and state management.</li><li>Demonstrated knowledge of relational database schema design.</li></ul>"
+    },
+    {
+      "text": "Nice to Have",
+      "content": "<ul><li>Experience with AWS ECS and Terraform infrastructure as code.</li><li>Familiarity with Tailwind CSS and accessible design systems.</li></ul>"
+    }
+  ],
+  "additionalPlain": "Compensation: $165,000 - $195,000 CAD base salary."
+}

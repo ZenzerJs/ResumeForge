@@ -312,9 +312,91 @@ A hosted password wall blocked anyone without `APP_ACCESS_SECRET` and made the p
 
 ---
 
+## ADR-015: Client-Side Immutable Application Package (.zip) & Cryptographic Manifest
 
+- **Date**: 2026-08-17
+- **Status**: Approved
 
+### Context
+Applying to job portals often requires a multi-file package (.pdf, .docx, plain text, Typst source, cover letter, application summary). Bundling on a server introduces unnecessary latency, bandwidth costs, and state management. The bundle must also prevent tampering, guarantee cryptographic integrity, and sanitize filenames across OS platforms.
 
+### Decision
+1. **Client-side parallel compilation** using `JSZip`, `compileTypstToPdf`, and `generateAtsDocx`.
+2. **Immutable Snapshot Freeze**: Input state is frozen into an immutable `ZipExportSnapshot` before compilation to guarantee consistency across all bundled artifacts.
+3. **Cryptographic Manifest (`manifest.json`)**: Generated with schemaVersion 1, ISO timestamp, generator metadata, job target, guardrail status, and SHA-256 checksums computed for every bundled artifact.
+4. **Strict Entry Allowlist**: Only `resume.pdf`, `resume.docx`, `resume.txt`, `resume.typ`, `cover_letter.md`, `cover_letter.txt`, `application_summary.txt`, `manifest.json`.
+5. **Filename Sanitization (`sanitizeZipFilename`)**: Strips Windows reserved device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`), removes illegal characters, and caps base names to 50 characters.
+6. **Recovery Error UI**: If bundle generation fails, error banners offer immediate single-click fallback downloads for individual PDF and DOCX files.
 
+### Consequences
+- **Positive**: Instant local-first bundle generation with zero server hops and cryptographic verification.
+- **Positive**: Mechanical guardrail enforcement guarantees no unverified claims exist in any bundled artifact.
 
+---
+
+## ADR-016: Server-Authoritative Idempotent Guest Draft Migration & Conflict Policy
+
+- **Date**: 2026-08-17
+- **Status**: Approved
+
+### Context
+Unauthenticated guest users work in browser `localStorage`. Upon creating an account or logging in, local drafts need to migrate to the user's PostgreSQL account without risk of silently overwriting existing Master Resumes or losing local state if network requests fail.
+
+### Decision
+1. **Server-Authoritative Endpoint**: `POST /api/auth/migrate-guest-drafts` authenticated with `requireUserId` (never trusting client-supplied user IDs).
+2. **Explicit Conflict Policy**: When the account already has an active Master Resume:
+   - `IMPORT_AS_DRAFT` (Default/Recommended): saves as a non-master `Resume` row, keeping master baseline safe.
+   - `REPLACE_MASTER`: atomically updates master status via Prisma `$transaction`.
+   - `DISCARD`: acknowledges and clears local draft without database writes.
+3. **Strict Local Cleanup Lifecycle**: `localStorage` keys (`resumeforge_typst_source`, `resumeforge_has_guest_draft`) are purged ONLY after receiving an HTTP 200 success response. On error or network failure, local content remains untouched and a Retry option is displayed.
+
+### Consequences
+- **Positive**: Prevents accidental destruction of Master Resumes.
+- **Positive**: Zero data loss guarantee during network drops or auth hiccups.
+
+---
+
+## ADR-017: STAR Provenance & Strict Evidence Grounding Contract
+
+- **Date**: 2026-08-17
+- **Status**: Approved
+
+### Context
+Job interview preparation requires structured STAR stories (Situation, Task, Action, Result) based on job requirements. Generative LLMs frequently hallucinate achievements, metrics, or technologies when prompted for interview answers.
+
+### Decision
+1. **Deterministic synthesis engine** (`src/lib/prep/star-synthesizer.ts`) that assembles interview prep material strictly from verified Evidence Bank records.
+2. **Grounding Taxonomy**:
+   - `DIRECT`: Exact match in verified evidence items, citing mandatory `evidenceIds` and `sourceBulletIds`.
+   - `TRANSFERABLE`: Adjacent technical domain match with an explicit bridge plan.
+   - `GAP`: Unsupported requirement rendered with an honest mitigation strategy and empty S/T/A/R fields (never fabricating faux stories).
+3. **Provenance Gate**: Reject unverified drafts (`status === "draft"`, `isDraft === true`) and archived items (`status === "archived"`). Only `status === "verified"` records may provide grounding.
+
+### Consequences
+- **Positive**: 100% verifiable candidate interview prep grounded in real career records.
+- **Positive**: Clear visual distinction between direct evidence, transferable skills, and unbacked gaps.
+
+---
+
+## ADR-018: Source-First Job Description Pipeline & Section Provenance
+
+- **Date**: 2026-08-17
+- **Status**: Approved
+
+### Context
+ATS evaluation and AI tailoring require structured knowledge of target job requirements without losing the original source context or fabricating requirements. Unstructured text blob extraction makes it impossible to verify where a requirement originated or whether it was mandatory or preferred.
+
+### Decision
+1. **Canonical Ingestion Pipeline (`src/lib/jd/document-pipeline.ts`)**:
+   - Parse input from diverse sources: Greenhouse, Lever, Ashby, JSON-LD schema, plain HTML, or raw user text.
+   - Detect structured document sections (`ABOUT_COMPANY`, `ROLE_SUMMARY`, `RESPONSIBILITIES`, `REQUIRED`, `PREFERRED`, `COMPENSATION`, `BENEFITS`, `OTHER`) using deterministic alias dictionaries.
+2. **Section Spans & Requirement Provenance (`ProvenanceRequirement`)**:
+   - Every requirement stores `sourceQuote`, `sourceSectionId`, byte spans (`sourceStart`, `sourceEnd`), `category` (`SKILL`, `EXPERIENCE`, `EDUCATION`, `CERTIFICATION`, `DOMAIN`), `priority` (`REQUIRED`, `PREFERRED`), and `confidence` (`EXPLICIT`, `USER_ADDED`, `INFERRED`).
+3. **Content Integrity**:
+   - SHA-256 content hashing of normalized text to detect revisions and caching.
+   - Diagnostics reporting (`VERIFIED_ATS`, `STRUCTURED_PAGE`, `PARTIAL_EXTRACTION`, `USER_PASTED`).
+
+### Consequences
+- **Positive**: Complete auditability and provenance for every job requirement matched against candidate evidence.
+- **Positive**: Distinguishes between native ATS structured postings and partial SPA shell extracts.
 

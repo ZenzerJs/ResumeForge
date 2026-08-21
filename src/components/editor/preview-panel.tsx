@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2, BarChart3, Sparkles, FileText, ChevronDown } from "lucide-react";
+import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2, BarChart3, Sparkles, FileText, ChevronDown, Package } from "lucide-react";
 import dynamic from "next/dynamic";
 import { compileTypstToPdf } from "@/lib/typst/compiler";
 import { generateAtsDocx } from "@/lib/export/docx";
+import { generateApplicationPackageZip, cleanTypstToText, sanitizeZipFilename } from "@/lib/export/zip";
 import { assertCanExport } from "@/lib/guardrail/policy";
 import { ResumeFacts } from "@/lib/facts/types";
 import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
@@ -132,15 +133,7 @@ export function PreviewPanel({
 
   const handleExportTxt = () => {
     try {
-      const cleanTxt = source
-        .replace(/#(show|set|let)[^\n]*\n?/g, "")
-        .replace(/==+\s*(.*?)\n/g, "\n--- $1 ---\n")
-        .replace(/=+\s*(.*?)\n/g, "\n=== $1 ===\n")
-        .replace(/\[|\]/g, "")
-        .replace(/\*+/g, "")
-        .replace(/_+/g, "")
-        .replace(/\n{3,}/g, "\n\n")
-        .trim();
+      const cleanTxt = cleanTypstToText(source);
 
       const blob = new Blob([cleanTxt], { type: "text/plain;charset=utf-8" });
       const url = URL.createObjectURL(blob);
@@ -186,6 +179,45 @@ export function PreviewPanel({
       URL.revokeObjectURL(url);
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "Failed to export JSON resume");
+    }
+  };
+
+  const handleExportZip = async () => {
+    try {
+      setIsExporting(true);
+      setExportError(null);
+
+      const zipBytes = await generateApplicationPackageZip({
+        typstSource: source,
+        masterFacts: masterFacts || undefined,
+        job: roleTitle
+          ? {
+              company: "Target Company",
+              roleTitle: roleTitle,
+              requirements: extractedRequirements,
+            }
+          : null,
+      });
+
+      const blob = new Blob([zipBytes.buffer as ArrayBuffer], {
+        type: "application/zip",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = sanitizeZipFilename("Target_Company", roleTitle || "Resume");
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(
+        err instanceof Error
+          ? err.message
+          : "Package creation failed. You can try again or download individual PDF / DOCX files below."
+      );
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -278,6 +310,14 @@ export function PreviewPanel({
               >
                 <FileText className="size-3.5 text-purple-500" />
                 <span>JSON Resume (.json)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportZip}
+                data-testid="export-zip-menu-item"
+                className="cursor-pointer text-xs flex items-center gap-2"
+              >
+                <Package className="size-3.5 text-amber-600" />
+                <span>Application Package (.zip)</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -378,8 +418,43 @@ export function PreviewPanel({
         )}
 
         {exportError && (
-          <div className="w-full max-w-[850px] mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-            <p className="font-semibold">Export Warning: {exportError}</p>
+          <div
+            data-testid="export-error-recovery-banner"
+            className="w-full max-w-[850px] mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 shadow-sm space-y-2"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-semibold">
+                Export Notice: {exportError}
+              </p>
+              <button
+                type="button"
+                onClick={() => setExportError(null)}
+                className="text-amber-800 hover:text-amber-950 text-xs underline font-medium shrink-0"
+              >
+                Dismiss
+              </button>
+            </div>
+            <div className="flex items-center gap-2 pt-1 border-t border-amber-200">
+              <span className="text-[11px] text-amber-800 font-medium">Fallback direct downloads:</span>
+              <button
+                type="button"
+                onClick={handleExportPdf}
+                data-testid="fallback-download-pdf-btn"
+                className="px-2 py-0.5 rounded bg-white border border-amber-300 text-indigo-700 hover:bg-indigo-50 font-medium text-[11px] inline-flex items-center gap-1 shadow-xs"
+              >
+                <Download className="size-3" />
+                <span>PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleExportDocx}
+                data-testid="fallback-download-docx-btn"
+                className="px-2 py-0.5 rounded bg-white border border-amber-300 text-blue-700 hover:bg-blue-50 font-medium text-[11px] inline-flex items-center gap-1 shadow-xs"
+              >
+                <FileText className="size-3" />
+                <span>DOCX</span>
+              </button>
+            </div>
           </div>
         )}
 

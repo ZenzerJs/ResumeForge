@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { TopNav } from "@/components/navigation/top-nav";
+import { GuestMigrationModal } from "@/components/auth/guest-migration-modal";
 import { cn } from "@/lib/utils";
 
 /** Kept for layout/testid affinity; no longer drives decorative atmosphere. */
@@ -71,6 +72,63 @@ export function AppShell({
   hideNav = false,
 }: AppShellProps) {
   const lockViewport = variant === "editor" || variant === "tracker";
+  const [showMigrationModal, setShowMigrationModal] = useState(false);
+  const [guestDraft, setGuestDraft] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const isDismissed = localStorage.getItem("resumeforge_migration_dismissed") === "true";
+    const isMigrated = localStorage.getItem("resumeforge_draft_migrated") === "true";
+    if (isDismissed || isMigrated) return;
+
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then(async (json) => {
+        const isAuthUser = json?.data && !json.guest;
+        if (isAuthUser) {
+          const hasGuestDraft = localStorage.getItem("resumeforge_has_guest_draft") === "true";
+          const stored = localStorage.getItem("resumeforge_typst_source");
+          if (
+            hasGuestDraft &&
+            stored &&
+            stored.trim().length > 30 &&
+            !stored.includes("// Starter Typst Resume")
+          ) {
+            try {
+              const res = await fetch("/api/resumes");
+              const resJson = await res.json();
+              if (resJson.success && Array.isArray(resJson.data)) {
+                const alreadyExists = resJson.data.some(
+                  (r: { typstSource: string }) => r.typstSource?.trim() === stored.trim()
+                );
+                if (alreadyExists) {
+                  localStorage.removeItem("resumeforge_has_guest_draft");
+                  localStorage.setItem("resumeforge_draft_migrated", "true");
+                  return;
+                }
+              }
+            } catch {
+              // ignore
+            }
+            setGuestDraft(stored);
+            setShowMigrationModal(true);
+          }
+        } else if (json?.guest) {
+          const stored = localStorage.getItem("resumeforge_typst_source");
+          if (
+            stored &&
+            stored.trim().length > 30 &&
+            !stored.includes("// Starter Typst Resume")
+          ) {
+            localStorage.setItem("resumeforge_has_guest_draft", "true");
+          }
+        }
+      })
+      .catch(() => {
+        // ignore
+      });
+  }, []);
 
   return (
     <div
@@ -94,6 +152,15 @@ export function AppShell({
         {!hideNav ? <GuestBanner /> : null}
         {children}
       </main>
+
+      {showMigrationModal && guestDraft && (
+        <GuestMigrationModal
+          isOpen={showMigrationModal}
+          onClose={() => setShowMigrationModal(false)}
+          draftSource={guestDraft}
+          onSuccess={() => setShowMigrationModal(false)}
+        />
+      )}
     </div>
   );
 }

@@ -43,4 +43,68 @@ describe("One-Click Apply Pipeline", () => {
     expect(result.passed).toBe(true);
     expect(result.hasHardViolations).toBe(false);
   });
+
+  it("generates an application package zip for the job with ATS score audit", async () => {
+    const { generateApplicationPackageZip } = await import("@/lib/export/zip");
+    const JSZip = (await import("jszip")).default;
+
+    const requirements = {
+      roleTitle: "Software Engineer",
+      company: "Stripe",
+      requiredSkills: ["typescript", "postgresql"],
+      preferredSkills: ["react"],
+      domainTerms: ["latency"],
+    };
+
+    const score = evaluateAtsScore(candidateTypst, requirements, "Full-stack");
+
+    const zipBytes = await generateApplicationPackageZip({
+      typstSource: candidateTypst,
+      masterFacts,
+      job: {
+        company: "Stripe",
+        roleTitle: "Software Engineer",
+        location: "San Francisco, CA",
+        requirements,
+      },
+      atsScore: score,
+    });
+
+    expect(zipBytes).toBeInstanceOf(Uint8Array);
+    const unzipped = await JSZip.loadAsync(zipBytes);
+    expect(unzipped.file("resume.pdf")).not.toBeNull();
+    expect(unzipped.file("resume.docx")).not.toBeNull();
+    expect(unzipped.file("resume.txt")).not.toBeNull();
+    expect(unzipped.file("resume.typ")).not.toBeNull();
+    expect(unzipped.file("application_summary.txt")).not.toBeNull();
+
+    const summary = await unzipped.file("application_summary.txt")?.async("string");
+    expect(summary).toContain("Company: Stripe");
+    expect(summary).toContain("Role: Software Engineer");
+    expect(summary).toContain(`Overall Match Score: ${score.overallScore} / 100`);
+  });
+
+  it("blocks downloads and export generation when guardrail detects hard violations", async () => {
+    const { assertCanExport, GuardrailBlockError } = await import("@/lib/guardrail/policy");
+    const { generateApplicationPackageZip } = await import("@/lib/export/zip");
+
+    const invalidCandidate = `
+= Jane Doe
+== EXPERIENCE
+*Tesla* -- *Chief Architect*
+- Invented full self driving reducing latency by 99% across $10B revenue fleet.
+    `;
+
+    expect(() => assertCanExport(invalidCandidate, masterFacts)).toThrow(GuardrailBlockError);
+
+    await expect(
+      generateApplicationPackageZip({
+        typstSource: invalidCandidate,
+        masterFacts,
+        job: { company: "Stripe", roleTitle: "Software Engineer" },
+      })
+    ).rejects.toThrow(GuardrailBlockError);
+  });
 });
+
+

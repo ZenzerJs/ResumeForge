@@ -6,6 +6,7 @@ import { normalizeJob } from "@/lib/ingestion/normalize-job";
 import { extractFullTextFromUrl } from "@/lib/ingestion/tier2-fetcher";
 import { ProviderConfigSchema } from "@/lib/ai/types";
 import { formatJobDescriptionWithAi } from "@/lib/ai/gateway";
+import { parseJobDescriptionDocument } from "@/lib/jd/document-pipeline";
 
 const ExtractRequestSchema = z
   .object({
@@ -93,11 +94,17 @@ export async function POST(request: Request) {
       }
     }
 
+    const document = parseJobDescriptionDocument({
+      text: targetDescription,
+      sourceUrl: sourceUrl || undefined,
+    });
+
     return NextResponse.json({
       success: true,
       data: extracted,
       normalized,
       formattedJd,
+      document,
     });
   } catch (err) {
     return NextResponse.json(

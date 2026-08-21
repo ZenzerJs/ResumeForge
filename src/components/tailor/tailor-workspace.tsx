@@ -26,6 +26,12 @@ import { isPlaceholderDescription } from "@/lib/ingestion/helpers";
 import { JD_PASTE_TEMPLATE, convertHtmlToCleanMarkdown } from "@/lib/ingestion/jd-format";
 import { AiProgress, type AiJobStage } from "@/components/ui/ai-progress";
 import { QuickAddEvidenceModal } from "./quick-add-evidence-modal";
+import {
+  parseJobDescriptionDocument,
+  createUserRequirement,
+  JobDescriptionDocument,
+  ProvenanceRequirement,
+} from "@/lib/jd/document-pipeline";
 import { Plus } from "lucide-react";
 
 interface RankedMatch {
@@ -103,6 +109,17 @@ export function TailorWorkspace() {
   const [activeTab, setActiveTab] = useState<"overview" | "job-info">(
     tabParam === "overview" ? "overview" : "job-info"
   );
+  const [jobInfoSubTab, setJobInfoSubTab] = useState<"structured" | "original" | "details">("original");
+  const [newUserReqText, setNewUserReqText] = useState("");
+  const [customUserReqs, setCustomUserReqs] = useState<ProvenanceRequirement[]>([]);
+
+  const jobDoc = React.useMemo(() => {
+    return parseJobDescriptionDocument({
+      text: rawDescription,
+      sourceKind: "PASTED",
+    });
+  }, [rawDescription]);
+
   const [gapSkillToResolve, setGapSkillToResolve] = useState<string | null>(null);
   const [isAutoScanning, setIsAutoScanning] = useState(false);
   const [matches, setMatches] = useState<RankedMatch[]>([]);
@@ -771,94 +788,294 @@ export function TailorWorkspace() {
                       ← Back to Overview
                     </button>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label htmlFor="tailor-company" className="block font-mono text-xs text-slate-400 mb-1">Company</label>
-                      <input
-                        id="tailor-company"
-                        name="company"
-                        type="text"
-                        autoComplete="organization"
-                        value={company}
-                        onChange={(e) => setCompany(e.target.value)}
-                        className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="tailor-role" className="block font-mono text-xs text-slate-400 mb-1">Role</label>
-                      <input
-                        id="tailor-role"
-                        name="role"
-                        type="text"
-                        autoComplete="off"
-                        value={roleTitle}
-                        onChange={(e) => setRoleTitle(e.target.value)}
-                        className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
-                      />
-                    </div>
+
+                  {/* Diagnostics / Confidence Banner */}
+                  <div className="mb-4">
+                    {jobDoc.diagnostics.status === "VERIFIED_ATS" && (
+                      <div
+                        data-testid="confidence-banner-verified-ats"
+                        className="p-2.5 rounded-md bg-emerald-950/60 border border-emerald-800 text-xs text-emerald-300 font-mono flex items-center gap-2"
+                      >
+                        <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
+                        <span>✓ Verified ATS Source: Loaded directly from official ATS endpoint. No action needed.</span>
+                      </div>
+                    )}
+                    {jobDoc.diagnostics.status === "STRUCTURED_PAGE" && (
+                      <div
+                        data-testid="confidence-banner-structured-page"
+                        className="p-2.5 rounded-md bg-blue-950/60 border border-blue-800 text-xs text-blue-300 font-mono flex items-center gap-2"
+                      >
+                        <FileText className="size-4 text-blue-400 shrink-0" />
+                        <span>ℹ Structured Page Extraction: JSON-LD or semantic HTML. Review extracted sections.</span>
+                      </div>
+                    )}
+                    {jobDoc.diagnostics.status === "PARTIAL_EXTRACTION" && (
+                      <div
+                        data-testid="confidence-banner-partial-extraction"
+                        className="p-2.5 rounded-md bg-amber-950/60 border border-amber-800 text-xs text-amber-300 font-mono flex items-center gap-2"
+                      >
+                        <AlertTriangle className="size-4 text-amber-400 shrink-0" />
+                        <span>⚠ Partial Extraction: Description may be incomplete. Paste full description below.</span>
+                      </div>
+                    )}
+                    {jobDoc.diagnostics.status === "USER_PASTED" && (
+                      <div
+                        data-testid="confidence-banner-user-pasted"
+                        className="p-2.5 rounded-md bg-slate-900/80 border border-slate-700 text-xs text-slate-300 font-mono flex items-center gap-2"
+                      >
+                        <FileText className="size-4 text-slate-400 shrink-0" />
+                        <span>✎ User Pasted: Candidate-provided source. Edit sections as needed.</span>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <label className="block font-mono text-xs text-slate-400 mb-1 flex justify-between">
-                      <span>Raw Description</span>
-                      <button
-                        type="button"
-                        onClick={handleExtract}
-                        disabled={isExtracting}
-                        data-testid="extract-reqs-btn"
-                        className="text-xs text-[#4edea3] hover:underline font-mono"
-                      >
-                        {isExtracting ? "Scanning..." : "Extract Requirements"}
-                      </button>
-                    </label>
-                    <textarea
-                      value={rawDescription}
-                      onChange={(e) => setRawDescription(e.target.value)}
-                      rows={8}
-                      data-testid="jd-textarea"
-                      aria-label="Job description"
-                      placeholder={JD_PASTE_TEMPLATE}
-                      className="w-full bg-[#060e20] text-slate-200 font-mono text-xs p-4 rounded border border-slate-800 focus:border-[#ff8c00] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 resize-none leading-relaxed"
-                    />
-                    {tier2Status?.type === "error" ? (
-                      <pre className="mt-2 whitespace-pre-wrap rounded border border-slate-800 bg-[#060e20] p-3 font-mono text-[10px] leading-relaxed text-slate-500">
-                        {JD_PASTE_TEMPLATE}
-                      </pre>
-                    ) : null}
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        data-testid="sample-backend-btn"
-                        onClick={() => {
-                          setCompany("Nova Labs");
-                          setRoleTitle("Senior Backend Engineer");
-                          setRawDescription(SAMPLE_BACKEND_JD);
-                        }}
-                        className="text-[10px] font-mono px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-white"
-                      >
-                        Sample Backend JD
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="sample-frontend-btn"
-                        onClick={() => {
-                          setCompany("WebCraft Systems");
-                          setRoleTitle("Frontend Engineer");
-                          setRawDescription(SAMPLE_FRONTEND_JD);
-                        }}
-                        className="text-[10px] font-mono px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-white"
-                      >
-                        Sample Frontend JD
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="save-job-btn"
-                        onClick={() => void handleSaveJob()}
-                        className="text-[10px] font-mono px-2 py-1 rounded border border-emerald-700/60 text-emerald-300 hover:text-white"
-                      >
-                        Save Job
-                      </button>
-                    </div>
+
+                  {/* Sub-tab Selector */}
+                  <div className="flex items-center gap-1 border-b border-slate-800/80 mb-4 pb-2">
+                    <button
+                      type="button"
+                      onClick={() => setJobInfoSubTab("structured")}
+                      data-testid="job-subtab-structured"
+                      className={`px-3 py-1 text-xs font-mono rounded transition-colors ${
+                        jobInfoSubTab === "structured"
+                          ? "bg-[#ff8c00] text-slate-950 font-bold"
+                          : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+                      }`}
+                    >
+                      Structured Breakdown
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setJobInfoSubTab("original")}
+                      data-testid="job-subtab-original"
+                      className={`px-3 py-1 text-xs font-mono rounded transition-colors ${
+                        jobInfoSubTab === "original"
+                          ? "bg-[#ff8c00] text-slate-950 font-bold"
+                          : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+                      }`}
+                    >
+                      Original Source
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setJobInfoSubTab("details")}
+                      data-testid="job-subtab-details"
+                      className={`px-3 py-1 text-xs font-mono rounded transition-colors ${
+                        jobInfoSubTab === "details"
+                          ? "bg-[#ff8c00] text-slate-950 font-bold"
+                          : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+                      }`}
+                    >
+                      Extraction Details
+                    </button>
                   </div>
+
+                  {/* Subtab 1: Structured Breakdown */}
+                  {jobInfoSubTab === "structured" && (
+                    <div className="space-y-4 font-mono text-xs">
+                      {/* Sections breakdown */}
+                      <div className="space-y-2.5">
+                        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                          Document Sections ({jobDoc.sections.length})
+                        </span>
+                        {jobDoc.sections.map((sec) => (
+                          <div
+                            key={sec.id}
+                            className="p-3 rounded bg-[#060e20] border border-slate-800 space-y-1.5"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-[#ffb77d]">{sec.heading}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold uppercase">
+                                {sec.kind}
+                              </span>
+                            </div>
+                            <div className="text-slate-300 text-[11px] whitespace-pre-wrap leading-relaxed">
+                              {sec.markdown}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Add Custom User Requirement */}
+                      <div className="p-3 rounded bg-[#060e20] border border-slate-800 space-y-2">
+                        <span className="font-semibold text-slate-300 block">
+                          Add Custom Requirement (User-Added)
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={newUserReqText}
+                            onChange={(e) => setNewUserReqText(e.target.value)}
+                            placeholder="e.g. 5+ years Go microservices experience"
+                            data-testid="add-user-requirement-input"
+                            className="flex-1 bg-slate-900 border border-slate-700 p-1.5 text-xs text-slate-200 rounded outline-none focus:border-[#ff8c00]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!newUserReqText.trim()) return;
+                              const newReq = createUserRequirement(newUserReqText.trim());
+                              setCustomUserReqs((prev) => [...prev, newReq]);
+                              if (extractedRequirements) {
+                                setExtractedRequirements({
+                                  ...extractedRequirements,
+                                  requiredSkills: Array.from(
+                                    new Set([...extractedRequirements.requiredSkills, newReq.label])
+                                  ),
+                                });
+                              }
+                              setNewUserReqText("");
+                            }}
+                            data-testid="add-user-requirement-btn"
+                            className="px-3 py-1.5 rounded bg-[#ff8c00] text-slate-950 font-bold text-xs hover:bg-amber-400"
+                          >
+                            Add Requirement
+                          </button>
+                        </div>
+                        {customUserReqs.length > 0 && (
+                          <div className="pt-2 space-y-1">
+                            <span className="text-[10px] text-slate-400">Custom User Requirements:</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {customUserReqs.map((req) => (
+                                <span
+                                  key={req.id}
+                                  className="px-2 py-0.5 rounded bg-amber-950/60 border border-amber-800 text-[11px] text-amber-300 flex items-center gap-1"
+                                >
+                                  <span>{req.label}</span>
+                                  <span className="text-[9px] px-1 rounded bg-amber-900 text-amber-100 font-bold">
+                                    USER_ADDED
+                                  </span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Subtab 2: Original Source */}
+                  {jobInfoSubTab === "original" && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label htmlFor="tailor-company" className="block font-mono text-xs text-slate-400 mb-1">Company</label>
+                          <input
+                            id="tailor-company"
+                            name="company"
+                            type="text"
+                            autoComplete="organization"
+                            value={company}
+                            onChange={(e) => setCompany(e.target.value)}
+                            className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="tailor-role" className="block font-mono text-xs text-slate-400 mb-1">Role</label>
+                          <input
+                            id="tailor-role"
+                            name="role"
+                            type="text"
+                            autoComplete="off"
+                            value={roleTitle}
+                            onChange={(e) => setRoleTitle(e.target.value)}
+                            className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block font-mono text-xs text-slate-400 mb-1 flex justify-between">
+                          <span>Raw Description</span>
+                          <button
+                            type="button"
+                            onClick={handleExtract}
+                            disabled={isExtracting}
+                            data-testid="extract-reqs-btn"
+                            className="text-xs text-[#4edea3] hover:underline font-mono"
+                          >
+                            {isExtracting ? "Scanning..." : "Extract Requirements"}
+                          </button>
+                        </label>
+                        <textarea
+                          value={rawDescription}
+                          onChange={(e) => setRawDescription(e.target.value)}
+                          rows={8}
+                          data-testid="jd-textarea"
+                          aria-label="Job description"
+                          placeholder={JD_PASTE_TEMPLATE}
+                          className="w-full bg-[#060e20] text-slate-200 font-mono text-xs p-4 rounded border border-slate-800 focus:border-[#ff8c00] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 resize-none leading-relaxed"
+                        />
+                        {tier2Status?.type === "error" ? (
+                          <pre className="mt-2 whitespace-pre-wrap rounded border border-slate-800 bg-[#060e20] p-3 font-mono text-[10px] leading-relaxed text-slate-500">
+                            {JD_PASTE_TEMPLATE}
+                          </pre>
+                        ) : null}
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            data-testid="sample-backend-btn"
+                            onClick={() => {
+                              setCompany("Nova Labs");
+                              setRoleTitle("Senior Backend Engineer");
+                              setRawDescription(SAMPLE_BACKEND_JD);
+                            }}
+                            className="text-[10px] font-mono px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-white"
+                          >
+                            Sample Backend JD
+                          </button>
+                          <button
+                            type="button"
+                            data-testid="sample-frontend-btn"
+                            onClick={() => {
+                              setCompany("WebCraft Systems");
+                              setRoleTitle("Frontend Engineer");
+                              setRawDescription(SAMPLE_FRONTEND_JD);
+                            }}
+                            className="text-[10px] font-mono px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-white"
+                          >
+                            Sample Frontend JD
+                          </button>
+                          <button
+                            type="button"
+                            data-testid="save-job-btn"
+                            onClick={() => void handleSaveJob()}
+                            className="text-[10px] font-mono px-2 py-1 rounded border border-emerald-700/60 text-emerald-300 hover:text-white"
+                          >
+                            Save Job
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Subtab 3: Extraction Details */}
+                  {jobInfoSubTab === "details" && (
+                    <div className="space-y-3 font-mono text-xs">
+                      <div className="p-3 rounded bg-[#060e20] border border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Ingestion Source Kind:</span>
+                          <span className="px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800 font-bold text-[10px]">
+                            {jobDoc.sourceKind}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Acquired At:</span>
+                          <span className="text-slate-200 text-[11px]">{jobDoc.acquiredAt}</span>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-slate-400 block">Content Hash (SHA-256):</span>
+                          <code className="block p-1.5 rounded bg-slate-950 border border-slate-800 text-[10px] text-emerald-400 break-all">
+                            {jobDoc.contentHash}
+                          </code>
+                        </div>
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-slate-400">Diagnostics Status:</span>
+                          <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold text-[10px]">
+                            {jobDoc.diagnostics.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </section>
 
                 <section className="glass-panel rounded-lg p-5 glow-effect transition-shadow">

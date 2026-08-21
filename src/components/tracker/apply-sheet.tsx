@@ -23,13 +23,16 @@ import {
   BarChart3,
   Loader2,
   AlertCircle,
+  Package,
 } from "lucide-react";
 import { GuardrailFeedback } from "@/components/ui/guardrail-feedback";
 import { GuardrailResult } from "@/lib/guardrail/types";
 import { checkGuardrail } from "@/lib/guardrail/check";
+import { assertCanExport } from "@/lib/guardrail/policy";
 import { evaluateAtsScore } from "@/lib/ats-evaluator/evaluator";
 import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
 import { generateAtsDocx } from "@/lib/export/docx";
+import { generateApplicationPackageZip, sanitizeZipFilename } from "@/lib/export/zip";
 import { compileTypstToPdf } from "@/lib/typst/compiler";
 import { ResumeFacts } from "@/lib/facts/types";
 
@@ -129,12 +132,16 @@ export function ApplySheet({
   const handleDownloadPdf = async () => {
     try {
       setExportError(null);
-      const pdfBytes = await compileTypstToPdf(tailoredTypst || masterTypst);
+      const workingTypst = tailoredTypst || masterTypst;
+      assertCanExport(workingTypst, masterFacts);
+
+      const pdfBytes = await compileTypstToPdf(workingTypst);
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${job.company.replace(/\s+/g, "_")}_Resume.pdf`;
+      const safeName = (job.company || "Job").replace(/[^a-zA-Z0-9_-]/g, "_");
+      a.download = `${safeName}_Resume.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -147,7 +154,10 @@ export function ApplySheet({
   const handleDownloadDocx = async () => {
     try {
       setExportError(null);
-      const docxBytes = await generateAtsDocx(tailoredTypst || masterTypst, {
+      const workingTypst = tailoredTypst || masterTypst;
+      assertCanExport(workingTypst, masterFacts);
+
+      const docxBytes = await generateAtsDocx(workingTypst, {
         facts: masterFacts || undefined,
       });
       const blob = new Blob([docxBytes.buffer as ArrayBuffer], {
@@ -156,13 +166,54 @@ export function ApplySheet({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${job.company.replace(/\s+/g, "_")}_Resume.docx`;
+      const safeName = (job.company || "Job").replace(/[^a-zA-Z0-9_-]/g, "_");
+      a.download = `${safeName}_Resume.docx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "Failed to download DOCX");
+    }
+  };
+
+  const handleDownloadZip = async () => {
+    try {
+      setExportError(null);
+      const workingTypst = tailoredTypst || masterTypst;
+      assertCanExport(workingTypst, masterFacts);
+
+      const zipBytes = await generateApplicationPackageZip({
+        typstSource: workingTypst,
+        masterFacts: masterFacts || undefined,
+        job: job
+          ? {
+              company: job.company,
+              roleTitle: job.roleTitle,
+              location: job.location,
+              salarySnippet: job.salarySnippet,
+              requirements: job.requirements,
+            }
+          : null,
+        atsScore: atsScore || undefined,
+      });
+      const blob = new Blob([zipBytes.buffer as ArrayBuffer], {
+        type: "application/zip",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = sanitizeZipFilename(job.company, job.roleTitle);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(
+        err instanceof Error
+          ? err.message
+          : "Package creation failed. You can try again or download individual PDF / DOCX files below."
+      );
     }
   };
 
@@ -173,6 +224,8 @@ export function ApplySheet({
     score: 4,
     export: 5,
   }[currentStep];
+
+  const hasHardViolations = Boolean(guardrailResult?.hasHardViolations);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -266,9 +319,42 @@ export function ApplySheet({
           )}
 
           {exportError && (
-            <div className="p-3 rounded-lg bg-red-950/40 border border-red-900 text-xs text-red-300 flex items-center gap-2">
-              <AlertCircle className="size-4 text-red-400 shrink-0" />
-              <span>{exportError}</span>
+            <div
+              data-testid="apply-export-error-recovery"
+              className="p-3 rounded-lg bg-red-950/40 border border-red-900 text-xs text-red-300 space-y-2"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="size-4 text-red-400 shrink-0" />
+                  <span>{exportError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExportError(null)}
+                  className="text-red-400 hover:text-red-200 text-xs underline shrink-0 font-medium"
+                >
+                  Dismiss
+                </button>
+              </div>
+              <div className="flex items-center gap-2 pt-1 border-t border-red-900/60 text-[11px]">
+                <span className="text-red-300">Fallback direct downloads:</span>
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  data-testid="fallback-apply-pdf-btn"
+                  className="px-2 py-0.5 rounded bg-red-900/40 hover:bg-red-800 text-red-100 border border-red-700 font-medium"
+                >
+                  PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadDocx}
+                  data-testid="fallback-apply-docx-btn"
+                  className="px-2 py-0.5 rounded bg-red-900/40 hover:bg-red-800 text-red-100 border border-red-700 font-medium"
+                >
+                  DOCX
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -293,8 +379,9 @@ export function ApplySheet({
                   type="button"
                   variant="outline"
                   onClick={handleDownloadPdf}
+                  disabled={hasHardViolations}
                   data-testid="apply-download-pdf-btn"
-                  className="w-full border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 text-xs gap-1.5"
+                  className="w-full border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-xs gap-1.5"
                 >
                   <Download className="size-3.5 text-indigo-400" />
                   Download PDF
@@ -303,13 +390,26 @@ export function ApplySheet({
                   type="button"
                   variant="outline"
                   onClick={handleDownloadDocx}
+                  disabled={hasHardViolations}
                   data-testid="apply-download-docx-btn"
-                  className="w-full border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 text-xs gap-1.5"
+                  className="w-full border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-xs gap-1.5"
                 >
                   <FileText className="size-3.5 text-blue-400" />
                   Download DOCX
                 </Button>
               </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleDownloadZip}
+                disabled={hasHardViolations}
+                data-testid="apply-download-zip-btn"
+                className="w-full border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-xs gap-1.5"
+              >
+                <Package className="size-3.5 text-amber-400" />
+                Download Package (.zip)
+              </Button>
 
               {job.jobUrl && (
                 <a

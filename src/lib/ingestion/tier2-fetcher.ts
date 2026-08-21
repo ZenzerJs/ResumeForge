@@ -23,6 +23,8 @@ export type { CanonicalJdFields };
 export {
   formatCanonicalJobDescription,
   convertHtmlToCleanMarkdown,
+  cleanJobHtml,
+  BOOKMARKLET_EXTRACT_SNIPPET,
   JD_PASTE_TEMPLATE,
 } from "@/lib/ingestion/jd-format";
 
@@ -418,6 +420,43 @@ async function extractFromAtsJsonApis(
   return null;
 }
 
+/**
+ * Strategy B: Jina Reader Markdown Fallback
+ * Bypasses SPA client-side rendering (<div id="root"></div>) and Cloudflare challenge walls
+ * by fetching structured markdown representation.
+ */
+async function fetchWithJinaReader(
+  url: string,
+  meta?: { company?: string; roleTitle?: string }
+): Promise<ExtractResultSuccess | null> {
+  try {
+    const jinaUrl = `https://r.jina.ai/${url}`;
+    const fetched = await fetchJsonOrHtml(jinaUrl, "text/markdown");
+    if (fetched.ok && fetched.body) {
+      const markdown = fetched.body;
+      if (
+        markdown.length > 250 &&
+        !markdown.includes("Security check") &&
+        !markdown.includes("Cloudflare") &&
+        !markdown.includes("Just a moment...") &&
+        !markdown.includes("Access denied")
+      ) {
+        return canonicalIfValid(
+          {
+            title: meta?.roleTitle,
+            company: meta?.company,
+            description: markdown,
+          },
+          url
+        );
+      }
+    }
+  } catch {
+    // Gracefully ignore Jina proxy failures
+  }
+  return null;
+}
+
 function extractFromJsonLd(
   html: string,
   sourceUrl: string,
@@ -528,6 +567,10 @@ export async function extractFullTextFromUrl(
 
     const fetched = await fetchJsonOrHtml(url, FETCH_HEADERS.Accept);
     if (!fetched.ok) {
+      // Try Jina Reader fallback on 401/403/500 before hard failure
+      const jinaFallback = await fetchWithJinaReader(url, meta);
+      if (jinaFallback) return jinaFallback;
+
       const code: ExtractFailureCode =
         fetched.status === 401 || fetched.status === 403
           ? "http_401_403"
@@ -557,6 +600,9 @@ export async function extractFullTextFromUrl(
       body.includes("cf-browser-verification") ||
       (body.includes("Cloudflare") && body.includes("Just a moment..."))
     ) {
+      const jinaFallback = await fetchWithJinaReader(url, meta);
+      if (jinaFallback) return jinaFallback;
+
       return {
         success: false,
         reason: "UNUSABLE_CONTENT",
@@ -573,6 +619,9 @@ export async function extractFullTextFromUrl(
         lowerBody.includes("auth-wall")) &&
       !lowerBody.includes("jobposting")
     ) {
+      const jinaFallback = await fetchWithJinaReader(url, meta);
+      if (jinaFallback) return jinaFallback;
+
       return {
         success: false,
         reason: "UNUSABLE_CONTENT",
@@ -587,6 +636,9 @@ export async function extractFullTextFromUrl(
       !body.includes("JobPosting") &&
       body.length < 1500
     ) {
+      const jinaFallback = await fetchWithJinaReader(url, meta);
+      if (jinaFallback) return jinaFallback;
+
       return {
         success: false,
         reason: "UNUSABLE_CONTENT",
@@ -600,6 +652,10 @@ export async function extractFullTextFromUrl(
 
     const fromHtml = extractFromHtmlBody(body, url, meta);
     if (fromHtml) return fromHtml;
+
+    // Last-ditch attempt: Jina Reader
+    const jinaFinal = await fetchWithJinaReader(url, meta);
+    if (jinaFinal) return jinaFinal;
 
     return {
       success: false,

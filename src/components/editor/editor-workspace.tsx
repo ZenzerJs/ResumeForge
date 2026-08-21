@@ -336,6 +336,8 @@ export function EditorWorkspace() {
         // Sync localStorage with DB master content so localStorage does NOT overwrite DB content
         if (typeof window !== "undefined") {
           localStorage.setItem(STORAGE_KEY, master.typstSource);
+          localStorage.setItem("resumeforge_draft_migrated", "true");
+          localStorage.removeItem("resumeforge_has_guest_draft");
         }
         setIsLoadingDocument(false);
         return;
@@ -578,6 +580,10 @@ export function EditorWorkspace() {
           title: "Master Resume",
           id: json.data?.id,
         });
+        if (typeof window !== "undefined") {
+          localStorage.setItem("resumeforge_draft_migrated", "true");
+          localStorage.removeItem("resumeforge_has_guest_draft");
+        }
         setShowSaveConfirm(false);
         setTimeout(() => setSaveSuccess(false), 3000);
 
@@ -934,6 +940,7 @@ export function EditorWorkspace() {
         open={showSaveConfirm}
         onOpenChange={setShowSaveConfirm}
         typstSource={source}
+        priorSource={baselineSource}
         title={docMetadata.title}
         onConfirm={handleConfirmSaveAsMaster}
         isSaving={isSavingMaster}

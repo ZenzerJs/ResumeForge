@@ -4,6 +4,35 @@ This document records completed project milestones, current state, known limitat
 
 ---
 
+## Phase Update: Dual-Subagent Audit & Hard-Slice Features (H1–H3, E4, Q1)
+
+- **Completed Date**: 2026-08-17
+- **Status Summary**: Implemented Multi-Format Application Bundle (.zip) packaging engine, Side-by-side Typst Master Diff with LCS line comparison, Interview Prep Sheet with deterministic STAR response synthesis & gap mitigations, Guardrail 1-Click Align recovery action, and Guest-to-Account draft migration flow.
+- **Verification Summary**: 100% clean passes across lint, typecheck, 387 Vitest unit tests, production build (46 pages), and 84 Playwright E2E tests.
+
+### Completed Deliverables
+1. **Multi-Format Application Bundle (`.zip`)**:
+   - Client-side parallel builder (`src/lib/export/zip.ts`) packaging PDF (Typst WASM), clean ATS DOCX, TXT resume, Typst source, cover letter (.md/.txt), cryptographic manifest (`manifest.json`), and application summary (.txt). Parallelize independent generation, measure export performance on representative inputs, and keep the UI responsive with progress/cancel/error states.
+   - Export dropdown in `PreviewPanel` and Step 5 export in `ApplySheet` with fail-closed mechanical guardrail gating (`assertCanExport`), cryptographic SHA-256 validation, and sanitized filenames.
+2. **Side-by-Side Typst Master Diff**:
+   - Longest Common Subsequence (LCS) line diff algorithm (`src/lib/diff/simple-diff.ts`) with O(n) identical document fast path, 2,000-line capping protection, and CRLF normalization.
+   - Segmented diff review tab and line diff container (`data-testid="master-diff-container"`) in `ConfirmMasterDialog`.
+3. **Interview Prep Sheet (STAR Format)**:
+   - Deterministic STAR interview response synthesizer (`src/lib/prep/star-synthesizer.ts`): Deterministic synthesis that only assembles statements from cited Evidence Bank text; unsupported requirements render as explicit gaps.
+   - Upgraded `ApplyPrepSheetModal` with segmented navigation, STAR cards (`data-testid="star-story-card"`), grounding badges (`DIRECT`, `TRANSFERABLE`, `GAP`), and 1-click clipboard export (`data-testid="copy-star-story-btn"`).
+4. **Ergonomic Refinements**:
+   - `GuardrailFeedback`: 1-click "Align with Master Baseline" action (`data-testid="guardrail-align-btn"`).
+   - `GuestMigrationModal`: 1-click promotion of unauthenticated `localStorage` drafts to PostgreSQL user accounts.
+
+### Verification Tests Executed
+- `npm run lint` — Pass (0 warnings, 0 errors)
+- `npm run typecheck` — Pass (0 errors)
+- `npm run test` — Pass (387/387 tests across 79 test files)
+- `npm run build` — Pass (46 pages rendered)
+- `npx playwright test` — Pass (84/84 tests across 28 spec files in 1.7m)
+
+---
+
 ## Phase Update: Workstream 5 (WS5) — Tailor Information Architecture: Overview vs Job Info Views
 
 - **Completed Date**: 2026-08-17
