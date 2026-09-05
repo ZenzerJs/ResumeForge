@@ -390,18 +390,24 @@ export function JobDetailPane({
                   </div>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => setPrepSheetOpen(true)}
-                  className="w-full mt-2 py-2 px-3 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center justify-center gap-2 transition"
-                >
-                  <Terminal className="w-3.5 h-3.5" />
-                  <span>
-                    {oaProblems.length > 0
-                      ? `Open All Practice Problems (${oaProblems.length})`
-                      : "Launch Technical Prep & Mock Simulator"}
-                  </span>
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                  <Link
+                    href={`/practice?company=${encodeURIComponent(detailJob.company || "")}`}
+                    className="flex-1 py-2 px-3 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center justify-center gap-1.5 transition text-center"
+                  >
+                    <Code2 className="w-3.5 h-3.5" />
+                    <span>Practice in Interactive Workspace</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setPrepSheetOpen(true)}
+                    className="py-2 px-3 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+                    title="Open Quick Prep Modal"
+                  >
+                    <Terminal className="w-3.5 h-3.5" />
+                    <span>Prep Sheet</span>
+                  </button>
+                </div>
               </div>
             </div>
 
