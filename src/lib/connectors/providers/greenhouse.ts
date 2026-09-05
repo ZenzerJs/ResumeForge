@@ -1,16 +1,28 @@
 import { safeFetch } from "../http";
+import { filterInternshipListings } from "../internship-filter";
 import { sanitizeJobPayload } from "../sanitize";
 import { ConnectorClient, RawJobListing } from "../types";
 
 export const GREENHOUSE_CURATED_BOARDS = [
-  { slug: "shopify", name: "Shopify" },
-  { slug: "wealthsimple", name: "Wealthsimple" },
-  { slug: "1password", name: "1Password" },
-  { slug: "ada", name: "Ada" },
-  { slug: "clio", name: "Clio" },
-  { slug: "bench", name: "Bench" },
-  { slug: "koho", name: "KOHO" },
   { slug: "relationalai", name: "RelationalAI" },
+  { slug: "d2l", name: "D2L" },
+  { slug: "figma", name: "Figma" },
+  { slug: "stripe", name: "Stripe" },
+  { slug: "cloudflare", name: "Cloudflare" },
+  { slug: "databricks", name: "Databricks" },
+  { slug: "cockroachlabs", name: "Cockroach Labs" },
+  { slug: "twilio", name: "Twilio" },
+  { slug: "affirm", name: "Affirm" },
+  { slug: "asana", name: "Asana" },
+  { slug: "gusto", name: "Gusto" },
+  { slug: "fleet", name: "Fleet" },
+  { slug: "tulip", name: "Tulip" },
+  { slug: "hootsuite", name: "Hootsuite" },
+  { slug: "later", name: "Later" },
+  { slug: "gremlin", name: "Gremlin" },
+  { slug: "elastic", name: "Elastic" },
+  { slug: "coinbase", name: "Coinbase" },
+  { slug: "twitch", name: "Twitch" },
 ];
 
 function isCanadianOrRemote(locationStr: string): boolean {
@@ -38,7 +50,7 @@ export class GreenhouseConnector implements ConnectorClient {
   readonly id = "greenhouse" as const;
   readonly name = "Greenhouse Boards API";
 
-  async fetchJobs(params?: { boards?: string[] }): Promise<RawJobListing[]> {
+  async fetchJobs(params?: { boards?: string[]; includeAllRoles?: boolean }): Promise<RawJobListing[]> {
     const targetBoards = params?.boards
       ? GREENHOUSE_CURATED_BOARDS.filter((b) => params.boards!.includes(b.slug))
       : GREENHOUSE_CURATED_BOARDS;
@@ -86,12 +98,12 @@ export class GreenhouseConnector implements ConnectorClient {
       }
     }
 
-    return results;
+    return filterInternshipListings(results, { includeAllRoles: params?.includeAllRoles });
   }
 
   async healthCheck(): Promise<boolean> {
     try {
-      const res = await safeFetch("https://boards-api.greenhouse.io/v1/boards/shopify/jobs");
+      const res = await safeFetch("https://boards-api.greenhouse.io/v1/boards/figma/jobs");
       return res.ok;
     } catch {
       return false;
