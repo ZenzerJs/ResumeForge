@@ -118,9 +118,20 @@ export function buildClearedSessionCookie(): string {
 
 export function isPublicPath(pathname: string): boolean {
   if (
+    pathname === "/" ||
     pathname === "/login" ||
     pathname === "/privacy" ||
+    pathname === "/terms" ||
+    pathname === "/discover" ||
+    pathname === "/practice" ||
+    pathname.startsWith("/practice/") ||
+    pathname === "/tracker" ||
+    pathname.startsWith("/tracker/") ||
     pathname.startsWith("/api/auth/") ||
+    pathname === "/api/connectors/jobs" ||
+    pathname === "/api/connectors/status" ||
+    pathname.startsWith("/api/practice/") ||
+    (pathname.startsWith("/api/jobs/") && pathname.endsWith("/interview-prep")) ||
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/wasm/") ||
     pathname.startsWith("/fonts/") ||

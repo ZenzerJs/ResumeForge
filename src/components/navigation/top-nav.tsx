@@ -14,6 +14,7 @@ import {
   X,
   Bell,
   Terminal,
+  Code2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -28,6 +29,7 @@ const NAV_LINKS = [
   { href: "/library", label: "Evidence Bank", icon: Database },
   { href: "/tracker", label: "Jobs", icon: Briefcase },
   { href: "/tailor", label: "Tailor", icon: Sparkles },
+  { href: "/practice", label: "Practice", icon: Code2 },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 

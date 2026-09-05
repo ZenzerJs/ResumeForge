@@ -35,6 +35,10 @@ export async function middleware(request: NextRequest) {
     if (!rateLimit(clientKey(request, "heavy"), 10, 60_000)) {
       return NextResponse.json({ success: false, error: "Too many requests" }, { status: 429 });
     }
+  } else if (pathname === "/api/practice/execute") {
+    if (!rateLimit(clientKey(request, "practice"), 30, 60_000)) {
+      return NextResponse.json({ success: false, error: "Too many code run requests. Please wait a moment." }, { status: 429 });
+    }
   }
 
   return NextResponse.next();

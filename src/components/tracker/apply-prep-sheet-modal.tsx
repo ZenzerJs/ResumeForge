@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
 import {
   X,
   Copy,
@@ -449,15 +450,25 @@ export function ApplyPrepSheetModal({
                   </div>
                 </div>
 
-                {oaMatched && oaProblems.length > 0 ? (
-                  <Badge variant="outline" className="border-emerald-500/50 bg-emerald-950/60 text-emerald-300 text-[10px] shrink-0 self-start sm:self-auto">
-                    ✓ Verified {job.company} Bank ({oaProblems.length})
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="border-slate-700 bg-slate-800/80 text-slate-300 text-[10px] shrink-0 self-start sm:self-auto">
-                    Curated Tech Repository
-                  </Badge>
-                )}
+                <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-auto">
+                  <Link
+                    href={`/practice?company=${encodeURIComponent(job.company || "")}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold transition"
+                    title="Open in dedicated Practice Workspace"
+                  >
+                    <span>Full Practice Workspace</span>
+                    <ExternalLink className="size-3" />
+                  </Link>
+                  {oaMatched && oaProblems.length > 0 ? (
+                    <Badge variant="outline" className="border-emerald-500/50 bg-emerald-950/60 text-emerald-300 text-[10px] shrink-0">
+                      ✓ Verified {job.company} Bank ({oaProblems.length})
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-slate-700 bg-slate-800/80 text-slate-300 text-[10px] shrink-0">
+                      Curated Tech Repository
+                    </Badge>
+                  )}
+                </div>
               </div>
 
               {/* Search & Category Filter Controls */}
