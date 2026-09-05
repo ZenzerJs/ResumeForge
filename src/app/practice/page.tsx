@@ -11,7 +11,7 @@ export default function PracticePage() {
   return (
     <Suspense
       fallback={
-        <div className="flex-1 flex items-center justify-center min-h-screen bg-[#0a0d14] text-slate-400">
+        <div className="flex-1 flex items-center justify-center min-h-screen bg-rf-bg text-rf-meta font-mono text-xs">
           Loading practice workspace...
         </div>
       }
