@@ -1,10 +1,10 @@
 import { safeFetch } from "../http";
+import { filterInternshipListings } from "../internship-filter";
 import { sanitizeJobPayload } from "../sanitize";
 import { ConnectorClient, RawJobListing } from "../types";
 
 export const ASHBY_CURATED_BOARDS = [
   { slug: "cohere", name: "Cohere" },
-  { slug: "dropbox", name: "Dropbox" },
   { slug: "linear", name: "Linear" },
   { slug: "deel", name: "Deel" },
   { slug: "ramp", name: "Ramp" },
@@ -29,7 +29,7 @@ export class AshbyConnector implements ConnectorClient {
   readonly id = "ashby" as const;
   readonly name = "Ashby Job Board API";
 
-  async fetchJobs(params?: { boards?: string[] }): Promise<RawJobListing[]> {
+  async fetchJobs(params?: { boards?: string[]; includeAllRoles?: boolean }): Promise<RawJobListing[]> {
     const targetBoards = params?.boards
       ? ASHBY_CURATED_BOARDS.filter((b) => params.boards!.includes(b.slug))
       : ASHBY_CURATED_BOARDS;
@@ -92,7 +92,7 @@ export class AshbyConnector implements ConnectorClient {
       }
     }
 
-    return results;
+    return filterInternshipListings(results, { includeAllRoles: params?.includeAllRoles });
   }
 
   async healthCheck(): Promise<boolean> {

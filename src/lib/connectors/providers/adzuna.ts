@@ -21,7 +21,7 @@ export class AdzunaCaConnector implements ConnectorClient {
     }
 
     const page = params?.page ?? 1;
-    const what = encodeURIComponent(params?.query ?? "software developer");
+    const what = encodeURIComponent(params?.query ?? "software internship");
     const url = `https://api.adzuna.com/v1/api/jobs/ca/search/${page}?app_id=${creds.appId}&app_key=${creds.appKey}&results_per_page=50&what=${what}`;
 
     try {
@@ -79,7 +79,7 @@ export class AdzunaCaConnector implements ConnectorClient {
     const creds = this.getCredentials();
     if (!creds) return false;
     try {
-      const url = `https://api.adzuna.com/v1/api/jobs/ca/search/1?app_id=${creds.appId}&app_key=${creds.appKey}&results_per_page=1&what=developer`;
+      const url = `https://api.adzuna.com/v1/api/jobs/ca/search/1?app_id=${creds.appId}&app_key=${creds.appKey}&results_per_page=1&what=software%20internship`;
       const res = await safeFetch(url);
       return res.ok;
     } catch {

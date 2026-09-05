@@ -1,13 +1,13 @@
 import { safeFetch } from "../http";
+import { filterInternshipListings } from "../internship-filter";
 import { sanitizeJobPayload } from "../sanitize";
 import { ConnectorClient, RawJobListing } from "../types";
 
 export const LEVER_CURATED_BOARDS = [
-  { slug: "certn", name: "Certn" },
-  { slug: "tulip", name: "Tulip Retail" },
-  { slug: "symend", name: "Symend" },
-  { slug: "league", name: "League" },
-  { slug: "properly", name: "Properly" },
+  { slug: "spotify", name: "Spotify" },
+  { slug: "palantir", name: "Palantir" },
+  { slug: "wealthfront", name: "Wealthfront" },
+  { slug: "rover", name: "Rover" },
 ];
 
 function isCanadianOrRemote(locationStr: string): boolean {
@@ -28,7 +28,7 @@ export class LeverConnector implements ConnectorClient {
   readonly id = "lever" as const;
   readonly name = "Lever Postings API";
 
-  async fetchJobs(params?: { boards?: string[] }): Promise<RawJobListing[]> {
+  async fetchJobs(params?: { boards?: string[]; includeAllRoles?: boolean }): Promise<RawJobListing[]> {
     const targetBoards = params?.boards
       ? LEVER_CURATED_BOARDS.filter((b) => params.boards!.includes(b.slug))
       : LEVER_CURATED_BOARDS;
@@ -78,12 +78,12 @@ export class LeverConnector implements ConnectorClient {
       }
     }
 
-    return results;
+    return filterInternshipListings(results, { includeAllRoles: params?.includeAllRoles });
   }
 
   async healthCheck(): Promise<boolean> {
     try {
-      const res = await safeFetch("https://api.lever.co/v0/postings/certn?mode=json");
+      const res = await safeFetch("https://api.lever.co/v0/postings/spotify?mode=json");
       return res.ok;
     } catch {
       return false;
