@@ -103,8 +103,14 @@ export function runCodeAgainstTestCases(
       };
     }
 
-    // Wrap in function constructor with sandbox scope
+    // Wrap in function constructor with sandbox scope shadowing server-side globals
     const factory = new Function(
+      "process",
+      "require",
+      "global",
+      "globalThis",
+      "module",
+      "exports",
       `"use strict";
       ${sanitized}
       if (typeof ${targetFnName} !== "function") {
@@ -113,7 +119,7 @@ export function runCodeAgainstTestCases(
       return ${targetFnName};`
     );
 
-    const fn = factory();
+    const fn = factory(undefined, undefined, undefined, undefined, undefined, undefined);
 
     for (const tc of testCases) {
       const caseStart = Date.now();
