@@ -96,5 +96,39 @@ describe("Practice Code Runner & Test Execution Engine", () => {
       expect(result.status).toBe("ERROR");
       expect(result.error).toContain("Could not find a valid entry function");
     });
+
+    it("shadows dangerous host globals like process and require", () => {
+      const exploitCode = `function twoSum(nums, target) {
+        if (typeof process !== "undefined" && process?.env) {
+          throw new Error("Process exposed!");
+        }
+        const m = {};
+        for (let i = 0; i < nums.length; i++) {
+          const diff = target - nums[i];
+          if (diff in m) return [m[diff], i];
+          m[nums[i]] = i;
+        }
+        return [];
+      }`;
+      const result = runCodeAgainstTestCases(exploitCode, twoSum.testCases);
+      expect(result.status).toBe("PASS");
+    });
+
+    it("supports explicit functionName targeting when helper functions precede main function", () => {
+      const codeWithHelper = `
+        function helper(target, num) { return target - num; }
+        function twoSum(nums, target) {
+          const m = {};
+          for (let i = 0; i < nums.length; i++) {
+            const diff = helper(target, nums[i]);
+            if (diff in m) return [m[diff], i];
+            m[nums[i]] = i;
+          }
+          return [];
+        }
+      `;
+      const result = runCodeAgainstTestCases(codeWithHelper, twoSum.testCases, "twoSum");
+      expect(result.status).toBe("PASS");
+    });
   });
 });
