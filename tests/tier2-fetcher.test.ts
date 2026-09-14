@@ -217,8 +217,12 @@ describe("Task 8.4: Tier 2 On-Demand Full-Text Fetcher", () => {
       </html>
     `;
 
-    vi.spyOn(global, "fetch").mockResolvedValueOnce(
-      new Response(mockWorkdayHtml, { status: 200, headers: { "Content-Type": "text/html" } })
+    vi.spyOn(global, "fetch").mockImplementation(
+      async () =>
+        new Response(mockWorkdayHtml, {
+          status: 200,
+          headers: { "Content-Type": "text/html" },
+        })
     );
 
     const result = await extractFullTextFromUrl("https://workdayco.wd5.myworkdayjobs.com/job/123");

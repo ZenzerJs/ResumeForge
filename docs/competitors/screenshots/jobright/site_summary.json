@@ -1,0 +1,501 @@
+{
+  "url": "https://jobright.ai/",
+  "title": "Jobright: Your AI Job Search Copilot",
+  "navLinks": [
+    {
+      "text": "",
+      "href": "https://jobright.ai/"
+    },
+    {
+      "text": "Job seekers",
+      "href": "https://jobright.ai/"
+    },
+    {
+      "text": "Employers",
+      "href": "https://jobright.ai/employers"
+    },
+    {
+      "text": "",
+      "href": "https://jobright.ai/employers/pricing"
+    },
+    {
+      "text": "",
+      "href": "https://jobright.ai/employers#customer-stories"
+    },
+    {
+      "text": "",
+      "href": "https://jobright.ai/employers#employers-faq"
+    },
+    {
+      "text": "AI Agent",
+      "href": "https://jobright.ai/ai-agent"
+    },
+    {
+      "text": "Resume AI",
+      "href": "https://jobright.ai/ai-resume-builder"
+    }
+  ],
+  "headings": [
+    {
+      "tag": "H1",
+      "text": "No More Solo Job Hunting\nDo it with AI"
+    },
+    {
+      "tag": "H3",
+      "text": "2,000,000"
+    },
+    {
+      "tag": "H3",
+      "text": "3x"
+    },
+    {
+      "tag": "H3",
+      "text": "80%"
+    },
+    {
+      "tag": "H3",
+      "text": "No.1 Choice"
+    },
+    {
+      "tag": "H2",
+      "text": "NO.1 AI\nJOB HUNTING PLATFORM"
+    },
+    {
+      "tag": "H3",
+      "text": "Personalized AI Job Matches"
+    },
+    {
+      "tag": "H3",
+      "text": "1-Click Application Autofill"
+    },
+    {
+      "tag": "H3",
+      "text": "Job Specific Tailored Resume"
+    },
+    {
+      "tag": "H3",
+      "text": "Get Your Insider Referrals"
+    },
+    {
+      "tag": "H3",
+      "text": "24/7 AI Career Copilot"
+    },
+    {
+      "tag": "H2",
+      "text": "2,000,000+\nHAPPY USERS’ LOVE"
+    },
+    {
+      "tag": "H2",
+      "text": "FIND YOUR PERFECT JOB IN A CLICK!"
+    },
+    {
+      "tag": "H3",
+      "text": "Features"
+    },
+    {
+      "tag": "H3",
+      "text": "Blog"
+    },
+    {
+      "tag": "H3",
+      "text": "Related Tools"
+    },
+    {
+      "tag": "H3",
+      "text": "Information"
+    }
+  ],
+  "styles": {
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(0, 0, 0)",
+    "bodyFont": "ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+    "h1Font": "\"Titillium Web\", \"Titillium Web Fallback\"",
+    "h1Size": "38px",
+    "h1Weight": "600",
+    "btnBg": "rgba(0, 0, 0, 0)",
+    "btnColor": "rgb(0, 0, 0)",
+    "btnRadius": "0px"
+  },
+  "allLinks": [
+    {
+      "text": "",
+      "href": "https://jobright.ai/",
+      "title": ""
+    },
+    {
+      "text": "Job seekers",
+      "href": "https://jobright.ai/",
+      "title": ""
+    },
+    {
+      "text": "Employers",
+      "href": "https://jobright.ai/employers",
+      "title": ""
+    },
+    {
+      "text": "",
+      "href": "https://jobright.ai/employers/pricing",
+      "title": ""
+    },
+    {
+      "text": "",
+      "href": "https://jobright.ai/employers#customer-stories",
+      "title": ""
+    },
+    {
+      "text": "",
+      "href": "https://jobright.ai/employers#employers-faq",
+      "title": ""
+    },
+    {
+      "text": "AI Agent",
+      "href": "https://jobright.ai/ai-agent",
+      "title": ""
+    },
+    {
+      "text": "Resume AI",
+      "href": "https://jobright.ai/ai-resume-builder",
+      "title": ""
+    },
+    {
+      "text": "",
+      "href": "https://www.trustpilot.com/review/jobright.ai",
+      "title": ""
+    },
+    {
+      "text": "FieldAI · 3 minutes ago\nSenior ML Engineer — Data Flywheel",
+      "href": "https://jobright.ai/jobs/info/6aa712b82ed333b4ea5cae6e",
+      "title": ""
+    },
+    {
+      "text": "Ruekert & Mielke, Inc. · 8 minutes ago\nBusiness Process Automation Developer",
+      "href": "https://jobright.ai/jobs/info/6aa7118a930bff471a2a2db3",
+      "title": ""
+    },
+    {
+      "text": "Subaru of Indiana Automotive · 8 minutes ago\nProfessional Internships - Information Technology 2027 Job Details | Subaru",
+      "href": "https://jobright.ai/jobs/info/6aa7118aa77a53f5a1574eef",
+      "title": ""
+    },
+    {
+      "text": "TTEC · 11 minutes ago\nReal Time Specialist Workforce Management",
+      "href": "https://jobright.ai/jobs/info/6aa710c42ed333b4ea5cae5a",
+      "title": ""
+    },
+    {
+      "text": "Jane Street · 12 minutes ago\nSoftware Engineer",
+      "href": "https://jobright.ai/jobs/info/6aa710882ed333b4ea5cae56",
+      "title": ""
+    },
+    {
+      "text": "SAFCO · 13 minutes ago\nBusiness Strategy Analyst/Data Scientist",
+      "href": "https://jobright.ai/jobs/info/6aa710602ed333b4ea5cae4c",
+      "title": ""
+    },
+    {
+      "text": "CyberProof · 13 minutes ago\nJunior Full Stack Developer (Data CoE)",
+      "href": "https://jobright.ai/jobs/info/6aa7104f2ed333b4ea5cae48",
+      "title": ""
+    },
+    {
+      "text": "Carousel Checks Inc. · 18 minutes ago\nSenior Product Management Associate",
+      "href": "https://jobright.ai/jobs/info/6aa70f3a2ed333b4ea5cae38",
+      "title": ""
+    },
+    {
+      "text": "VanEck · 22 minutes ago\nSenior Analyst, HR Operations",
+      "href": "https://jobright.ai/jobs/info/6a811d69e51a1e18a241ca55",
+      "title": ""
+    },
+    {
+      "text": "Exelon · 23 minutes ago\nSr Data Scientist",
+      "href": "https://jobright.ai/jobs/info/6aa70e0e82e82a31997c17e5",
+      "title": ""
+    },
+    {
+      "text": "Capgemini · 23 minutes ago\nAngular (.Net) Front-End Developer Onsite Jersey City, NJ",
+      "href": "https://jobright.ai/jobs/info/6a4fb064397d8d353c28c259",
+      "title": ""
+    },
+    {
+      "text": "Mphasis · 24 minutes ago\nDelivery Module Lead",
+      "href": "https://jobright.ai/jobs/info/6aa70ddd654b2a9424cf85aa",
+      "title": ""
+    },
+    {
+      "text": "Peraton · 28 minutes ago\nSoftware Development",
+      "href": "https://jobright.ai/jobs/info/6aa70cd5654b2a9424cf8598",
+      "title": ""
+    },
+    {
+      "text": "Enhance IT · 28 minutes ago\nJr Data Engineer",
+      "href": "https://jobright.ai/jobs/info/6aa70cda930bff471a2a2d50",
+      "title": ""
+    },
+    {
+      "text": "TikTok · 33 minutes ago\nMachine Learning Engineer Graduate (Brand Ads) - 2027 Start",
+      "href": "https://jobright.ai/jobs/info/6a714fe202d93145bf88ef4a",
+      "title": ""
+    },
+    {
+      "text": "Midmark Corporation · 35 minutes ago\nSoftware Developer",
+      "href": "https://jobright.ai/jobs/info/6a5b5585c8e3a473cb8afb48",
+      "title": ""
+    },
+    {
+      "text": "AutoStore™ · 40 minutes ago\nEntry Level Software Engineer",
+      "href": "https://jobright.ai/jobs/info/6aa6c2f2930bff471a2a2875",
+      "title": ""
+    },
+    {
+      "text": "Redesign Health · 54 minutes ago\nStaff Product Designer",
+      "href": "https://jobright.ai/jobs/info/6a7dc9eae2030208f2765e85",
+      "title": ""
+    },
+    {
+      "text": "CLEAR · 1 hour ago\nSenior Business Recruiter",
+      "href": "https://jobright.ai/jobs/info/6aa70376930bff471a2a2cee",
+      "title": ""
+    },
+    {
+      "text": "Salesforce · 1 hour ago\nSoftware Engineer, Data & Observability Platforms — MTS/SMTS",
+      "href": "https://jobright.ai/jobs/info/6aa6fa19930bff471a2a2c92",
+      "title": ""
+    },
+    {
+      "text": "FieldAI · 3 minutes ago\nSenior ML Engineer — Data Flywheel",
+      "href": "https://jobright.ai/jobs/info/6aa712b82ed333b4ea5cae6e",
+      "title": ""
+    },
+    {
+      "text": "Ruekert & Mielke, Inc. · 8 minutes ago\nBusiness Process Automation Developer",
+      "href": "https://jobright.ai/jobs/info/6aa7118a930bff471a2a2db3",
+      "title": ""
+    },
+    {
+      "text": "Subaru of Indiana Automotive · 8 minutes ago\nProfessional Internships - Information Technology 2027 Job Details | Subaru",
+      "href": "https://jobright.ai/jobs/info/6aa7118aa77a53f5a1574eef",
+      "title": ""
+    },
+    {
+      "text": "TTEC · 11 minutes ago\nReal Time Specialist Workforce Management",
+      "href": "https://jobright.ai/jobs/info/6aa710c42ed333b4ea5cae5a",
+      "title": ""
+    },
+    {
+      "text": "Jane Street · 12 minutes ago\nSoftware Engineer",
+      "href": "https://jobright.ai/jobs/info/6aa710882ed333b4ea5cae56",
+      "title": ""
+    },
+    {
+      "text": "SAFCO · 13 minutes ago\nBusiness Strategy Analyst/Data Scientist",
+      "href": "https://jobright.ai/jobs/info/6aa710602ed333b4ea5cae4c",
+      "title": ""
+    },
+    {
+      "text": "CyberProof · 13 minutes ago\nJunior Full Stack Developer (Data CoE)",
+      "href": "https://jobright.ai/jobs/info/6aa7104f2ed333b4ea5cae48",
+      "title": ""
+    },
+    {
+      "text": "Carousel Checks Inc. · 18 minutes ago\nSenior Product Management Associate",
+      "href": "https://jobright.ai/jobs/info/6aa70f3a2ed333b4ea5cae38",
+      "title": ""
+    },
+    {
+      "text": "VanEck · 22 minutes ago\nSenior Analyst, HR Operations",
+      "href": "https://jobright.ai/jobs/info/6a811d69e51a1e18a241ca55",
+      "title": ""
+    },
+    {
+      "text": "Exelon · 23 minutes ago\nSr Data Scientist",
+      "href": "https://jobright.ai/jobs/info/6aa70e0e82e82a31997c17e5",
+      "title": ""
+    },
+    {
+      "text": "Capgemini · 23 minutes ago\nAngular (.Net) Front-End Developer Onsite Jersey City, NJ",
+      "href": "https://jobright.ai/jobs/info/6a4fb064397d8d353c28c259",
+      "title": ""
+    },
+    {
+      "text": "Mphasis · 24 minutes ago\nDelivery Module Lead",
+      "href": "https://jobright.ai/jobs/info/6aa70ddd654b2a9424cf85aa",
+      "title": ""
+    },
+    {
+      "text": "Peraton · 28 minutes ago\nSoftware Development",
+      "href": "https://jobright.ai/jobs/info/6aa70cd5654b2a9424cf8598",
+      "title": ""
+    },
+    {
+      "text": "Enhance IT · 28 minutes ago\nJr Data Engineer",
+      "href": "https://jobright.ai/jobs/info/6aa70cda930bff471a2a2d50",
+      "title": ""
+    },
+    {
+      "text": "TikTok · 33 minutes ago\nMachine Learning Engineer Graduate (Brand Ads) - 2027 Start",
+      "href": "https://jobright.ai/jobs/info/6a714fe202d93145bf88ef4a",
+      "title": ""
+    },
+    {
+      "text": "Midmark Corporation · 35 minutes ago\nSoftware Developer",
+      "href": "https://jobright.ai/jobs/info/6a5b5585c8e3a473cb8afb48",
+      "title": ""
+    },
+    {
+      "text": "AutoStore™ · 40 minutes ago\nEntry Level Software Engineer",
+      "href": "https://jobright.ai/jobs/info/6aa6c2f2930bff471a2a2875",
+      "title": ""
+    },
+    {
+      "text": "Redesign Health · 54 minutes ago\nStaff Product Designer",
+      "href": "https://jobright.ai/jobs/info/6a7dc9eae2030208f2765e85",
+      "title": ""
+    },
+    {
+      "text": "CLEAR · 1 hour ago\nSenior Business Recruiter",
+      "href": "https://jobright.ai/jobs/info/6aa70376930bff471a2a2cee",
+      "title": ""
+    },
+    {
+      "text": "Salesforce · 1 hour ago\nSoftware Engineer, Data & Observability Platforms — MTS/SMTS",
+      "href": "https://jobright.ai/jobs/info/6aa6fa19930bff471a2a2c92",
+      "title": ""
+    },
+    {
+      "text": "",
+      "href": "https://www.instagram.com/jobright.ai",
+      "title": ""
+    },
+    {
+      "text": "",
+      "href": "https://www.tiktok.com/@jobright.ai",
+      "title": ""
+    },
+    {
+      "text": "Resume AI",
+      "href": "https://jobright.ai/ai-resume-builder",
+      "title": ""
+    },
+    {
+      "text": "AI Job Match",
+      "href": "https://jobright.ai/ai-job-match",
+      "title": ""
+    },
+    {
+      "text": "Insider Connections",
+      "href": "https://jobright.ai/job-referral",
+      "title": ""
+    },
+    {
+      "text": "AI Copilot Orion",
+      "href": "https://jobright.ai/orion-copilot",
+      "title": ""
+    },
+    {
+      "text": "Job Autofill",
+      "href": "https://jobright.ai/job-autofill",
+      "title": ""
+    },
+    {
+      "text": "H1B Jobs",
+      "href": "https://jobright.ai/h1b-jobs",
+      "title": ""
+    },
+    {
+      "text": "TNT Network",
+      "href": "https://jobright.ai/tnt",
+      "title": ""
+    },
+    {
+      "text": "Interview Questions",
+      "href": "https://jobright.ai/interview-landing",
+      "title": ""
+    },
+    {
+      "text": "Blog",
+      "href": "https://jobright.ai/blog/",
+      "title": ""
+    },
+    {
+      "text": "Is Jobright Legit?",
+      "href": "https://jobright.ai/blog/is-jobright-legit/",
+      "title": ""
+    },
+    {
+      "text": "Success Stories from Jobright Users",
+      "href": "https://jobright.ai/blog/success-stories-that-started-with-jobright-real-people-real-results/",
+      "title": ""
+    },
+    {
+      "text": "What Top AI Companies Are Looking For",
+      "href": "https://jobright.ai/blog/inside-the-ai-hiring-boom-what-top-ai-companies-are-looking-for-in-2025/",
+      "title": ""
+    },
+    {
+      "text": "Jobright AI Agent Launch",
+      "href": "https://jobright.ai/blog/jobright-launches-first-ai-agent-to-put-job-search-on-autopilot/",
+      "title": ""
+    },
+    {
+      "text": "Top Entry Level Jobs",
+      "href": "https://jobright.ai/entry-level-jobs",
+      "title": ""
+    },
+    {
+      "text": "Top U.S. 100% Remote Jobs",
+      "href": "https://jobright.ai/remote-jobs",
+      "title": ""
+    },
+    {
+      "text": "Related Tools",
+      "href": "https://jobright.ai/tools",
+      "title": ""
+    },
+    {
+      "text": "AI Job Assistant",
+      "href": "https://jobright.ai/tools/ai-job-assistant",
+      "title": ""
+    },
+    {
+      "text": "AI Cover Letter Generator",
+      "href": "https://jobright.ai/tools/cover-letter-generator",
+      "title": ""
+    },
+    {
+      "text": "AI Resume Helper",
+      "href": "https://jobright.ai/tools/resume-helper",
+      "title": ""
+    },
+    {
+      "text": "AI Job Tracker",
+      "href": "https://jobright.ai/tools/job-tracker",
+      "title": ""
+    },
+    {
+      "text": "AI Fraud Detection",
+      "href": "https://jobright.ai/fake-candidate-detection",
+      "title": ""
+    },
+    {
+      "text": "About Us",
+      "href": "https://jobright.ai/about",
+      "title": ""
+    },
+    {
+      "text": "Privacy Policy",
+      "href": "https://jobright.ai/legal/privacy",
+      "title": ""
+    },
+    {
+      "text": "Terms of Service",
+      "href": "https://jobright.ai/legal/service",
+      "title": ""
+    },
+    {
+      "text": "Partners",
+      "href": "https://jobright.ai/partners",
+      "title": ""
+    }
+  ]
+}

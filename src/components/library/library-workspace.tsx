@@ -20,6 +20,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/design-system/app-shell";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BulkPdfDropzone } from "@/components/evidence/bulk-pdf-dropzone";
+import { ExtractedPdfEvidence } from "@/lib/evidence/pdfExtractor";
+import { convertExtractedPdfToEvidenceItems, type CreateEvidencePayload } from "@/lib/evidence/evidence-transform";
 
 export interface Bullet {
   id?: string;
@@ -31,6 +34,7 @@ export interface Bullet {
 
 export interface EvidenceItem {
   id: string;
+  userId?: string;
   type: string;
   title: string;
   organization?: string | null;
@@ -39,12 +43,18 @@ export interface EvidenceItem {
   tags: string[];
   status: string;
   createdAt: string;
+  updatedAt?: string;
   bullets: Bullet[];
+  needsReview?: boolean;
+  similarityScore?: number;
+  candidateBullet?: string;
+  existingBullet?: string;
 }
 
 export function LibraryWorkspace() {
   const [items, setItems] = useState<EvidenceItem[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<"library" | "review">("library");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isImporting, setIsImporting] = useState<boolean>(false);
@@ -82,10 +92,25 @@ export function LibraryWorkspace() {
       const res = await fetch(url);
       const json = await res.json();
       if (json.success) {
-        setItems(json.data);
-        // Expand first item by default
-        if (json.data.length > 0) {
-          setExpandedIds({ [json.data[0].id]: true });
+        let loadedItems: EvidenceItem[] = json.data || [];
+        try {
+          const stored = typeof window !== "undefined" ? localStorage.getItem("resumeforge_guest_evidence") : null;
+          if (stored) {
+            const guestItems: EvidenceItem[] = JSON.parse(stored);
+            const existingIds = new Set(loadedItems.map((i) => i.id));
+            const nonDups = guestItems.filter((g) => !existingIds.has(g.id));
+            loadedItems = [...loadedItems, ...nonDups];
+          }
+        } catch (e) {
+          console.error("Failed to read guest evidence from localStorage:", e);
+        }
+        setItems(loadedItems);
+        // Expand first item by default while preserving existing expanded items
+        if (loadedItems.length > 0) {
+          setExpandedIds((prev) => ({
+            ...prev,
+            [loadedItems[0].id]: true,
+          }));
         }
       }
     } catch (err) {
@@ -175,7 +200,7 @@ export function LibraryWorkspace() {
         });
         if (res.ok) {
           setIsModalOpen(false);
-          fetchItems();
+          await fetchItems();
           setNotification({
             type: "success",
             message: `Updated "${formData.title}" successfully.`,
@@ -189,17 +214,53 @@ export function LibraryWorkspace() {
         });
         if (res.ok) {
           setIsModalOpen(false);
-          fetchItems();
+          await fetchItems();
           setNotification({
             type: "success",
             message: `Created evidence item "${formData.title}".`,
           });
         } else {
           const json = await res.json().catch(() => ({}));
-          setNotification({
-            type: "error",
-            message: json.error || "Failed to save evidence item.",
-          });
+          if (res.status === 401 || json.code === "GUEST_READ_ONLY") {
+            const guestItem: EvidenceItem = {
+              id: `guest-evi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              userId: "guest",
+              type: payload.type,
+              title: payload.title,
+              organization: payload.organization || null,
+              dates: payload.dates || null,
+              verifiedSummary: payload.verifiedSummary,
+              tags: payload.tags,
+              status: payload.status,
+              bullets: payload.bullets.map((b, idx) => ({
+                id: `b-${idx}-${Date.now()}`,
+                evidenceItemId: "",
+                text: b.text,
+                technologies: [],
+                roleAffinity: [],
+                verified: b.verified,
+                orderIndex: idx,
+              })),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            try {
+              const stored = typeof window !== "undefined" ? localStorage.getItem("resumeforge_guest_evidence") : null;
+              const existing: EvidenceItem[] = stored ? JSON.parse(stored) : [];
+              localStorage.setItem("resumeforge_guest_evidence", JSON.stringify([guestItem, ...existing]));
+            } catch (e) {}
+            setItems((prev) => [guestItem, ...prev]);
+            setIsModalOpen(false);
+            setNotification({
+              type: "success",
+              message: `Created evidence item "${formData.title}" in local workspace.`,
+            });
+          } else {
+            setNotification({
+              type: "error",
+              message: json.error || "Failed to save evidence item.",
+            });
+          }
         }
       }
     } catch (err) {
@@ -212,6 +273,23 @@ export function LibraryWorkspace() {
   };
 
   const handleArchiveItem = async (id: string) => {
+    if (id.startsWith("guest-evi-")) {
+      try {
+        const stored = typeof window !== "undefined" ? localStorage.getItem("resumeforge_guest_evidence") : null;
+        if (stored) {
+          const existing: EvidenceItem[] = JSON.parse(stored);
+          const filtered = existing.filter((item) => item.id !== id);
+          localStorage.setItem("resumeforge_guest_evidence", JSON.stringify(filtered));
+        }
+      } catch (e) {}
+      setItems((prev) => prev.filter((item) => item.id !== id));
+      setNotification({
+        type: "success",
+        message: "Item archived successfully.",
+      });
+      return;
+    }
+
     try {
       const res = await fetch(`/api/evidence/${id}`, {
         method: "DELETE",
@@ -228,6 +306,86 @@ export function LibraryWorkspace() {
     }
   };
 
+  const handlePdfIngestComplete = async (extractedItems: ExtractedPdfEvidence[]) => {
+    let createdCount = 0;
+    const guestItemsToAdd: EvidenceItem[] = [];
+
+    for (const extracted of extractedItems) {
+      const itemsToCreate = convertExtractedPdfToEvidenceItems(extracted);
+
+      for (const itemPayload of itemsToCreate) {
+        try {
+          const res = await fetch("/api/evidence", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(itemPayload),
+          });
+
+          if (res.ok) {
+            createdCount++;
+          } else {
+            const guestItem: EvidenceItem = {
+              id: `guest-evi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              userId: "guest",
+              type: itemPayload.type,
+              title: itemPayload.title,
+              organization: itemPayload.organization || null,
+              dates: itemPayload.dates || null,
+              verifiedSummary: itemPayload.verifiedSummary,
+              tags: itemPayload.tags || [],
+              status: itemPayload.status || "verified",
+              bullets: (itemPayload.bullets || []).map((b, idx) => ({
+                id: `b-${idx}-${Date.now()}`,
+                evidenceItemId: "",
+                text: b.text,
+                technologies: [],
+                roleAffinity: [],
+                verified: b.verified ?? true,
+                orderIndex: idx,
+              })),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            guestItemsToAdd.push(guestItem);
+          }
+        } catch (err) {
+          console.error("Failed to save extracted evidence item:", err);
+        }
+      }
+    }
+
+    if (guestItemsToAdd.length > 0) {
+      try {
+        const stored = typeof window !== "undefined" ? localStorage.getItem("resumeforge_guest_evidence") : null;
+        const existing: EvidenceItem[] = stored ? JSON.parse(stored) : [];
+        const combined = [...guestItemsToAdd, ...existing];
+        localStorage.setItem("resumeforge_guest_evidence", JSON.stringify(combined));
+        setItems((prev) => [...guestItemsToAdd, ...prev]);
+        createdCount += guestItemsToAdd.length;
+      } catch (err) {
+        console.error("Failed to write to localStorage:", err);
+        setItems((prev) => [...guestItemsToAdd, ...prev]);
+        createdCount += guestItemsToAdd.length;
+      }
+    }
+
+    await fetchItems();
+
+    if (createdCount > 0) {
+      setNotification({
+        type: "success",
+        message: `Successfully indexed and added ${createdCount} evidence item${createdCount === 1 ? "" : "s"} to Evidence Bank.`,
+      });
+    } else {
+      setNotification({
+        type: "error",
+        message: "No evidence items could be extracted from the uploaded document.",
+      });
+    }
+
+    return createdCount;
+  };
+
   const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -242,6 +400,7 @@ export function LibraryWorkspace() {
 
       let successCount = 0;
       let failCount = 0;
+      const guestItemsToImport: EvidenceItem[] = [];
 
       for (const rawItem of itemsToImport) {
         if (!rawItem.title || !rawItem.verifiedSummary) {
@@ -272,9 +431,43 @@ export function LibraryWorkspace() {
 
         if (res.ok) {
           successCount++;
+        } else if (res.status === 401) {
+          const guestItem: EvidenceItem = {
+            id: `guest-evi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            userId: "guest",
+            type: payload.type,
+            title: payload.title,
+            organization: payload.organization || null,
+            dates: payload.dates || null,
+            verifiedSummary: payload.verifiedSummary,
+            tags: payload.tags,
+            status: payload.status,
+            bullets: payload.bullets.map((b: any, idx: number) => ({
+              id: `b-${idx}-${Date.now()}`,
+              evidenceItemId: "",
+              text: b.text,
+              technologies: [],
+              roleAffinity: [],
+              verified: b.verified,
+              orderIndex: idx,
+            })),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          guestItemsToImport.push(guestItem);
+          successCount++;
         } else {
           failCount++;
         }
+      }
+
+      if (guestItemsToImport.length > 0) {
+        try {
+          const stored = typeof window !== "undefined" ? localStorage.getItem("resumeforge_guest_evidence") : null;
+          const existing: EvidenceItem[] = stored ? JSON.parse(stored) : [];
+          localStorage.setItem("resumeforge_guest_evidence", JSON.stringify([...guestItemsToImport, ...existing]));
+          setItems((prev) => [...guestItemsToImport, ...prev]);
+        } catch (e) {}
       }
 
       await fetchItems();
@@ -346,9 +539,10 @@ export function LibraryWorkspace() {
       <div className="mx-auto max-w-5xl w-full px-6 pt-8 pb-16 flex-1 flex flex-col gap-8">
         {/* Page Title Header */}
         <div>
-          <h1 className="text-3xl font-extrabold text-white tracking-[-0.03em]">
+          <h1 className="text-3xl font-extrabold text-white tracking-[-0.03em] mb-4">
             Verified Evidence Bank Inventory
           </h1>
+          <BulkPdfDropzone onComplete={handlePdfIngestComplete} />
         </div>
 
         {/* Toast Notification Banner */}
@@ -384,6 +578,29 @@ export function LibraryWorkspace() {
           )}
         </AnimatePresence>
 
+        {/* Tabs */}
+        <div className="flex border-b border-slate-800">
+          <button
+            onClick={() => setActiveTab("library")}
+            className={`px-4 py-2 text-sm font-medium ${activeTab === "library" ? "text-[#ff8c00] border-b-2 border-[#ff8c00]" : "text-slate-400 hover:text-white"}`}
+          >
+            Library
+          </button>
+          <button
+            onClick={() => setActiveTab("review")}
+            className={`px-4 py-2 text-sm font-medium ${activeTab === "review" ? "text-[#ff8c00] border-b-2 border-[#ff8c00]" : "text-slate-400 hover:text-white"} flex items-center gap-2`}
+          >
+            Review Queue
+            {items.filter(i => i.needsReview).length > 0 && (
+              <span className="bg-[#ff8c00] text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {items.filter(i => i.needsReview).length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {activeTab === "library" ? (
+        <>
         {/* Search Input Bar + Status Select Dropdown + Item Count Bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           {/* Search Input Box */}
@@ -562,6 +779,46 @@ export function LibraryWorkspace() {
                 </div>
               );
             })}
+          </div>
+        )}
+        </>
+        ) : (
+          <div className="grid gap-4">
+            {items.filter(item => item.needsReview).length === 0 ? (
+              <div className="text-center p-8 text-slate-400">No items need review.</div>
+            ) : (
+              items.filter(item => item.needsReview).map(item => (
+                <div key={item.id} className="rounded-xl border border-slate-800 bg-[#121929]/90 p-5">
+                  <h3 className="text-lg font-bold text-white mb-2">Review Potential Duplicate</h3>
+                  <div className="flex gap-4 mb-4">
+                    <div className="flex-1 p-4 rounded bg-slate-900 border border-slate-700">
+                      <div className="text-xs text-slate-400 mb-1 font-mono uppercase">Candidate Bullet</div>
+                      <p className="text-sm text-slate-200">{item.candidateBullet || 'N/A'}</p>
+                    </div>
+                    <div className="flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-[#ff8c00] font-bold text-lg">{(item.similarityScore || 0.75) * 100}%</div>
+                        <div className="text-[10px] text-slate-500 uppercase">Similarity</div>
+                      </div>
+                    </div>
+                    <div className="flex-1 p-4 rounded bg-slate-900 border border-slate-700">
+                      <div className="text-xs text-slate-400 mb-1 font-mono uppercase">Existing Bullet</div>
+                      <p className="text-sm text-slate-200">{item.existingBullet || 'N/A'}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button onClick={() => {
+                      const newItems = items.map(i => i.id === item.id ? { ...i, needsReview: false } : i);
+                      setItems(newItems);
+                    }} variant="outline" className="border-slate-700 text-slate-300">Keep Both</Button>
+                    <Button onClick={() => {
+                      const newItems = items.map(i => i.id === item.id ? { ...i, needsReview: false } : i);
+                      setItems(newItems);
+                    }} className="bg-[#ff8c00] text-black font-bold">Merge</Button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         )}
       </div>

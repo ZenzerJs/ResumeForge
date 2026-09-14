@@ -73,7 +73,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Unable to create session" }, { status: 500 });
     }
 
-    const secure = new URL(request.url).protocol === "https:";
+    const secure =
+      new URL(request.url).protocol === "https:" ||
+      request.headers.get("x-forwarded-proto") === "https";
     const response = NextResponse.json({
       success: true,
       data: publicUser(user),

@@ -30,6 +30,10 @@ import { isSafeHref } from "@/lib/security/safe-fetch";
 import { type PostedWithin } from "@/lib/jobs/posted-within";
 import type { ScoreBreakdown } from "@/lib/scoring/blended-sort";
 import type { CompatibilityResult } from "@/lib/scoring/compatibility-engine";
+import { JobCardSignalBadge } from "@/components/tracker/job-card-signal-badge";
+import { FitPercentageDial } from "@/components/tracker/fit-percentage-dial";
+import { TechDiffPillList } from "@/components/tracker/tech-diff-pill-list";
+import { normalizeCompanyIntel, formatFundingBadge, formatH1BBadge } from "@/lib/companyIntel";
 
 export interface IngestedJobItem {
   id: string;
@@ -669,24 +673,31 @@ export function DiscoverFeed() {
                         {j.companyName}
                       </span>
                       <div className="flex items-center gap-1.5">
-                        <span
-                          className={`rounded border px-1.5 py-0.5 font-mono text-[10px] font-bold ${
-                            matchScore >= 80
-                              ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-                              : matchScore >= 60
-                              ? "border-amber-500/40 bg-amber-500/15 text-amber-300"
-                              : "border-slate-700 bg-slate-800/80 text-slate-400"
-                          }`}
-                          title={`Blended Score: ${matchScore}% (ATS: ${j.scoreBreakdown?.atsScore ?? matchScore}%, Recency: ${j.scoreBreakdown?.recencyScore ?? "N/A"}%)`}
-                          data-testid={`match-badge-${j.id}`}
-                        >
-                          {matchScore}% Match
-                        </span>
                         <span className="rounded border border-slate-700 bg-slate-800/80 px-1.5 py-0.5 font-mono text-[10px] text-slate-300 uppercase">
                           {j.source}
                         </span>
                       </div>
                     </div>
+
+                    {/* Signal Badge Pill with Popover, Funding & H1B Sub-Badges */}
+                    {(() => {
+                      const intel = normalizeCompanyIntel(j.companyName);
+                      const fundingBadge = formatFundingBadge(intel.fundingIntel);
+                      const h1bBadge = formatH1BBadge(intel.h1bIntel);
+                      return (
+                        <div className="flex flex-wrap items-center gap-1.5 my-0.5">
+                          <FitPercentageDial compositeScore={matchScore} breakdown={j.scoreBreakdown as any} size={40} />
+                          <JobCardSignalBadge
+                            compositeScore={matchScore}
+                            compatibility={j.compatibility}
+                            fundingBadge={fundingBadge}
+                            h1bBadge={h1bBadge}
+                            companyName={j.companyName}
+                            jobId={j.id}
+                          />
+                        </div>
+                      );
+                    })()}
 
                     <h3 className="text-sm font-bold leading-snug tracking-tight text-white">
                       {j.title}
@@ -719,15 +730,23 @@ export function DiscoverFeed() {
                     </div>
 
                     {j.compatibility && (
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
-                        <span className="rounded bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-emerald-300">
-                          {j.compatibility.matchedSkills.length}/{j.compatibility.totalRequiredCount || j.compatibility.matchedSkills.length || 1} Skills Matched
-                        </span>
-                        {j.compatibility.matchedEvidenceCount > 0 && (
-                          <span className="rounded bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 text-cyan-300">
-                            {j.compatibility.matchedEvidenceCount} Evidence Items
+                      <div className="mt-2 space-y-1.5">
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
+                          <span className="rounded bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-emerald-300">
+                            {j.compatibility.matchedSkills.length}/{j.compatibility.totalRequiredCount || j.compatibility.matchedSkills.length || 1} Skills Matched
                           </span>
-                        )}
+                          {j.compatibility.matchedEvidenceCount > 0 && (
+                            <span className="rounded bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 text-cyan-300">
+                              {j.compatibility.matchedEvidenceCount} Evidence Items
+                            </span>
+                          )}
+                        </div>
+                        {/* High-density Tech Diff Pill List */}
+                        <TechDiffPillList
+                          verifiedSkillNames={j.compatibility.matchedSkills}
+                          missingSkillNames={j.compatibility.missingSkills}
+                          maxDisplay={5}
+                        />
                       </div>
                     )}
                   </div>

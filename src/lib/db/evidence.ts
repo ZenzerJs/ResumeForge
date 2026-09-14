@@ -162,9 +162,9 @@ export async function updateEvidenceItem(id: string, input: UpdateEvidenceItemIn
         data: updateData,
       });
     }
-
-    return await getEvidenceItemById(id);
   });
+
+  return await getEvidenceItemById(id);
 }
 
 export async function archiveEvidenceItem(id: string) {

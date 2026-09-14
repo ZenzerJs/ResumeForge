@@ -14,6 +14,8 @@ export default defineConfig({
     },
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@packages/schema": path.resolve(__dirname, "./packages/schema/src"),
+      "@packages/core": path.resolve(__dirname, "./packages/core/src"),
     },
   },
 });

@@ -11,7 +11,8 @@
     "test": "vitest run",
     "sync:oa": "tsx scripts/sync-oa-bank.ts",
     "seed:intel": "tsx scripts/seed-company-intel.ts",
-    "normalize:jobs": "tsx scripts/normalize-job-descriptions.ts"
+    "normalize:jobs": "tsx scripts/normalize-job-descriptions.ts",
+    "postinstall": "tsx scripts/copy-pdf-worker.ts"
   },
   "dependencies": {
     "@codemirror/state": "^6.7.1",
@@ -25,6 +26,7 @@
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-dropdown-menu": "^2.1.24",
     "@radix-ui/react-label": "^2.1.15",
+    "@radix-ui/react-popover": "^1.1.23",
     "@radix-ui/react-progress": "^1.1.16",
     "@radix-ui/react-scroll-area": "^1.2.18",
     "@radix-ui/react-select": "^2.3.7",
@@ -39,11 +41,14 @@
     "clsx": "^2.1.1",
     "docx": "^9.7.1",
     "framer-motion": "^13.0.0",
+    "idb-keyval": "^6.3.0",
     "ipaddr.js": "^2.5.0",
     "jszip": "^3.10.1",
+    "lodash": "^4.18.1",
     "lucide-react": "^0.475.0",
     "next": "^15.1.7",
     "next-themes": "^0.4.6",
+    "pdfjs-dist": "^6.3.289",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
@@ -55,10 +60,13 @@
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.0.1",
     "unist-util-visit": "^5.1.0",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^22.13.4",
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19.0.8",

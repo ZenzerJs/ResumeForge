@@ -40,30 +40,30 @@ export function ProductProofCard({ shouldReduceMotion = false }: ProductProofCar
       <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
         <div className="flex items-center gap-2">
           <div className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-400">
+          <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-400">
             WORKSPACE PREVIEW
           </span>
         </div>
-        <span className="text-[10px] font-mono text-slate-400 italic">
+        <span className="text-xs font-mono text-slate-400 italic">
           Illustrative interface — sample layout only
         </span>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 space-y-3 font-mono text-xs">
-        <div className="flex items-center justify-between text-[11px]">
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 font-mono text-xs">
+        <div className="flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
             <FileCode className="h-4 w-4 text-amber-400" />
-            <span className="text-white font-semibold">master-resume.typ</span>
-            <span className="text-[10px] text-amber-400/90 bg-amber-950/50 border border-amber-800/50 px-2 py-0.5 rounded">
+            <span className="text-white font-semibold text-xs md:text-sm">master-resume.typ</span>
+            <span className="text-xs text-amber-400/90 bg-amber-950/50 border border-amber-800/50 px-2.5 py-0.5 rounded font-mono">
               Protected Master
             </span>
           </div>
-          <span className="text-slate-400 text-[10px]">WASM Compiled</span>
+          <span className="text-slate-400 text-xs font-mono">WASM Compiled</span>
         </div>
 
-        <div className="bg-slate-950 border border-slate-800/80 rounded-lg p-3 min-h-[140px] text-[11px] text-slate-300 overflow-x-auto">
+        <div className="bg-slate-950 border border-slate-800/80 rounded-lg p-3.5 min-h-[140px] text-xs text-slate-300 overflow-x-auto">
           {shouldReduceMotion ? (
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 leading-relaxed">
               <div className="text-amber-300/90">#let section(title) = block(width: 100%)[ ... ]</div>
               <div className="text-slate-300">#section(&quot;Technical Experience&quot;)</div>
             </div>
@@ -85,26 +85,26 @@ export function ProductProofCard({ shouldReduceMotion = false }: ProductProofCar
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-center gap-2 text-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex items-center gap-2.5 text-xs">
           <ShieldCheck className="h-4 w-4 text-amber-400 shrink-0" />
           <div>
-            <span className="text-[10px] text-slate-400 font-mono uppercase block">Constraint</span>
-            <span className="font-medium text-slate-200 text-[11px]">Protected Master</span>
+            <span className="text-xs text-slate-400 font-mono uppercase block">Constraint</span>
+            <span className="font-semibold text-slate-200 text-xs md:text-sm">Protected Master</span>
           </div>
         </div>
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-center gap-2 text-xs">
+        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex items-center gap-2.5 text-xs">
           <Database className="h-4 w-4 text-emerald-400 shrink-0" />
           <div>
-            <span className="text-[10px] text-slate-400 font-mono uppercase block">Grounding</span>
-            <span className="font-medium text-slate-200 text-[11px]">Evidence ID: exp-01</span>
+            <span className="text-xs text-slate-400 font-mono uppercase block">Grounding</span>
+            <span className="font-semibold text-slate-200 text-xs md:text-sm">Evidence ID: exp-01</span>
           </div>
         </div>
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-center gap-2 text-xs">
+        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex items-center gap-2.5 text-xs">
           <Sparkles className="h-4 w-4 text-purple-400 shrink-0" />
           <div>
-            <span className="text-[10px] text-slate-400 font-mono uppercase block">ATS Rubric</span>
-            <span className="font-medium text-slate-200 text-[11px]">100-Point Audit</span>
+            <span className="text-xs text-slate-400 font-mono uppercase block">ATS Rubric</span>
+            <span className="font-semibold text-slate-200 text-xs md:text-sm">100-Point Audit</span>
           </div>
         </div>
       </div>
