@@ -993,7 +993,15 @@ export function TailorWorkspace() {
               </>
             ) : activeTab === "diagnostic" ? (
               <section className="glass-panel rounded-lg p-5 glow-effect transition-shadow">
-                <TailorDiagnosticPanel report={diagnosticReport} />
+                <TailorDiagnosticPanel
+                  report={diagnosticReport}
+                  typstAst={activeVariantContent}
+                  evidence={matches}
+                  onPatchApplied={(patchedTypstAst) => {
+                    setActiveVariantContent(patchedTypstAst);
+                    setSaveStatus("Deterministic fix applied to working copy — review, then save or re-run guardrail.");
+                  }}
+                />
               </section>
             ) : (
               <>

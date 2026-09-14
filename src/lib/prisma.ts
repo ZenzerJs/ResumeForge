@@ -54,25 +54,51 @@ async function getActiveClient(): Promise<any> {
       });
     }
     return realClient;
-  } else {
-    if (!mockClient) {
-      mockClient = createPrismaMockClient();
-    }
-    return mockClient;
   }
+
+  // Fail-closed in production: never masquerade in-memory mock writes as
+  // durable persistence. Guests/dev/E2E keep the offline mock fallback.
+  const allowMockFallback =
+    process.env.NODE_ENV !== "production" ||
+    process.env.RESUME_FORGE_ALLOW_MOCK_DB === "1";
+  if (!allowMockFallback) {
+    throw new Error(
+      "RESUMEFORGE_DB_UNAVAILABLE: PostgreSQL is not reachable. Refusing to fall back to the in-memory mock store in production because writes would be lost on restart. Start PostgreSQL or set DATABASE_URL to a reachable instance."
+    );
+  }
+
+  if (!mockClient) {
+    mockClient = createPrismaMockClient();
+  }
+  return mockClient;
 }
 
 export const prisma: PrismaClient = new Proxy({} as any, {
   get(_target, prop: string) {
+    const fallbackToMockOnError = (err: any): boolean =>
+      dbAvailable && (err?.message?.includes("Can't reach database") || err?.code === "P1001");
+
+    const switchToMock = async () => {
+      dbAvailable = false;
+      const allowMockFallback =
+        process.env.NODE_ENV !== "production" ||
+        process.env.RESUME_FORGE_ALLOW_MOCK_DB === "1";
+      if (!allowMockFallback) {
+        throw new Error(
+          "RESUMEFORGE_DB_UNAVAILABLE: PostgreSQL connection lost mid-session. Refusing to fall back to the in-memory mock store in production because writes would be lost on restart."
+        );
+      }
+      mockClient = mockClient || createPrismaMockClient();
+    };
+
     if (prop === "$transaction") {
       return async (arg: any) => {
         const client = await getActiveClient();
         try {
           return await client.$transaction(arg);
         } catch (err: any) {
-          if (dbAvailable && (err?.message?.includes("Can't reach database") || err?.code === "P1001")) {
-            dbAvailable = false;
-            mockClient = mockClient || createPrismaMockClient();
+          if (fallbackToMockOnError(err)) {
+            await switchToMock();
             return await mockClient.$transaction(arg);
           }
           throw err;
@@ -94,9 +120,8 @@ export const prisma: PrismaClient = new Proxy({} as any, {
           try {
             return await client[prop][method](...args);
           } catch (err: any) {
-            if (dbAvailable && (err?.message?.includes("Can't reach database") || err?.code === "P1001")) {
-              dbAvailable = false;
-              mockClient = mockClient || createPrismaMockClient();
+            if (fallbackToMockOnError(err)) {
+              await switchToMock();
               return await mockClient[prop][method](...args);
             }
             throw err;

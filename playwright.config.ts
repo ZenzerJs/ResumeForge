@@ -1,6 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const testSecret = process.env.APP_ACCESS_SECRET || "playwright-test-secret";
+// Pin the deterministic E2E secret instead of inheriting the developer's real
+// shell secret: the middleware grants a 100/min auth rate limit only for the
+// canonical "playwright-test-secret" value, so inheriting the real secret made
+// the auth suite trip the production 10/min limiter and fail with 429s.
+const testSecret = "playwright-test-secret";
 
 export default defineConfig({
   testDir: "./e2e",
