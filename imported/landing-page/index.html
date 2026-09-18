@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ResumeForge - Local-First AI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;800&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ff8c00",
+                        "on-primary": "#4d2600",
+                        "on-tertiary-container": "#830010",
+                        "surface-tint": "#ff8c00",
+                        "inverse-surface": "#dae2fd",
+                        "primary-fixed": "#ffdcc3",
+                        "surface-container-high": "#222a3d",
+                        "tertiary-fixed": "#ffdad7",
+                        "background": "#0b1326",
+                        "on-background": "#dae2fd",
+                        "tertiary": "#ffb3ad",
+                        "surface-bright": "#31394d",
+                        "on-primary-fixed-variant": "#6e3900",
+                        "surface": "#0b1326",
+                        "inverse-primary": "#904d00",
+                        "on-secondary-fixed-variant": "#005236",
+                        "on-secondary-fixed": "#002113",
+                        "on-error-container": "#ffdad6",
+                        "error": "#ffb4ab",
+                        "on-tertiary-fixed": "#410004",
+                        "error-container": "#93000a",
+                        "on-secondary-container": "#00311f",
+                        "secondary-fixed-dim": "#9ca3af",
+                        "tertiary-container": "#ff8780",
+                        "on-primary-container": "#623200",
+                        "outline": "#6b7280",
+                        "surface-variant": "#2d3449",
+                        "on-tertiary-fixed-variant": "#930013",
+                        "surface-dim": "#0b1326",
+                        "inverse-on-surface": "#283044",
+                        "on-primary-fixed": "#2f1500",
+                        "surface-container-lowest": "#060e20",
+                        "secondary": "#9ca3af",
+                        "secondary-fixed": "#e5e7eb",
+                        "primary-container": "#ff8c00",
+                        "surface-container-highest": "#2d3449",
+                        "on-surface-variant": "#9ca3af",
+                        "primary-fixed-dim": "#ff8c00",
+                        "on-tertiary": "#68000a",
+                        "on-error": "#690005",
+                        "outline-variant": "#4b5563",
+                        "on-secondary": "#1f2937",
+                        "surface-container-low": "#131b2e",
+                        "secondary-container": "#374151",
+                        "surface-container": "#171f33",
+                        "tertiary-fixed-dim": "#ffb3ad",
+                        "on-surface": "#f3f4f6"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    spacing: {
+                        "unit": "4px",
+                        "margin-desktop": "32px",
+                        "panel-padding": "20px",
+                        "margin-mobile": "16px",
+                        "gutter": "16px"
+                    },
+                    fontFamily: {
+                        "page-title-mobile": ["Hanken Grotesk"],
+                        "page-title": ["Hanken Grotesk"],
+                        "mono-data": ["JetBrains Mono"],
+                        "body-regular": ["Hanken Grotesk"],
+                        "body-dense": ["Hanken Grotesk"],
+                        "section-label": ["JetBrains Mono"]
+                    },
+                    fontSize: {
+                        "page-title-mobile": ["32px", { lineHeight: "1.2", fontWeight: "800", letterSpacing: "-0.05em" }],
+                        "page-title": ["40px", { lineHeight: "1.2", letterSpacing: "-0.05em", fontWeight: "800" }],
+                        "mono-data": ["13px", { lineHeight: "1.5", fontWeight: "400" }],
+                        "body-regular": ["16px", { lineHeight: "1.6", fontWeight: "400" }],
+                        "body-dense": ["14px", { lineHeight: "1.6", fontWeight: "400" }],
+                        "section-label": ["10px", { lineHeight: "16px", letterSpacing: "0.2em", fontWeight: "600" }]
+                    },
+                    animation: {
+                        'fade-in-up': 'fadeInUp 1s ease-out forwards',
+                        'fade-in': 'fadeIn 1.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        fadeInUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(45, 52, 73, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(164, 140, 122, 0.2);
+        }
+        
+        .glow-effect:hover {
+            box-shadow: 0 0 20px rgba(255, 140, 0, 0.15);
+            border-color: rgba(255, 140, 0, 0.4);
+        }
+
+        .glow-secondary:hover {
+            box-shadow: 0 0 20px rgba(156, 163, 175, 0.15);
+            border-color: rgba(156, 163, 175, 0.4);
+        }
+        
+        .terminal-text {
+            color: #ff8c00;
+            text-shadow: 0 0 8px rgba(255, 140, 0, 0.4);
+        }
+
+        .stagger-item {
+            opacity: 0;
+            transform: translateY(24px);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        .stagger-item.in-view {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-regular min-h-screen flex flex-col antialiased selection:bg-primary-container selection:text-on-primary-container leading-[1.6]">
+<!-- TopNavBar -->
+<nav class="bg-background/80 backdrop-blur-xl border-b border-outline-variant shadow-[0_0_20px_rgba(255,140,0,0.05)] fixed top-0 w-full z-50 flex items-center justify-between px-margin-desktop h-16 w-full max-w-full">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 bg-primary rounded flex items-center justify-center font-bold text-on-primary">R</div>
+<span class="font-page-title text-page-title text-primary tracking-[-0.05em] text-xl">ResumeForge</span>
+</div>
+<div class="hidden md:flex items-center gap-6">
+<a class="text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-2 hover:bg-surface-variant/50 transition-all duration-200 px-3 py-1.5 rounded active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="edit_note">edit_note</span>
+                    Editor
+                </a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-2 hover:bg-surface-variant/50 transition-all duration-200 px-3 py-1.5 rounded active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="database">database</span>
+                    Evidence Bank
+                </a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-2 hover:bg-surface-variant/50 transition-all duration-200 px-3 py-1.5 rounded active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="work">work</span>
+                    Jobs
+                </a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-2 hover:bg-surface-variant/50 transition-all duration-200 px-3 py-1.5 rounded active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="auto_fix_high">auto_fix_high</span>
+                    Tailor
+                </a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-2 hover:bg-surface-variant/50 transition-all duration-200 px-3 py-1.5 rounded active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="settings">settings</span>
+                    Settings
+                </a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-full hover:bg-surface-variant/50">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-full hover:bg-surface-variant/50">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+</button>
+<img alt="User Profile Avatar" class="w-8 h-8 rounded-full border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCCh23JZsQv8zL2pKPAh1RCsDGiwF3polecYf2W1gA59c-hLJzUY7zD09EqsLeblo_AUpGZkPc4w0rL8cWWlsi7ngCyQhk1h0Jdu4fNHuYZVg_Aot-x3JyGYecUWIAAsJ6-YP519cj2lANsQIlVoQPGhDrfR_vJtGXnajy9EdJKU43d4vO52m9KHAT-b3nZ1RrVzzsTynkDWWmiu77kiVddBE5OlkJF3JMT5pfvJcvBjd0JfxbvehKWFA"/>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-grow pt-24 pb-16 flex flex-col relative overflow-hidden">
+<!-- Hero Section -->
+<section class="relative min-h-[819px] flex items-center px-margin-mobile md:px-margin-desktop max-w-7xl mx-auto w-full z-10">
+<!-- WebGL Canvas for Perspective Grid Background -->
+<canvas class="absolute inset-0 w-full h-full z-0 opacity-60" id="heroCanvas"></canvas>
+<div class="grid md:grid-cols-2 gap-12 items-center relative z-10 w-full">
+<!-- Hero Text -->
+<div class="flex flex-col gap-6 animate-fade-in-up">
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 w-fit">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="vpn_key">vpn_key</span>
+<span class="font-section-label text-[10px] uppercase tracking-[0.2em] text-primary">Local-First Resume Intelligence</span>
+</div>
+<h1 class="font-page-title text-page-title-mobile md:text-page-title text-on-surface leading-tight font-bold tracking-[-0.05em]">
+                        Make every application feel <span class="text-primary">intentional.</span>
+</h1>
+<p class="text-on-surface-variant text-lg max-w-xl font-body-regular leading-[1.6]">
+                        Craft evidence-grounded, job-tailored resume variants from one protected master resume. Zero hallucination. WASM compilation with local BYOK AI gateway.
+                    </p>
+<div class="flex items-center gap-4 pt-4">
+<button class="bg-primary text-on-primary font-bold px-6 py-3 rounded flex items-center gap-2 hover:bg-primary-fixed transition-colors shadow-[0_0_15px_rgba(255,140,0,0.3)] hover:shadow-[0_0_25px_rgba(255,140,0,0.5)]">
+<span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+                            Start Tailoring
+                        </button>
+</div>
+</div>
+<!-- Hero Terminal Preview -->
+<div class="glass-panel rounded-xl p-1 relative overflow-hidden shadow-2xl animate-fade-in opacity-0" style="animation-delay: 0.5s;">
+<div class="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent z-0"></div>
+<div class="bg-surface-container-lowest/90 backdrop-blur-md rounded-lg overflow-hidden border border-surface-variant relative z-10 h-full">
+<!-- Terminal Header -->
+<div class="flex items-center justify-between px-4 py-3 border-b border-surface-variant bg-surface-container-low/80">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="terminal">terminal</span>
+<span class="font-mono-data text-mono-data text-on-surface-variant">master-resume.typ</span>
+<span class="px-2 py-0.5 rounded text-[10px] uppercase tracking-[0.2em] font-section-label bg-secondary/10 text-secondary border border-secondary/20">Protected Master</span>
+</div>
+<span class="font-mono-data text-[10px] text-surface-variant">WASM Compiled</span>
+</div>
+<!-- Terminal Body -->
+<div class="p-6 font-mono-data text-mono-data leading-relaxed overflow-x-auto">
+<div class="text-on-surface-variant opacity-50 mb-2"># Editor View - Typst Markup</div>
+<div class="text-primary">#let <span class="text-on-surface">master</span> = <span class="text-secondary">import</span>(<span class="text-on-background">"resume.pdf"</span>)</div>
+<div class="text-primary">#set <span class="text-on-surface">section</span>(title) = <span class="text-secondary">block</span>(width: 100%) [ ... ]</div>
+<br/>
+<div class="text-primary">#section(<span class="text-on-background">"Technical Experience"</span>)</div>
+<div class="text-primary">#entry(title: <span class="text-on-background">"Senior Software Engineer"</span>, company: <span class="text-on-background">"TechCorp"</span>) [</div>
+<div class="pl-4 text-on-surface-variant leading-[1.6]">
+                                - Architected high-throughput microservices using Go and gRPC.<br/>
+                                - Reduced deployment latency by 40% via CI/CD pipeline optimization.<br/>
+                                - Spearheaded migration from legacy monolith to Kubernetes cluster.
+                            </div>
+<div class="text-primary">]</div>
+<div class="mt-6 flex items-center gap-2 text-surface-variant animate-pulse">
+<div class="w-2 h-4 bg-primary"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Operation Pipeline -->
+<section class="w-full bg-surface-container-low border-y border-outline-variant/30 py-16 px-margin-mobile md:px-margin-desktop z-10 relative">
+<div class="max-w-7xl mx-auto">
+<div class="text-center mb-12">
+<h2 class="font-page-title-mobile text-page-title-mobile text-on-surface mb-2 font-bold tracking-[-0.05em]">How ResumeForge Operates</h2>
+<p class="text-on-surface-variant font-mono-data text-mono-data">Local processing. Zero data leaks.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+<!-- Step 1 -->
+<div class="flex flex-col items-center text-center p-4">
+<div class="w-12 h-12 rounded-full bg-surface-variant flex items-center justify-center border border-outline-variant mb-4 relative z-10">
+<span class="material-symbols-outlined text-primary" data-icon="upload_file">upload_file</span>
+</div>
+<h3 class="font-section-label text-[10px] uppercase tracking-[0.2em] text-on-surface mb-2">1. Import</h3>
+<p class="text-on-surface-variant font-body-dense text-body-dense leading-[1.6]">Load your master CV.</p>
+</div>
+<!-- Step 2 -->
+<div class="flex flex-col items-center text-center p-4 relative">
+<div class="hidden md:block absolute top-10 left-[-50%] w-full h-[1px] bg-outline-variant/50 z-0"></div>
+<div class="w-12 h-12 rounded-full bg-surface-variant flex items-center justify-center border border-outline-variant mb-4 relative z-10">
+<span class="material-symbols-outlined text-primary" data-icon="anchor">anchor</span>
+</div>
+<h3 class="font-section-label text-[10px] uppercase tracking-[0.2em] text-on-surface mb-2">2. Ground</h3>
+<p class="text-on-surface-variant font-body-dense text-body-dense leading-[1.6]">Extract verified facts.</p>
+</div>
+<!-- Step 3 -->
+<div class="flex flex-col items-center text-center p-4 relative">
+<div class="hidden md:block absolute top-10 left-[-50%] w-full h-[1px] bg-outline-variant/50 z-0"></div>
+<div class="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center border border-primary/50 mb-4 shadow-[0_0_15px_rgba(255,140,0,0.2)] relative z-10">
+<span class="material-symbols-outlined text-primary" data-icon="auto_fix_high">auto_fix_high</span>
+</div>
+<h3 class="font-section-label text-[10px] uppercase tracking-[0.2em] text-on-surface mb-2">3. Tailor</h3>
+<p class="text-on-surface-variant font-body-dense text-body-dense leading-[1.6]">Align to Job Description.</p>
+</div>
+<!-- Step 4 -->
+<div class="flex flex-col items-center text-center p-4 relative">
+<div class="hidden md:block absolute top-10 left-[-50%] w-full h-[1px] bg-outline-variant/50 z-0"></div>
+<div class="w-12 h-12 rounded-full bg-surface-variant flex items-center justify-center border border-outline-variant mb-4 relative z-10">
+<span class="material-symbols-outlined text-secondary" data-icon="verified">verified</span>
+</div>
+<h3 class="font-section-label text-[10px] uppercase tracking-[0.2em] text-on-surface mb-2">4. Verify</h3>
+<p class="text-on-surface-variant font-body-dense text-body-dense leading-[1.6]">Audit against evidence.</p>
+</div>
+<!-- Step 5 -->
+<div class="flex flex-col items-center text-center p-4 relative">
+<div class="hidden md:block absolute top-10 left-[-50%] w-full h-[1px] bg-outline-variant/50 z-0"></div>
+<div class="w-12 h-12 rounded-full bg-surface-variant flex items-center justify-center border border-outline-variant mb-4 relative z-10">
+<span class="material-symbols-outlined text-primary" data-icon="send">send</span>
+</div>
+<h3 class="font-section-label text-[10px] uppercase tracking-[0.2em] text-on-surface mb-2">5. Apply</h3>
+<p class="text-on-surface-variant font-body-dense text-body-dense leading-[1.6]">Export tailored PDF.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Workspace Capability Modules -->
+<section class="py-24 px-margin-mobile md:px-margin-desktop max-w-7xl mx-auto w-full z-10">
+<div class="text-center mb-16">
+<h2 class="font-page-title text-page-title-mobile md:text-page-title text-on-surface font-bold tracking-[-0.05em]">Workspace Capability Modules</h2>
+</div>
+<!-- Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="workspace-grid">
+<!-- Card 1: Master Resume Editor -->
+<div class="stagger-item glass-panel rounded-xl p-panel-padding flex flex-col justify-between min-h-[280px] glow-effect transition-all duration-300 group">
+<div>
+<div class="w-10 h-10 rounded-lg bg-surface-container-high border border-outline-variant flex items-center justify-center mb-6 group-hover:border-primary/50 transition-colors">
+<span class="material-symbols-outlined text-primary" data-icon="description">description</span>
+</div>
+<h3 class="font-body-regular text-lg font-bold text-on-surface mb-2 tracking-[-0.05em]">Master Resume Editor</h3>
+<p class="text-on-surface-variant font-body-dense text-body-dense leading-[1.6]">
+                            Edit your protected Typst master resume with WASM compilation and instant live preview.
+                        </p>
+</div>
+<div class="mt-6 pt-4 border-t border-outline-variant/30 flex items-center justify-between">
+<span class="font-mono-data text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-surface-container-high border border-outline-variant text-secondary">1 Master Resume</span>
+<a class="text-primary font-mono-data text-mono-data flex items-center gap-1 hover:text-primary-fixed transition-colors" href="#">
+                            Open <span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Card 2: Verified Evidence Bank -->
+<div class="stagger-item glass-panel rounded-xl p-panel-padding flex flex-col justify-between min-h-[280px] glow-secondary transition-all duration-300 group" style="transition-delay: 150ms;">
+<div>
+<div class="w-10 h-10 rounded-lg bg-surface-container-high border border-outline-variant flex items-center justify-center mb-6 group-hover:border-secondary/50 transition-colors">
+<span class="material-symbols-outlined text-secondary" data-icon="topic">topic</span>
+</div>
+<h3 class="font-body-regular text-lg font-bold text-on-surface mb-2 tracking-[-0.05em]">Verified Evidence Bank</h3>
+<p class="text-on-surface-variant font-body-dense text-body-dense leading-[1.6]">
+                            Central repository of career achievements, verified bullets, and skill inventory.
+                        </p>
+</div>
+<div class="mt-6 pt-4 border-t border-outline-variant/30 flex items-center justify-between">
+<span class="font-mono-data text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-secondary/10 border border-secondary/30 text-secondary">4 Total Items</span>
+<a class="text-secondary font-mono-data text-mono-data flex items-center gap-1 hover:text-secondary-fixed transition-colors" href="#">
+                            Open <span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Card 3: Tailor Engine & AI Gateway (The Missing 5th Card) -->
+<div class="stagger-item glass-panel rounded-xl p-panel-padding flex flex-col justify-between min-h-[280px] glow-effect transition-all duration-300 group lg:col-span-1 md:col-span-2 lg:row-span-2 relative overflow-hidden" style="transition-delay: 300ms;">
+<div class="absolute -right-10 -top-10 w-40 h-40 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
+<div>
+<div class="w-12 h-12 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(255,140,0,0.15)]">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="memory">memory</span>
+</div>
+<h3 class="font-page-title-mobile text-2xl text-on-surface mb-3 tracking-[-0.05em] font-bold">Tailor Engine &amp; AI Gateway</h3>
+<p class="text-on-surface-variant font-body-regular text-body-regular leading-[1.6] mb-6">
+                            Intelligently map evidence to job descriptions. Generate tailored variants while maintaining absolute ground truth. Local processing ensures your data never leaves your machine.
+                        </p>
+<!-- Mini visual within the large card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-3 font-mono-data text-xs text-on-surface-variant mb-4">
+<div class="flex justify-between items-center mb-2 border-b border-surface-variant pb-2">
+<span>Variant Generation</span>
+<span class="text-secondary">Processing...</span>
+</div>
+<div class="w-full bg-surface-variant h-1 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[70%] rounded-full shadow-[0_0_8px_rgba(255,140,0,0.8)]"></div>
+</div>
+</div>
+</div>
+<div class="mt-auto pt-4 border-t border-outline-variant/30 flex items-center justify-between z-10">
+<span class="font-mono-data text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-surface-container-high border border-outline-variant text-secondary">10 Variants Generated</span>
+<a class="bg-primary text-on-primary font-bold px-4 py-1.5 rounded flex items-center gap-2 hover:bg-primary-fixed transition-colors text-sm" href="#">
+                            Tailor Now
+                        </a>
+</div>
+</div>
+<!-- Card 4: AI Key Vault & Settings -->
+<div class="stagger-item glass-panel rounded-xl p-panel-padding flex flex-col justify-between min-h-[280px] glow-secondary transition-all duration-300 group" style="transition-delay: 450ms;">
+<div>
+<div class="w-10 h-10 rounded-lg bg-surface-container-high border border-outline-variant flex items-center justify-center mb-6 group-hover:border-secondary/50 transition-colors">
+<span class="material-symbols-outlined text-secondary" data-icon="vpn_lock">vpn_lock</span>
+</div>
+<h3 class="font-body-regular text-lg font-bold text-on-surface mb-2 tracking-[-0.05em]">AI Key Vault &amp; Settings</h3>
+<p class="text-on-surface-variant font-body-dense text-body-dense leading-[1.6]">
+                            Configure BYOK credentials (OpenAI, Anthropic, Gemini) with local client-side key scrubbing.
+                        </p>
+</div>
+<div class="mt-6 pt-4 border-t border-outline-variant/30 flex items-center justify-between">
+<span class="font-mono-data text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-secondary/10 border border-secondary/30 text-secondary">Zero-Leak Redaction</span>
+<a class="text-secondary font-mono-data text-mono-data flex items-center gap-1 hover:text-secondary-fixed transition-colors" href="#">
+                            Open <span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Card 5: Job Application Tracker -->
+<div class="stagger-item glass-panel rounded-xl p-panel-padding flex flex-col justify-between min-h-[280px] glow-effect transition-all duration-300 group" style="transition-delay: 600ms;">
+<div>
+<div class="w-10 h-10 rounded-lg bg-surface-container-high border border-outline-variant flex items-center justify-center mb-6 group-hover:border-primary/50 transition-colors">
+<span class="material-symbols-outlined text-primary" data-icon="work_history">work_history</span>
+</div>
+<h3 class="font-body-regular text-lg font-bold text-on-surface mb-2 tracking-[-0.05em]">Job Application Tracker</h3>
+<p class="text-on-surface-variant font-body-dense text-body-dense leading-[1.6]">
+                            Kanban &amp; list pipeline for tracking applications, interview notes, and status history.
+                        </p>
+</div>
+<div class="mt-6 pt-4 border-t border-outline-variant/30 flex items-center justify-between">
+<span class="font-mono-data text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-surface-container-high border border-outline-variant text-secondary">27 Jobs Tracked</span>
+<a class="text-primary font-mono-data text-mono-data flex items-center gap-1 hover:text-primary-fixed transition-colors" href="#">
+                            Open <span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-background w-full py-8 border-t border-outline-variant/30 flex flex-col items-center justify-center gap-4 px-margin-desktop z-20 relative">
+<div class="flex gap-6">
+<a class="font-mono-data text-mono-data text-on-surface-variant hover:text-primary transition-colors opacity-100" href="#">Privacy</a>
+<a class="font-mono-data text-mono-data text-on-surface-variant hover:text-primary transition-colors opacity-100" href="#">Terms</a>
+<a class="font-mono-data text-mono-data text-on-surface-variant hover:text-primary transition-colors opacity-100" href="#">Github</a>
+</div>
+<p class="font-mono-data text-mono-data text-on-surface-variant opacity-100">
+<span class="text-primary font-bold">ResumeForge</span> © 2024. Local-First. Secure.
+        </p>
+</footer>
+<!-- Scripts -->
+<script>
+        // Setup Intersection Observer for Staggered Animation
+        document.addEventListener("DOMContentLoaded", () => {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('in-view');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            document.querySelectorAll('.stagger-item').forEach((item) => {
+                observer.observe(item);
+            });
+        });
+
+        // Setup WebGL Shader for Hero Background
+        const canvas = document.getElementById('heroCanvas');
+        if (canvas) {
+            const gl = canvas.getContext('webgl');
+            if (gl) {
+                const vertexShaderSource = `
+                    attribute vec4 position;
+                    void main() {
+                        gl_Position = position;
+                    }
+                `;
+                const fragmentShaderSource = `
+                    precision highp float;
+                    uniform float u_time;
+                    uniform vec2 u_resolution;
+
+                    void main() {
+                        vec2 uv = gl_FragCoord.xy / u_resolution.xy;
+                        
+                        // Subtle grid calculation
+                        vec2 grid_uv = fract(uv * vec2(20.0, 20.0 * (u_resolution.y / u_resolution.x)));
+                        float line = smoothstep(0.0, 0.02, abs(grid_uv.x - 0.5)) * smoothstep(0.0, 0.02, abs(grid_uv.y - 0.5));
+                        
+                        // Perspective shift
+                        float perspective = 1.0 - uv.y;
+                        float alpha = (1.0 - line) * 0.1 * perspective;
+                        
+                        // Color shift (Orange brand accent #ff8c00 -> [1.0, 0.55, 0.0])
+                        vec3 baseColor = vec3(0.04, 0.07, 0.15); // Deep surface
+                        vec3 accentColor = vec3(1.0, 0.55, 0.0);
+                        
+                        float glow = sin(u_time * 0.5 + uv.y * 5.0) * 0.5 + 0.5;
+                        vec3 finalColor = mix(baseColor, accentColor, alpha * glow);
+                        
+                        gl_FragColor = vec4(finalColor, 1.0);
+                    }
+                `;
+
+                function compileShader(gl, source, type) {
+                    const shader = gl.createShader(type);
+                    gl.shaderSource(shader, source);
+                    gl.compileShader(shader);
+                    return shader;
+                }
+
+                const vertexShader = compileShader(gl, vertexShaderSource, gl.VERTEX_SHADER);
+                const fragmentShader = compileShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
+
+                const program = gl.createProgram();
+                gl.attachShader(program, vertexShader);
+                gl.attachShader(program, fragmentShader);
+                gl.linkProgram(program);
+                gl.useProgram(program);
+
+                const positionBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+                const positions = new Float32Array([
+                    -1.0, -1.0,  1.0, -1.0,
+                    -1.0,  1.0,  1.0, -1.0,
+                     1.0,  1.0, -1.0,  1.0
+                ]);
+                gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+
+                const positionLocation = gl.getAttribLocation(program, "position");
+                gl.enableVertexAttribArray(positionLocation);
+                gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+                const timeLocation = gl.getUniformLocation(program, "u_time");
+                const resolutionLocation = gl.getUniformLocation(program, "u_resolution");
+
+                function resizeCanvasToDisplaySize(canvas) {
+                    const displayWidth  = canvas.clientWidth;
+                    const displayHeight = canvas.clientHeight;
+                    if (canvas.width  !== displayWidth || canvas.height !== displayHeight) {
+                        canvas.width  = displayWidth;
+                        canvas.height = displayHeight;
+                    }
+                }
+
+                function render(time) {
+                    time *= 0.001; 
+                    resizeCanvasToDisplaySize(gl.canvas);
+                    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+                    
+                    gl.uniform1f(timeLocation, time);
+                    gl.uniform2f(resolutionLocation, gl.canvas.width, gl.canvas.height);
+
+                    gl.drawArrays(gl.TRIANGLES, 0, 6);
+                    requestAnimationFrame(render);
+                }
+                requestAnimationFrame(render);
+            }
+        }
+    </script>
+</body></html>

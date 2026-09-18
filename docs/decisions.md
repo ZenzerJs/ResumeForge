@@ -237,8 +237,166 @@ We implement an **On-Demand Evidence-Grounded Cover Letter Generator**:
 - **Positive**: Strict citation rules prevent AI hallucination from polluting cover letter submissions.
 - **Negative**: Unsupported job requirements result in explicit gap notices or omitted paragraphs, requiring candidate review when evidence is missing.
 
+---
 
+## ADR-012: Unified Master AI System Prompt & Composition Pattern
 
+- **Date**: 2026-08-08
+- **Status**: Approved
 
+### Context
+Prior to Task 9.4, AI system prompts (`prompt-template.ts`, `qualitative-prompt.ts`, `cover-letter-prompt.ts`) duplicated ResumeForge's core AI guardrails — zero hallucination, mandatory evidence citations, explicit gap reporting, anti-ATS gaming rules, and strict JSON output formatting — independently. This duplication created drift risk across prompt files and made it difficult to guarantee that new AI features followed the same non-negotiable contracts.
 
+### Decision
+We implement a **Unified Master AI System Prompt Engine**:
+1. **Single Source of Truth (`src/lib/ai/master-prompt.ts`)**: Export `RESUMEFORGE_MASTER_SYSTEM_PROMPT` containing all 5 core guardrails:
+   - Zero Hallucination & Strict Evidence Grounding
+   - Mandatory Evidence Citation (`evidenceIds` / `evidenceCitations`)
+   - Explicit Gap Reporting (never fabricate missing experience)
+   - Anti-ATS Gaming Enforcement (no white text or keyword stuffing)
+   - Strict JSON Output Contracts
+2. **Composition Pattern (`buildComposedSystemPrompt`)**: Every task-specific prompt builder (`buildPatchSystemPrompt`, `buildQualitativeReviewSystemPrompt`, `buildCoverLetterSystemPrompt`) prepends `RESUMEFORGE_MASTER_SYSTEM_PROMPT` before appending task-specific instructions and JSON schemas.
+3. **Schema Invariance**: Output schemas (`PatchProposal`, qualitative review JSON, cover letter JSON) remain 100% unchanged.
+
+### Consequences
+- **Positive**: Eliminates prompt drift risk across AI features. Any new AI capability (e.g. editor chat) imports the master prompt module to inherit all core guardrails automatically.
+- **Positive**: Maintains 100% backward compatibility with all existing provider adapters and Zod validation schemas.
+- **Negative**: Adds a small static overhead (~350 tokens) to system prompt payloads, well within all LLM context window limits.
+
+---
+
+## ADR-013: Hosted Single-User Gate, Postgres, and SSRF Controls
+
+- **Date**: 2026-08-12
+- **Status**: Approved (overrides ADR-002 and ADR-005 for public hosting)
+- **Supersedes for hosted deploys**: ADR-002 (SQLite) and ADR-005 (no auth / local-first only)
+
+### Context
+A public Render/Vercel deployment cannot use SQLite on ephemeral disks, and unauthenticated APIs would expose PII, job data, and BYOK-proxied AI spend. Clerk/OAuth multi-user is out of scope for this personal hosted tool.
+
+### Decision
+1. **Postgres** via Prisma (`provider = "postgresql"`). Local development uses `docker-compose.yml`. Hosted deploys use Render Postgres or Neon.
+2. **Single-user password gate**: HttpOnly `rf_session` cookie signed with `APP_ACCESS_SECRET`. Next.js middleware covers app and `/api/*` except `/login`, `/api/auth/*`, icons, `/wasm/*`, and static assets. Mutation requests require a matching Origin/Referer.
+3. **Fail-closed secrets**: `JOB_SYNC_SECRET` must be set or Pitt CSC sync returns 401. `APP_ACCESS_SECRET` missing returns 503/redirect.
+4. **SSRF**: Server-side fetches (bulk-import, tier-2 apply URLs, custom AI `baseUrl`) go through `safeFetch` (HTTPS-only except localhost in non-production, private/metadata host block, `redirect: "manual"`, import host allowlist).
+5. **BYOK on HTTPS**: Keys remain in `localStorage` and POST bodies to the same origin. CSP and redaction reduce XSS/leak risk; this is an accepted trade-off versus OS keychain for V1 hosted.
+
+### Consequences
+- **Positive**: Resume/PII survive deploys; anonymous internet cannot mutate data or drain AI credits without the password.
+- **Negative**: Operators must run Postgres and set secrets. Local SQLite `dev.db` is no longer the runtime store.
+- **Negative**: BYOK keys are still XSS-reachable in the browser; CSP is the primary mitigation until a vault/keychain migration.
+
+---
+
+## ADR-014: Guest Sessions with Optional Email/Password Accounts
+
+- **Date**: 2026-08-12
+- **Status**: Approved (overrides ADR-013 password gate for pages)
+- **Supersedes for product access**: ADR-013 item 2 (single-user workspace password on all pages)
+
+### Context
+A hosted password wall blocked anyone without `APP_ACCESS_SECRET` and made the product look like a private workspace. Users should be able to try the editor without signing up. Saved resumes and evidence must not land in a shared database for anonymous visitors. Job postings and their descriptions should be a shared catalog everyone can browse.
+
+### Decision
+1. **Pages are public.** Middleware no longer redirects unauthenticated browsers to `/login`. Missing `APP_ACCESS_SECRET` does not lock the site.
+2. **Guest work is local-only for personal materials.** Resume, evidence, variant, and cover-letter persist APIs require a signed-in `User`. Guests receive `401` `{ code: "GUEST_READ_ONLY" }` on those save mutations. Resume/evidence/variant/cover-letter list GETs return empty `{ data: [], guest: true }`.
+3. **Optional accounts.** Email + password signup/login (`scrypt` hash) create a `User` row. Session cookie `rf_session` is `uid=...|exp=....hmac` signed with `APP_ACCESS_SECRET` (cookie signing key only — not a login password).
+4. **Data scoping.** `Resume` and `EvidenceItem` are owned by `userId`. The `Job` catalog (including `rawDescription`) is shared across guests and accounts. Nested variants and cover letters stay private via the owning master resume's `userId`.
+5. **Shared job catalog.** Creating, updating, or deleting jobs still requires sign-in (spam control). Guests can read the catalog and full descriptions. Promoting a discovered job writes a shared Job row with no owner. Deleting a user sets `Job.userId` to null instead of cascade-deleting catalog rows.
+6. **Stateless tools stay public.** JD extract, ATS evaluate with body `typstContent`, AI test-connection, and Typst repair do not require a session.
+
+### Consequences
+- **Positive**: Anyone can browse the job tracker; signed-in users keep private evidence and resumes.
+- **Negative**: Signup/login still need `APP_ACCESS_SECRET` to mint cookies. Guest editor work is lost if the browser storage is cleared. Job application status on a catalog row is currently shared.
+- **Negative**: Clerk/OAuth remains out of scope.
+
+---
+
+## ADR-015: Client-Side Immutable Application Package (.zip) & Cryptographic Manifest
+
+- **Date**: 2026-08-17
+- **Status**: Approved
+
+### Context
+Applying to job portals often requires a multi-file package (.pdf, .docx, plain text, Typst source, cover letter, application summary). Bundling on a server introduces unnecessary latency, bandwidth costs, and state management. The bundle must also prevent tampering, guarantee cryptographic integrity, and sanitize filenames across OS platforms.
+
+### Decision
+1. **Client-side parallel compilation** using `JSZip`, `compileTypstToPdf`, and `generateAtsDocx`.
+2. **Immutable Snapshot Freeze**: Input state is frozen into an immutable `ZipExportSnapshot` before compilation to guarantee consistency across all bundled artifacts.
+3. **Cryptographic Manifest (`manifest.json`)**: Generated with schemaVersion 1, ISO timestamp, generator metadata, job target, guardrail status, and SHA-256 checksums computed for every bundled artifact.
+4. **Strict Entry Allowlist**: Only `resume.pdf`, `resume.docx`, `resume.txt`, `resume.typ`, `cover_letter.md`, `cover_letter.txt`, `application_summary.txt`, `manifest.json`.
+5. **Filename Sanitization (`sanitizeZipFilename`)**: Strips Windows reserved device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`), removes illegal characters, and caps base names to 50 characters.
+6. **Recovery Error UI**: If bundle generation fails, error banners offer immediate single-click fallback downloads for individual PDF and DOCX files.
+
+### Consequences
+- **Positive**: Instant local-first bundle generation with zero server hops and cryptographic verification.
+- **Positive**: Mechanical guardrail enforcement guarantees no unverified claims exist in any bundled artifact.
+
+---
+
+## ADR-016: Server-Authoritative Idempotent Guest Draft Migration & Conflict Policy
+
+- **Date**: 2026-08-17
+- **Status**: Approved
+
+### Context
+Unauthenticated guest users work in browser `localStorage`. Upon creating an account or logging in, local drafts need to migrate to the user's PostgreSQL account without risk of silently overwriting existing Master Resumes or losing local state if network requests fail.
+
+### Decision
+1. **Server-Authoritative Endpoint**: `POST /api/auth/migrate-guest-drafts` authenticated with `requireUserId` (never trusting client-supplied user IDs).
+2. **Explicit Conflict Policy**: When the account already has an active Master Resume:
+   - `IMPORT_AS_DRAFT` (Default/Recommended): saves as a non-master `Resume` row, keeping master baseline safe.
+   - `REPLACE_MASTER`: atomically updates master status via Prisma `$transaction`.
+   - `DISCARD`: acknowledges and clears local draft without database writes.
+3. **Strict Local Cleanup Lifecycle**: `localStorage` keys (`resumeforge_typst_source`, `resumeforge_has_guest_draft`) are purged ONLY after receiving an HTTP 200 success response. On error or network failure, local content remains untouched and a Retry option is displayed.
+
+### Consequences
+- **Positive**: Prevents accidental destruction of Master Resumes.
+- **Positive**: Zero data loss guarantee during network drops or auth hiccups.
+
+---
+
+## ADR-017: STAR Provenance & Strict Evidence Grounding Contract
+
+- **Date**: 2026-08-17
+- **Status**: Approved
+
+### Context
+Job interview preparation requires structured STAR stories (Situation, Task, Action, Result) based on job requirements. Generative LLMs frequently hallucinate achievements, metrics, or technologies when prompted for interview answers.
+
+### Decision
+1. **Deterministic synthesis engine** (`src/lib/prep/star-synthesizer.ts`) that assembles interview prep material strictly from verified Evidence Bank records.
+2. **Grounding Taxonomy**:
+   - `DIRECT`: Exact match in verified evidence items, citing mandatory `evidenceIds` and `sourceBulletIds`.
+   - `TRANSFERABLE`: Adjacent technical domain match with an explicit bridge plan.
+   - `GAP`: Unsupported requirement rendered with an honest mitigation strategy and empty S/T/A/R fields (never fabricating faux stories).
+3. **Provenance Gate**: Reject unverified drafts (`status === "draft"`, `isDraft === true`) and archived items (`status === "archived"`). Only `status === "verified"` records may provide grounding.
+
+### Consequences
+- **Positive**: 100% verifiable candidate interview prep grounded in real career records.
+- **Positive**: Clear visual distinction between direct evidence, transferable skills, and unbacked gaps.
+
+---
+
+## ADR-018: Source-First Job Description Pipeline & Section Provenance
+
+- **Date**: 2026-08-17
+- **Status**: Approved
+
+### Context
+ATS evaluation and AI tailoring require structured knowledge of target job requirements without losing the original source context or fabricating requirements. Unstructured text blob extraction makes it impossible to verify where a requirement originated or whether it was mandatory or preferred.
+
+### Decision
+1. **Canonical Ingestion Pipeline (`src/lib/jd/document-pipeline.ts`)**:
+   - Parse input from diverse sources: Greenhouse, Lever, Ashby, JSON-LD schema, plain HTML, or raw user text.
+   - Detect structured document sections (`ABOUT_COMPANY`, `ROLE_SUMMARY`, `RESPONSIBILITIES`, `REQUIRED`, `PREFERRED`, `COMPENSATION`, `BENEFITS`, `OTHER`) using deterministic alias dictionaries.
+2. **Section Spans & Requirement Provenance (`ProvenanceRequirement`)**:
+   - Every requirement stores `sourceQuote`, `sourceSectionId`, byte spans (`sourceStart`, `sourceEnd`), `category` (`SKILL`, `EXPERIENCE`, `EDUCATION`, `CERTIFICATION`, `DOMAIN`), `priority` (`REQUIRED`, `PREFERRED`), and `confidence` (`EXPLICIT`, `USER_ADDED`, `INFERRED`).
+3. **Content Integrity**:
+   - SHA-256 content hashing of normalized text to detect revisions and caching.
+   - Diagnostics reporting (`VERIFIED_ATS`, `STRUCTURED_PAGE`, `PARTIAL_EXTRACTION`, `USER_PASTED`).
+
+### Consequences
+- **Positive**: Complete auditability and provenance for every job requirement matched against candidate evidence.
+- **Positive**: Distinguishes between native ATS structured postings and partial SPA shell extracts.
 

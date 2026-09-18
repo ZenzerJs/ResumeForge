@@ -2,14 +2,18 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { importTier1Jobs, DEFAULT_SIMPLIFY_SOURCE_URL } from "@/lib/ingestion/tier1-importer";
 import { sanitizeError } from "@/lib/ai/redact";
+import { requireUserId } from "@/lib/security/auth-request";
 
 const BulkImportSchema = z.object({
-  sourceUrl: z.string().url().optional(),
-  tableMarkdown: z.string().optional(),
+  sourceUrl: z.string().url().max(2000).optional(),
+  tableMarkdown: z.string().max(2_000_000).optional(),
 });
 
 export async function POST(request: Request) {
   try {
+    const gated = await requireUserId(request);
+    if (gated instanceof NextResponse) return gated;
+
     let body = {};
     try {
       body = await request.json();
@@ -49,7 +53,7 @@ export async function POST(request: Request) {
       {
         success: false,
         error: "Failed to execute Tier 1 bulk job import",
-        message: sanitizeError(String(err)),
+        message: sanitizeError(err),
       },
       { status: 500 }
     );

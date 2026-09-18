@@ -3,13 +3,19 @@ import { prisma } from "@/lib/prisma";
 import { CoverLetterResponseSchema } from "@/lib/ai/cover-letter-schema";
 import { generateCoverLetter } from "@/lib/ai/gateway";
 import { verifyCoverLetterGrounding } from "@/lib/ai/cover-letter-verifier";
+import { extractJsonObject, normalizeCoverLetterPayload } from "@/lib/ai/json-response";
 import { getEvidenceItems } from "@/lib/db/evidence";
 import { createCoverLetter } from "@/lib/db/cover-letters";
+import { getMasterResume } from "@/lib/db/resumes";
 import { sanitizeError } from "@/lib/ai/redact";
-import { ProviderConfig } from "@/lib/ai/types";
+import { ProviderConfigSchema } from "@/lib/ai/types";
+import { requireUserId } from "@/lib/security/auth-request";
 
 export async function POST(req: NextRequest) {
   try {
+    const userId = await requireUserId(req);
+    if (userId instanceof NextResponse) return userId;
+
     const body = await req.json();
 
     const { jobId, variantId, providerConfig: rawProviderConfig } = body;
@@ -22,7 +28,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify job exists
-    const job = await prisma.job.findUnique({
+    const job = await prisma.job.findFirst({
       where: { id: jobId },
     });
 
@@ -46,9 +52,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Validate provider configuration
-    const providerConfig: ProviderConfig = rawProviderConfig || body.provider || {};
-    if (!providerConfig.provider || !providerConfig.apiKey) {
+    const parsedConfig = ProviderConfigSchema.safeParse(rawProviderConfig || body.provider);
+    if (
+      !parsedConfig.success ||
+      !parsedConfig.data.provider ||
+      (!parsedConfig.data.apiKey && parsedConfig.data.provider !== "custom")
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -57,9 +66,10 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    const providerConfig = parsedConfig.data;
 
     // Gather active evidence items
-    const evidenceItems = await getEvidenceItems();
+    const evidenceItems = await getEvidenceItems(undefined, userId);
     const activeEvidenceItems = evidenceItems.filter((e) => e.status !== "archived");
 
     const activeEvidenceIds: string[] = [];
@@ -91,8 +101,15 @@ export async function POST(req: NextRequest) {
       activeRoleProfile: body.activeRoleProfile || "Full-stack",
     };
 
+    const master = await getMasterResume(userId);
+
     // Call BYOK AI Gateway
-    const gatewayResult = await generateCoverLetter(providerConfig, inputPayload, activeEvidenceItems);
+    const gatewayResult = await generateCoverLetter(
+      providerConfig,
+      inputPayload,
+      activeEvidenceItems,
+      master?.typstSource
+    );
 
     if (!gatewayResult.success || !gatewayResult.rawJson) {
       return NextResponse.json(
@@ -104,27 +121,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Strip markdown JSON fences if present
-    let cleanedJson = gatewayResult.rawJson.trim();
-    if (cleanedJson.startsWith("```")) {
-      cleanedJson = cleanedJson.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
-    }
-
-    let parsedResponse;
+    // Parse + normalize AI JSON
+    let parsedResponse: unknown;
     try {
-      parsedResponse = JSON.parse(cleanedJson);
+      parsedResponse = extractJsonObject(gatewayResult.rawJson);
     } catch {
       return NextResponse.json(
         {
           success: false,
           error: "AI provider returned malformed non-JSON output for cover letter.",
-          rawOutput: sanitizeError(cleanedJson.slice(0, 300)),
+          rawOutput: sanitizeError(gatewayResult.rawJson.slice(0, 300)),
         },
         { status: 422 }
       );
     }
 
-    const schemaValidation = CoverLetterResponseSchema.safeParse(parsedResponse);
+    const normalized = normalizeCoverLetterPayload(
+      parsedResponse,
+      inputPayload.candidateName || "Candidate"
+    );
+    const schemaValidation = CoverLetterResponseSchema.safeParse(normalized);
     if (!schemaValidation.success) {
       return NextResponse.json(
         {
@@ -165,6 +181,7 @@ export async function POST(req: NextRequest) {
       fullMarkdown: coverLetterData.fullMarkdown,
       evidenceCitations: coverLetterData.evidenceCitations,
       status: "DRAFT",
+      userId,
     });
 
     return NextResponse.json({

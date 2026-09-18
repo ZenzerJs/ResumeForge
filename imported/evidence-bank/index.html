@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Evidence Bank - ResumeForge</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;800&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#ff8c00",
+                        "on-primary": "#ffffff",
+                        "primary-container": "#ffb77d",
+                        "on-primary-container": "#4d2600",
+                        "secondary": "#00a572",
+                        "on-secondary": "#ffffff",
+                        "secondary-container": "#6ffbbe",
+                        "on-secondary-container": "#00311f",
+                        "tertiary": "#ffb3ad",
+                        "on-tertiary": "#68000a",
+                        "tertiary-container": "#ffdad7",
+                        "on-tertiary-container": "#410004",
+                        "error": "#ffb4ab",
+                        "on-error": "#690005",
+                        "error-container": "#93000a",
+                        "on-error-container": "#ffdad6",
+                        "background": "#0b1326",
+                        "on-background": "#dae2fd",
+                        "surface": "#0b1326",
+                        "on-surface": "#dae2fd",
+                        "surface-variant": "#2d3449",
+                        "on-surface-variant": "#ddc1ae",
+                        "outline": "#a48c7a",
+                        "outline-variant": "#564334",
+                        "surface-container-highest": "#31394d",
+                        "surface-container-high": "#283044",
+                        "surface-container": "#222a3d",
+                        "surface-container-low": "#171f33",
+                        "surface-container-lowest": "#060e20",
+                        "inverse-surface": "#dae2fd",
+                        "inverse-on-surface": "#0b1326",
+                        "inverse-primary": "#ffb77d",
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "margin-desktop": "32px",
+                        "panel-padding": "20px",
+                        "margin-mobile": "16px",
+                        "gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "page-title-mobile": ["Hanken Grotesk", "sans-serif"],
+                        "page-title": ["Hanken Grotesk", "sans-serif"],
+                        "mono-data": ["JetBrains Mono", "monospace"],
+                        "body-regular": ["Hanken Grotesk", "sans-serif"],
+                        "body-dense": ["Hanken Grotesk", "sans-serif"],
+                        "section-label": ["JetBrains Mono", "monospace"]
+                    },
+                    "fontSize": {
+                        "page-title-mobile": ["32px", { "lineHeight": "1.2", "fontWeight": "800" }],
+                        "page-title": ["40px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+                        "mono-data": ["13px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "body-regular": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "body-dense": ["14px", { "lineHeight": "1.4", "fontWeight": "400" }],
+                        "section-label": ["12px", { "lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .glass-panel {
+            background-color: rgba(45, 52, 73, 0.4);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(86, 67, 52, 0.5);
+            transition: all 0.3s ease;
+        }
+        .glow-hover:hover {
+            box-shadow: 0 0 20px rgba(255, 140, 0, 0.15);
+            border-color: rgba(255, 140, 0, 0.3);
+        }
+        .terminal-input {
+            background-color: rgba(11, 19, 38, 0.6);
+            border: 1px solid rgba(86, 67, 52, 0.5);
+            transition: all 0.2s;
+        }
+        .terminal-input:focus {
+            border-color: #ff8c00;
+            outline: none;
+            box-shadow: 0 0 10px rgba(255, 140, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-regular min-h-screen flex flex-col">
+<!-- Top Navigation -->
+<nav class="bg-surface-container-lowest/80 backdrop-blur-xl border-b border-surface-variant shadow-[0_4px_30px_rgba(0,0,0,0.1)] fixed top-0 w-full z-50 flex items-center justify-between px-6 h-16">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-2xl" data-weight="fill" style="font-variation-settings: 'FILL' 1;">terminal</span>
+<span class="font-page-title text-[22px] text-primary tracking-tighter">ResumeForge</span>
+</div>
+<div class="hidden md:flex items-center gap-8">
+<a class="text-on-surface-variant hover:text-on-surface transition-colors font-body-regular text-[15px]" href="#">Editor</a>
+<a class="text-on-surface font-semibold border-b-2 border-primary pb-1 font-body-regular text-[15px]" href="#">Evidence Bank</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors font-body-regular text-[15px]" href="#">Jobs</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors font-body-regular text-[15px]" href="#">Tailor</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors font-body-regular text-[15px]" href="#">Settings</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-2 px-3 py-1.5 border border-surface-variant rounded hover:bg-surface-variant/50 font-mono-data text-[13px]">
+<span class="material-symbols-outlined text-[18px]">upload</span>
+            Import JSON
+        </button>
+<button class="bg-primary/10 text-primary border border-primary/30 hover:bg-primary hover:text-on-primary transition-all duration-300 flex items-center gap-2 px-4 py-1.5 rounded font-mono-data text-[13px] font-semibold">
+<span class="material-symbols-outlined text-[18px]">add</span>
+            Add Evidence Item
+        </button>
+</div>
+</nav>
+<!-- Main Content -->
+<main class="flex-1 mt-16 p-margin-mobile md:p-margin-desktop max-w-[1000px] mx-auto w-full">
+<!-- Header Section -->
+<header class="mb-8">
+<h1 class="font-page-title text-page-title text-on-surface mb-2 tracking-tighter font-extrabold">Verified Evidence Bank Inventory</h1>
+</header>
+<!-- Search and Filter Bar -->
+<div class="flex flex-col md:flex-row gap-4 mb-6">
+<div class="relative flex-1">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
+<input class="w-full terminal-input pl-10 pr-4 py-2 font-mono-data text-mono-data text-on-surface rounded" placeholder="Search evidence by title, org, summary, or tags..." type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative min-w-[250px]">
+<select class="w-full terminal-input text-on-surface font-mono-data text-mono-data py-2 px-3 pr-8 rounded appearance-none cursor-pointer">
+<option>Status: All, Verified, Draft, Archived</option>
+<option>Status: Verified</option>
+<option>Status: Draft</option>
+<option>Status: Archived</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+</div>
+<span class="font-mono-data text-mono-data text-on-surface-variant whitespace-nowrap">4 items</span>
+</div>
+</div>
+<!-- Evidence List -->
+<div class="flex flex-col gap-3">
+<!-- Expanded Item -->
+<div class="glass-panel rounded-lg overflow-hidden glow-hover">
+<div class="p-4 border-b border-surface-variant flex items-start gap-3 cursor-pointer hover:bg-surface-variant/20 transition-colors">
+<button class="mt-1 text-on-surface-variant hover:text-primary transition-colors flex-shrink-0">
+<span class="material-symbols-outlined text-[20px]">expand_less</span>
+</button>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-3 mb-1.5 flex-wrap">
+<span class="bg-surface-variant text-on-surface-variant border border-outline-variant px-2 py-0.5 rounded text-[10px] font-section-label uppercase tracking-widest">EXPERIENCE</span>
+<h3 class="font-body-regular text-[18px] font-semibold text-on-surface truncate">Automated Test Project 1786485719090 (Updated)</h3>
+<div class="flex-1 min-w-[20px]"></div>
+<span class="bg-secondary/10 text-secondary border border-secondary/30 px-2 py-0.5 rounded text-[10px] font-section-label uppercase flex items-center gap-1 tracking-widest">
+<span class="material-symbols-outlined text-[12px]" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                            VERIFIED
+                        </span>
+<span class="font-mono-data text-[12px] text-on-surface-variant">Jun 29, 2023</span>
+</div>
+<p class="font-body-dense text-body-dense text-on-surface-variant mb-2.5 truncate">Built an automated Playwright testing framework.</p>
+<div class="flex flex-wrap gap-2">
+<span class="bg-surface-variant/50 border border-surface-variant text-on-surface-variant px-2 py-0.5 rounded text-[11px] font-mono-data">Playwright</span>
+<span class="bg-surface-variant/50 border border-surface-variant text-on-surface-variant px-2 py-0.5 rounded text-[11px] font-mono-data">Vitest</span>
+</div>
+</div>
+</div>
+<div class="p-4 bg-surface-container-lowest/30">
+<ul class="list-disc list-inside space-y-2 font-body-dense text-body-dense text-on-surface pl-2">
+<li><span class="font-semibold text-on-surface">Bullet Point Alpha:</span> Built high-coverage test suite 1786485719090 (Updated).</li>
+<li><span class="font-semibold text-on-surface">Bullet Point Alpha:</span> Built high-coverage test suite 1788485719090 (Updated).</li>
+</ul>
+</div>
+</div>
+<!-- Collapsed Item 1 -->
+<div class="glass-panel rounded-lg overflow-hidden glow-hover">
+<div class="p-4 flex items-start gap-3 cursor-pointer hover:bg-surface-variant/20 transition-colors">
+<button class="mt-1 text-on-surface-variant hover:text-primary transition-colors flex-shrink-0">
+<span class="material-symbols-outlined text-[20px]">chevron_right</span>
+</button>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-3 mb-1.5 flex-wrap">
+<span class="bg-surface-variant text-on-surface-variant border border-outline-variant px-2 py-0.5 rounded text-[10px] font-section-label uppercase tracking-widest">EXPERIENCE</span>
+<h3 class="font-body-regular text-[18px] font-semibold text-on-surface truncate">ResumeForge Workspace @ Personal Open Source</h3>
+<div class="flex-1 min-w-[20px]"></div>
+<span class="bg-secondary/10 text-secondary border border-secondary/30 px-2 py-0.5 rounded text-[10px] font-section-label uppercase flex items-center gap-1 tracking-widest">
+<span class="material-symbols-outlined text-[12px]" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                            VERIFIED
+                        </span>
+<span class="font-mono-data text-[12px] text-on-surface-variant">Jun 22, 2023</span>
+</div>
+<p class="font-body-dense text-body-dense text-on-surface-variant mb-2.5 truncate">Local-first AI resume workspace using Next.js, CodeMirror 6, and Typst WASM.</p>
+<div class="flex flex-wrap gap-2">
+<span class="bg-surface-variant/50 border border-surface-variant text-on-surface-variant px-2 py-0.5 rounded text-[11px] font-mono-data">Next.js</span>
+<span class="bg-surface-variant/50 border border-surface-variant text-on-surface-variant px-2 py-0.5 rounded text-[11px] font-mono-data">TypeScript</span>
+<span class="bg-surface-variant/50 border border-surface-variant text-on-surface-variant px-2 py-0.5 rounded text-[11px] font-mono-data">Typst</span>
+<span class="bg-surface-variant/50 border border-surface-variant text-on-surface-variant px-2 py-0.5 rounded text-[11px] font-mono-data">SQLite</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Collapsed Item 2 -->
+<div class="glass-panel rounded-lg overflow-hidden glow-hover">
+<div class="p-4 flex items-start gap-3 cursor-pointer hover:bg-surface-variant/20 transition-colors">
+<button class="mt-1 text-on-surface-variant hover:text-primary transition-colors flex-shrink-0">
+<span class="material-symbols-outlined text-[20px]">chevron_right</span>
+</button>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-3 mb-1.5 flex-wrap">
+<span class="bg-surface-variant text-on-surface-variant border border-outline-variant px-2 py-0.5 rounded text-[10px] font-section-label uppercase tracking-widest">PROJECT</span>
+<h3 class="font-body-regular text-[18px] font-semibold text-on-surface truncate">Software Engineer Intern @ TechCorp Systems</h3>
+<div class="flex-1 min-w-[20px]"></div>
+<span class="bg-secondary/10 text-secondary border border-secondary/30 px-2 py-0.5 rounded text-[10px] font-section-label uppercase flex items-center gap-1 tracking-widest">
+<span class="material-symbols-outlined text-[12px]" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                            VERIFIED
+                        </span>
+<span class="font-mono-data text-[12px] text-on-surface-variant">Jun 29, 2023</span>
+</div>
+<p class="font-body-dense text-body-dense text-on-surface-variant mb-2.5 truncate">Built scalable REST &amp; GraphQL APIs with high throughput.</p>
+<div class="flex flex-wrap gap-2">
+<span class="bg-surface-variant/50 border border-surface-variant text-on-surface-variant px-2 py-0.5 rounded text-[11px] font-mono-data">TypeScript</span>
+<span class="bg-surface-variant/50 border border-surface-variant text-on-surface-variant px-2 py-0.5 rounded text-[11px] font-mono-data">GraphQL</span>
+<span class="bg-surface-variant/50 border border-surface-variant text-on-surface-variant px-2 py-0.5 rounded text-[11px] font-mono-data">Node.js</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Collapsed Item 3 -->
+<div class="glass-panel rounded-lg overflow-hidden glow-hover">
+<div class="p-4 flex items-start gap-3 cursor-pointer hover:bg-surface-variant/20 transition-colors">
+<button class="mt-1 text-on-surface-variant hover:text-primary transition-colors flex-shrink-0">
+<span class="material-symbols-outlined text-[20px]">chevron_right</span>
+</button>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-3 mb-1.5 flex-wrap">
+<span class="bg-surface-variant text-on-surface-variant border border-outline-variant px-2 py-0.5 rounded text-[10px] font-section-label uppercase tracking-widest">PROJECT</span>
+<h3 class="font-body-regular text-[18px] font-semibold text-on-surface truncate">Backend Engineer @ Nova Labs</h3>
+<div class="flex-1 min-w-[20px]"></div>
+<span class="bg-surface-variant/50 text-on-surface-variant border border-outline-variant px-2 py-0.5 rounded text-[10px] font-section-label uppercase tracking-widest">DRAFT</span>
+<span class="font-mono-data text-[12px] text-on-surface-variant">Aug 21, 2023</span>
+</div>
+<p class="font-body-dense text-body-dense text-on-surface-variant mb-2.5 truncate">Engineered robust microservices infrastructure.</p>
+<div class="flex flex-wrap gap-2">
+<span class="bg-surface-variant/50 border border-surface-variant text-on-surface-variant px-2 py-0.5 rounded text-[11px] font-mono-data">Go</span>
+<span class="bg-surface-variant/50 border border-surface-variant text-on-surface-variant px-2 py-0.5 rounded text-[11px] font-mono-data">gRPC</span>
+<span class="bg-surface-variant/50 border border-surface-variant text-on-surface-variant px-2 py-0.5 rounded text-[11px] font-mono-data">PostgreSQL</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

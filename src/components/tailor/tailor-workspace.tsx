@@ -1,31 +1,38 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  FileText,
-  Briefcase,
   Sparkles,
   CheckCircle2,
   AlertTriangle,
   X,
-  Plus,
-  ArrowRight,
-  Database,
-  Search,
-  BookOpen,
   Loader2,
-  Settings,
-  Wand2,
+  Briefcase,
+  ClipboardCheck,
+  FileText,
+  Database,
+  XCircle,
 } from "lucide-react";
 import { JobRequirements } from "@/lib/jd-parser/types";
+import { RoleProfile, ROLE_PROFILES } from "@/lib/ats-evaluator/types";
 import { PatchDiffReview } from "./patch-diff-review";
 import { AtsScorePanel } from "./ats-score-panel";
 import { CoverLetterPanel } from "./cover-letter-panel";
 import type { PatchProposal, Gap, RejectedPatch } from "@/lib/ai/patch-schema";
-import { TopNav } from "@/components/navigation/top-nav";
+import { AppShell } from "@/components/design-system/app-shell";
+import { PageSkeleton } from "@/components/design-system/page-skeleton";
 import { isPlaceholderDescription } from "@/lib/ingestion/helpers";
+import { JD_PASTE_TEMPLATE, convertHtmlToCleanMarkdown } from "@/lib/ingestion/jd-format";
+import { AiProgress, type AiJobStage } from "@/components/ui/ai-progress";
+import { QuickAddEvidenceModal } from "./quick-add-evidence-modal";
+import {
+  parseJobDescriptionDocument,
+  createUserRequirement,
+  JobDescriptionDocument,
+  ProvenanceRequirement,
+} from "@/lib/jd/document-pipeline";
+import { Plus } from "lucide-react";
 
 interface RankedMatch {
   id: string;
@@ -49,20 +56,23 @@ interface RankedMatch {
   }[];
 }
 
-const SAMPLE_BACKEND_JD = `Senior Backend Engineer — Acme Corp
+const SAMPLE_BACKEND_JD = `Senior Backend Engineer — Nova Labs
 
-Role Overview:
-We are looking for a Senior Backend Engineer to build high-performance distributed systems.
+We are looking for a Senior Backend Engineer to join our core infrastructure team. 
+You will be responsible for designing and building highly scalable microservices 
+using Go and Python.
 
-Required Qualifications:
-- 4+ years of professional software engineering experience with Node.js, Python, or Go.
-- Deep expertise in PostgreSQL database design, SQL query optimization, and Redis caching.
-- Strong hands-on experience with Docker, Kubernetes, and AWS cloud architecture.
-- Demonstrated experience building REST APIs and microservices.
+Requirements:
+- 5+ years of experience in backend development.
+- Strong proficiency in Go and Python.
+- Experience with Kubernetes and Docker.
+- Solid understanding of distributed systems and RESTful APIs.
+- Familiarity with PostgreSQL and Redis.
 
-Preferred Qualifications:
-- Experience with GraphQL, TypeScript, and Kafka event streams.
-- Background in System Design and Performance Optimization.`;
+Preferred:
+- Experience with AWS or GCP.
+- Knowledge of GraphQL.
+- Open-source contributions.`;
 
 const SAMPLE_FRONTEND_JD = `Frontend Engineer — WebCraft Systems
 
@@ -82,25 +92,44 @@ export function TailorWorkspace() {
   const searchParams = useSearchParams();
   const jobIdParam = searchParams.get("jobId");
 
-  const [company, setCompany] = useState("");
-  const [roleTitle, setRoleTitle] = useState("");
-  const [rawDescription, setRawDescription] = useState("");
+  const [company, setCompany] = useState("Nova Labs");
+  const [roleTitle, setRoleTitle] = useState("Senior Backend Engineer");
+  const [rawDescription, setRawDescription] = useState(SAMPLE_BACKEND_JD);
 
-  const [extractedRequirements, setExtractedRequirements] = useState<JobRequirements | null>(null);
+  const [extractedRequirements, setExtractedRequirements] = useState<JobRequirements | null>({
+    requiredSkills: ["Go", "Python", "Kubernetes", "Docker", "RESTful APIs", "PostgreSQL"],
+    preferredSkills: ["AWS/GCP", "GraphQL"],
+    domainTerms: ["Distributed Systems", "Microservices"],
+    roleTitle: "Senior Backend Engineer",
+    company: "Nova Labs",
+  });
+
+  const [selectedRoleProfile, setSelectedRoleProfile] = useState<RoleProfile>("Full-stack");
+  const tabParam = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<"overview" | "job-info">(
+    tabParam === "overview" ? "overview" : "job-info"
+  );
+  const [jobInfoSubTab, setJobInfoSubTab] = useState<"structured" | "original" | "details">("original");
+  const [newUserReqText, setNewUserReqText] = useState("");
+  const [customUserReqs, setCustomUserReqs] = useState<ProvenanceRequirement[]>([]);
+
+  const jobDoc = React.useMemo(() => {
+    return parseJobDescriptionDocument({
+      text: rawDescription,
+      sourceKind: "PASTED",
+    });
+  }, [rawDescription]);
+
+  const [gapSkillToResolve, setGapSkillToResolve] = useState<string | null>(null);
+  const [isAutoScanning, setIsAutoScanning] = useState(false);
   const [matches, setMatches] = useState<RankedMatch[]>([]);
-
-  const [newRequiredTerm, setNewRequiredTerm] = useState("");
-  const [newPreferredTerm, setNewPreferredTerm] = useState("");
-  const [newDomainTerm, setNewDomainTerm] = useState("");
-
   const [isExtracting, setIsExtracting] = useState(false);
   const [isMatching, setIsMatching] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Phase 4.2: AI Patch Generation state
   const [isGeneratingPatches, setIsGeneratingPatches] = useState(false);
+  const [patchStage, setPatchStage] = useState<AiJobStage>("done");
   const [patchVerified, setPatchVerified] = useState<PatchProposal[]>([]);
   const [patchRejected, setPatchRejected] = useState<RejectedPatch[]>([]);
   const [patchGaps, setPatchGaps] = useState<Gap[]>([]);
@@ -110,9 +139,9 @@ export function TailorWorkspace() {
   const [patchError, setPatchError] = useState<string | null>(null);
   const [savedJobId, setSavedJobId] = useState<string | null>(null);
 
-  // Task 8.4: Tier 2 On-Demand Fetch state
   const [isTier2Fetching, setIsTier2Fetching] = useState<boolean>(false);
   const [tier2Status, setTier2Status] = useState<{ type: "loading" | "success" | "error"; message: string } | null>(null);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
 
   useEffect(() => {
     async function loadMasterOrStarterResume() {
@@ -126,9 +155,7 @@ export function TailorWorkspace() {
           setActiveVariantContent(master.typstSource);
           return;
         }
-      } catch {
-        // Fallback
-      }
+      } catch {}
 
       try {
         const tRes = await fetch("/templates/starter-resume.typ");
@@ -138,16 +165,14 @@ export function TailorWorkspace() {
           setActiveVariantContent(text);
           return;
         }
-      } catch {
-        // Fallback
-      }
+      } catch {}
 
       const defaultSource = `#let resume-section(title) = [ === #title ]\n#resume-section("Skills")\nLanguages: TypeScript, Node.js, Python, PostgreSQL\n#resume-section("Experience")\n*Software Engineer* (2024 - Present)\n- Built REST APIs using Node.js and PostgreSQL.\n`;
       setMasterTypstSource(defaultSource);
       setActiveVariantContent(defaultSource);
     }
 
-    loadMasterOrStarterResume();
+    void loadMasterOrStarterResume().finally(() => setIsBootstrapping(false));
   }, []);
 
   const triggerTier2Fetch = async (jobIdToFetch: string) => {
@@ -164,7 +189,7 @@ export function TailorWorkspace() {
       const json = await res.json();
 
       if (res.ok && json.success && json.data) {
-        setRawDescription(json.data.rawDescription);
+        setRawDescription(convertHtmlToCleanMarkdown(json.data.rawDescription));
         setTier2Status({
           type: "success",
           message: json.cached
@@ -172,28 +197,23 @@ export function TailorWorkspace() {
             : "Successfully extracted full job description text from external posting page!",
         });
       } else {
-        // Fallback gracefully to manual paste
         setTier2Status({
           type: "error",
           message:
             json.error ||
-            "Couldn't extract automatically (page requires JavaScript rendering or login) — please paste the description manually below.",
+            "Couldn't extract automatically (page requires JavaScript rendering or login). Paste using the Role / Company / Requirements format below.",
         });
-        // Clear placeholder text so candidate can paste directly
-        setRawDescription("");
       }
     } catch {
       setTier2Status({
         type: "error",
         message: "Network error during fetch — please paste the description manually below.",
       });
-      setRawDescription("");
     } finally {
       setIsTier2Fetching(false);
     }
   };
 
-  // Task 7.3 & Task 8.4: Auto-populate from ?jobId= param and trigger Tier 2 fetch if placeholder
   useEffect(() => {
     if (!jobIdParam) return;
     async function loadJobById() {
@@ -204,29 +224,78 @@ export function TailorWorkspace() {
           const job = json.data;
           if (job.company) setCompany(job.company);
           if (job.roleTitle) setRoleTitle(job.roleTitle);
-          if (job.rawDescription) setRawDescription(job.rawDescription);
+          if (job.rawDescription) setRawDescription(convertHtmlToCleanMarkdown(job.rawDescription));
           if (job.id) setSavedJobId(job.id);
           sessionStorage.setItem("resumeforge_active_job_id", job.id);
 
-          // Task 8.4: Trigger Tier 2 fetch on-demand ONLY if description is placeholder
           if (isPlaceholderDescription(job.rawDescription)) {
             triggerTier2Fetch(job.id);
           }
         }
-      } catch {
-        // Non-fatal
-      }
+      } catch {}
     }
     loadJobById();
   }, [jobIdParam]);
 
+  const ensureJobSaved = async (opts?: {
+    forceUpdate?: boolean;
+    requirements?: JobRequirements | null;
+  }): Promise<string | null> => {
+    if (!rawDescription.trim()) return null;
+
+    const payload = {
+      company: company.trim() || undefined,
+      roleTitle: roleTitle.trim() || undefined,
+      rawDescription,
+      extractedRequirements: opts?.requirements ?? extractedRequirements ?? undefined,
+    };
+
+    // Update existing saved job with latest posting fields (safe to keep in SQLite)
+    if (savedJobId) {
+      if (opts?.forceUpdate !== false) {
+        try {
+          const updateRes = await fetch(`/api/jobs/${savedJobId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const updateJson = await updateRes.json();
+          if (updateRes.ok && updateJson.success) {
+            setSaveStatus("Job posting saved to database.");
+            return savedJobId;
+          }
+        } catch {
+          // fall through to create if update fails unexpectedly
+        }
+      }
+      return savedJobId;
+    }
+
+    const saveRes = await fetch("/api/jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...payload,
+        source: "pasted",
+      }),
+    });
+    const saveJson = await saveRes.json();
+    if (saveRes.ok && saveJson.success) {
+      setSavedJobId(saveJson.data.id);
+      sessionStorage.setItem("resumeforge_active_job_id", saveJson.data.id);
+      setSaveStatus("Job posting saved to database.");
+      return saveJson.data.id as string;
+    }
+    return null;
+  };
+
   const handleGeneratePatches = async () => {
     if (!extractedRequirements) {
       setPatchError("Please extract requirements from a job description first.");
+      setPatchStage("error");
       return;
     }
 
-    // Load AI settings from localStorage
     let aiSettings;
     try {
       const stored = localStorage.getItem("resumeforge_ai_settings");
@@ -237,41 +306,27 @@ export function TailorWorkspace() {
 
     if (!aiSettings?.provider || !aiSettings?.apiKey) {
       setPatchError("No AI provider configured. Please configure your API key in Settings.");
+      setPatchStage("error");
       return;
     }
 
     setIsGeneratingPatches(true);
+    setPatchStage("connecting");
     setPatchError(null);
     setPatchVerified([]);
     setPatchRejected([]);
     setPatchGaps([]);
 
     try {
-      // Save job first if not already saved
-      let jobId = savedJobId;
+      const jobId = await ensureJobSaved();
       if (!jobId) {
-        const saveRes = await fetch("/api/jobs", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            company: company.trim() || undefined,
-            roleTitle: roleTitle.trim() || undefined,
-            rawDescription,
-            source: "pasted",
-            extractedRequirements: extractedRequirements,
-          }),
-        });
-        const saveJson = await saveRes.json();
-        if (saveRes.ok && saveJson.success) {
-          jobId = saveJson.data.id;
-          setSavedJobId(jobId);
-        } else {
-          setPatchError("Failed to save job posting before patch generation.");
-          setIsGeneratingPatches(false);
-          return;
-        }
+        setPatchError("Failed to save job posting before patch generation.");
+        setPatchStage("error");
+        setIsGeneratingPatches(false);
+        return;
       }
 
+      setPatchStage("writing");
       const res = await fetch("/api/ai/generate-patches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -296,30 +351,20 @@ export function TailorWorkspace() {
 
       if (!res.ok || !json.success) {
         setPatchError(json.error || "Failed to generate patches.");
+        setPatchStage("error");
         setIsGeneratingPatches(false);
         return;
       }
 
+      setPatchStage("verifying");
       setPatchVerified(json.data.verified || []);
       setPatchRejected(json.data.rejected || []);
       setPatchGaps(json.data.gaps || []);
       setMasterResumeId(json.data.masterResumeId || null);
-
-      // Fetch master resume content for diff merge computation
-      if (json.data.masterResumeId) {
-        try {
-          const masterRes = await fetch(`/api/resumes/${json.data.masterResumeId}`);
-          const masterJson = await masterRes.json();
-          if (masterRes.ok && masterJson.success) {
-            setMasterTypstSource(masterJson.data.typstSource || "");
-            setActiveVariantContent(masterJson.data.typstSource || "");
-          }
-        } catch {
-          // Non-fatal — user can still review patches
-        }
-      }
+      setPatchStage("done");
     } catch (err) {
       setPatchError(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      setPatchStage("error");
     } finally {
       setIsGeneratingPatches(false);
     }
@@ -353,12 +398,24 @@ export function TailorWorkspace() {
         setRoleTitle(json.data.roleTitle);
       }
 
-      // Automatically trigger matching after successful extraction
+      // Persist posting + extracted requirements into SQLite (safe to keep)
+      await ensureJobSaved({ forceUpdate: true, requirements: json.data });
+
       await fetchMatches(json.data);
     } catch (err) {
       setErrorMessage(String(err));
     } finally {
       setIsExtracting(false);
+    }
+  };
+
+  const handleSaveJob = async () => {
+    const id = await ensureJobSaved({ forceUpdate: true });
+    if (id) {
+      setSaveStatus("Job posting saved successfully!");
+      setActiveTab("overview");
+    } else {
+      setErrorMessage("Failed to save job posting.");
     }
   };
 
@@ -405,668 +462,799 @@ export function TailorWorkspace() {
     fetchMatches(updated);
   };
 
-  const handleAddRequirement = (category: "required" | "preferred" | "domain") => {
-    if (!extractedRequirements) return;
-
-    let termToAdd = "";
-    if (category === "required") {
-      termToAdd = newRequiredTerm.trim();
-      if (!termToAdd) return;
-      if (!extractedRequirements.requiredSkills.includes(termToAdd)) {
-        const updated = {
-          ...extractedRequirements,
-          requiredSkills: [...extractedRequirements.requiredSkills, termToAdd],
-        };
-        setExtractedRequirements(updated);
-        fetchMatches(updated);
-      }
-      setNewRequiredTerm("");
-    } else if (category === "preferred") {
-      termToAdd = newPreferredTerm.trim();
-      if (!termToAdd) return;
-      if (!extractedRequirements.preferredSkills.includes(termToAdd)) {
-        const updated = {
-          ...extractedRequirements,
-          preferredSkills: [...extractedRequirements.preferredSkills, termToAdd],
-        };
-        setExtractedRequirements(updated);
-        fetchMatches(updated);
-      }
-      setNewPreferredTerm("");
-    } else if (category === "domain") {
-      termToAdd = newDomainTerm.trim();
-      if (!termToAdd) return;
-      if (!extractedRequirements.domainTerms.includes(termToAdd)) {
-        const updated = {
-          ...extractedRequirements,
-          domainTerms: [...extractedRequirements.domainTerms, termToAdd],
-        };
-        setExtractedRequirements(updated);
-        fetchMatches(updated);
-      }
-      setNewDomainTerm("");
-    }
+  const skillIsCovered = (skill: string) => {
+    const needle = skill.toLowerCase();
+    return matches.some(
+      (m) =>
+        m.matchedRequirements.some((r) => r.toLowerCase().includes(needle) || needle.includes(r.toLowerCase())) ||
+        m.verifiedSummary.toLowerCase().includes(needle) ||
+        m.matchedBullets.some((b) => b.text.toLowerCase().includes(needle))
+    );
   };
 
-  const handleSaveJob = async () => {
-    if (!rawDescription.trim()) {
-      setErrorMessage("Please enter a job description to save.");
-      return;
-    }
+  // Ensure a job record exists so CoverLetterPanel can generate,
+  // and keep company / role / description / requirements synced in SQLite.
+  useEffect(() => {
+    if (!rawDescription.trim()) return;
+    const timer = setTimeout(() => {
+      void ensureJobSaved({ forceUpdate: true });
+    }, 900);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawDescription, company, roleTitle, extractedRequirements]);
 
-    setIsSaving(true);
-    setErrorMessage(null);
-    setSaveStatus(null);
+  // Auto-rescan debounce when rawDescription changes
+  useEffect(() => {
+    if (!rawDescription.trim() || rawDescription.length < 50) return;
 
-    try {
-      const res = await fetch("/api/jobs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          company: company.trim() || undefined,
-          roleTitle: roleTitle.trim() || undefined,
-          rawDescription,
-          source: "pasted",
-          extractedRequirements: extractedRequirements || {
-            requiredSkills: [],
-            preferredSkills: [],
-            domainTerms: [],
-          },
-        }),
-      });
-
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        setErrorMessage(json.error || "Failed to save job posting.");
-      } else {
-        setSaveStatus("Job posting saved successfully!");
-        if (json.data?.id) {
-          setSavedJobId(json.data.id);
+    const timer = setTimeout(async () => {
+      try {
+        setIsAutoScanning(true);
+        const res = await fetch("/api/jobs/extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rawDescription }),
+        });
+        const json = await res.json();
+        if (res.ok && json.success && json.data) {
+          setExtractedRequirements(json.data);
+          if (json.data.roleTitle && !roleTitle) {
+            setRoleTitle(json.data.roleTitle);
+          }
+          await fetchMatches(json.data);
         }
+      } catch (err) {
+        console.error("Auto-rescan error:", err);
+      } finally {
+        setIsAutoScanning(false);
       }
-    } catch (err) {
-      setErrorMessage(String(err));
-    } finally {
-      setIsSaving(false);
+    }, 1200);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawDescription]);
+
+  // Refresh matches when requirements present on mount
+  useEffect(() => {
+    if (extractedRequirements) {
+      void fetchMatches(extractedRequirements);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (isBootstrapping) {
+    return <PageSkeleton variant="tailor" />;
+  }
 
   return (
-    <div className="min-h-screen text-slate-100 flex flex-col font-sans" style={{ backgroundColor: "#0A0E17" }}>
-      {/* Shared Top Nav */}
-      <TopNav />
+    <AppShell variant="tailor">
+      <div className="relative z-10 flex-1 pt-8 pb-12 px-4 md:px-8 max-w-7xl mx-auto w-full">
+        <div className="flex justify-between items-end mb-8 gap-4 flex-wrap">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="font-page-title text-4xl font-extrabold text-[#ff8c00] tracking-tighter mb-1">Tailor</h1>
+              {isAutoScanning && (
+                <span
+                  data-testid="auto-scanning-indicator"
+                  className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-mono text-amber-300 animate-pulse"
+                >
+                  <Loader2 className="h-3 w-3 animate-spin" /> Auto-rescanning...
+                </span>
+              )}
+            </div>
+            <p className="font-body-regular text-slate-400 text-sm">
+              Analyze job requirements and forge targeted materials from your master resume + Evidence Bank.
+            </p>
+          </div>
 
-      {/* Active Job Header Indicator */}
-      {(savedJobId || company || roleTitle) && (
-        <div
-          data-testid="active-job-header-banner"
-          className="max-w-7xl w-full mx-auto px-6 pt-4 flex items-center justify-between"
-        >
-          <div className="bg-amber-950/40 border border-amber-800/60 rounded-lg px-3.5 py-2 flex items-center gap-2.5 text-xs text-amber-200 shadow-sm">
-            <Briefcase className="h-4 w-4 text-amber-400 shrink-0" />
-            <span>
-              Active Job Context: <strong className="text-white">{company || "Unknown Company"}</strong> — <span className="text-amber-300 font-medium">{roleTitle || "Untitled Role"}</span>
-            </span>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-[#060e20] px-3 py-1.5">
+              <label
+                htmlFor="tailor-role-profile-select"
+                className="font-mono text-xs text-slate-400 font-medium whitespace-nowrap"
+              >
+                Target Profile:
+              </label>
+              <select
+                id="tailor-role-profile-select"
+                value={selectedRoleProfile}
+                onChange={(e) => setSelectedRoleProfile(e.target.value as RoleProfile)}
+                className="bg-transparent font-mono text-xs font-semibold text-amber-400 outline-none cursor-pointer"
+                data-testid="tailor-role-profile-select"
+              >
+                {ROLE_PROFILES.map((p) => (
+                  <option key={p} value={p} className="bg-slate-900 text-slate-200">
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGeneratePatches}
+              disabled={isGeneratingPatches}
+              data-testid="generate-patches-btn"
+              className="bg-[#ff8c00] text-black font-bold px-6 py-2.5 rounded font-mono text-xs uppercase hover:shadow-[0_0_15px_rgba(255,140,0,0.4)] transition-shadow flex items-center gap-2"
+            >
+              {isGeneratingPatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              Generate AI Patches
+            </button>
           </div>
         </div>
-      )}
 
-      {/* Main Workspace Layout */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Page h1 — visually hidden but present for E2E selectors */}
-        <h1 className="sr-only">Job Tailoring &amp; Requirement Matcher</h1>
-        {/* Left Column: Job Description Input & Sample Buttons */}
-        <section className="lg:col-span-6 flex flex-col gap-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                <FileText className="h-4 w-4 text-amber-400" />
-                Target Job Posting
-              </h2>
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <span>Quick Fill:</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRawDescription(SAMPLE_BACKEND_JD);
-                    setCompany("Acme Corp");
-                    setRoleTitle("Senior Backend Engineer");
-                  }}
-                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded text-xs font-medium transition"
-                  data-testid="sample-backend-btn"
-                >
-                  Backend Posting
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRawDescription(SAMPLE_FRONTEND_JD);
-                    setCompany("WebCraft Systems");
-                    setRoleTitle("Frontend Engineer");
-                  }}
-                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded text-xs font-medium transition"
-                  data-testid="sample-frontend-btn"
-                >
-                  Frontend Posting
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Company (Optional)</label>
-                <input
-                  type="text"
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
-                  placeholder="e.g. Acme Corp"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Role Title (Optional)</label>
-                <input
-                  type="text"
-                  value={roleTitle}
-                  onChange={(e) => setRoleTitle(e.target.value)}
-                  placeholder="e.g. Senior Backend Engineer"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
-                />
-              </div>
-            </div>
-
-            {/* Task 8.4: Tier 2 On-Demand Fetch Banner */}
-            {tier2Status && (
-              <div
-                data-testid="tier2-fetch-status-banner"
-                className={`p-3 rounded-lg flex items-start justify-between gap-3 text-xs border ${
-                  tier2Status.type === "loading"
-                    ? "bg-amber-950/60 border-amber-800/80 text-amber-200"
-                    : tier2Status.type === "success"
-                    ? "bg-emerald-950/60 border-emerald-800/80 text-emerald-200"
-                    : "bg-amber-950/40 border-amber-800/60 text-amber-300"
-                }`}
-              >
-                <div className="flex items-start gap-2">
-                  {tier2Status.type === "loading" ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-amber-400 shrink-0 mt-0.5" />
-                  ) : tier2Status.type === "success" ? (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                  ) : (
-                    <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                  )}
-                  <span>{tier2Status.message}</span>
-                </div>
-                {tier2Status.type === "loading" && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsTier2Fetching(false);
-                      setTier2Status({
-                        type: "error",
-                        message: "Skipped automatic fetch — paste the job description manually below.",
-                      });
-                      setRawDescription("");
-                    }}
-                    className="shrink-0 px-2 py-0.5 bg-amber-900/60 hover:bg-amber-800 text-amber-200 border border-amber-700 text-[11px] rounded font-medium transition"
-                  >
-                    Skip &amp; Paste Manually
-                  </button>
-                )}
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Raw Job Description Text</label>
-              <textarea
-                value={rawDescription}
-                onChange={(e) => setRawDescription(e.target.value)}
-                placeholder="Paste the full job posting requirements and responsibilities here..."
-                rows={12}
-                data-testid="jd-textarea"
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500"
-              />
-            </div>
-
-            {errorMessage && (
-              <div className="p-3 bg-red-950/50 border border-red-800/50 rounded-lg flex items-center gap-2 text-xs text-red-300">
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-                <span>{errorMessage}</span>
-              </div>
-            )}
-
-            {saveStatus && (
-              <div className="p-3 bg-emerald-950/50 border border-emerald-800/50 rounded-lg flex items-center gap-2 text-xs text-emerald-300">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
-                <span>{saveStatus}</span>
-              </div>
-            )}
-
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={handleExtract}
-                disabled={isExtracting || !rawDescription.trim()}
-                data-testid="extract-reqs-btn"
-                className="flex-1 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-semibold text-xs px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition"
-              >
-                <Sparkles className="h-4 w-4" />
-                {isExtracting ? "Extracting Requirements..." : "Extract Requirements"}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSaveJob}
-                disabled={isSaving || !rawDescription.trim()}
-                data-testid="save-job-btn"
-                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition"
-              >
-                <Database className="h-3.5 w-3.5" />
-                {isSaving ? "Saving..." : "Save Job"}
-              </button>
-            </div>
+        {(jobIdParam || savedJobId) && (
+          <div
+            data-testid="active-job-header-banner"
+            className="mb-4 rounded-lg border border-amber-800/50 bg-amber-950/30 px-3 py-2 text-xs text-amber-200"
+          >
+            Active job: {company || "Untitled"} — {roleTitle || "Role"}
           </div>
+        )}
 
-          {/* Extracted Requirements Review Card */}
-          {extractedRequirements && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                  <Search className="h-4 w-4 text-emerald-400" />
-                  Extracted Requirements Editor
-                </h3>
-                <span className="text-xs text-slate-400">Click &apos;X&apos; to remove incorrect terms</span>
-              </div>
+        {(isGeneratingPatches || (patchStage !== "done" && patchStage !== "queued") || patchError) && (
+          <div className="mb-4">
+            <AiProgress
+              stage={patchStage}
+              stages={["connecting", "writing", "verifying", "done"]}
+              error={patchError}
+              onDismissError={() => {
+                setPatchError(null);
+                setPatchStage("done");
+              }}
+            />
+          </div>
+        )}
 
-              {/* Required Skills */}
-              <div>
-                <label className="block text-xs font-semibold text-amber-400 mb-2">
-                  Required Skills & Technologies ({extractedRequirements.requiredSkills.length})
-                </label>
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {extractedRequirements.requiredSkills.map((term) => (
-                    <span
-                      key={term}
-                      data-testid={`req-skill-${term}`}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-amber-950/60 border border-amber-800/60 text-amber-200"
-                    >
-                      {term}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveRequirement("required", term)}
-                        data-testid={`remove-term-${term}`}
-                        className="text-amber-400 hover:text-amber-100 transition"
-                        title="Remove term"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                  {extractedRequirements.requiredSkills.length === 0 && (
-                    <span className="text-xs text-slate-500 italic">No required skills detected</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={newRequiredTerm}
-                    onChange={(e) => setNewRequiredTerm(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAddRequirement("required")}
-                    placeholder="Add custom required skill..."
-                    className="flex-1 bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-white placeholder-slate-600 focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleAddRequirement("required")}
-                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs flex items-center gap-1"
-                  >
-                    <Plus className="h-3 w-3" /> Add
-                  </button>
-                </div>
-              </div>
-
-              {/* Preferred Skills */}
-              <div>
-                <label className="block text-xs font-semibold text-amber-300 mb-2">
-                  Preferred Skills / Nice to Have ({extractedRequirements.preferredSkills.length})
-                </label>
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {extractedRequirements.preferredSkills.map((term) => (
-                    <span
-                      key={term}
-                      data-testid={`pref-skill-${term}`}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-amber-950/60 border border-amber-800/60 text-amber-200"
-                    >
-                      {term}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveRequirement("preferred", term)}
-                        data-testid={`remove-term-${term}`}
-                        className="text-amber-400 hover:text-amber-100 transition"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                  {extractedRequirements.preferredSkills.length === 0 && (
-                    <span className="text-xs text-slate-500 italic">No preferred skills detected</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={newPreferredTerm}
-                    onChange={(e) => setNewPreferredTerm(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAddRequirement("preferred")}
-                    placeholder="Add custom preferred skill..."
-                    className="flex-1 bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-white placeholder-slate-600 focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleAddRequirement("preferred")}
-                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs flex items-center gap-1"
-                  >
-                    <Plus className="h-3 w-3" /> Add
-                  </button>
-                </div>
-              </div>
-
-              {/* Domain Terms */}
-              <div>
-                <label className="block text-xs font-semibold text-emerald-300 mb-2">
-                  Domain Concepts & System Architecture ({extractedRequirements.domainTerms.length})
-                </label>
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {extractedRequirements.domainTerms.map((term) => (
-                    <span
-                      key={term}
-                      data-testid={`domain-term-${term}`}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-950/60 border border-emerald-800/60 text-emerald-200"
-                    >
-                      {term}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveRequirement("domain", term)}
-                        data-testid={`remove-term-${term}`}
-                        className="text-emerald-400 hover:text-emerald-100 transition"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                  {extractedRequirements.domainTerms.length === 0 && (
-                    <span className="text-xs text-slate-500 italic">No domain terms detected</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={newDomainTerm}
-                    onChange={(e) => setNewDomainTerm(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAddRequirement("domain")}
-                    placeholder="Add custom domain term..."
-                    className="flex-1 bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-white placeholder-slate-600 focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleAddRequirement("domain")}
-                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs flex items-center gap-1"
-                  >
-                    <Plus className="h-3 w-3" /> Add
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </section>
-
-        {/* Right Column: Ranked Evidence Recommendations */}
-        <section className="lg:col-span-6 flex flex-col gap-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div>
-                <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-amber-400" />
-                  Ranked Evidence Bank Matches
-                </h2>
-                <p className="text-xs text-slate-400">
-                  Matches derived from tag and bullet technology overlap with target JD
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => extractedRequirements && fetchMatches(extractedRequirements)}
-                disabled={isMatching || !extractedRequirements}
-                data-testid="find-matches-btn"
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-200 rounded-md flex items-center gap-1 transition"
-              >
-                <Search className="h-3.5 w-3.5" />
-                Re-Match
-              </button>
-            </div>
-
-            {isMatching && (
-              <div className="text-center py-12 text-slate-400 text-xs animate-pulse">
-                Evaluating Evidence Bank items against extracted requirements...
+        {(errorMessage || saveStatus) && (
+          <div className="mb-4 space-y-2">
+            {errorMessage && (
+              <div className="rounded-lg border border-red-800/60 bg-red-950/40 px-3 py-2 text-xs text-red-300 flex items-center gap-2">
+                <AlertTriangle className="h-3.5 w-3.5" /> {errorMessage}
               </div>
             )}
-
-            {!isMatching && matches.length === 0 && (
-              <div className="text-center py-12 text-slate-500 text-xs space-y-2">
-                <BookOpen className="h-8 w-8 mx-auto text-slate-600" />
-                <p>No matching evidence bank items found yet.</p>
-                <p className="text-slate-600">
-                  Extract requirements from a job posting to view ranked evidence recommendations.
-                </p>
+            {saveStatus && (
+              <div className="rounded-lg border border-emerald-800/60 bg-emerald-950/40 px-3 py-2 text-xs text-emerald-300 flex items-center gap-2">
+                <CheckCircle2 className="h-3.5 w-3.5" /> {saveStatus}
               </div>
             )}
+          </div>
+        )}
 
-            {!isMatching && matches.length > 0 && (
-              <div className="space-y-4" data-testid="evidence-matches-list">
-                {matches.map((item) => (
-                  <div
-                    key={item.id}
-                    data-testid={`match-card-${item.id}`}
-                    className="bg-slate-950 border border-slate-800/80 hover:border-slate-700 rounded-xl p-4 transition space-y-3"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-semibold text-sm text-white">{item.title}</h4>
-                          {item.organization && (
-                            <span className="text-xs text-slate-400">@ {item.organization}</span>
-                          )}
-                          <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                            {item.type}
-                          </span>
-                          {/* Unverified Draft Badge */}
-                          {item.isDraft && (
-                            <span
-                              data-testid="draft-unverified-badge"
-                              className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800/80 flex items-center gap-1"
-                            >
-                              <AlertTriangle className="h-3 w-3" /> Unverified Draft
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-300 mt-1">{item.verifiedSummary}</p>
-                      </div>
+        {tier2Status && (
+          <div
+            className={`mb-4 rounded-lg border px-3 py-2 text-xs flex items-start gap-2 ${
+              tier2Status.type === "error"
+                ? "border-red-800/60 bg-red-950/40 text-red-300"
+                : tier2Status.type === "success"
+                ? "border-emerald-800/60 bg-emerald-950/40 text-emerald-300"
+                : "border-slate-700 bg-slate-900 text-slate-300"
+            }`}
+          >
+            {isTier2Fetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            <span>{tier2Status.message}</span>
+          </div>
+        )}
 
-                      <div className="text-right shrink-0">
-                        <span className="inline-block px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-950 text-indigo-300 border border-indigo-800">
-                          {item.matchPercentage}% Match
+        {/* Tab Navigation */}
+        <div className="flex items-center gap-2 border-b border-slate-800 pb-3 mb-6" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "overview"}
+            onClick={() => setActiveTab("overview")}
+            data-testid="tailor-tab-overview"
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-mono font-semibold transition ${
+              activeTab === "overview"
+                ? "bg-amber-500/15 border border-amber-500/40 text-amber-300 shadow-sm"
+                : "border border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-white"
+            }`}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Overview & Materials
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "job-info"}
+            onClick={() => setActiveTab("job-info")}
+            data-testid="tailor-tab-job-info"
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-mono font-semibold transition ${
+              activeTab === "job-info"
+                ? "bg-amber-500/15 border border-amber-500/40 text-amber-300 shadow-sm"
+                : "border border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-white"
+            }`}
+          >
+            <Briefcase className="h-3.5 w-3.5" />
+            Job Info & Requirements
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          <div className="xl:col-span-7 flex flex-col gap-6 min-w-0">
+            {activeTab === "overview" ? (
+              <>
+                {/* Overview Summary Card */}
+                <section className="glass-panel rounded-lg p-5 glow-effect transition-shadow" data-testid="tailor-overview-panel">
+                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
+                    <div className="flex items-center gap-2">
+                      <Briefcase className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
+                      <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">
+                        Target Role: {roleTitle || "Untitled Role"}
+                      </h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("job-info")}
+                      data-testid="edit-job-info-btn"
+                      className="text-xs text-amber-400 hover:underline font-mono"
+                    >
+                      Edit Job &amp; Reqs →
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <div className="text-xs text-slate-300">
+                      <span className="text-slate-500 font-mono">Company:</span> {company || "Unspecified"}
+                    </div>
+
+                    {extractedRequirements && extractedRequirements.requiredSkills.length > 0 && (
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] text-slate-500 font-mono uppercase tracking-wider">
+                          Key Required Skills:
                         </span>
-                        <div className="text-[10px] text-slate-500 mt-1 font-mono">{item.score} pts</div>
-                      </div>
-                    </div>
-
-                    {/* Satisfied Requirements Badges */}
-                    <div>
-                      <div className="text-[11px] font-medium text-slate-400 mb-1">
-                        Satisfied Requirements:
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {item.matchedRequirements.map((req) => (
-                          <span
-                            key={req}
-                            data-testid="matched-req-badge"
-                            className="px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-950/80 text-emerald-300 border border-emerald-800/80 flex items-center gap-1"
-                          >
-                            <CheckCircle2 className="h-3 w-3 text-emerald-400" />
-                            {req}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Bullets */}
-                    {item.matchedBullets.length > 0 && (
-                      <div className="border-t border-slate-900 pt-2 space-y-1.5">
-                        <div className="text-[11px] text-slate-400">Supporting Verified Bullets:</div>
-                        {item.matchedBullets.map((bullet) => (
-                          <div
-                            key={bullet.id}
-                            className="text-xs text-slate-300 bg-slate-900/60 p-2 rounded border border-slate-800/60 flex items-start gap-2"
-                          >
-                            <ArrowRight className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
-                            <div className="space-y-1">
-                              <p>{bullet.text}</p>
-                              <div className="flex flex-wrap gap-1">
-                                {bullet.technologies.map((tech) => (
-                                  <span
-                                    key={tech}
-                                    className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded"
-                                  >
-                                    {tech}
-                                  </span>
-                                ))}
-                                {!bullet.verified && (
-                                  <span className="text-[10px] text-amber-400 bg-amber-950 px-1.5 py-0.5 rounded font-mono">
-                                    unverified
-                                  </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {extractedRequirements.requiredSkills.slice(0, 8).map((skill) => {
+                            const covered = skillIsCovered(skill);
+                            return (
+                              <span
+                                key={skill}
+                                className={`px-2 py-0.5 rounded text-[11px] font-mono border flex items-center gap-1 ${
+                                  covered
+                                    ? "bg-emerald-950/40 border-emerald-800/60 text-emerald-300"
+                                    : "bg-slate-900 border-slate-700 text-slate-400"
+                                }`}
+                              >
+                                {covered ? (
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                                ) : (
+                                  <XCircle className="h-3 w-3 text-slate-500" />
                                 )}
-                              </div>
+                                {skill}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                {(patchVerified.length > 0 || patchRejected.length > 0 || patchGaps.length > 0) &&
+                  masterResumeId &&
+                  savedJobId && (
+                    <PatchDiffReview
+                      verified={patchVerified}
+                      rejected={patchRejected}
+                      gaps={patchGaps}
+                      masterResumeId={masterResumeId}
+                      masterTypstSource={masterTypstSource || activeVariantContent}
+                      jobId={savedJobId}
+                      onApplySuccess={(_variantId, mergedContent) => {
+                        setActiveVariantContent(mergedContent);
+                        setSaveStatus("Tailored variant applied — ATS will re-score against updated content.");
+                      }}
+                    />
+                  )}
+
+                <section className="glass-panel rounded-lg p-5 flex flex-col glow-effect transition-shadow">
+                  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800/60">
+                    <FileText className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
+                    <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">
+                      Generated Cover Letter
+                    </h2>
+                  </div>
+                  {savedJobId ? (
+                    <CoverLetterPanel
+                      jobId={savedJobId}
+                      company={company}
+                      roleTitle={roleTitle}
+                      rawDescription={rawDescription}
+                      extractedRequirements={extractedRequirements || undefined}
+                    />
+                  ) : (
+                    <p className="text-xs text-slate-400">
+                      Paste a job description to create a saved job, then generate an evidence-grounded cover letter.
+                    </p>
+                  )}
+                </section>
+              </>
+            ) : (
+              <>
+                {/* Job Info & Requirements View */}
+                <section className="glass-panel rounded-lg p-5 glow-effect transition-shadow" data-testid="tailor-job-info-panel">
+                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
+                    <div className="flex items-center gap-2">
+                      <Briefcase className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
+                      <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">Target Job Posting</h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("overview")}
+                      data-testid="back-to-overview-btn"
+                      className="text-xs text-amber-400 hover:underline font-mono"
+                    >
+                      ← Back to Overview
+                    </button>
+                  </div>
+
+                  {/* Diagnostics / Confidence Banner */}
+                  <div className="mb-4">
+                    {jobDoc.diagnostics.status === "VERIFIED_ATS" && (
+                      <div
+                        data-testid="confidence-banner-verified-ats"
+                        className="p-2.5 rounded-md bg-emerald-950/60 border border-emerald-800 text-xs text-emerald-300 font-mono flex items-center gap-2"
+                      >
+                        <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
+                        <span>✓ Verified ATS Source: Loaded directly from official ATS endpoint. No action needed.</span>
+                      </div>
+                    )}
+                    {jobDoc.diagnostics.status === "STRUCTURED_PAGE" && (
+                      <div
+                        data-testid="confidence-banner-structured-page"
+                        className="p-2.5 rounded-md bg-blue-950/60 border border-blue-800 text-xs text-blue-300 font-mono flex items-center gap-2"
+                      >
+                        <FileText className="size-4 text-blue-400 shrink-0" />
+                        <span>ℹ Structured Page Extraction: JSON-LD or semantic HTML. Review extracted sections.</span>
+                      </div>
+                    )}
+                    {jobDoc.diagnostics.status === "PARTIAL_EXTRACTION" && (
+                      <div
+                        data-testid="confidence-banner-partial-extraction"
+                        className="p-2.5 rounded-md bg-amber-950/60 border border-amber-800 text-xs text-amber-300 font-mono flex items-center gap-2"
+                      >
+                        <AlertTriangle className="size-4 text-amber-400 shrink-0" />
+                        <span>⚠ Partial Extraction: Description may be incomplete. Paste full description below.</span>
+                      </div>
+                    )}
+                    {jobDoc.diagnostics.status === "USER_PASTED" && (
+                      <div
+                        data-testid="confidence-banner-user-pasted"
+                        className="p-2.5 rounded-md bg-slate-900/80 border border-slate-700 text-xs text-slate-300 font-mono flex items-center gap-2"
+                      >
+                        <FileText className="size-4 text-slate-400 shrink-0" />
+                        <span>✎ User Pasted: Candidate-provided source. Edit sections as needed.</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Sub-tab Selector */}
+                  <div className="flex items-center gap-1 border-b border-slate-800/80 mb-4 pb-2">
+                    <button
+                      type="button"
+                      onClick={() => setJobInfoSubTab("structured")}
+                      data-testid="job-subtab-structured"
+                      className={`px-3 py-1 text-xs font-mono rounded transition-colors ${
+                        jobInfoSubTab === "structured"
+                          ? "bg-[#ff8c00] text-slate-950 font-bold"
+                          : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+                      }`}
+                    >
+                      Structured Breakdown
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setJobInfoSubTab("original")}
+                      data-testid="job-subtab-original"
+                      className={`px-3 py-1 text-xs font-mono rounded transition-colors ${
+                        jobInfoSubTab === "original"
+                          ? "bg-[#ff8c00] text-slate-950 font-bold"
+                          : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+                      }`}
+                    >
+                      Original Source
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setJobInfoSubTab("details")}
+                      data-testid="job-subtab-details"
+                      className={`px-3 py-1 text-xs font-mono rounded transition-colors ${
+                        jobInfoSubTab === "details"
+                          ? "bg-[#ff8c00] text-slate-950 font-bold"
+                          : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+                      }`}
+                    >
+                      Extraction Details
+                    </button>
+                  </div>
+
+                  {/* Subtab 1: Structured Breakdown */}
+                  {jobInfoSubTab === "structured" && (
+                    <div className="space-y-4 font-mono text-xs">
+                      {/* Sections breakdown */}
+                      <div className="space-y-2.5">
+                        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                          Document Sections ({jobDoc.sections.length})
+                        </span>
+                        {jobDoc.sections.map((sec) => (
+                          <div
+                            key={sec.id}
+                            className="p-3 rounded bg-[#060e20] border border-slate-800 space-y-1.5"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-[#ffb77d]">{sec.heading}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold uppercase">
+                                {sec.kind}
+                              </span>
+                            </div>
+                            <div className="text-slate-300 text-[11px] whitespace-pre-wrap leading-relaxed">
+                              {sec.markdown}
                             </div>
                           </div>
                         ))}
                       </div>
-                    )}
+
+                      {/* Add Custom User Requirement */}
+                      <div className="p-3 rounded bg-[#060e20] border border-slate-800 space-y-2">
+                        <span className="font-semibold text-slate-300 block">
+                          Add Custom Requirement (User-Added)
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={newUserReqText}
+                            onChange={(e) => setNewUserReqText(e.target.value)}
+                            placeholder="e.g. 5+ years Go microservices experience"
+                            data-testid="add-user-requirement-input"
+                            className="flex-1 bg-slate-900 border border-slate-700 p-1.5 text-xs text-slate-200 rounded outline-none focus:border-[#ff8c00]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!newUserReqText.trim()) return;
+                              const newReq = createUserRequirement(newUserReqText.trim());
+                              setCustomUserReqs((prev) => [...prev, newReq]);
+                              if (extractedRequirements) {
+                                setExtractedRequirements({
+                                  ...extractedRequirements,
+                                  requiredSkills: Array.from(
+                                    new Set([...extractedRequirements.requiredSkills, newReq.label])
+                                  ),
+                                });
+                              }
+                              setNewUserReqText("");
+                            }}
+                            data-testid="add-user-requirement-btn"
+                            className="px-3 py-1.5 rounded bg-[#ff8c00] text-slate-950 font-bold text-xs hover:bg-amber-400"
+                          >
+                            Add Requirement
+                          </button>
+                        </div>
+                        {customUserReqs.length > 0 && (
+                          <div className="pt-2 space-y-1">
+                            <span className="text-[10px] text-slate-400">Custom User Requirements:</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {customUserReqs.map((req) => (
+                                <span
+                                  key={req.id}
+                                  className="px-2 py-0.5 rounded bg-amber-950/60 border border-amber-800 text-[11px] text-amber-300 flex items-center gap-1"
+                                >
+                                  <span>{req.label}</span>
+                                  <span className="text-[9px] px-1 rounded bg-amber-900 text-amber-100 font-bold">
+                                    USER_ADDED
+                                  </span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Subtab 2: Original Source */}
+                  {jobInfoSubTab === "original" && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label htmlFor="tailor-company" className="block font-mono text-xs text-slate-400 mb-1">Company</label>
+                          <input
+                            id="tailor-company"
+                            name="company"
+                            type="text"
+                            autoComplete="organization"
+                            value={company}
+                            onChange={(e) => setCompany(e.target.value)}
+                            className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="tailor-role" className="block font-mono text-xs text-slate-400 mb-1">Role</label>
+                          <input
+                            id="tailor-role"
+                            name="role"
+                            type="text"
+                            autoComplete="off"
+                            value={roleTitle}
+                            onChange={(e) => setRoleTitle(e.target.value)}
+                            className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block font-mono text-xs text-slate-400 mb-1 flex justify-between">
+                          <span>Raw Description</span>
+                          <button
+                            type="button"
+                            onClick={handleExtract}
+                            disabled={isExtracting}
+                            data-testid="extract-reqs-btn"
+                            className="text-xs text-[#4edea3] hover:underline font-mono"
+                          >
+                            {isExtracting ? "Scanning..." : "Extract Requirements"}
+                          </button>
+                        </label>
+                        <textarea
+                          value={rawDescription}
+                          onChange={(e) => setRawDescription(e.target.value)}
+                          rows={8}
+                          data-testid="jd-textarea"
+                          aria-label="Job description"
+                          placeholder={JD_PASTE_TEMPLATE}
+                          className="w-full bg-[#060e20] text-slate-200 font-mono text-xs p-4 rounded border border-slate-800 focus:border-[#ff8c00] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 resize-none leading-relaxed"
+                        />
+                        {tier2Status?.type === "error" ? (
+                          <pre className="mt-2 whitespace-pre-wrap rounded border border-slate-800 bg-[#060e20] p-3 font-mono text-[10px] leading-relaxed text-slate-500">
+                            {JD_PASTE_TEMPLATE}
+                          </pre>
+                        ) : null}
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            data-testid="sample-backend-btn"
+                            onClick={() => {
+                              setCompany("Nova Labs");
+                              setRoleTitle("Senior Backend Engineer");
+                              setRawDescription(SAMPLE_BACKEND_JD);
+                            }}
+                            className="text-[10px] font-mono px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-white"
+                          >
+                            Sample Backend JD
+                          </button>
+                          <button
+                            type="button"
+                            data-testid="sample-frontend-btn"
+                            onClick={() => {
+                              setCompany("WebCraft Systems");
+                              setRoleTitle("Frontend Engineer");
+                              setRawDescription(SAMPLE_FRONTEND_JD);
+                            }}
+                            className="text-[10px] font-mono px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-white"
+                          >
+                            Sample Frontend JD
+                          </button>
+                          <button
+                            type="button"
+                            data-testid="save-job-btn"
+                            onClick={() => void handleSaveJob()}
+                            className="text-[10px] font-mono px-2 py-1 rounded border border-emerald-700/60 text-emerald-300 hover:text-white"
+                          >
+                            Save Job
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Subtab 3: Extraction Details */}
+                  {jobInfoSubTab === "details" && (
+                    <div className="space-y-3 font-mono text-xs">
+                      <div className="p-3 rounded bg-[#060e20] border border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Ingestion Source Kind:</span>
+                          <span className="px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800 font-bold text-[10px]">
+                            {jobDoc.sourceKind}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Acquired At:</span>
+                          <span className="text-slate-200 text-[11px]">{jobDoc.acquiredAt}</span>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-slate-400 block">Content Hash (SHA-256):</span>
+                          <code className="block p-1.5 rounded bg-slate-950 border border-slate-800 text-[10px] text-emerald-400 break-all">
+                            {jobDoc.contentHash}
+                          </code>
+                        </div>
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-slate-400">Diagnostics Status:</span>
+                          <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold text-[10px]">
+                            {jobDoc.diagnostics.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </section>
+
+                <section className="glass-panel rounded-lg p-5 glow-effect transition-shadow">
+                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
+                    <div className="flex items-center gap-2">
+                      <ClipboardCheck className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
+                      <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">Extracted Requirements</h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleExtract}
+                      className="text-[#4edea3] text-xs hover:underline font-mono"
+                    >
+                      {isExtracting ? "Scanning..." : isMatching ? "Matching..." : "Re-Scan"}
+                    </button>
+                  </div>
+
+                  {extractedRequirements && (
+                    <>
+                      <div className="mb-4">
+                        <h3 className="font-mono text-xs text-slate-400 mb-2">Required Skills</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {extractedRequirements.requiredSkills.map((skill) => {
+                            const covered = skillIsCovered(skill);
+                            return (
+                              <div
+                                key={skill}
+                                className={`flex items-center gap-1.5 px-2.5 py-1 bg-[#171f33] rounded text-xs font-mono border ${
+                                  covered ? "border-[#4edea3]/40 text-slate-300" : "border-red-500/40 text-slate-300"
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveRequirement("required", skill)}
+                                  title="Click to remove"
+                                  data-testid={`req-skill-${skill}`}
+                                  className="flex items-center gap-1.5 hover:text-white"
+                                >
+                                  {covered ? (
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-[#4edea3] shrink-0" aria-hidden />
+                                  ) : (
+                                    <XCircle className="h-3.5 w-3.5 text-red-400 shrink-0" aria-hidden />
+                                  )}
+                                  {skill}
+                                  <span data-testid={`remove-term-${skill}`} className="inline-flex">
+                                    <X className="h-3 w-3 opacity-50" />
+                                  </span>
+                                </button>
+                                {!covered && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setGapSkillToResolve(skill);
+                                    }}
+                                    data-testid={`resolve-gap-${skill}`}
+                                    className="ml-1 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300 hover:bg-amber-500/30 transition-colors flex items-center gap-0.5"
+                                    title="Add evidence for this missing skill"
+                                  >
+                                    <Plus className="h-2.5 w-2.5" />
+                                    Add
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="font-mono text-xs text-slate-400 mb-2">Preferred Skills</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {extractedRequirements.preferredSkills.map((skill) => (
+                            <button
+                              type="button"
+                              key={skill}
+                              onClick={() => handleRemoveRequirement("preferred", skill)}
+                              className="px-2.5 py-1 bg-[#171f33] rounded text-xs font-mono border border-slate-700 text-slate-400 flex items-center gap-1"
+                            >
+                              {skill}
+                              <X className="h-3 w-3 opacity-50" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </section>
+              </>
+            )}
+          </div>
+
+          <div className="xl:col-span-5 flex flex-col gap-6 min-w-0">
+            {extractedRequirements && (activeVariantContent || masterTypstSource) ? (
+              <section className="glass-panel rounded-lg p-5 min-w-0">
+                <AtsScorePanel
+                  typstContent={activeVariantContent || masterTypstSource}
+                  extractedRequirements={extractedRequirements}
+                  roleTitle={roleTitle}
+                  rawDescription={rawDescription}
+                  initialProfile={selectedRoleProfile}
+                  onProfileChange={setSelectedRoleProfile}
+                  includeEvidenceBank
+                  className="!bg-transparent !border-0 !shadow-none !p-0"
+                />
+              </section>
+            ) : (
+              <section className="glass-panel rounded-lg p-5 text-xs text-slate-400">
+                Extract job requirements to run ATS scoring against your master resume and Evidence Bank.
+              </section>
+            )}
+
+            <section className="glass-panel rounded-lg p-5">
+              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800/60">
+                <Database className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
+                <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">Evidence Matches</h2>
+              </div>
+              <div className="space-y-3">
+                {isMatching && (
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Matching Evidence Bank...
+                  </div>
+                )}
+                {!isMatching && matches.length === 0 && (
+                  <p className="text-xs text-slate-500">No evidence matches yet. Re-scan after updating the Evidence Bank.</p>
+                )}
+                {matches.slice(0, 6).map((m) => (
+                  <div
+                    key={m.id}
+                    className="p-3 bg-[#171f33] border border-slate-700/60 rounded hover:border-[#ff8c00]/50 transition-colors"
+                  >
+                    <div className="flex justify-between items-start mb-1 gap-2">
+                      <h4 className="font-bold text-sm text-white">{m.title}</h4>
+                      <span
+                        className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                          m.matchPercentage >= 60
+                            ? "bg-[#062c24] border-[#065f46] text-[#34d399]"
+                            : "bg-slate-800 text-slate-400 border-slate-700"
+                        }`}
+                      >
+                        {m.matchPercentage}% · {m.matchPercentage >= 60 ? "High" : "Low"} Match
+                      </span>
+                    </div>
+                    <p className="font-mono text-xs text-slate-400 mb-2">
+                      {m.organization ? `@ ${m.organization}` : ""}
+                      {m.dates ? ` • ${m.dates}` : ""}
+                      {m.isDraft ? " · draft" : ""}
+                    </p>
+                    <p className="text-xs text-slate-300 line-clamp-2">{m.verifiedSummary}</p>
+                    {m.matchedRequirements.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {m.matchedRequirements.slice(0, 4).map((req) => (
+                          <span
+                            key={req}
+                            data-testid="matched-req-badge"
+                            className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700"
+                          >
+                            {req}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        </section>
-      </main>
-
-      {/* Phase 4.2: AI Patch Generation Section */}
-      {extractedRequirements && (
-        <div className="max-w-7xl w-full mx-auto px-6 pb-8 space-y-6">
-          <div className="border-t border-slate-800 pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                <Wand2 className="h-4 w-4 text-amber-400" />
-                AI Patch Generator
-                <span className="text-xs font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">
-                  BYOK AI
-                </span>
-              </h2>
-              <div className="flex items-center gap-2">
-                <Link
-                  href="/settings"
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 rounded-md flex items-center gap-1.5 transition"
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                  AI Settings
-                </Link>
-                <button
-                  type="button"
-                  onClick={handleGeneratePatches}
-                  disabled={isGeneratingPatches}
-                  data-testid="generate-patches-btn"
-                  className="bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-semibold text-xs px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg shadow-amber-500/20 transition"
-                >
-                  {isGeneratingPatches ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Generating Patches...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4" />
-                      Generate AI Patches
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Patch error banner — shown immediately above generate button so it's always visible */}
-            {patchError && (
-              <div
-                data-testid="patch-error-banner"
-                className={`p-3 rounded-lg flex items-start gap-3 text-xs mb-4 ${
-                  patchError.toLowerCase().includes("no ai provider") ||
-                  patchError.toLowerCase().includes("not configured")
-                    ? "bg-amber-950/50 border border-amber-800/60 text-amber-300"
-                    : "bg-red-950/50 border border-red-800/50 text-red-300"
-                }`}
-              >
-                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                <div className="flex-1 space-y-1">
-                  <span>{patchError}</span>
-                  {(patchError.toLowerCase().includes("no ai provider") ||
-                    patchError.toLowerCase().includes("not configured") ||
-                    patchError.toLowerCase().includes("api key")) && (
-                    <div>
-                      <Link
-                        href="/settings"
-                        className="underline underline-offset-2 text-amber-400 hover:text-amber-300 font-medium"
-                      >
-                        → Go to Settings to configure your API key
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {(patchVerified.length > 0 || patchRejected.length > 0 || patchGaps.length > 0) && masterResumeId && savedJobId && (
-              <PatchDiffReview
-                verified={patchVerified}
-                rejected={patchRejected}
-                gaps={patchGaps}
-                masterResumeId={masterResumeId}
-                masterTypstSource={masterTypstSource}
-                jobId={savedJobId}
-                onApplySuccess={(variantId, mergedContent) => {
-                  setActiveVariantContent(mergedContent);
-                }}
-              />
-            )}
-
-            {extractedRequirements && (
-              <div className="pt-6 space-y-6">
-                <AtsScorePanel
-                  typstContent={activeVariantContent || masterTypstSource || "// Master Resume"}
-                  extractedRequirements={extractedRequirements}
-                  roleTitle={roleTitle}
-                />
-
-                {savedJobId && (
-                  <CoverLetterPanel
-                    jobId={savedJobId}
-                    company={company}
-                    roleTitle={roleTitle}
-                    rawDescription={rawDescription}
-                    extractedRequirements={extractedRequirements}
-                  />
-                )}
-              </div>
-            )}
+            </section>
           </div>
         </div>
-      )}
-    </div>
+      </div>
+      <QuickAddEvidenceModal
+        isOpen={Boolean(gapSkillToResolve)}
+        onClose={() => setGapSkillToResolve(null)}
+        initialSkill={gapSkillToResolve || ""}
+        onEvidenceCreated={async () => {
+          if (extractedRequirements) {
+            await fetchMatches(extractedRequirements);
+          }
+        }}
+      />
+    </AppShell>
   );
 }

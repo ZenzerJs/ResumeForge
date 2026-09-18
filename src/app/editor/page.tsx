@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { EditorWorkspace } from "@/components/editor/editor-workspace";
+import { EditorWorkspaceSkeleton } from "@/components/editor/editor-workspace-skeleton";
 
 export const metadata = {
   title: "Typst Workspace | ResumeForge",
@@ -8,13 +9,7 @@ export const metadata = {
 
 export default function EditorPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="dark flex h-dvh w-screen items-center justify-center bg-background text-muted-foreground text-xs font-mono">
-          Loading editor workspace...
-        </div>
-      }
-    >
+    <Suspense fallback={<EditorWorkspaceSkeleton />}>
       <EditorWorkspace />
     </Suspense>
   );

@@ -15,7 +15,7 @@ test.describe("Phase 4.2: AI Patch Generator Workspace", () => {
   });
 
   test("should render the tailor workspace page", async ({ page }) => {
-    await expect(page.locator("h1")).toContainText("Job Tailoring");
+    await expect(page.locator("h1")).toContainText("Tailor");
     await expect(page.locator('[data-testid="jd-textarea"]')).toBeVisible();
   });
 

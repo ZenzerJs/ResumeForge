@@ -79,9 +79,21 @@ test.describe("Typst Live-Preview Workspace E2E Tests", () => {
   test("4. Export PDF downloads valid PDF file with extractable text", async ({ page }) => {
     await page.waitForSelector(".typst-preview-svg svg", { timeout: 15000 });
 
+    const editor = page.locator(".cm-content").first();
+    await editor.click();
+    await page.keyboard.press("Control+A");
+    await page.keyboard.type("= ResumeForge Export Probe\n\nAlex Morgan · Backend Developer\n");
+    await page.keyboard.press("Control+s");
+    await page.waitForSelector(".typst-preview-svg svg", { timeout: 15000 });
+
     // Intercept download event
     const downloadPromise = page.waitForEvent("download");
-    await page.click("button:has-text('Export PDF')");
+    if (await page.locator("[data-testid='export-dropdown-btn']").isVisible()) {
+      await page.click("[data-testid='export-dropdown-btn']");
+      await page.click("[data-testid='export-pdf-menu-item']");
+    } else {
+      await page.click("button:has-text('Export PDF')");
+    }
     const download = await downloadPromise;
 
     expect(download.suggestedFilename()).toBe("resume.pdf");
@@ -102,7 +114,7 @@ test.describe("Typst Live-Preview Workspace E2E Tests", () => {
 
       expect(extractedText).toBeTruthy();
       expect(extractedText.length).toBeGreaterThan(10);
-      expect(extractedText).toMatch(/Alex Morgan|ResumeForge|Technical Skills|Test Master Typst|Database Master|Jane Smith|Backend Developer/i);
+      expect(extractedText).toMatch(/Alex Morgan|ResumeForge|Technical Skills|Test Master Typst|Database Master|Jane Smith|Backend Developer|Export Probe/i);
     }
   });
 });

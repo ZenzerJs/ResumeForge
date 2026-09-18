@@ -1,0 +1,19 @@
+{
+  "results": [
+    {
+      "id": "adzuna-ca-112233",
+      "title": "Senior Frontend React Developer",
+      "description": "Looking for an experienced React/Next.js developer for Canadian fintech company.",
+      "company": {
+        "display_name": "Canadian Fintech Inc."
+      },
+      "location": {
+        "display_name": "Calgary, Alberta, Canada"
+      },
+      "redirect_url": "https://www.adzuna.ca/land/ad/adzuna-ca-112233?utm_source=adzuna_api",
+      "created": "2026-08-12T09:00:00Z",
+      "salary_min": 110000,
+      "salary_max": 145000
+    }
+  ]
+}

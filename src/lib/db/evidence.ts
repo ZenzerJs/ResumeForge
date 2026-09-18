@@ -17,6 +17,7 @@ export interface CreateEvidenceItemInput {
   tags?: string[];
   status?: string; // verified | draft | archived
   bullets?: BulletInput[];
+  userId?: string;
 }
 
 export interface UpdateEvidenceItemInput {
@@ -30,8 +31,10 @@ export interface UpdateEvidenceItemInput {
   bullets?: BulletInput[];
 }
 
-export async function getEvidenceItems(statusFilter?: string) {
-  const where = statusFilter && statusFilter !== "all" ? { status: statusFilter } : {};
+export async function getEvidenceItems(statusFilter?: string, userId?: string) {
+  const where: Record<string, unknown> = {};
+  if (statusFilter && statusFilter !== "all") where.status = statusFilter;
+  if (userId) where.userId = userId;
 
   const items = await prisma.evidenceItem.findMany({
     where,
@@ -54,9 +57,9 @@ export async function getEvidenceItems(statusFilter?: string) {
   }));
 }
 
-export async function getEvidenceItemById(id: string) {
-  const item = await prisma.evidenceItem.findUnique({
-    where: { id },
+export async function getEvidenceItemById(id: string, userId?: string) {
+  const item = await prisma.evidenceItem.findFirst({
+    where: { id, ...(userId ? { userId } : {}) },
     include: {
       bullets: {
         orderBy: { orderIndex: "asc" },
@@ -97,6 +100,7 @@ export async function createEvidenceItem(input: CreateEvidenceItemInput) {
       verifiedSummary: input.verifiedSummary,
       tags: tagsJson,
       status: input.status || "verified",
+      userId: input.userId,
       bullets: {
         create: bulletsCreate,
       },

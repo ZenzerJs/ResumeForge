@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getCoverLetters, createCoverLetter, getCoverLettersByJobId } from "@/lib/db/cover-letters";
+import { getJobById } from "@/lib/db/jobs";
 import { sanitizeError } from "@/lib/ai/redact";
 import { z } from "zod";
+import { getRequestUserId, requireUserId } from "@/lib/security/auth-request";
 
 const CreateCoverLetterSchema = z.object({
   jobId: z.string().min(1),
@@ -18,15 +20,24 @@ const CreateCoverLetterSchema = z.object({
 
 export async function GET(request: Request) {
   try {
+    const userId = await getRequestUserId(request);
+    if (!userId) {
+      return NextResponse.json({ success: true, data: [], guest: true });
+    }
+
     const { searchParams } = new URL(request.url);
     const jobId = searchParams.get("jobId");
 
     if (jobId) {
-      const letters = await getCoverLettersByJobId(jobId);
+      const job = await getJobById(jobId, userId);
+      if (!job) {
+        return NextResponse.json({ success: true, data: [] });
+      }
+      const letters = await getCoverLettersByJobId(jobId, userId);
       return NextResponse.json({ success: true, data: letters });
     }
 
-    const letters = await getCoverLetters();
+    const letters = await getCoverLetters(userId);
     return NextResponse.json({ success: true, data: letters });
   } catch (err) {
     return NextResponse.json(
@@ -42,6 +53,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const userId = await requireUserId(request);
+    if (userId instanceof NextResponse) return userId;
+
     const body = await request.json();
     const parseResult = CreateCoverLetterSchema.safeParse(body);
 
@@ -56,7 +70,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const coverLetter = await createCoverLetter(parseResult.data);
+    const coverLetter = await createCoverLetter({ ...parseResult.data, userId });
     return NextResponse.json({ success: true, data: coverLetter }, { status: 201 });
   } catch (err) {
     return NextResponse.json(

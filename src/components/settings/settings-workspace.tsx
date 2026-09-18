@@ -3,8 +3,17 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { ProviderType } from "@/lib/ai/types";
-import { ArrowLeft, CheckCircle2, XCircle, Loader2, Key, Server, ShieldCheck, Trash2, Briefcase } from "lucide-react";
-import { TopNav } from "@/components/navigation/top-nav";
+import { CheckCircle2, XCircle, Loader2, Key, Server, ShieldCheck, Trash2, LogOut, LogIn, UserRound } from "lucide-react";
+import { AppShell } from "@/components/design-system/app-shell";
+import { PageHeader } from "@/components/design-system/page-header";
+import { Surface } from "@/components/design-system/surface";
+import { PageSkeleton } from "@/components/design-system/page-skeleton";
+import {
+  fetchSessionUser,
+  signOutAndRedirect,
+  usernameInitial,
+  type SessionUser,
+} from "@/components/auth/session-user";
 
 const SETTINGS_STORAGE_KEY = "resumeforge_ai_settings";
 
@@ -19,6 +28,12 @@ export function SettingsWorkspace() {
     message: string;
     latencyMs?: number;
   } | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [usernameDraft, setUsernameDraft] = useState("");
+  const [usernameStatus, setUsernameStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [isSavingUsername, setIsSavingUsername] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Load saved settings from localStorage
   useEffect(() => {
@@ -33,8 +48,46 @@ export function SettingsWorkspace() {
       }
     } catch (err) {
       console.error("Failed to load saved settings:", err);
+    } finally {
+      setIsHydrated(true);
     }
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchSessionUser().then((user) => {
+      if (cancelled) return;
+      setSessionUser(user);
+      setUsernameDraft(user?.username ?? "");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSaveUsername = async () => {
+    setIsSavingUsername(true);
+    setUsernameStatus(null);
+    try {
+      const res = await fetch("/api/auth/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: usernameDraft }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        setUsernameStatus({ type: "error", message: json.error || "Unable to update username" });
+        return;
+      }
+      setSessionUser(json.data);
+      setUsernameDraft(json.data.username);
+      setUsernameStatus({ type: "success", message: "Username saved." });
+    } catch {
+      setUsernameStatus({ type: "error", message: "Unable to update username" });
+    } finally {
+      setIsSavingUsername(false);
+    }
+  };
 
   // Save settings to localStorage on change
   const saveSettingsToStorage = (newProvider: ProviderType, newKey: string, newUrl: string, newModel: string) => {
@@ -124,28 +177,99 @@ export function SettingsWorkspace() {
     return `${key.slice(0, 4)}••••••••${key.slice(-4)}`;
   };
 
+  if (!isHydrated) {
+    return <PageSkeleton variant="settings" />;
+  }
+
   return (
-    <div className="flex h-screen w-screen flex-col overflow-y-auto text-slate-100" style={{ backgroundColor: "#0A0E17" }}>
-      {/* Shared Top Navigation */}
-      <TopNav />
-
-      {/* Main Form Content */}
-      <main className="mx-auto w-full max-w-3xl flex-1 p-6 md:p-8">
+    <AppShell variant="settings" className="overflow-y-auto">
+      <div className="mx-auto w-full max-w-3xl flex-1 p-6 md:p-8">
         <div className="space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-              <Server className="h-6 w-6 text-amber-400" />
-              Bring-Your-Own-Key (BYOK) AI Configuration
-            </h1>
-            <p className="mt-1.5 text-xs font-mono" style={{ color: "#4B5A7A" }}>
-              AI Provider Gateway Settings
-            </p>
-            <p className="mt-1 text-sm text-slate-400">
-              Configure your preferred LLM provider or local OpenAI-compatible endpoint. API keys are stored in browser localStorage for local single-user convenience and never saved in SQLite.
-            </p>
-          </div>
+          <PageHeader
+            eyebrow="Control room"
+            title="AI Provider Gateway Settings — Bring-Your-Own-Key (BYOK) AI Configuration"
+            description="Configure your preferred LLM provider or local OpenAI-compatible endpoint. API keys stay in this browser and are never written to the database."
+          />
 
-          <div className="rounded-xl border border-slate-800 bg-slate-950 p-6 space-y-6 shadow-sm">
+          <Surface variant="primary" className="p-6 space-y-5" data-testid="account-settings">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300">Account</h2>
+                <p className="mt-1 text-xs text-slate-400">
+                  Sign in to save resumes, evidence, and jobs. The nav shows your username, not your email.
+                </p>
+              </div>
+              {sessionUser ? (
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-700 bg-slate-800 font-bold text-[#ff8c00]">
+                  {usernameInitial(sessionUser.username)}
+                </span>
+              ) : (
+                <UserRound className="h-5 w-5 text-slate-500" aria-hidden />
+              )}
+            </div>
+
+            {sessionUser ? (
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="settings-username" className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
+                    Username
+                  </label>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <input
+                      id="settings-username"
+                      value={usernameDraft}
+                      onChange={(event) => setUsernameDraft(event.target.value)}
+                      className="h-11 w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 text-sm text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                    />
+                    <button
+                      type="button"
+                      disabled={isSavingUsername || usernameDraft.trim() === sessionUser.username}
+                      onClick={() => void handleSaveUsername()}
+                      className="inline-flex h-11 shrink-0 items-center justify-center rounded-md bg-slate-800 px-4 text-sm font-semibold text-white hover:bg-slate-700 focus-visible:ring-2 focus-visible:ring-amber-500/60 disabled:opacity-50"
+                    >
+                      {isSavingUsername ? "Saving…" : "Save username"}
+                    </button>
+                  </div>
+                </div>
+                {usernameStatus ? (
+                  <p className={`text-xs ${usernameStatus.type === "success" ? "text-emerald-400" : "text-rose-400"}`} role="status">
+                    {usernameStatus.message}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  aria-label="Sign Out"
+                  disabled={isSigningOut}
+                  onClick={() => {
+                    setIsSigningOut(true);
+                    void signOutAndRedirect("/");
+                  }}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-700 px-4 text-sm font-medium text-slate-200 hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-amber-500/60 disabled:opacity-50"
+                >
+                  <LogOut className="h-4 w-4" aria-hidden />
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href="/login"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-700 px-4 text-sm font-medium text-slate-200 hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                >
+                  <LogIn className="h-4 w-4" aria-hidden />
+                  Sign In
+                </Link>
+                <Link
+                  href="/login?mode=signup"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#ff8c00] px-4 text-sm font-semibold text-black hover:bg-[#ffa024] focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                >
+                  Sign Up
+                </Link>
+              </div>
+            )}
+          </Surface>
+
+          <Surface variant="primary" className="p-6 space-y-6">
             {/* Provider Selection */}
             <div>
               <label htmlFor="provider-select" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
@@ -155,7 +279,7 @@ export function SettingsWorkspace() {
                 id="provider-select"
                 value={provider}
                 onChange={handleProviderChange}
-                className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
               >
                 <option value="openai">OpenAI (Direct API)</option>
                 <option value="anthropic">Anthropic (Direct API)</option>
@@ -196,7 +320,7 @@ export function SettingsWorkspace() {
                       ? "AIzaSy..."
                       : "Optional API Key for custom endpoint"
                   }
-                  className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                  className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-mono"
                 />
               </div>
               {apiKey && (
@@ -219,7 +343,7 @@ export function SettingsWorkspace() {
                   value={baseUrl}
                   onChange={handleBaseUrlChange}
                   placeholder={provider === "custom" ? "http://localhost:8000" : "https://api.openai.com"}
-                  className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                  className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-mono"
                 />
               </div>
             )}
@@ -243,7 +367,7 @@ export function SettingsWorkspace() {
                     ? "gemini-2.5-flash, gemini-1.5-pro…"
                     : "llama3, mistral, codellama…"
                 }
-                className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-mono"
               />
               <p className="mt-1.5 text-[11px] text-slate-500">
                 For custom/local endpoints (Ollama, LM Studio, FreeLLMAPI): specify the exact model name your server exposes.
@@ -299,9 +423,9 @@ export function SettingsWorkspace() {
                 </div>
               </div>
             )}
-          </div>
+          </Surface>
         </div>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }

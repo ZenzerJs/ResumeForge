@@ -1,0 +1,14 @@
+{
+  "jobs": [
+    {
+      "id": 1234567,
+      "title": "Senior Backend Developer",
+      "updated_at": "2026-08-10T12:00:00Z",
+      "absolute_url": "https://boards.greenhouse.io/shopify/jobs/1234567?gh_jid=1234567&utm_source=boards",
+      "location": {
+        "name": "Toronto, Ontario, Canada (Remote)"
+      },
+      "content": "<h1>About Shopify</h1><p>We are seeking a <strong>Senior Backend Developer</strong> to scale systems.</p><script>alert('xss')</script><ul><li>5+ years Node.js</li><li>Distributed systems</li></ul>"
+    }
+  ]
+}

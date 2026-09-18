@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { Metadata } from "next";
 import { TailorWorkspace } from "@/components/tailor/tailor-workspace";
+import { PageSkeleton } from "@/components/design-system/page-skeleton";
 
 export const metadata: Metadata = {
   title: "Job Tailoring & Requirement Matcher | ResumeForge",
@@ -9,13 +10,7 @@ export const metadata: Metadata = {
 
 export default function TailorPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="dark flex h-dvh w-screen items-center justify-center bg-slate-950 text-slate-400 text-xs font-mono">
-          Loading tailor workspace...
-        </div>
-      }
-    >
+    <Suspense fallback={<PageSkeleton variant="tailor" />}>
       <TailorWorkspace />
     </Suspense>
   );

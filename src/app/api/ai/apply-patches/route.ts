@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getMasterResume } from "@/lib/db/resumes";
 import { createVariant, assertNotProtectedResume } from "@/lib/db/variants";
 import { sanitizeError } from "@/lib/ai/redact";
+import { requireUserId } from "@/lib/security/auth-request";
 
 const ApplyPatchesRequestSchema = z.object({
   masterResumeId: z.string(),
@@ -25,6 +26,9 @@ const ApplyPatchesRequestSchema = z.object({
  */
 export async function POST(request: Request) {
   try {
+    const userId = await requireUserId(request);
+    if (userId instanceof NextResponse) return userId;
+
     const body = await request.json();
     const parseResult = ApplyPatchesRequestSchema.safeParse(body);
 
@@ -38,7 +42,7 @@ export async function POST(request: Request) {
     const { masterResumeId, jobId, variantTitle, mergedTypstContent } = parseResult.data;
 
     // Amendment 3: Hard guard — verify master resume is protected and exists
-    const masterResume = await getMasterResume();
+    const masterResume = await getMasterResume(userId);
     if (!masterResume || masterResume.id !== masterResumeId) {
       return NextResponse.json(
         { success: false, error: "Master resume not found or ID mismatch." },
@@ -64,6 +68,7 @@ export async function POST(request: Request) {
       jobId,
       variantTitle,
       typstContent: mergedTypstContent,
+      userId,
     });
 
     return NextResponse.json({
@@ -76,7 +81,7 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     // Amendment 3: Catch security assertion errors
-    const errorMessage = err instanceof Error ? err.message : String(err);
+    const errorMessage = sanitizeError(err);
     if (errorMessage.includes("SECURITY")) {
       return NextResponse.json(
         { success: false, error: errorMessage },

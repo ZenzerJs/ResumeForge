@@ -39,6 +39,11 @@ export interface EvidenceItemForPrompt {
   }[];
 }
 
+export interface TailorFeedbackContext {
+  overviewCommentary: string;
+  nextStepsAdvice?: string[];
+}
+
 export interface GeneratePatchesInput {
   providerConfig: ProviderConfig;
   masterTypst: string;
@@ -50,6 +55,7 @@ export interface GeneratePatchesInput {
     company?: string;
   };
   evidenceItems: EvidenceItemForPrompt[];
+  tailorFeedback?: TailorFeedbackContext;
 }
 
 export interface GeneratePatchesResult {
@@ -73,3 +79,21 @@ export interface GenerateCoverLetterResult {
   rawJson?: string;
   error?: string;
 }
+
+// --- Task 9.1: PDF-to-Typst conversion types ---
+
+import { ExtractedPdfLink } from "../pdf/parser";
+
+export interface ConvertPdfInput {
+  providerConfig: ProviderConfig;
+  rawText: string;
+  fileName?: string;
+  links?: ExtractedPdfLink[];
+}
+
+export interface ConvertPdfResult {
+  success: boolean;
+  typstSource?: string;
+  error?: string;
+}
+

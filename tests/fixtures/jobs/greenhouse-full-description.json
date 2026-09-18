@@ -1,0 +1,20 @@
+{
+  "id": 4829102003,
+  "title": "Staff Backend Engineer, Core Infrastructure",
+  "location": {
+    "name": "San Francisco, CA (Hybrid)"
+  },
+  "departments": [
+    {
+      "id": 10293,
+      "name": "Engineering"
+    }
+  ],
+  "offices": [
+    {
+      "id": 4482,
+      "name": "San Francisco HQ"
+    }
+  ],
+  "content": "<h2>About the Company</h2><p>Acme Cloud builds scalable developer infrastructure powering millions of cloud workloads globally.</p><h2>What You'll Do</h2><ul><li>Design and maintain high-throughput distributed transaction engines in Go and TypeScript.</li><li>Scale database clusters across multiple availability zones with sub-50ms latency SLAs.</li><li>Mentor senior engineers and lead technical architecture reviews.</li></ul><h2>Minimum Qualifications</h2><ul><li>8+ years of production experience in backend software engineering.</li><li>BS or MS in Computer Science or equivalent practical experience.</li><li>Strong expertise in PostgreSQL, distributed consensus, and Redis caching.</li></ul><h2>Preferred Qualifications</h2><ul><li>Experience with Kubernetes operators and Envoy service mesh.</li><li>Familiarity with financial payment compliance and PCI-DSS standards.</li></ul><h2>Compensation</h2><p>The base salary range for this role is $220,000 - $275,000 per year plus equity and benefits.</p>"
+}

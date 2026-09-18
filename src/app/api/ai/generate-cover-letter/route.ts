@@ -2,12 +2,17 @@ import { NextResponse } from "next/server";
 import { GenerateCoverLetterInputSchema, CoverLetterResponseSchema } from "@/lib/ai/cover-letter-schema";
 import { generateCoverLetter } from "@/lib/ai/gateway";
 import { verifyCoverLetterGrounding } from "@/lib/ai/cover-letter-verifier";
+import { extractJsonObject, normalizeCoverLetterPayload } from "@/lib/ai/json-response";
 import { getEvidenceItems } from "@/lib/db/evidence";
+import { getMasterResume } from "@/lib/db/resumes";
 import { sanitizeError } from "@/lib/ai/redact";
-import { ProviderConfig } from "@/lib/ai/types";
+import { requireUserId } from "@/lib/security/auth-request";
 
 export async function POST(request: Request) {
   try {
+    const userId = await requireUserId(request);
+    if (userId instanceof NextResponse) return userId;
+
     const body = await request.json();
 
     const parseResult = GenerateCoverLetterInputSchema.safeParse(body);
@@ -23,10 +28,20 @@ export async function POST(request: Request) {
     }
 
     const input = parseResult.data;
-    const providerConfig: ProviderConfig = body.providerConfig || { provider: "openai" };
+    const providerConfig = input.providerConfig;
+
+    if (!providerConfig?.provider || (!providerConfig.apiKey && providerConfig.provider !== "custom")) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "No AI provider configured. Please configure your API key in Settings.",
+        },
+        { status: 400 }
+      );
+    }
 
     // Fetch active evidence items from database
-    const evidenceItems = await getEvidenceItems();
+    const evidenceItems = await getEvidenceItems(undefined, userId);
     const activeEvidenceItems = evidenceItems.filter((e) => e.status !== "archived");
 
     // Collect all active evidence item and bullet IDs
@@ -40,8 +55,15 @@ export async function POST(request: Request) {
       }
     }
 
+    const master = await getMasterResume(userId);
+
     // Invoke BYOK AI Gateway
-    const gatewayResult = await generateCoverLetter(providerConfig, input, activeEvidenceItems);
+    const gatewayResult = await generateCoverLetter(
+      providerConfig,
+      input,
+      activeEvidenceItems,
+      master?.typstSource
+    );
 
     if (!gatewayResult.success || !gatewayResult.rawJson) {
       return NextResponse.json(
@@ -53,27 +75,23 @@ export async function POST(request: Request) {
       );
     }
 
-    // Clean JSON response (strip markdown fences if present)
-    let cleanedJson = gatewayResult.rawJson.trim();
-    if (cleanedJson.startsWith("```")) {
-      cleanedJson = cleanedJson.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
-    }
-
-    let parsedResponse;
+    // Parse + normalize AI JSON (fences, length floors, etc.)
+    let parsedResponse: unknown;
     try {
-      parsedResponse = JSON.parse(cleanedJson);
+      parsedResponse = extractJsonObject(gatewayResult.rawJson);
     } catch {
       return NextResponse.json(
         {
           success: false,
           error: "AI provider returned malformed non-JSON output for cover letter.",
-          rawOutput: sanitizeError(cleanedJson.slice(0, 300)),
+          rawOutput: sanitizeError(gatewayResult.rawJson.slice(0, 300)),
         },
         { status: 422 }
       );
     }
 
-    const schemaValidation = CoverLetterResponseSchema.safeParse(parsedResponse);
+    const normalized = normalizeCoverLetterPayload(parsedResponse, input.candidateName);
+    const schemaValidation = CoverLetterResponseSchema.safeParse(normalized);
     if (!schemaValidation.success) {
       return NextResponse.json(
         {

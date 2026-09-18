@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ResumeForge - Jobs Tracker</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;800&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Grid background pattern */
+        .bg-grid-pattern {
+            background-size: 40px 40px;
+            background-image: 
+                linear-gradient(to right, rgba(164, 140, 122, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(164, 140, 122, 0.05) 1px, transparent 1px);
+        }
+        /* Custom scrollbar for dense lists */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2d3449; /* surface-variant */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #564334; /* outline-variant */
+        }
+        
+        @keyframes staggerFade {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .stagger-item {
+            opacity: 0;
+            animation: staggerFade 0.4s ease forwards;
+        }
+        .stagger-item:nth-child(1) { animation-delay: 0.1s; }
+        .stagger-item:nth-child(2) { animation-delay: 0.2s; }
+        .stagger-item:nth-child(3) { animation-delay: 0.3s; }
+        .stagger-item:nth-child(4) { animation-delay: 0.4s; }
+        
+        details > summary {
+            list-style: none;
+        }
+        details > summary::-webkit-details-marker {
+            display: none;
+        }
+        details[open] summary ~ * {
+            animation: staggerFade 0.3s ease-in-out;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "primary": "#ffb77d",
+                      "on-primary": "#4d2600",
+                      "on-tertiary-container": "#830010",
+                      "surface-tint": "#ffb77d",
+                      "inverse-surface": "#dae2fd",
+                      "primary-fixed": "#ffdcc3",
+                      "surface-container-high": "#222a3d",
+                      "tertiary-fixed": "#ffdad7",
+                      "background": "#0b1326",
+                      "on-background": "#dae2fd",
+                      "tertiary": "#ffb3ad",
+                      "surface-bright": "#31394d",
+                      "on-primary-fixed-variant": "#6e3900",
+                      "surface": "#0b1326",
+                      "inverse-primary": "#904d00",
+                      "on-secondary-fixed-variant": "#005236",
+                      "on-secondary-fixed": "#002113",
+                      "on-error-container": "#ffdad6",
+                      "error": "#ffb4ab",
+                      "on-tertiary-fixed": "#410004",
+                      "error-container": "#93000a",
+                      "on-secondary-container": "#00311f",
+                      "secondary-fixed-dim": "#4edea3",
+                      "tertiary-container": "#ff8780",
+                      "on-primary-container": "#623200",
+                      "outline": "#a48c7a",
+                      "surface-variant": "#2d3449",
+                      "on-tertiary-fixed-variant": "#930013",
+                      "surface-dim": "#0b1326",
+                      "inverse-on-surface": "#283044",
+                      "on-primary-fixed": "#2f1500",
+                      "surface-container-lowest": "#060e20",
+                      "secondary": "#4edea3",
+                      "secondary-fixed": "#6ffbbe",
+                      "primary-container": "#ff8c00",
+                      "surface-container-highest": "#2d3449",
+                      "on-surface-variant": "#ddc1ae",
+                      "primary-fixed-dim": "#ffb77d",
+                      "on-tertiary": "#68000a",
+                      "on-error": "#690005",
+                      "outline-variant": "#564334",
+                      "on-secondary": "#003824",
+                      "surface-container-low": "#131b2e",
+                      "secondary-container": "#00a572",
+                      "surface-container": "#171f33",
+                      "tertiary-fixed-dim": "#ffb3ad",
+                      "on-surface": "#dae2fd"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "unit": "4px",
+                      "margin-desktop": "32px",
+                      "panel-padding": "20px",
+                      "margin-mobile": "16px",
+                      "gutter": "16px"
+              },
+              "fontFamily": {
+                      "page-title-mobile": [
+                              "Hanken Grotesk"
+                      ],
+                      "page-title": [
+                              "Hanken Grotesk"
+                      ],
+                      "mono-data": [
+                              "JetBrains Mono"
+                      ],
+                      "body-regular": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-dense": [
+                              "Hanken Grotesk"
+                      ],
+                      "section-label": [
+                              "JetBrains Mono"
+                      ]
+              },
+              "fontSize": {
+                      "page-title-mobile": [
+                              "32px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "fontWeight": "800"
+                              }
+                      ],
+                      "page-title": [
+                              "40px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "800"
+                              }
+                      ],
+                      "mono-data": [
+                              "13px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-regular": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.6",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-dense": [
+                              "14px",
+                              {
+                                      "lineHeight": "1.4",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "section-label": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.1em",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+</head>
+<body class="bg-background text-on-surface font-body-regular min-h-screen flex flex-col bg-grid-pattern overflow-hidden">
+<!-- Top Navigation -->
+<nav class="bg-background/80 backdrop-blur-xl border-b border-outline-variant shadow-[0_0_20px_rgba(255,183,125,0.05)] fixed top-0 w-full z-50 flex items-center justify-between px-margin-desktop h-16 w-full max-w-full">
+<div class="flex items-center gap-8">
+<a class="font-page-title text-[24px] text-primary-container tracking-tighter flex items-center gap-2" href="#">
+<span class="material-symbols-outlined text-[28px] text-primary-container">terminal</span>
+                ResumeForge
+            </a>
+<div class="hidden md:flex items-center h-full">
+<a class="text-on-surface-variant hover:text-on-surface transition-colors hover:bg-surface-variant/50 transition-all duration-200 active:scale-95 transition-transform h-16 flex items-center px-4 font-body-regular text-body-regular" href="#">Editor</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors hover:bg-surface-variant/50 transition-all duration-200 active:scale-95 transition-transform h-16 flex items-center px-4 font-body-regular text-body-regular" href="#">Evidence Bank</a>
+<a class="text-primary-container font-bold border-b-2 border-primary-container pb-1 h-16 flex items-center px-4 font-body-regular text-body-regular bg-surface-variant/20" href="#">Jobs</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors hover:bg-surface-variant/50 transition-all duration-200 active:scale-95 transition-transform h-16 flex items-center px-4 font-body-regular text-body-regular" href="#">Tailor</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors hover:bg-surface-variant/50 transition-all duration-200 active:scale-95 transition-transform h-16 flex items-center px-4 font-body-regular text-body-regular" href="#">Settings</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button aria-label="Notifications" class="text-on-surface-variant hover:text-primary-container transition-colors p-2 rounded-full hover:bg-surface-variant/50">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button aria-label="Terminal Actions" class="text-on-surface-variant hover:text-primary-container transition-colors p-2 rounded-full hover:bg-surface-variant/50">
+<span class="material-symbols-outlined">terminal</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-surface-variant border border-outline flex items-center justify-center overflow-hidden ml-2 cursor-pointer hover:border-primary-container transition-colors">
+<img alt="User Profile Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC9K3T2TiqHLrtlKoLBgaUqDcmtROwJC_-dJ65-w3UAopobIpj8WyNTg3j0LQ4fHvseUEp9_1xh8OEvOXnQXBqyxSuDdwOvhE7pxmp4flrgwl2OH-1qDrdJ1ofKm_lwWA0bVmygnHj0ToNo1Z9RexoVIRNBdRHUxOHS7kgwCTrwRP2yhslmMzaWS39C3hHKTv35WJBScIj2eUau6Z5IVht4nf7ePwEPkAxxrjzbr6nSHURq3RVXxzaySA"/>
+</div>
+</div>
+</nav>
+<!-- Main Workspace -->
+<main class="flex-1 mt-16 flex overflow-hidden w-full max-w-[1920px] mx-auto">
+<!-- Left Column: Job List -->
+<section class="w-full md:w-[400px] lg:w-[500px] border-r border-outline-variant flex flex-col bg-surface/50 backdrop-blur-sm z-10 relative">
+<!-- List Header & Controls -->
+<div class="p-4 border-b border-outline-variant/50 shrink-0 bg-background/90 backdrop-blur-md">
+<div class="flex items-center justify-between mb-4">
+<h1 class="font-section-label text-section-label text-on-surface">JOB TRACKER</h1>
+<div class="flex gap-2">
+<button class="flex items-center gap-1 px-3 py-1.5 rounded bg-surface-variant border border-outline-variant text-on-surface-variant hover:text-on-surface hover:border-outline text-xs font-mono-data transition-colors">
+<span class="material-symbols-outlined text-[14px]">cloud_download</span>
+                            Import
+                        </button>
+<button class="flex items-center gap-1 px-3 py-1.5 rounded bg-surface-variant border border-outline-variant text-on-surface-variant hover:text-on-surface hover:border-outline text-xs font-mono-data transition-colors">
+<span class="material-symbols-outlined text-[14px]">sync</span>
+                            Refresh
+                        </button>
+</div>
+</div>
+<!-- Filters -->
+<div class="flex flex-wrap gap-2 mb-4">
+<button class="px-3 py-1 rounded-full bg-primary-container/10 border border-primary-container text-primary-container text-xs font-mono-data">All</button>
+<button class="px-3 py-1 rounded-full bg-surface border border-outline-variant text-on-surface-variant hover:text-on-surface text-xs font-mono-data transition-colors">Saved</button>
+<button class="px-3 py-1 rounded-full bg-surface border border-outline-variant text-on-surface-variant hover:text-on-surface text-xs font-mono-data transition-colors">Applied</button>
+<button class="px-3 py-1 rounded-full bg-surface border border-outline-variant text-on-surface-variant hover:text-on-surface text-xs font-mono-data transition-colors">Interviewing</button>
+</div>
+<!-- Search & Date Range -->
+<div class="flex gap-2">
+<div class="relative flex-1">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
+<input class="w-full bg-surface border border-outline-variant rounded pl-9 pr-3 py-1.5 text-sm font-body-dense text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-all placeholder:text-on-surface-variant/50" placeholder="Search jobs, companies..." type="text"/>
+</div>
+<select class="bg-surface border border-outline-variant rounded px-3 py-1.5 text-sm font-body-dense text-on-surface-variant focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-all">
+<option>Any time</option>
+<option>Last 24h</option>
+<option>Last 7 days</option>
+</select>
+</div>
+</div>
+<!-- Job Items List -->
+<div class="flex-1 overflow-y-auto p-2 space-y-1">
+<!-- Active Item -->
+<div class="p-3 rounded-lg bg-surface-variant/40 border border-primary-container/50 cursor-pointer relative overflow-hidden group">
+<div class="absolute inset-0 bg-primary-container/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary-container rounded-l-lg"></div>
+<div class="flex items-start gap-3 relative z-10">
+<div class="w-10 h-10 rounded bg-surface border border-outline flex items-center justify-center shrink-0 text-lg font-bold text-primary-container">
+                            A
+                        </div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-body-regular text-body-dense font-bold text-on-surface truncate pr-2">Software Engineer Intern - Summer 2027</h3>
+<span class="shrink-0 px-2 py-0.5 rounded text-[10px] font-mono-data bg-surface-variant text-on-surface-variant border border-outline-variant uppercase">Saved</span>
+</div>
+<div class="text-xs font-body-dense text-on-surface-variant mb-1">Atoms • Mountain View, CA (Hybrid)</div>
+<div class="flex justify-between items-end mt-2">
+<div class="text-[11px] font-mono-data text-on-surface-variant/70 flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">schedule</span> 4d ago
+                                </div>
+<button class="px-3 py-1 rounded bg-primary-container text-white text-xs font-mono-data font-semibold hover:bg-orange-500 transition-colors shadow-[0_0_10px_rgba(255,140,0,0.2)]">Tailor</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Inactive Item 1 -->
+<div class="p-3 rounded-lg border border-transparent hover:border-outline-variant hover:bg-surface-variant/20 cursor-pointer transition-all">
+<div class="flex items-start gap-3">
+<div class="w-10 h-10 rounded bg-surface border border-outline-variant flex items-center justify-center shrink-0 text-lg font-bold text-on-surface-variant">
+                            T
+                        </div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-body-regular text-body-dense font-bold text-on-surface truncate pr-2">Frontend Engineer Intern</h3>
+<span class="shrink-0 px-2 py-0.5 rounded text-[10px] font-mono-data bg-surface-variant text-on-surface-variant border border-outline-variant uppercase">Saved</span>
+</div>
+<div class="text-xs font-body-dense text-on-surface-variant mb-1">TikTok • San Jose, CA</div>
+<div class="flex justify-between items-end mt-2">
+<div class="text-[11px] font-mono-data text-on-surface-variant/70 flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">schedule</span> 4d ago
+                                </div>
+</div>
+</div>
+</div>
+</div>
+<!-- Inactive Item 2 -->
+<div class="p-3 rounded-lg border border-transparent hover:border-outline-variant hover:bg-surface-variant/20 cursor-pointer transition-all">
+<div class="flex items-start gap-3">
+<div class="w-10 h-10 rounded bg-surface border border-outline-variant flex items-center justify-center shrink-0 text-lg font-bold text-on-surface-variant">
+                            A
+                        </div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-body-regular text-body-dense font-bold text-on-surface truncate pr-2">Software Engineer Intern 2027</h3>
+<span class="shrink-0 px-2 py-0.5 rounded text-[10px] font-mono-data bg-secondary/10 text-secondary border border-secondary/20 uppercase">Applied</span>
+</div>
+<div class="text-xs font-body-dense text-on-surface-variant mb-1">Axon • Boston, MA</div>
+<div class="flex justify-between items-end mt-2">
+<div class="text-[11px] font-mono-data text-on-surface-variant/70 flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">schedule</span> 1w ago
+                                </div>
+</div>
+</div>
+</div>
+</div>
+<!-- Inactive Item 3 -->
+<div class="p-3 rounded-lg border border-transparent hover:border-outline-variant hover:bg-surface-variant/20 cursor-pointer transition-all">
+<div class="flex items-start gap-3">
+<div class="w-10 h-10 rounded bg-surface border border-outline-variant flex items-center justify-center shrink-0 text-lg font-bold text-on-surface-variant">
+                            B
+                        </div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-body-regular text-body-dense font-bold text-on-surface truncate pr-2">Software Dev Engineer Intern</h3>
+<span class="shrink-0 px-2 py-0.5 rounded text-[10px] font-mono-data bg-surface-variant text-on-surface-variant border border-outline-variant uppercase">Saved</span>
+</div>
+<div class="text-xs font-body-dense text-on-surface-variant mb-1">ByteDance • Seattle, WA</div>
+<div class="flex justify-between items-end mt-2">
+<div class="text-[11px] font-mono-data text-on-surface-variant/70 flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">schedule</span> 2w ago
+                                </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Pagination -->
+<div class="p-2 border-t border-outline-variant/50 bg-background/90 backdrop-blur-md flex justify-between items-center text-xs font-mono-data text-on-surface-variant">
+<span>Showing 1-20 of 331</span>
+<div class="flex gap-1">
+<button class="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-variant transition-colors disabled:opacity-50"><span class="material-symbols-outlined text-[16px]">chevron_left</span></button>
+<button class="w-6 h-6 rounded flex items-center justify-center bg-primary-container text-white">1</button>
+<button class="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-variant transition-colors">2</button>
+<button class="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-variant transition-colors"><span class="material-symbols-outlined text-[16px]">chevron_right</span></button>
+</div>
+</div>
+</section>
+<!-- Right Column: Job Details -->
+<section class="flex-1 flex flex-col bg-background/50 relative overflow-hidden">
+<!-- Glassmorphic glow layer -->
+<div class="absolute top-20 right-20 w-[500px] h-[500px] bg-primary-container/5 rounded-full blur-[100px] pointer-events-none"></div>
+<div class="flex-1 overflow-y-auto p-margin-desktop z-10">
+<div class="max-w-4xl mx-auto space-y-6">
+<!-- Detail Header -->
+<div class="bg-surface/80 backdrop-blur-md border border-outline-variant rounded-xl p-6 shadow-[0_0_15px_rgba(255,140,0,0.05)]">
+<div class="flex gap-6 items-start">
+<div class="w-16 h-16 rounded-lg bg-surface-variant border border-outline flex items-center justify-center shrink-0 text-3xl font-bold text-primary-container shadow-[0_0_15px_rgba(255,140,0,0.1)]">
+                                A
+                            </div>
+<div class="flex-1">
+<h1 class="font-page-title-mobile text-page-title-mobile text-on-surface mb-2 tracking-tighter">Software Engineer Intern - Summer 2027</h1>
+<div class="flex flex-wrap gap-x-4 gap-y-2 text-sm font-body-dense text-on-surface-variant mb-4">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">business</span> Atoms</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">location_on</span> Mountain View, CA (Hybrid)</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">payments</span> No salary listed</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">schedule</span> Posted 4d ago</span>
+</div>
+<!-- Primary Actions -->
+<div class="flex flex-wrap gap-3">
+<button class="px-5 py-2 rounded bg-primary-container text-white font-section-label text-section-label font-bold hover:bg-orange-500 hover:shadow-[0_0_15px_rgba(255,140,0,0.3)] transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">auto_fix_high</span>
+                                        Tailor Resume
+                                    </button>
+<button class="px-4 py-2 rounded bg-transparent border border-outline text-on-surface font-section-label text-section-label hover:border-primary-container hover:text-primary-container transition-all">
+                                        Generate Cover Letter
+                                    </button>
+<button class="px-4 py-2 rounded bg-surface-variant border border-transparent text-on-surface font-section-label text-section-label hover:border-outline-variant transition-all flex items-center gap-2">
+                                        Open Posting <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+</button>
+<button aria-label="More actions" class="p-2 rounded bg-transparent border border-outline text-on-surface hover:bg-surface-variant transition-all ml-auto">
+<span class="material-symbols-outlined">more_horiz</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+<!-- Left Sub-column: Match & Notes -->
+<div class="xl:col-span-1 space-y-6">
+<!-- Match Score Module -->
+<div class="bg-surface/80 backdrop-blur-md border border-outline-variant rounded-xl p-5 shadow-[0_0_15px_rgba(255,140,0,0.05)]">
+<details class="group" open="">
+<summary class="flex justify-between items-center cursor-pointer mb-4 border-b border-outline-variant/50 pb-2">
+<h3 class="font-section-label text-section-label text-on-surface-variant uppercase tracking-widest">EVIDENCE MATCH &amp; GAPS</h3>
+<span class="material-symbols-outlined text-on-surface-variant group-open:rotate-180 transition-transform">expand_more</span>
+</summary>
+<div class="flex items-center gap-3 mb-4">
+<div class="w-12 h-12">
+
+</div>
+<div class="text-sm font-body-dense text-on-surface-variant">
+<span class="text-on-surface font-bold">Low match</span> — 1 of 4 stated requirements backed by evidence.
+                                    </div>
+</div>
+<ul class="space-y-2 font-mono-data text-xs">
+<li class="flex items-center gap-2 text-on-surface-variant stagger-item">
+<span class="material-symbols-outlined text-[16px] text-error">close</span> Python
+                                    </li>
+<li class="flex items-center gap-2 text-on-surface-variant stagger-item">
+<span class="material-symbols-outlined text-[16px] text-error">close</span> Java
+                                    </li>
+<li class="flex items-center gap-2 text-on-surface-variant stagger-item">
+<span class="material-symbols-outlined text-[16px] text-secondary">check</span> Go
+                                    </li>
+<li class="flex items-center gap-2 text-on-surface-variant stagger-item">
+<span class="material-symbols-outlined text-[16px] text-error">close</span> Agile
+                                    </li>
+</ul>
+</details>
+</div>
+<!-- Notes Module -->
+<div class="bg-surface/80 backdrop-blur-md border border-outline-variant rounded-xl p-5 shadow-[0_0_15px_rgba(255,140,0,0.05)] flex flex-col">
+<h3 class="font-section-label text-section-label text-on-surface-variant mb-3 border-b border-outline-variant/50 pb-2 uppercase tracking-widest">NOTES</h3>
+<textarea class="w-full bg-background border border-outline-variant rounded p-3 text-sm font-mono-data text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-all resize-y min-h-[120px] mb-3" placeholder="Add custom notes here...">Tier 1 Bulk Import | Location: 5 locations (Mountain View, CA)
+Posted: 4d | Tier 2 Fetched</textarea>
+<button class="px-3 py-1.5 rounded bg-surface-variant border border-outline text-on-surface text-xs font-mono-data self-start hover:border-primary-container hover:text-primary-container transition-all flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">save</span> Save Notes
+                                </button>
+</div>
+</div>
+<!-- Right Sub-column: Job Description -->
+<div class="xl:col-span-2">
+<div class="bg-surface/80 backdrop-blur-md border border-outline-variant rounded-xl p-6 shadow-[0_0_15px_rgba(255,140,0,0.05)] h-full flex flex-col">
+<h3 class="font-section-label text-section-label text-on-surface-variant mb-4 border-b border-outline-variant/50 pb-2 sticky top-0 bg-surface/90 backdrop-blur-md z-10 py-2 uppercase tracking-widest">JOB DETAILS</h3>
+<div class="prose prose-invert max-w-none font-body-regular text-sm text-on-surface/90 space-y-4 overflow-y-auto pr-2" style="max-height: 600px; line-height: 1.6;">
+<p>Job Application for Software Engineer Intern - Summer 2027 at ATOMS Careers page</p>
+<p><strong>Join Us</strong><br/>
+                                    Who we are</p>
+<p>Atoms is building the machines that power the next era of progress. Over the last decade, software has transformed the digital world. But the physical world, where food is made, minerals are mined, goods are moved, and industries are run, remains far less intelligent, far less efficient, and far more constrained. We're changing that.</p>
+<p>Atoms builds Physical AI — real-world robots for the industries that move civilization forward, starting with food, mining, and transport. Our systems are designed to understand, predict, and control the real world with precision, turning complex physical operations into something more reliable, more scalable, and more productive.</p>
+<p><strong>Who You Are:</strong></p>
+<ul class="list-disc pl-5 space-y-1 text-on-surface-variant">
+<li>Actively pursuing a Bachelor/Master in Computer Science, Engineering or a related technical field</li>
+<li>Graduating in Fall/Winter 2027 or Spring/Summer 2028.</li>
+<li>3.7 GPA Minimum</li>
+<li>Must have completed an introductory Computer Science course</li>
+<li>Have advanced programming experience in one or more application or systems languages (Go, Python, Ruby, Java, Kotlin, C/C++, etc.)</li>
+</ul>
+<p><strong>What you'll do</strong></p>
+<ul class="list-disc pl-5 space-y-1 text-on-surface-variant">
+<li>As an engineering intern at Atoms, you'll be an integral part of building out the state-of-the-art intelligent machine for the food industry.</li>
+<li>You will build foundational software systems to enable globally scaled kitchen infrastructure and real estate innovations</li>
+<li>You test software development methodology in an agile environment</li>
+<li>You write, debug, maintain and test code</li>
+</ul>
+<p><strong>Compensation</strong><br/>
+                                    $70 per hour.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+</body></html>

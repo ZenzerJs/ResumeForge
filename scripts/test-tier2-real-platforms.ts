@@ -58,6 +58,11 @@ async function main() {
     const fetchRes = await fetchAndCacheJobFullText(dummyId);
     const duration = Date.now() - startTime;
 
+    // Second call: verify read-through cache hit
+    const startCacheTime = Date.now();
+    const cacheRes = await fetchAndCacheJobFullText(dummyId);
+    const cacheDuration = Date.now() - startCacheTime;
+
     const report = {
       platformType: item.platformType,
       company: item.company,
@@ -65,6 +70,8 @@ async function main() {
       success: fetchRes.success,
       durationMs: duration,
       cached: fetchRes.cached,
+      cacheHitSuccess: cacheRes.success && cacheRes.cached,
+      cacheDurationMs: cacheDuration,
       error: fetchRes.error,
       extractedLength: fetchRes.data?.rawDescription ? fetchRes.data.rawDescription.length : 0,
       sampleText: fetchRes.data?.rawDescription
@@ -74,13 +81,15 @@ async function main() {
 
     results.push(report);
 
-    console.log(`  Status:   ${fetchRes.success ? "SUCCESS ✅" : "FAILED / FALLBACK REQUIRED ❌"}`);
-    console.log(`  Duration: ${duration}ms`);
+    console.log(`  Initial Pass Status:   ${fetchRes.success ? "SUCCESS ✅" : "FAILED / FALLBACK REQUIRED ❌"}`);
+    console.log(`  Initial Pass Duration: ${duration}ms (Network/Parse)`);
     if (fetchRes.success) {
-      console.log(`  Text Length: ${report.extractedLength} characters`);
-      console.log(`  Sample Text: "${report.sampleText}"`);
+      console.log(`  Cache Pass Status:     ${cacheRes.cached ? "CACHE HIT ✅" : "CACHE MISS ❌"}`);
+      console.log(`  Cache Pass Duration:   ${cacheDuration}ms (DB Read-Through)`);
+      console.log(`  Text Length:          ${report.extractedLength} characters`);
+      console.log(`  Sample Text:          "${report.sampleText}"`);
     } else {
-      console.log(`  Fallback Prompt: "${fetchRes.error}"`);
+      console.log(`  Fallback Prompt:       "${fetchRes.error}"`);
     }
     console.log("-----------------------------------------------------------------\n");
 
@@ -95,7 +104,9 @@ async function main() {
       Company: r.company,
       Result: r.success ? "SUCCESS" : "FALLBACK",
       Length: r.extractedLength,
-      Duration: `${r.durationMs}ms`,
+      "Fetch Duration": `${r.durationMs}ms`,
+      "Cache Hit": r.cacheHitSuccess ? "YES ✅" : "N/A",
+      "Cache Duration": r.cacheHitSuccess ? `${r.cacheDurationMs}ms` : "N/A",
     }))
   );
 }

@@ -42,7 +42,7 @@ const OPERATION_STYLES: Record<string, { bg: string; text: string }> = {
 };
 
 /**
- * Phase 4.2: Patch Diff Review Component
+ * Patch Diff Review Component
  *
  * Renders verified patches with side-by-side before/after diffs,
  * rejected patches with invalid citation warnings (Amendment 1),

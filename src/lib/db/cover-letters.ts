@@ -1,4 +1,12 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+
+function coverLetterOwnerWhere(userId?: string): Prisma.CoverLetterWhereInput | undefined {
+  if (!userId) return undefined;
+  return {
+    OR: [{ userId }, { variant: { masterResume: { userId } } }],
+  };
+}
 
 export interface CreateCoverLetterInput {
   jobId: string;
@@ -11,6 +19,7 @@ export interface CreateCoverLetterInput {
   fullMarkdown: string;
   evidenceCitations?: string[]; // array of evidenceIds
   status?: "DRAFT" | "FINAL";
+  userId?: string;
 }
 
 export interface UpdateCoverLetterInput {
@@ -29,7 +38,7 @@ export interface UpdateCoverLetterInput {
  */
 export async function createCoverLetter(input: CreateCoverLetterInput) {
   // Verify job exists
-  const job = await prisma.job.findUnique({
+  const job = await prisma.job.findFirst({
     where: { id: input.jobId },
   });
 
@@ -37,10 +46,13 @@ export async function createCoverLetter(input: CreateCoverLetterInput) {
     throw new Error(`Job record not found: ${input.jobId}`);
   }
 
-  // Verify variant exists if provided
+  // Verify variant exists (and belongs to the caller when userId is provided)
   if (input.variantId) {
-    const variant = await prisma.resumeVariant.findUnique({
-      where: { id: input.variantId },
+    const variant = await prisma.resumeVariant.findFirst({
+      where: {
+        id: input.variantId,
+        ...(input.userId ? { masterResume: { userId: input.userId } } : {}),
+      },
     });
     if (!variant) {
       throw new Error(`ResumeVariant record not found: ${input.variantId}`);
@@ -49,6 +61,7 @@ export async function createCoverLetter(input: CreateCoverLetterInput) {
 
   return await prisma.coverLetter.create({
     data: {
+      userId: input.userId || null,
       jobId: input.jobId,
       variantId: input.variantId || null,
       title: input.title,
@@ -81,9 +94,9 @@ export async function createCoverLetter(input: CreateCoverLetterInput) {
 /**
  * Fetches all cover letters for a specific job ID.
  */
-export async function getCoverLettersByJobId(jobId: string) {
+export async function getCoverLettersByJobId(jobId: string, userId?: string) {
   const letters = await prisma.coverLetter.findMany({
-    where: { jobId },
+    where: { jobId, ...coverLetterOwnerWhere(userId) },
     orderBy: { createdAt: "desc" },
     include: {
       job: {
@@ -108,8 +121,9 @@ export async function getCoverLettersByJobId(jobId: string) {
 /**
  * Fetches all cover letters in the database.
  */
-export async function getCoverLetters() {
+export async function getCoverLetters(userId?: string) {
   const letters = await prisma.coverLetter.findMany({
+    where: coverLetterOwnerWhere(userId),
     orderBy: { createdAt: "desc" },
     include: {
       job: {
@@ -134,9 +148,9 @@ export async function getCoverLetters() {
 /**
  * Fetches a single CoverLetter by ID.
  */
-export async function getCoverLetterById(id: string) {
-  const letter = await prisma.coverLetter.findUnique({
-    where: { id },
+export async function getCoverLetterById(id: string, userId?: string) {
+  const letter = await prisma.coverLetter.findFirst({
+    where: { id, ...coverLetterOwnerWhere(userId) },
     include: {
       job: {
         select: {
@@ -161,8 +175,10 @@ export async function getCoverLetterById(id: string) {
 /**
  * Updates an existing CoverLetter record.
  */
-export async function updateCoverLetter(id: string, input: UpdateCoverLetterInput) {
-  const existing = await prisma.coverLetter.findUnique({ where: { id } });
+export async function updateCoverLetter(id: string, input: UpdateCoverLetterInput, userId?: string) {
+  const existing = await prisma.coverLetter.findFirst({
+    where: { id, ...coverLetterOwnerWhere(userId) },
+  });
   if (!existing) {
     throw new Error(`CoverLetter not found: ${id}`);
   }
@@ -202,7 +218,13 @@ export async function updateCoverLetter(id: string, input: UpdateCoverLetterInpu
 /**
  * Deletes a CoverLetter record by ID.
  */
-export async function deleteCoverLetter(id: string) {
+export async function deleteCoverLetter(id: string, userId?: string) {
+  const existing = await prisma.coverLetter.findFirst({
+    where: { id, ...coverLetterOwnerWhere(userId) },
+  });
+  if (!existing) {
+    throw new Error(`CoverLetter not found: ${id}`);
+  }
   return await prisma.coverLetter.delete({
     where: { id },
   });

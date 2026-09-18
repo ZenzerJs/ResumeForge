@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getResumeById, updateResume } from "@/lib/db/resumes";
+import { sanitizeError } from "@/lib/ai/redact";
+import { ProtectedResumeError } from "@/lib/security/protected-resume";
+import { getRequestUserId, requireUserId } from "@/lib/security/auth-request";
 
 const UpdateResumeSchema = z.object({
-  title: z.string().optional(),
-  typstSource: z.string().min(1, "typstSource cannot be empty").optional(),
-  isMaster: z.boolean().optional(),
+  title: z.string().max(200).optional(),
+  typstSource: z.string().min(1, "typstSource cannot be empty").max(200_000).optional(),
 });
 
 export async function GET(
@@ -13,8 +15,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getRequestUserId(request);
+    if (!userId) {
+      return NextResponse.json({ success: false, error: "Resume record not found" }, { status: 404 });
+    }
     const { id } = await params;
-    const resume = await getResumeById(id);
+    const resume = await getResumeById(id, userId);
 
     if (!resume) {
       return NextResponse.json(
@@ -26,7 +32,7 @@ export async function GET(
     return NextResponse.json({ success: true, data: resume });
   } catch (err) {
     return NextResponse.json(
-      { success: false, error: "Failed to fetch resume", message: String(err) },
+      { success: false, error: "Failed to fetch resume", message: sanitizeError(err) },
       { status: 500 }
     );
   }
@@ -37,6 +43,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await requireUserId(request);
+    if (userId instanceof NextResponse) return userId;
+
     const { id } = await params;
     const body = await request.json();
     const validation = UpdateResumeSchema.safeParse(body);
@@ -52,7 +61,7 @@ export async function PUT(
       );
     }
 
-    const existing = await getResumeById(id);
+    const existing = await getResumeById(id, userId);
     if (!existing) {
       return NextResponse.json(
         { success: false, error: "Resume record not found" },
@@ -63,8 +72,11 @@ export async function PUT(
     const updated = await updateResume(id, validation.data);
     return NextResponse.json({ success: true, data: updated });
   } catch (err) {
+    if (err instanceof ProtectedResumeError) {
+      return NextResponse.json({ success: false, error: err.message }, { status: 403 });
+    }
     return NextResponse.json(
-      { success: false, error: "Failed to update resume", message: String(err) },
+      { success: false, error: "Failed to update resume", message: sanitizeError(err) },
       { status: 500 }
     );
   }

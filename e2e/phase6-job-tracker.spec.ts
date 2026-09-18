@@ -41,8 +41,9 @@ test.describe("Phase 6 Job Application Tracker E2E Tests", () => {
     expect(getJson.data.status).toBe("APPLIED");
     expect(getJson.data.appliedAt).not.toBeNull();
 
-    // Expand notes section for specific job card
-    await page.click(`[data-testid='notes-toggle-btn-${jobId}']`);
+    // Select job card so detail pane (with notes) is visible
+    await page.locator(`[data-testid='tracker-job-card-${jobId}']`).click();
+    await expect(page.locator(`[data-testid='notes-textarea-${jobId}']`)).toBeVisible();
 
     // Type notes and click Save Notes
     const patchPromise = page.waitForResponse(
@@ -57,12 +58,12 @@ test.describe("Phase 6 Job Application Tracker E2E Tests", () => {
     const getJson2 = await getRes2.json();
     expect(getJson2.data.notes).toBe("Referred by Alex. Initial screen scheduled for next Tuesday.");
 
-    // Toggle sub-page tab to Applied & Active
-    await page.click("a:has-text('Applied & Active')");
+    // Toggle sub-page tab to Applied
+    await page.click("[data-testid='tracker-tab-applied']");
     await expect(page.locator("text=Stripe").first()).toBeVisible();
 
-    // Toggle back to All Jobs
-    await page.click("a:has-text('All Jobs')");
+    // Toggle back to All
+    await page.click("[data-testid='tracker-tab-all']");
     await expect(page.locator("[data-testid='tracker-page-title']")).toBeVisible();
   });
 
@@ -70,21 +71,21 @@ test.describe("Phase 6 Job Application Tracker E2E Tests", () => {
     // Check Editor workspace header
     await page.goto("/editor");
     await page.waitForSelector("text=ResumeForge", { timeout: 10000 });
-    await expect(page.locator("header a[href='/tracker']").first()).toBeVisible();
+    await expect(page.locator("header a[href^='/tracker']").first()).toBeVisible();
 
     // Check Library workspace header
     await page.goto("/library");
     await page.waitForSelector("text=Verified Evidence Bank", { timeout: 10000 });
-    await expect(page.locator("header a[href='/tracker']").first()).toBeVisible();
+    await expect(page.locator("header a[href^='/tracker']").first()).toBeVisible();
 
     // Check Tailor workspace header
     await page.goto("/tailor");
     await page.waitForSelector("text=Target Job Posting", { timeout: 10000 });
-    await expect(page.locator("header a[href='/tracker']").first()).toBeVisible();
+    await expect(page.locator("header a[href^='/tracker']").first()).toBeVisible();
 
     // Check Settings workspace header
     await page.goto("/settings");
     await page.waitForSelector("text=AI Provider Gateway Settings", { timeout: 10000 });
-    await expect(page.locator("header a[href='/tracker']").first()).toBeVisible();
+    await expect(page.locator("header a[href^='/tracker']").first()).toBeVisible();
   });
 });

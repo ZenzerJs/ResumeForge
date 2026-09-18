@@ -1,15 +1,45 @@
 "use client";
 
 import React, { useState } from "react";
-import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2, BarChart3, Sparkles, FileText, ChevronDown, Package } from "lucide-react";
+import dynamic from "next/dynamic";
 import { compileTypstToPdf } from "@/lib/typst/compiler";
+import { generateAtsDocx } from "@/lib/export/docx";
+import { generateApplicationPackageZip, cleanTypstToText, sanitizeZipFilename } from "@/lib/export/zip";
+import { assertCanExport } from "@/lib/guardrail/policy";
+import { ResumeFacts } from "@/lib/facts/types";
+import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const AtsScorePanel = dynamic(
+  () => import("@/components/tailor/ats-score-panel").then((m) => ({ default: m.AtsScorePanel })),
+  { ssr: false }
+);
 
 interface PreviewPanelProps {
   svg: string | null;
-  error: { message: string; line?: number } | null;
+  error: { message: string; line?: number; column?: number } | null;
   source: string;
   isCompiling: boolean;
   onResetTemplate: () => void;
+  masterFacts?: ResumeFacts | null;
+  extractedRequirements?: {
+    requiredSkills: string[];
+    preferredSkills: string[];
+    domainTerms: string[];
+  };
+  roleTitle?: string;
+  onTriggerRepair?: (context: {
+    compileError: string;
+    line?: number;
+    column?: number;
+    sourceExcerpt?: string;
+  }) => void;
 }
 
 export function PreviewPanel({
@@ -18,17 +48,30 @@ export function PreviewPanel({
   source,
   isCompiling,
   onResetTemplate,
+  masterFacts,
+  extractedRequirements,
+  roleTitle,
+  onTriggerRepair,
 }: PreviewPanelProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+
+  // Task 9.5: ATS Grade in Editor preview state
+  const [showGrade, setShowGrade] = useState(false);
+
+  const handleToggleGrade = () => {
+    setShowGrade((prev) => !prev);
+  };
 
   const handleExportPdf = async () => {
     try {
       setIsExporting(true);
       setExportError(null);
 
+      // Phase 11.2 Mechanical Guardrail Gate
+      assertCanExport(source, masterFacts);
+
       const pdfBytes = await compileTypstToPdf(source);
-      // Create blob and trigger browser file download
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -40,6 +83,139 @@ export function PreviewPanel({
       URL.revokeObjectURL(url);
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "Failed to export PDF");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportDocx = async () => {
+    try {
+      setIsExporting(true);
+      setExportError(null);
+
+      // Phase 11.2 Mechanical Guardrail Gate
+      assertCanExport(source, masterFacts);
+
+      const docxBytes = await generateAtsDocx(source, { facts: masterFacts || undefined });
+      const blob = new Blob([docxBytes.buffer as ArrayBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "resume.docx";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Failed to export DOCX");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportTypst = () => {
+    try {
+      const blob = new Blob([source], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "resume.typ";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Failed to export Typst source");
+    }
+  };
+
+  const handleExportTxt = () => {
+    try {
+      const cleanTxt = cleanTypstToText(source);
+
+      const blob = new Blob([cleanTxt], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "resume.txt";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Failed to export Text resume");
+    }
+  };
+
+  const handleExportJson = () => {
+    try {
+      const jsonResume = {
+        basics: {
+          name: "Candidate",
+          summary: "Tailored Professional Resume",
+        },
+        skills: masterFacts?.skills || [],
+        work: (masterFacts?.employers || []).map((emp, i) => ({
+          name: emp.raw,
+          position: masterFacts?.titles[i]?.raw || "Role",
+          startDate: emp.startDate,
+          endDate: emp.endDate,
+        })),
+        metrics: masterFacts?.metrics || [],
+      };
+
+      const blob = new Blob([JSON.stringify(jsonResume, null, 2)], {
+        type: "application/json;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "resume.json";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Failed to export JSON resume");
+    }
+  };
+
+  const handleExportZip = async () => {
+    try {
+      setIsExporting(true);
+      setExportError(null);
+
+      const zipBytes = await generateApplicationPackageZip({
+        typstSource: source,
+        masterFacts: masterFacts || undefined,
+        job: roleTitle
+          ? {
+              company: "Target Company",
+              roleTitle: roleTitle,
+              requirements: extractedRequirements,
+            }
+          : null,
+      });
+
+      const blob = new Blob([zipBytes.buffer as ArrayBuffer], {
+        type: "application/zip",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = sanitizeZipFilename("Target_Company", roleTitle || "Resume");
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(
+        err instanceof Error
+          ? err.message
+          : "Package creation failed. You can try again or download individual PDF / DOCX files below."
+      );
     } finally {
       setIsExporting(false);
     }
@@ -58,6 +234,17 @@ export function PreviewPanel({
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={handleToggleGrade}
+            data-testid="grade-resume-btn"
+            className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition-colors shadow-sm"
+            title="Grade current draft against ATS evaluation engine"
+          >
+            <BarChart3 className="h-3.5 w-3.5 text-amber-600" />
+            {showGrade ? "Close Grade" : "Grade"}
+          </button>
+
+          <button
+            type="button"
             onClick={onResetTemplate}
             className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
             title="Reset to starter template"
@@ -66,27 +253,121 @@ export function PreviewPanel({
             Reset Template
           </button>
 
-          <button
-            type="button"
-            onClick={handleExportPdf}
-            disabled={isExporting || Boolean(error)}
-            className="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1 text-xs font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {isExporting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Download className="h-3.5 w-3.5" />
-            )}
-            Export PDF
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                disabled={isExporting || Boolean(error)}
+                data-testid="export-dropdown-btn"
+                className="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1 text-xs font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isExporting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
+                )}
+                Export
+                <ChevronDown className="h-3 w-3 opacity-80" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem
+                onClick={handleExportPdf}
+                data-testid="export-pdf-menu-item"
+                className="cursor-pointer text-xs flex items-center gap-2"
+              >
+                <Download className="size-3.5 text-indigo-500" />
+                <span>Compiled PDF (.pdf)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportDocx}
+                data-testid="export-docx-menu-item"
+                className="cursor-pointer text-xs flex items-center gap-2"
+              >
+                <FileText className="size-3.5 text-blue-500" />
+                <span>Word ATS (.docx)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportTypst}
+                data-testid="export-typst-menu-item"
+                className="cursor-pointer text-xs flex items-center gap-2"
+              >
+                <FileText className="size-3.5 text-amber-500" />
+                <span>Typst Source (.typ)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportTxt}
+                data-testid="export-txt-menu-item"
+                className="cursor-pointer text-xs flex items-center gap-2"
+              >
+                <FileText className="size-3.5 text-emerald-500" />
+                <span>Plain Text ATS (.txt)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportJson}
+                data-testid="export-json-menu-item"
+                className="cursor-pointer text-xs flex items-center gap-2"
+              >
+                <FileText className="size-3.5 text-purple-500" />
+                <span>JSON Resume (.json)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportZip}
+                data-testid="export-zip-menu-item"
+                className="cursor-pointer text-xs flex items-center gap-2"
+              >
+                <Package className="size-3.5 text-amber-600" />
+                <span>Application Package (.zip)</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
       {/* Main Preview Container */}
-      <div className="relative flex-1 overflow-auto p-4 md:p-6 flex flex-col items-center">
+      <div className="relative flex-1 min-h-0 overflow-auto p-4 md:p-6 flex flex-col items-center">
+        {/* Task 9.5: ATS Grade Overlay Breakdown */}
+        {showGrade && (
+          <div data-testid="editor-ats-score-overlay" className="w-full max-w-[850px] mb-6">
+            {!source || !source.trim() ? (
+              <div
+                data-testid="editor-grade-error"
+                className="p-4 bg-red-950/90 border border-red-800 rounded-xl flex items-center justify-between gap-3 text-xs text-red-200 shadow-lg"
+              >
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
+                  <span>Cannot grade an empty document. Please enter valid Typst source.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowGrade(false)}
+                  className="text-red-400 hover:text-red-200 text-xs underline font-medium"
+                >
+                  Dismiss
+                </button>
+              </div>
+            ) : (
+              <AtsScorePanel
+                typstContent={source}
+                extractedRequirements={
+                  extractedRequirements || {
+                    requiredSkills: [],
+                    preferredSkills: [],
+                    domainTerms: [],
+                  }
+                }
+                roleTitle={roleTitle}
+              />
+            )}
+          </div>
+        )}
+
         {/* Error Banner overlay at top if present */}
         {error && (
-          <div className="w-full max-w-[850px] mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800 shadow-sm">
+          <div
+            data-testid="typst-error-banner"
+            className="w-full max-w-[850px] mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800 shadow-sm"
+          >
             <div className="flex items-start gap-2">
               <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
               <div className="flex-1">
@@ -101,24 +382,87 @@ export function PreviewPanel({
                 <p className="mt-1 font-mono text-[11px] leading-relaxed break-words whitespace-pre-wrap">
                   {error.message}
                 </p>
-                <p className="mt-1.5 text-[10px] text-red-600">
-                  Showing last valid compilation preview below.
-                </p>
+                <div className="mt-2 flex items-center justify-between">
+                  <p className="text-[10px] text-red-600">
+                    Showing last valid compilation preview below.
+                  </p>
+                  {onTriggerRepair && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const lineNum = typeof error.line === "number" ? error.line : undefined;
+                        const colNum = typeof error.column === "number" ? error.column : undefined;
+                        let excerpt: string | undefined = undefined;
+                        if (source && lineNum) {
+                          const lines = source.split("\n");
+                          excerpt = lines.slice(Math.max(0, lineNum - 3), lineNum + 2).join("\n");
+                        }
+                        onTriggerRepair({
+                          compileError: error.message,
+                          line: lineNum,
+                          column: colNum,
+                          sourceExcerpt: excerpt,
+                        });
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-sm transition-colors cursor-pointer"
+                      data-testid="fix-typst-ai-btn"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Fix with AI
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         )}
 
         {exportError && (
-          <div className="w-full max-w-[850px] mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-            <p className="font-semibold">Export Warning: {exportError}</p>
+          <div
+            data-testid="export-error-recovery-banner"
+            className="w-full max-w-[850px] mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 shadow-sm space-y-2"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-semibold">
+                Export Notice: {exportError}
+              </p>
+              <button
+                type="button"
+                onClick={() => setExportError(null)}
+                className="text-amber-800 hover:text-amber-950 text-xs underline font-medium shrink-0"
+              >
+                Dismiss
+              </button>
+            </div>
+            <div className="flex items-center gap-2 pt-1 border-t border-amber-200">
+              <span className="text-[11px] text-amber-800 font-medium">Fallback direct downloads:</span>
+              <button
+                type="button"
+                onClick={handleExportPdf}
+                data-testid="fallback-download-pdf-btn"
+                className="px-2 py-0.5 rounded bg-white border border-amber-300 text-indigo-700 hover:bg-indigo-50 font-medium text-[11px] inline-flex items-center gap-1 shadow-xs"
+              >
+                <Download className="size-3" />
+                <span>PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleExportDocx}
+                data-testid="fallback-download-docx-btn"
+                className="px-2 py-0.5 rounded bg-white border border-amber-300 text-blue-700 hover:bg-blue-50 font-medium text-[11px] inline-flex items-center gap-1 shadow-xs"
+              >
+                <FileText className="size-3" />
+                <span>DOCX</span>
+              </button>
+            </div>
           </div>
         )}
 
         {/* Paper Sheet Preview Container */}
         {svg ? (
-          <div className="w-full max-w-[850px] rounded-sm bg-white p-4 sm:p-8 shadow-md border border-slate-200 transition-all">
+          <div className="w-full max-w-[850px] rounded-sm bg-white p-4 sm:p-8 shadow-md border border-slate-200">
             <div
+              data-testid="typst-preview-svg"
               className="typst-preview-svg w-full overflow-hidden [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-w-full"
               dangerouslySetInnerHTML={{ __html: svg }}
             />

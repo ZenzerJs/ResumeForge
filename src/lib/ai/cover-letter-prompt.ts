@@ -1,60 +1,118 @@
 import type { GenerateCoverLetterInput } from "./cover-letter-schema";
 import type { EvidenceItemForPrompt } from "./types";
+import { buildComposedSystemPrompt } from "./master-prompt";
 
 export function buildCoverLetterSystemPrompt(): string {
-  return `You are ResumeForge AI Cover Letter Specialist, an expert career advisor and technical writer.
-Your task is to write a highly compelling, professional, tailored cover letter for a candidate applying for a target job.
+  const taskInstructions = `## TASK-SPECIFIC: TAILORED COVER LETTER SPECIALIST
 
-CRITICAL SECURITY & EVIDENCE GROUNDING CONTRACT:
-1. MANDATORY EVIDENCE GROUNDING: You MUST base all candidate claims, metrics, and experience strictly on the verified Evidence Bank items provided in the prompt.
-2. ZERO HALLUCINATION: You MUST NOT invent companies, years of experience, metric percentages, or technologies that do not exist in the candidate's provided Evidence Bank items.
-3. ADVERSARIAL GAP HANDLING: If a job requirement (e.g. Kubernetes, AWS, Go) is NOT supported by any item in the candidate's Evidence Bank, you MUST NOT claim or fabricate experience with that technology. Either omit the unsupported requirement or explicitly represent it as a gap/review-needed item in the "gapsAddressed" array. Never use confident generic wording to assert unverified skills.
-4. CITATIONS: In the "evidenceCitations" JSON array, return every evidence ID (e.g. "exp-1", "bullet-101") that you referenced or drew from to write the body paragraphs.
-5. NO ATS GAMING: Do not use keyword stuffing, white text, or deceptive phrasing.
-6. STRUCTURED OUTPUT: You MUST return ONLY valid JSON conforming to the CoverLetterResponse schema without markdown codeblocks or extraneous commentary outside JSON.
+Write a professional, evidence-grounded cover letter. Never invent employers, metrics, or skills.
 
-OUTPUT JSON SCHEMA:
+### ADVERSARIAL GAP HANDLING
+If a job requirement (e.g. Kubernetes, AWS, Go) is NOT supported by any item in the candidate's Evidence Bank, you MUST NOT claim or fabricate experience with that technology. Either omit the unsupported requirement or list it in gapsAddressed.
+
+### OUTPUT FORMAT (CRITICAL)
+- Return ONE raw JSON object only.
+- Do NOT wrap in markdown fences (\`\`\`json).
+- Do NOT add prose before or after the JSON.
+
+### HARD VALIDATION RULES
+1. evidenceCitations: every Evidence/Bullet ID you used from the prompt. If Evidence Bank has items, include at least one valid ID.
+2. Never claim JD requirements unsupported by evidence — omit them or list in gapsAddressed.
+3. Length floors:
+   - openingParagraph ≥ 20 chars
+   - each bodyParagraphs entry ≥ 30 chars
+   - closingParagraph ≥ 20 chars
+   - fullMarkdown ≥ 100 chars (complete letter)
+4. fullMarkdown must include salutation, blank-line paragraphs, closing, and signature.
+
+### CANONICAL VALID JSON SHAPE
 {
-  "title": "Cover Letter — [Company] [RoleTitle]",
-  "salutation": "Dear [Hiring Manager / Hiring Team at Company],",
-  "openingParagraph": "Strong 2-3 sentence hook referencing the candidate's enthusiasm, target role title, company name, and core value proposition.",
+  "title": "Cover Letter — Acme Corp Senior Backend Engineer",
+  "salutation": "Dear Hiring Team at Acme Corp,",
+  "openingParagraph": "I am writing to apply for the Senior Backend Engineer role at Acme Corp. My verified backend experience building APIs and data systems aligns with your reliability and scale priorities.",
   "bodyParagraphs": [
-    "First body paragraph detailing specific technical achievements grounded in evidence items...",
-    "Second body paragraph highlighting problem-solving, scale, and role alignment..."
+    "In my recent platform work, I designed service APIs and improved database performance using approaches documented in my Evidence Bank, including measurable latency reductions on production queries.",
+    "I also collaborated on containerized deployments with a focus on maintainable services, staying within technologies I can verify from my evidence."
   ],
-  "closingParagraph": "Polite, confident closing statement thanking the reader, expressing eagerness for an interview, and offering to discuss qualifications.",
-  "fullMarkdown": "# Cover Letter\n\nDear Hiring Team,\n\n[Opening]\n\n[Body]\n\n[Closing]\n\nSincerely,\nCandidate",
+  "closingParagraph": "Thank you for considering my application. I would welcome the chance to discuss how my verified experience can support your backend roadmap.",
+  "fullMarkdown": "# Cover Letter — Acme Corp Senior Backend Engineer\\n\\nDear Hiring Team at Acme Corp,\\n\\nI am writing to apply for the Senior Backend Engineer role at Acme Corp. My verified backend experience building APIs and data systems aligns with your reliability and scale priorities.\\n\\nIn my recent platform work, I designed service APIs and improved database performance using approaches documented in my Evidence Bank, including measurable latency reductions on production queries.\\n\\nI also collaborated on containerized deployments with a focus on maintainable services, staying within technologies I can verify from my evidence.\\n\\nThank you for considering my application. I would welcome the chance to discuss how my verified experience can support your backend roadmap.\\n\\nSincerely,\\nCandidate",
   "evidenceCitations": ["exp-1", "bullet-101"],
-  "gapsAddressed": []
+  "gapsAddressed": ["No verified Kubernetes production ownership in Evidence Bank."]
 }`;
+
+  return buildComposedSystemPrompt(taskInstructions);
 }
 
 export function buildCoverLetterUserPrompt(
   input: GenerateCoverLetterInput,
-  evidenceItems: EvidenceItemForPrompt[]
+  evidenceItems: EvidenceItemForPrompt[],
+  masterTypstSource?: string
 ): string {
   const company = input.company || "Hiring Organization";
   const roleTitle = input.roleTitle || "Target Position";
+  const candidateName = input.candidateName || "Candidate";
 
-  const evidenceSummary = evidenceItems
-    .map((item) => {
-      const bulletsText = (item.bullets || [])
-        .map((b: { id: string; text: string }) => `  - [ID: ${b.id}] ${b.text}`)
-        .join("\n");
-      return `Item [ID: ${item.id}] ${item.title} (${item.organization || "N/A"})\nSummary: ${item.verifiedSummary}\nBullets:\n${bulletsText}`;
-    })
-    .join("\n\n");
+  const verified = evidenceItems.filter((item) => item.status === "verified");
+  const drafts = evidenceItems.filter((item) => item.status === "draft");
+  const preferred = verified.length > 0 ? verified : evidenceItems;
+
+  const formatEvidence = (items: EvidenceItemForPrompt[], label: string) => {
+    if (items.length === 0) return `${label}: (none)\n`;
+    return `${label}:\n${items
+      .map((item) => {
+        const bulletsText = (item.bullets || [])
+          .map((b: { id: string; text: string }) => `  - [ID: ${b.id}] ${b.text}`)
+          .join("\n");
+        return `Item [ID: ${item.id}] ${item.title} (${item.organization || "N/A"}) [${item.status}]\nSummary: ${item.verifiedSummary}\nBullets:\n${bulletsText}`;
+      })
+      .join("\n\n")}\n`;
+  };
+
+  const reqs = input.extractedRequirements as
+    | { requiredSkills?: string[]; preferredSkills?: string[]; domainTerms?: string[] }
+    | undefined;
+  const reqBlock = reqs
+    ? `EXTRACTED REQUIREMENTS:
+- Required: ${(reqs.requiredSkills || []).join(", ") || "n/a"}
+- Preferred: ${(reqs.preferredSkills || []).join(", ") || "n/a"}
+- Domain: ${(reqs.domainTerms || []).join(", ") || "n/a"}`
+    : "";
+
+  const jdExcerpt = input.rawDescription.slice(0, 6000);
+  const masterBlock = masterTypstSource?.trim()
+    ? `CANDIDATE MASTER RESUME (Typst — use for tone/history; still cite Evidence Bank IDs for claims):
+\`\`\`
+${masterTypstSource.slice(0, 8000)}
+\`\`\`
+`
+    : "CANDIDATE MASTER RESUME: (not available — ground exclusively in Evidence Bank)\n";
+
+  const availableIds = preferred
+    .flatMap((item) => [item.id, ...(item.bullets || []).map((b) => b.id)])
+    .filter(Boolean);
 
   return `TARGET JOB DETAILS:
 - Company: ${company}
 - Role Title: ${roleTitle}
+- Candidate Name: ${candidateName}
 - Target Role Profile Overlay: ${input.activeRoleProfile}
-- Raw Description Excerpt:
-${input.rawDescription.slice(0, 1500)}
+- Raw Job Description:
+${jdExcerpt}
 
-CANDIDATE VERIFIED EVIDENCE BANK:
-${evidenceSummary}
+${reqBlock}
+
+${masterBlock}
+${formatEvidence(preferred, "CANDIDATE EVIDENCE BANK (prefer verified)")}
+${drafts.length > 0 && verified.length > 0 ? formatEvidence(drafts, "DRAFT EVIDENCE (use sparingly; label as unverified if used)") : ""}
+
+AVAILABLE CITATION IDS (use only these in evidenceCitations):
+${availableIds.length > 0 ? availableIds.map((id) => `- ${id}`).join("\n") : "- (none)"}
 
 INSTRUCTIONS:
-Craft a 3-4 paragraph tailored cover letter for ${company} (${roleTitle}). Ground all claims in verified evidence IDs. If job requirements are unsupported by evidence, omit them or flag in gapsAddressed. Return valid JSON only.`;
+Write a 3–4 paragraph cover letter for ${candidateName} applying to ${roleTitle} at ${company}.
+- Return ONE raw JSON object matching the canonical schema (no markdown fences).
+- Cite real Evidence Bank IDs in evidenceCitations (required when IDs are listed above).
+- Do not invent experience. Unsupported JD requirements go in gapsAddressed.
+- fullMarkdown must be the complete letter signed "${candidateName}".
+- Meet minimum lengths: opening≥20, each body≥30, closing≥20, fullMarkdown≥100.`;
 }

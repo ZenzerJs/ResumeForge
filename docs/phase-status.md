@@ -4,6 +4,371 @@ This document records completed project milestones, current state, known limitat
 
 ---
 
+## Phase Update: Dual-Subagent Audit & Hard-Slice Features (H1–H3, E4, Q1)
+
+- **Completed Date**: 2026-08-17
+- **Status Summary**: Implemented Multi-Format Application Bundle (.zip) packaging engine, Side-by-side Typst Master Diff with LCS line comparison, Interview Prep Sheet with deterministic STAR response synthesis & gap mitigations, Guardrail 1-Click Align recovery action, and Guest-to-Account draft migration flow.
+- **Verification Summary**: 100% clean passes across lint, typecheck, 387 Vitest unit tests, production build (46 pages), and 84 Playwright E2E tests.
+
+### Completed Deliverables
+1. **Multi-Format Application Bundle (`.zip`)**:
+   - Client-side parallel builder (`src/lib/export/zip.ts`) packaging PDF (Typst WASM), clean ATS DOCX, TXT resume, Typst source, cover letter (.md/.txt), cryptographic manifest (`manifest.json`), and application summary (.txt). Parallelize independent generation, measure export performance on representative inputs, and keep the UI responsive with progress/cancel/error states.
+   - Export dropdown in `PreviewPanel` and Step 5 export in `ApplySheet` with fail-closed mechanical guardrail gating (`assertCanExport`), cryptographic SHA-256 validation, and sanitized filenames.
+2. **Side-by-Side Typst Master Diff**:
+   - Longest Common Subsequence (LCS) line diff algorithm (`src/lib/diff/simple-diff.ts`) with O(n) identical document fast path, 2,000-line capping protection, and CRLF normalization.
+   - Segmented diff review tab and line diff container (`data-testid="master-diff-container"`) in `ConfirmMasterDialog`.
+3. **Interview Prep Sheet (STAR Format)**:
+   - Deterministic STAR interview response synthesizer (`src/lib/prep/star-synthesizer.ts`): Deterministic synthesis that only assembles statements from cited Evidence Bank text; unsupported requirements render as explicit gaps.
+   - Upgraded `ApplyPrepSheetModal` with segmented navigation, STAR cards (`data-testid="star-story-card"`), grounding badges (`DIRECT`, `TRANSFERABLE`, `GAP`), and 1-click clipboard export (`data-testid="copy-star-story-btn"`).
+4. **Ergonomic Refinements**:
+   - `GuardrailFeedback`: 1-click "Align with Master Baseline" action (`data-testid="guardrail-align-btn"`).
+   - `GuestMigrationModal`: 1-click promotion of unauthenticated `localStorage` drafts to PostgreSQL user accounts.
+
+### Verification Tests Executed
+- `npm run lint` — Pass (0 warnings, 0 errors)
+- `npm run typecheck` — Pass (0 errors)
+- `npm run test` — Pass (387/387 tests across 79 test files)
+- `npm run build` — Pass (46 pages rendered)
+- `npx playwright test` — Pass (84/84 tests across 28 spec files in 1.7m)
+
+---
+
+## Phase Update: Workstream 5 (WS5) — Tailor Information Architecture: Overview vs Job Info Views
+
+- **Completed Date**: 2026-08-17
+- **Status Summary**: Implemented segmented tab navigation in Tailor workspace (`Overview & Materials` vs `Job Info & Requirements`), two-way view transitions (`Edit Job & Reqs →` / `← Back to Overview`), automatic transition to overview upon job save, URL search param deep-linking (`?tab=overview`), and state/ATS score evaluation preservation.
+
+### Completed Work
+- Enhanced `src/components/tailor/tailor-workspace.tsx` with segmented tabbar, Overview panel (`PatchDiffReview`, `CoverLetterPanel`, role summary), and Job Info panel (inputs, raw JD textarea, extracted requirements checklist).
+- Added unit tests in `tests/tailor-tab-views.test.ts` and Playwright E2E in `e2e/ws5-tailor-tab-views.spec.ts`.
+- Verified entire application test suite (80/80 Playwright tests passing, 355/355 Vitest unit tests passing).
+
+### Verification Tests Executed
+- `npm run lint` — Pass (0 errors)
+- `npm run typecheck` — Pass (0 errors)
+- `npm run test` — Pass (355/355 tests in 73 files)
+- `npm run build` — Pass (46 pages rendered)
+- `npx playwright test` — Pass (80/80 tests across 27 spec files)
+
+---
+
+## Phase Update: Workstream 4 (WS4) — Tailor Auto-Rescan & Target Role Profile Swap
+
+- **Completed Date**: 2026-08-17
+- **Status Summary**: Implemented Target Role Profile switcher dropdown in Tailor header supporting 6 canonical ATS archetypes (`Full-stack`, `Backend`, `AI/LLM`, `ML`, `Frontend`, `Data/Platform`), dynamic two-way ATS score re-weighting without modifying resume text, and debounced auto-rescan trigger on JD changes with a live scanning indicator.
+
+### Completed Work
+- Enhanced `src/components/tailor/tailor-workspace.tsx` with header Role Profile Switcher, `selectedRoleProfile` state, and auto-rescan `useEffect` debounce.
+- Wired live synchronization with `src/components/tailor/ats-score-panel.tsx` for instant score updates.
+- Added unit tests in `tests/tailor-role-swap.test.ts` and E2E in `e2e/ws4-role-swap-rescan.spec.ts`.
+
+### Verification Tests Executed
+- `npm run lint` — Pass (0 errors)
+- `npm run typecheck` — Pass (0 errors)
+- `npm run test` — Pass (353/353 tests)
+- `npm run build` — Pass (46 pages rendered)
+- `npx playwright test` — Pass (78/78 tests across 25 spec files)
+
+### Suggested Next Task
+- **WS5 (P1)**: Tailor Information Architecture — Overview vs Job Info Views: Tabbed navigation in Tailor workspace separating high-level strategic overview (ATS score gauge, top evidence matches, generated cover letter) from comprehensive job info view (full JD markup, extracted requirements checklist, and raw text).
+
+---
+
+## Phase Update: Workstream 3 (WS3) — Evidence Compatibility Filter & Badges
+
+- **Completed Date**: 2026-08-17
+- **Status Summary**: Implemented deterministic fast in-memory evidence compatibility calculation, synonym matching, candidate evidence resolution, `minScore` API query filtering, Match Tier selector dropdown (`50%+`, `70%+`, `80%+`), and color-coded `% Match` & skill counter badges in Discover feed.
+
+### Completed Work
+- Created `src/lib/scoring/compatibility-engine.ts` with `calculateJobCompatibility`, synonym mapping, and tier assignment.
+- Updated `GET /api/connectors/jobs` to fetch candidate Evidence Bank items and compute per-job compatibility and `minScore` filtering.
+- Enhanced `src/components/tracker/discover-feed.tsx` with Match Tier filter dropdown, `% Match` badge pills, and matched skill / evidence item counter chips.
+- Added unit tests in `tests/compatibility-engine.test.ts` and E2E in `e2e/ws3-compatibility.spec.ts`.
+
+### Verification Tests Executed
+- `npm run lint` — Pass (0 errors)
+- `npm run typecheck` — Pass (0 errors)
+- `npm run test` — Pass (350/350 tests)
+- `npm run build` — Pass (46 pages rendered)
+- `npx playwright test` — Pass (77/77 tests across 19 spec files)
+
+### Suggested Next Task
+- **WS4 (P1)**: Tailor Auto-Rescan & Target Role Profile Swap: Profile switcher dropdown in Tailor header (`Full-stack`, `Backend`, `AI/LLM`, `ML`, `Frontend`, `Data/Platform`), instant dynamic re-weighting of ATS score breakdown without losing edited text, and auto-rescan trigger debounce when resume text or target JD changes.
+
+---
+
+## Phase Update: Workstream 2 (WS2) — Discover Filters, Geocoding, Radius & Blended Sorting
+
+- **Completed Date**: 2026-08-16
+- **Status Summary**: Implemented Canadian city geocoding coordinates for 10 tech hubs, Haversine great-circle distance radius filtering, multi-factor blended match scoring (ATS qualification match 55% + recency 20% + location 15% + salary transparency 10%), expanded `GET /api/connectors/jobs` query filters, and interactive Discover toolbar with `% Match` color badges.
+
+### Completed Work
+- Created `src/lib/geo/geocoding.ts` with Canadian tech hub coordinates and Haversine formula (`haversineDistanceKm`, `isWithinRadiusKm`).
+- Created `src/lib/scoring/blended-sort.ts` with `calculateBlendedScore`, `calculateRecencyScore`, `calculateLocationScore`, and `calculateSalaryScore`.
+- Updated `GET /api/connectors/jobs` to support `city`, `radiusKm`, `minSalary`, `minScore`, and `sort` (`blended`, `newest`, `ats`, `salary`).
+- Enhanced `src/components/tracker/discover-feed.tsx` with Canadian city selector, distance radius slider/select, salary filter, sort order dropdown, and color-coded `% Match` card badges.
+- Added unit tests in `tests/geocoding-radius.test.ts`, `tests/blended-scoring.test.ts` and E2E in `e2e/ws2-discover-filters.spec.ts`.
+
+### Verification Tests Executed
+- `npm run lint` — Pass (0 errors)
+- `npm run typecheck` — Pass (0 errors)
+- `npm run test` — Pass (347/347 tests)
+- `npm run build` — Pass (46 pages rendered)
+- `npx playwright test` — Pass (76/76 tests across 18 spec files)
+
+### Suggested Next Task
+- **WS3 (P1)**: Evidence Compatibility Filter & Badges: Fast in-memory compatibility score against active Master Resume + Evidence Bank, `% Match` color badges on discover feed and job detail drawer, and compatibility score filter (`50%+`, `70%+`, `80%+`).
+
+---
+
+## Phase Update: Workstream 1 (WS1) — Job Ingestion Failure Taxonomy & Universal Normalizer
+
+- **Completed Date**: 2026-08-16
+- **Status Summary**: Implemented 13-reason failure taxonomy (`ExtractFailureCode`), strict policy compliance checker (`checkHostPolicy` blocking LinkedIn/Indeed search scraping per TOS), Ashby public JSON board API, Universal Job Normalizer (`NormalizedJob` with Canadian city geocoding and boilerplate stripping), and AI JD Formatter (`FormattedJdSchema` and prompt).
+
+### Completed Work
+- Defined 13-case `ExtractFailureCode` and diagnostic telemetry interface in `src/lib/ingestion/types.ts`.
+- Implemented `checkHostPolicy` and Ashby JSON board API in `src/lib/ingestion/tier2-fetcher.ts`.
+- Created `normalizeJob`, Canadian geo coordinate mapper, and `stripBoilerplate` in `src/lib/ingestion/normalize-job.ts`.
+- Created `FormattedJdSchema`, `buildJdFormatSystemPrompt`, and `formatJobDescriptionWithAi` in `src/lib/ai/`.
+- Updated `POST /api/jobs/extract` to return normalized data, typed 422 errors, and optional AI formatting.
+- Updated `prisma/schema.prisma` with `normalized`, `formattedJd`, `extractFailure`, `lat`, `lng`, `cityNorm`.
+- Added unit tests in `tests/ingestion-failure-taxonomy.test.ts`, `tests/normalize-job.test.ts`, `tests/jd-format.test.ts` and E2E in `e2e/ws1-ingestion.spec.ts`.
+
+### Verification Tests Executed
+- `npm run lint` — Pass (0 errors)
+- `npm run typecheck` — Pass (0 errors)
+- `npm run test` — Pass (339/339 tests)
+- `npm run build` — Pass (46 pages rendered)
+- `npx playwright test` — Pass (75/75 tests across 17 spec files)
+
+### Suggested Next Task
+- **WS2 (P1)**: Discover Page Filter Panel, Canadian City Geocoding, Distance Radius Filter (Haversine formula), and Blended Match Scoring (recency + ATS match).
+
+---
+
+## Phase Update: Workstream 0 (WS0) — UX Bug Fixes & Staged AI Feedback
+
+- **Completed Date**: 2026-08-16
+- **Status Summary**: Resolved P0 UX layout and visual bugs: flex column editor layout (fixed top nav overflow/clipping), accessible multi-stage `AiProgress` feedback component (queued -> connecting -> extracting -> matching -> writing -> verifying -> done), and seamless landing capability marquee infinite loop.
+
+### Completed Work
+- Fixed editor layout by removing nested `h-screen` in `src/app/editor/page.tsx` and removing redundant `h-dvh` on `AppShell` invocation in `src/components/editor/editor-workspace.tsx`.
+- Updated `src/components/editor/editor-workspace-skeleton.tsx` to use `h-dvh max-h-dvh` preventing initial layout shift.
+- Created `src/components/ui/ai-progress.tsx` with 8 named lifecycle stages, live timer, accessible `aria-live="polite"`, compact and full card view modes.
+- Replaced spinner-only states with `AiProgress` in `src/components/editor/ai-sidebar.tsx` and `src/components/tailor/tailor-workspace.tsx`.
+- Refactored `src/components/landing/capability-marquee.tsx` into dual matching subtracks and updated `src/app/globals.css` for seamless `-50%` infinite loop with reduced motion support.
+- Added unit tests in `tests/ai-progress.test.ts` and Playwright E2E tests in `e2e/ws0-ux-bugs.spec.ts`.
+
+### Verification Tests Executed
+- `npm run lint` — Pass (0 errors)
+- `npm run typecheck` — Pass (0 errors)
+- `npm run test` — Pass (320/320 tests)
+- `npm run build` — Pass (46 pages rendered)
+- `npx playwright test` — Pass (73/73 tests across 16 spec files)
+
+### Suggested Next Task
+- **WS1 (P1)**: Ingestion failure taxonomy (`ExtractFailureCode`), policy-compliant adapter pipeline (ATS JSON, robots check, user paste fallback), `NormalizedJob` transformer, and structured AI JD Formatter.
+
+---
+
+## Phase Update: Conversational Career Assistant (AI Sidebar Chat)
+
+- **Completed Date**: 2026-08-14
+- **Status Summary**: Expanded the editor AI sidebar into Chat | Tailor. Chat is a BYOK multi-turn career assistant with SSE streaming and read-only tool calling. Existing JD tailoring remains on the Tailor tab.
+
+### Completed Work
+- Chat system prompt composed on master guardrails (`src/lib/ai/chat-prompt.ts`).
+- `POST /api/ai/chat` SSE route with tool loop (`executeServerTool`, `CHAT_TOOLS` only).
+- Provider `chat*` adapters + `sendChatCompletion` gateway dispatcher.
+- `ChatPanel` UI with quick actions, tool badges, sessionStorage history.
+- Header badge: `Master Resume` (no duplicated title).
+
+### Verification Tests Executed
+- `npm run lint` — Pass
+- `npm run typecheck` — Pass
+- `npm run test` — Pass (316/316)
+- `npm run build` — Pass
+- `npx playwright test` — Pass (71/71 after Chat-tab E2E fixes)
+
+### Known Limitations
+- Collect-then-SSE (not token streaming from providers).
+- Chat history is session-scoped.
+- Mutation tools stay on Tailor.
+
+### Suggested Next Task
+- Native provider streaming and tool-result message formats.
+
+---
+
+## Current Status: Phase 12 — Job Ingestion Engine & Public Connectors
+
+
+- **Completed Date**: 2026-08-14
+- **Status Summary**: Implemented resilient, local-first job ingestion engine for Canadian and remote tech roles without headless scraping or auto-apply automation. Connects directly to 7 public REST APIs and syndication feeds (Greenhouse, Lever, Ashby, Adzuna CA, Jobicy, Remotive, RemoteOK). Hardened against SSRF via hostname allowlist and DNS IP validation (`ipaddr.js`). Deduplicates via URL canonicalization and SHA-256 fingerprinting. Sanitizes HTML and plain text via `sanitize-html`. Integrates with the Phase 11.5 Apply Sheet and database tracking pipeline.
+
+### Phase 12 Deliverables
+1. **SSRF Firewall & HTTP Dispatcher (`src/lib/connectors/http.ts`)**:
+   - Protocol check (`https:` only), 7-host allowlist, direct and resolved IP range validation (`ipaddr.js`), `redirect: "manual"`, and timeout aborts.
+2. **7 Public API / Feed Connectors (`src/lib/connectors/providers/`)**:
+   - `GreenhouseConnector`: Curated Canadian tech boards (Shopify, Wealthsimple, 1Password, Ada, Clio, Bench, KOHO, RelationalAI).
+   - `LeverConnector`: Curated tech postings (Certn, Tulip, Symend, League, Properly).
+   - `AshbyConnector`: Curated tech boards with compensation parsing (Cohere, Dropbox, Linear, Deel, Ramp).
+   - `AdzunaCaConnector`: Canada tech search with optional BYOK `ADZUNA_APP_ID`/`ADZUNA_APP_KEY`.
+   - `JobicyConnector`: Canada remote dev feed.
+   - `RemotiveConnector`: Software development remote feed.
+   - `RemoteOkConnector`: Developer tech tag filtering.
+3. **Deduplication & Sanitization (`src/lib/connectors/dedupe.ts`, `sanitize.ts`)**:
+   - Strip tracking query params (`utm_*`, `ref`, `gh_jid`, `lever-source`, `ashby_jid`).
+   - Deterministic SHA-256 fingerprinting on `norm_company:norm_title:canonical_url`.
+   - HTML sanitization allowing safe tags while stripping scripts and event handlers.
+4. **Ingestion Orchestrator & Database Models (`src/lib/connectors/orchestrator.ts`)**:
+   - Models: `IngestedJob`, `ConnectorSyncLog`, `WorkplaceType`, `JobSource`.
+   - Parallel `Promise.allSettled` sync runner with batch upserts and telemetry logging.
+   - Promotion helper `promoteIngestedJobToTrackedJob` to link with Phase 11.5 Apply Sheet.
+5. **API Endpoints (`src/app/api/connectors/`)**:
+   - `POST /api/connectors/sync`: Manual / cron sync trigger.
+   - `GET /api/connectors/status`: Health, telemetry, and log metrics.
+   - `GET /api/connectors/jobs`: Filtered search across ingested jobs.
+   - `POST /api/connectors/promote`: Promote ingested job to tracked job.
+
+---
+
+## Previous Status: Phase 11 — Evidence-Grounded Engine, Guardrails & Adaptive AI Assistant
+
+- **Completed Date**: 2026-08-14
+- **Status Summary**: Complete implementation of Phase 11. Fact snapshot engine freezes master facts on Postgres Json column (`Resume.factSnapshot` & `ResumeVariant.factSnapshot`). Mechanical fail-closed guardrail diffs candidate Typst against master facts (blocking hard violations on employer, title, date, metric, evidence citations). Clean ATS single-column DOCX generator with direct downloads. Confirm-before-master fact freezing dialog. 5-step one-click apply sheet in tracker feed. Allowlisted model tool executor with guardrail gates. Portaled tri-mode `AiAssistantWindow` with RAF dragging/resizing and streaming markdown rendering.
+
+### Phase 11 Deliverables
+1. **Fact Snapshot Engine (`src/lib/facts/`)**:
+   - `types.ts`, `normalize.ts`, `extract.ts`: Canonical string, employer, job title, date range, and metric tokenization pipeline.
+   - `prisma/schema.prisma`: `factSnapshot Json?` on `Resume` and `ResumeVariant`.
+   - Snapshot freezing on `saveMasterResume` and copy to variants for audit trail.
+2. **Mechanical Guardrail Engine (`src/lib/guardrail/`)**:
+   - `check.ts`, `policy.ts`, `types.ts`: Deterministic diff checker against master fact baseline.
+   - Fail-closed retry policy (1x retry on violation, fallback to master baseline on failure).
+   - Hard violation gate blocking PDF/DOCX export, patch applications, and master overwrite.
+   - `src/components/ui/guardrail-feedback.tsx`: Audit table with severity badges and violation details.
+3. **Clean ATS DOCX Generator (`src/lib/export/docx.ts`)**:
+   - Single-column semantic DOCX generator using `docx`.
+   - Export dropdown in preview panel (`PDF (WASM)` | `DOCX (ATS)`).
+4. **Confirm-Before-Master Flow (`src/components/editor/confirm-master-dialog.tsx`)**:
+   - Interactive preview of extracted employers, titles, metrics, and skills before freezing master baseline.
+5. **One-Click Apply Pipeline (`src/components/tracker/apply-sheet.tsx`)**:
+   - 5-step pipeline: `Job -> Tailor -> Guardrail Audit -> ATS Score -> Downloads & Direct Link`.
+6. **Model Tool Protocol (`src/lib/ai/tools/`)**:
+   - Allowlisted executor for `get_resume_facts`, `run_guardrail`, `get_ats_score`, `get_job`, `search_saved_jobs`, `apply_patches`, `export_docx`.
+7. **Adaptive AI Assistant Window (`src/components/editor/ai-assistant-window.tsx` & `ai-markdown-renderer.tsx`)**:
+   - Portaled container to `document.body` with tri-mode (`docked`, `floating`, `maximized`).
+   - High-FPS RAF dragging and resizing with `localStorage` geometry persistence.
+   - Streaming markdown rendering with code block copying and sanitization.
+
+---
+
+## Previous Status: Guest Sessions + Optional Accounts
+
+- **Completed Date**: 2026-08-12
+- **Status Summary**: The app is usable without signing up. Guest work stays in the browser. Email/password accounts persist resumes and evidence to Postgres scoped by `userId`. Jobs and full descriptions are a shared catalog readable by guests and every account.
+
+### Follow-up (2026-08-12): Shared job catalog, private evidence
+- Jobs and full descriptions are a global catalog. Guests and every account can read them. Creating/updating/deleting still requires sign-in.
+- Evidence Bank, resumes, variants, and cover letters stay scoped to the signed-in user. Guests get empty lists and cannot save.
+- Deleting a user no longer cascade-deletes catalog jobs (`Job.userId` is `ON DELETE SET NULL`). Cover letters store `userId` so they stay private even without a variant.
+- Landing atmosphere layers, capability marquee, proof-card badges, and footer links restored. Landing `main` no longer uses `overflow-hidden` (that was clipping sections below the fold).
+- Accounts have a unique `username`. Nav shows `@username` instead of the full email. Settings includes Sign In / Sign Up / Sign Out and username editing.
+
+### Delivered
+- `User` model and optional `userId` on `Resume`, `EvidenceItem`, and `Job`.
+- Signup/login/me/logout; session cookie carries `userId`.
+- Public pages; CSRF and rate limits unchanged. Missing `APP_ACCESS_SECRET` no longer locks browsing.
+- Persist APIs return `401 GUEST_READ_ONLY` for guests; resume/evidence list GETs return empty data. Job list GETs return the shared catalog.
+- Sign In / Sign Up nav, guest banner, login+signup page, Continue as guest.
+- ADR-014 overrides ADR-013’s page-level password gate.
+
+### Verification (2026-08-12)
+- `npm run lint` — pass
+- `npm run typecheck` — pass
+- `npm run test` — pass (233/233)
+- `npm run build` — pass
+- `npx playwright test` — pass (68/68)
+
+### Known limitations
+- BYOK keys remain in `localStorage`.
+- Rate limits are in-memory (one Render instance).
+- Clerk/OAuth is out of scope.
+- Guest editor drafts use localStorage + WASM; they are not written to Postgres.
+
+---
+
+## Current Status: Hosted Polish (Waves D–G)
+
+- **Completed Date**: 2026-08-12
+- **Status Summary**: Session chrome, leftover a11y, dead landing/kanban code, self-hosted Typst fonts, and Render start config. Host-readiness from Waves A–C is unchanged.
+
+### Polish delivered
+- Sign Out in nav (desktop + mobile). Dummy Notifications/Terminal controls removed.
+- Login password show/hide. Hosted copy no longer claims local-first.
+- One `<main>` per AppShell page. Search labels, focus-visible rings, 44px icon hits, editor `beforeunload`.
+- Deleted unused landing modules and `tracker-workspace.tsx`. Home no longer refetches `/api/stats`.
+- Typst text fonts served from `/fonts/typst/`; CSP no longer allows jsDelivr.
+- `npm start` binds `0.0.0.0`; `render.yaml` documents Render Web + Postgres.
+- CSRF origin check compares `Origin`/`Referer` to the `Host` header so `next start -H 0.0.0.0` does not 403 same-origin browser fetches.
+
+### Verification (2026-08-12)
+- `npm run lint` — pass
+- `npm run typecheck` — pass
+- `npm run test` — pass (231/231)
+- `npm run build` — pass
+- `npx playwright test` — pass (65/65)
+
+### Known limitations
+- BYOK keys remain in `localStorage` (CSP-mitigated, not vaulted).
+- Rate limits are in-memory (one Render instance).
+- Clerk/OAuth multi-user is out of scope.
+- Live Render/Vercel provisioning is still a manual step (`render.yaml` is the blueprint).
+
+---
+
+## Current Status: Hosted Security & Optimization (Wave A–C)
+
+- **Completed Date**: 2026-08-12
+- **Status Summary**: ResumeForge is host-ready for a single-user public deploy: Postgres, password middleware, real master immutability, SSRF-safe fetches, rate/body limits, security headers, editor debounce + dynamic panels, slim paginated jobs API, one landing animation, and a11y (skip link, mobile nav, reduced motion).
+
+### Hosted blockers closed
+- Prisma datasource is PostgreSQL (`docker-compose.yml` for local). ADR-013 records the override of ADR-002/ADR-005.
+- `src/middleware.ts` gates `/api/*` and app routes behind `rf_session`. Unauthenticated `GET /api/jobs` returns 401.
+- Protected masters reject `PUT /api/resumes/[id]` (403). `generate-patches` no longer auto-creates a master.
+- `safeFetch` wraps bulk-import, tier-2, and custom AI URLs. `JOB_SYNC_SECRET` is fail-closed.
+- PDF 10 MB + `%PDF-` magic, Zod string caps, AI/import rate limits, CSP and related headers, Gemini `x-goog-api-key`.
+
+### Optimization & a11y
+- Typst compile debounced 400ms; CodeEditor/Preview/AI sidebar and ATS grade are `next/dynamic`.
+- `GET /api/jobs` is paginated and omits `rawDescription`.
+- Tier 1 import uses one `findMany` + `createMany`.
+- Landing keeps AsciiWaves only (no WebGL/gsap). Stats load on the server. Nav uses Lucide. Skip link + mobile drawer.
+
+### Verification (2026-08-12)
+- `npm run lint` — pass
+- `npm run typecheck` — pass
+- `npm run test` — pass (229/229)
+- `npm run build` — pass (local Hanken/JetBrains fonts; `/` 168 kB, `/editor` 152 kB first-load JS)
+- `npx playwright test` — pass (64/64), including `hosted-security.spec.ts`
+
+### Follow-up hardening during verification
+- Restored missing `public/wasm/*.wasm` (git checkout).
+- CSP `connect-src`/`font-src` allow `cdn.jsdelivr.net` for Typst default fonts (was blocking live preview).
+- Landing `StaggeredText` emits real spaces (a11y + Playwright text assertions).
+- Editor AI-collapse persistence ignores mount-time `onResize` races.
+- Remaining API `String(err)` paths sanitized on generate-patches / ATS evaluate.
+
+### Known limitations
+- BYOK keys remain in `localStorage` (CSP-mitigated, not vaulted).
+- Rate limits are in-memory (one Render instance).
+- Clerk/OAuth multi-user is out of scope.
+- Provision Render/Vercel + Postgres after Playwright passes; this work is host-readiness, not the live deploy.
+
+---
+
 ## Current Status: Phase 2 Complete
 
 - **Phase Completed**: Phase 2 (Master Resume Persistence & Evidence Bank Data Layer)
@@ -365,5 +730,282 @@ All AI agents completing subsequent phases MUST update this file using the follo
 - Tier 2 extraction relies on static HTML & JSON-LD parsing; pages requiring authenticated user logins or complex CAPTCHA challenges gracefully degrade to the manual paste fallback prompt.
 
 ### Suggested Next Task
-- **Task 8.5 — PittCSC Internship Feed Sync & Automated Pipeline Integration**: Implement automated sync for PittCSC internship feed (`https://raw.githubusercontent.com/pittcsc/Summer2026-Internships/dev/README.md`) with deduplication and tracker feed integration.
+- **Task 9.1 — AI-Powered PDF-to-Typst Conversion & Guaranteed Editor Redirect**: Completed in full.
+
+---
+
+## Current Status: Task 9.1 Complete — AI PDF-to-Typst Conversion & Guaranteed Editor Redirect
+
+- **Task Completed**: Task 9.1 (AI-Powered PDF-to-Typst Conversion & Guaranteed Editor Redirect)
+- **Completed Date**: 2026-08-08
+- **Status Summary**: Implemented BYOK AI-assisted PDF-to-Typst conversion (`convertPdfTextToTypst`), shared `stripCodeFences()` utility (`src/lib/ai/utils.ts`), deterministic heuristic fallback (`convertTextToTypst`), FormData `providerConfig` transport, guaranteed client redirect to `/editor?resumeId=<id>`, non-master draft isolation (`isMaster: false`), session-dismissible status banners, Vitest unit test suite (`tests/pdf-ai-conversion.test.ts`), and Playwright E2E spec (`e2e/phase9-pdf-conversion.spec.ts`).
+
+### Completed Work in Task 9.1
+- **Shared AI Utilities**: Created `src/lib/ai/utils.ts` with `stripCodeFences()` supporting ` ```typst `, ` ```json `, ` ```markdown `, and bare code fences.
+- **AI Gateway & Adapters**: Added `ConvertPdfInput` / `ConvertPdfResult` to `src/lib/ai/types.ts`, prompt templates in `src/lib/ai/pdf-prompt.ts`, provider adapters in `openai.ts`, `anthropic.ts`, `gemini.ts`, and `custom.ts`, and exported `convertPdfTextToTypst()` from `gateway.ts`.
+- **Upload Route & Transport**: Updated `src/app/api/resumes/upload-pdf/route.ts` to parse `providerConfig` from `formData` or JSON payload, attempt AI conversion first, fall back seamlessly to heuristic formatting, prepend `// @conversion-path: ai|fallback`, and save non-master drafts (`isMaster: false`). Added `serverExternalPackages: ["pdf-parse", "pdfjs-dist"]` to `next.config.ts`.
+- **Guaranteed Editor Redirect & Banner UX**: Updated `src/app/page.tsx` with upload status labels and `router.push('/editor?resumeId=...')`. Added non-blocking, session-dismissible conversion status banners ("AI-Converted Draft" vs "AI conversion unavailable — used basic formatting") in `src/components/editor/editor-workspace.tsx`.
+- **Automated Verification**:
+  - `tests/pdf-ai-conversion.test.ts`: Vitest suite covering fence stripping, AI conversion output, error/timeout fallback, zero-content-drop metrics (>= 90% word preservation & 100% section header preservation), and special character escaping.
+  - `e2e/phase9-pdf-conversion.spec.ts`: Playwright spec verifying PDF upload, editor redirect, banner rendering, dismissal, and master resume isolation.
+
+### Verification Tests Executed
+- `npm run lint` — Passed with 0 errors or warnings.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (139/139 tests passing across 31 test files).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly (35/35 pages rendered).
+- `npx playwright test` — Playwright E2E tests passed cleanly (33/33 tests passing across all spec files).
+
+### Suggested Next Task
+- **Task 9.2 — Resizable & Collapsible Editor Panels**: Completed in full.
+
+---
+
+## Current Status: Task 9.2 Complete — Resizable & Collapsible Editor Panels
+
+- **Task Completed**: Task 9.2 (Resizable & Collapsible Editor Panels)
+- **Completed Date**: 2026-08-08
+- **Status Summary**: Implemented a 3-pane resizable desktop workspace (`react-resizable-panels`), brand gold/amber drag handle highlights (`src/components/ui/resizable.tsx`), native imperative collapse/expand controls for the AI sidebar (`panelRef={aiPanelRef}`), `localStorage` layout state persistence (`resumeforge_editor_layout`), complete preservation of mobile tabbed view (`lg:hidden`), Vitest unit test suite (`tests/editor-resizable-panels.test.ts`), and Playwright E2E spec (`e2e/phase9-resizable-editor.spec.ts`).
+
+### Completed Work in Task 9.2
+- **Resizable UI Primitives**: Created `src/components/ui/resizable.tsx` wrapping `Group`, `Panel`, `Separator` from `react-resizable-panels` with brand gold/amber hover & active state highlights.
+- **Desktop Resizable Layout (`hidden lg:flex`)**: Replaced static desktop 12-column grid in `src/components/editor/editor-workspace.tsx` with a resizable 3-pane layout (`id="panel-code"`, `id="panel-preview"`, `id="panel-ai"`) enforcing minimum sizes (Code 20%, Preview 25%, AI Sidebar 15%).
+- **Mobile Viewport Preservation (`lg:hidden`)**: Preserved the mobile tab switcher (`"editor" | "preview" | "ai"`) for viewports below `lg:`.
+- **Collapsible AI Sidebar**: Added header collapse button (`PanelRightClose` / `PanelRightOpen`) to `src/components/editor/ai-sidebar.tsx` linked imperatively via `panelRef={aiPanelRef}` without resetting or unmounting AI chat history.
+- **Layout Persistence**: Saved and restored pane layout and collapse state in `localStorage` (`resumeforge_editor_layout`) with graceful fallback defaults (`[45, 35, 20]`).
+- **Automated Verification**:
+  - `tests/editor-resizable-panels.test.ts`: Vitest unit tests for defaults, size bounds, layout persistence, and chat state preservation.
+  - `e2e/phase9-resizable-editor.spec.ts`: Playwright spec for pane rendering, collapse toggle, and reload persistence.
+
+### Verification Tests Executed
+- `npm run lint` — Passed with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (146/146 tests passing across 32 test files).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly (35/35 static & dynamic pages rendered).
+- `npx playwright test` — Playwright E2E tests passed cleanly (35/35 specs passing).
+
+### Suggested Next Task
+- **Task 9.3 — Ctrl+S Save Triggers Preview Recompile**: Completed in full.
+
+---
+
+## Current Status: Task 9.3 Complete — Ctrl+S Save Triggers Preview Recompile
+
+- **Task Completed**: Task 9.3 (Ctrl+S Save Triggers Preview Recompile)
+- **Completed Date**: 2026-08-08
+- **Status Summary**: Implemented global `Ctrl+S` / `Cmd+S` keyboard shortcut handler (`src/lib/editor/shortcut-handler.ts`), browser `preventDefault()` interception, 300ms debounce locking against key-repeat spam, active draft buffer persistence to `localStorage`, instant preview recompile triggering, header toast confirmation (`[data-testid="shortcut-save-toast"]`), Vitest unit tests (`tests/editor-shortcut-save.test.ts`), and Playwright E2E spec (`e2e/phase9-shortcut-save.spec.ts`).
+
+### Completed Work in Task 9.3
+- **Shortcut Interceptor (`src/lib/editor/shortcut-handler.ts`)**: Built standalone, cross-platform keyboard shortcut handler supporting `Ctrl+S` (Windows/Linux) and `Cmd+S` (macOS `metaKey`), calling `preventDefault()` and enforcing a 300ms lock (`isSavingShortcutRef`).
+- **Editor Workspace Wiring (`src/components/editor/editor-workspace.tsx`)**:
+  - Attached global keydown listener executing active draft persistence to `localStorage`.
+  - Triggered immediate compilation call `runCompile(source)` bypassing the typing debounce timer.
+  - Displayed 2-second header confirmation badge (`[data-testid="shortcut-save-toast"]`).
+  - Preserved "Save as Master Resume" modal isolation (`showSaveConfirm` remains untouched).
+- **Preview Panel Integration (`src/components/editor/preview-panel.tsx`)**: Added `data-testid="typst-preview-svg"` and `data-testid="typst-error-banner"` for automated verification.
+- **Automated Verification**:
+  - `tests/editor-shortcut-save.test.ts`: Vitest suite covering Windows/macOS key detection, `preventDefault()` execution, 300ms debounce locking, syntax error fallback reporting, and Save as Master isolation (153/153 tests passing).
+  - `e2e/phase9-shortcut-save.spec.ts`: Playwright spec verifying Ctrl+S draft save toast, immediate preview SVG update, syntax error banner preservation, and Save as Master isolation (38/38 specs passing).
+
+### Verification Tests Executed
+- `npm run lint` — Passed with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (153/153 tests passing across 33 test files).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly (35/35 static & dynamic pages rendered).
+- `npx playwright test` — Playwright E2E tests passed cleanly (38/38 specs passing).
+
+### Suggested Next Task
+- **Task 9.4 — Unified Master AI System Prompt**: Completed in full.
+
+---
+
+## Current Status: Task 9.4 Complete — Unified Master AI System Prompt Engine
+
+- **Task Completed**: Task 9.4 (Unified Master AI System Prompt Engine)
+- **Completed Date**: 2026-08-08
+- **Status Summary**: Created `src/lib/ai/master-prompt.ts` consolidating ResumeForge's 5 non-negotiable core AI guardrails (Zero Hallucination, Mandatory Evidence Citation, Explicit Gap Reporting, Anti-ATS Gaming Enforcement, Strict JSON Output Contracts). Refactored `prompt-template.ts` (patch generation), `qualitative-prompt.ts` (ATS review), and `cover-letter-prompt.ts` (cover letter generation) to compose with `buildComposedSystemPrompt()`. Documented decision in ADR-012 (`docs/decisions.md`) and updated `docs/ai-guardrails.md`. Created unit test suite (`tests/master-prompt.test.ts`).
+
+### Completed Work in Task 9.4
+- **Master Prompt Engine (`src/lib/ai/master-prompt.ts`)**: Built single source of truth `RESUMEFORGE_MASTER_SYSTEM_PROMPT` and helper `buildComposedSystemPrompt()`.
+- **System Prompt Composition**:
+  - `src/lib/ai/prompt-template.ts`: Composed `buildPatchSystemPrompt()` prepending master prompt.
+  - `src/lib/ai/qualitative-prompt.ts`: Composed `buildQualitativeReviewSystemPrompt()` prepending master prompt.
+  - `src/lib/ai/cover-letter-prompt.ts`: Composed `buildCoverLetterSystemPrompt()` prepending master prompt.
+- **Documentation & Architecture**:
+  - `docs/decisions.md`: Added ADR-012 (Unified Master AI System Prompt & Composition Pattern).
+  - `docs/ai-guardrails.md`: Added Section 5 detailing the unified prompt engine.
+- **Automated Verification**:
+  - `tests/master-prompt.test.ts`: Vitest suite covering all 5 core guardrails, prompt builder start assertions, and fail-first composition mutation proof (158/158 tests passing across 34 test files).
+  - `e2e/*`: Playwright E2E suite confirming patch generation, ATS qualitative review, and cover letter workflows remain 100% functional with zero schema or citation regressions (38/38 specs passing).
+
+### Verification Tests Executed
+- `npm run lint` — Passed with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (158/158 tests passing across 34 test files).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly (35/35 static & dynamic pages rendered).
+- `npx playwright test` — Playwright E2E tests passed cleanly (38/38 specs passing).
+
+### Suggested Next Task
+- **Task 9.5 — Retire In-Workflow Evidence Tab & Add ATS Grade Button**: Completed in full.
+
+---
+
+## Current Status: Task 9.5 Complete — Retire In-Workflow Evidence Tab & Add ATS Grade Button to Editor Preview
+
+- **Task Completed**: Task 9.5 (Retire In-Workflow Evidence Tab & Add ATS Grade Button to Editor Preview)
+- **Completed Date**: 2026-08-09
+- **Status Summary**: Streamlined the Editor preview toolbar with a header "Grade" action (`data-testid="grade-resume-btn"`) that invokes the ATS evaluation engine (`/api/ats/evaluate`) and renders an inline 100-point rubric breakdown overlay (`data-testid="editor-ats-score-overlay"`), reusing `AtsScorePanel` for 100% visual and numerical consistency with Tailor. Verified BYOK API key propagation for cover letter generation from `localStorage` (`resumeforge_ai_settings`). Retired in-workflow Evidence tabs while keeping `/library` fully functional and evidence citation badges intact. Built Vitest unit tests (`tests/editor-ats-grade.test.ts`) and Playwright E2E spec (`e2e/phase9-ats-grade.spec.ts`).
+
+### Completed Work in Task 9.5
+- **Editor ATS Grade Button & Overlay (`src/components/editor/preview-panel.tsx`)**:
+  - Added header toolbar "Grade" button (`data-testid="grade-resume-btn"`).
+  - Toggles inline ATS score breakdown overlay (`data-testid="editor-ats-score-overlay"`), rendering `AtsScorePanel` directly inside the preview pane container without navigating away.
+  - Implemented loading state (`Loader2` spinner) and recoverable error state (`data-testid="editor-grade-error"`).
+- **Cover Letter BYOK API Key Fix**:
+  - `src/components/tailor/cover-letter-panel.tsx`: Reads `resumeforge_ai_settings` from `localStorage` and includes `providerConfig` in `/api/ai/generate-cover-letter` requests.
+  - `src/app/api/ai/generate-cover-letter/route.ts`: Enforces `providerConfig` presence and returns a clean 400 error if no API key is configured in Settings.
+- **Workflow Streamlining**:
+  - Maintained `/library` as the single dedicated place for Evidence Bank management.
+  - Kept evidence citation transparency badges on AI patches and cover letter cards.
+- **Automated Verification**:
+  - `tests/editor-ats-grade.test.ts`: Vitest suite covering evaluator execution, score determinism between Editor and Tailor, and empty source handling (161/161 tests passing across 35 test files).
+  - `e2e/phase9-ats-grade.spec.ts`: Playwright spec verifying Grade button trigger, inline score breakdown rendering, and `/library` CRUD accessibility (40/40 specs passing).
+
+### Verification Tests Executed
+- `npm run lint` — Passed with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (161/161 tests passing across 35 test files).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly (35/35 static & dynamic pages rendered).
+- `npx playwright test` — Playwright E2E tests passed cleanly (40/40 specs passing).
+
+### Suggested Next Task
+- **Task 9.1b — PDF Conversion Template Exemplar**: Completed in full.
+
+---
+
+## Current Status: Task 9.1b Complete — Fixed Template Exemplar for AI PDF Conversion
+
+- **Task Completed**: Task 9.1b (PDF Conversion Template Exemplar)
+- **Completed Date**: 2026-08-09
+- **Status Summary**: Replaced freeform Typst prose styling rules in `src/lib/ai/pdf-prompt.ts` with a fixed, canonical Typst template exemplar (`#let section(title)`, `#let entry(...)`, `#set page`, `#set text`, `#show link`, `#set list`) and full worked example. Updated `public/templates/starter-resume.typ` to use the same canonical template pattern. Added template assertions to `tests/pdf-ai-conversion.test.ts`.
+
+### Completed Work in Task 9.1b
+- **AI PDF Prompt Exemplar (`src/lib/ai/pdf-prompt.ts`)**:
+  - Replaced prose styling rules with fixed Typst helper functions (`section()` and `entry()`) and full worked example document.
+  - Added strict instructions forbidding helper redefinitions or style block modifications while preserving character escaping and zero information loss rules.
+- **Starter Template Alignment (`public/templates/starter-resume.typ`)**:
+  - Reconciled default starter resume template to use the identical canonical `section()`/`entry()` pattern.
+- **Automated Verification**:
+  - `tests/pdf-ai-conversion.test.ts`: Added assertions verifying system prompt returns helper function definitions verbatim and forbids redefinitions (163/163 unit tests passing).
+
+### Suggested Next Task
+- **Task 9.6 — Tailor AI Feedback to Editor Handoff**: Completed in full.
+
+---
+
+## Current Status: Task 9.6 Complete — Tailor AI Feedback → Editor AI Chat Handoff
+
+- **Task Completed**: Task 9.6 (Tailor AI Feedback → Editor AI Chat Handoff)
+- **Completed Date**: 2026-08-09
+- **Status Summary**: Connected Tailor Qualitative Review findings directly to the Editor's AI tailoring assistant via a "Use as prompt" action (`data-testid="use-as-prompt-btn"`). Carried feedback is stored per-`jobId` in `sessionStorage` and pre-loads into the Editor AI sidebar with a clearly labeled banner (`data-testid="seeded-feedback-banner"`) and dismissal button (`data-testid="dismiss-seeded-feedback-btn"`). Subsequent patch generation requests compose the carried feedback into system and user prompts following the master prompt engine rules (`RESUMEFORGE_MASTER_SYSTEM_PROMPT`). Built Vitest unit tests (`tests/tailor-editor-handoff.test.ts`) and Playwright E2E spec (`e2e/phase9-tailor-handoff.spec.ts`).
+
+### Completed Work in Task 9.6
+- **"Use as prompt" Action (`src/components/tailor/qualitative-review-panel.tsx`)**:
+  - Added "Use as prompt" button (`data-testid="use-as-prompt-btn"`) on completed AI qualitative review cards.
+  - Navigates to `/editor?jobId=${activeJobId}` while writing `resumeforge_tailor_feedback_${activeJobId}` payload to `sessionStorage`.
+- **Editor AI Sidebar Pre-Load (`src/components/editor/ai-sidebar.tsx`)**:
+  - On `/editor` load, retrieves carried feedback payload for active `jobId` and renders a dedicated "Seeded Feedback from Tailor Review" banner (`data-testid="seeded-feedback-banner"`).
+  - Provided a "Dismiss Context" action (`data-testid="dismiss-seeded-feedback-btn"`). Clears `sessionStorage` key after single consumption so unseeded visits remain unaffected.
+- **Master Prompt Composition (`src/lib/ai/prompt-template.ts`, `src/lib/ai/gateway.ts`, `src/app/api/ai/generate-patches/route.ts`)**:
+  - Composed system prompt ordering: Master Prompt (`RESUMEFORGE_MASTER_SYSTEM_PROMPT`) → Structured Patch Instructions → Carried Tailor Review Feedback Context → JSON Schema Contract.
+  - Grounded all proposed edits in the Evidence Bank without bypassing zero-hallucination rules.
+- **Automated Verification**:
+  - `tests/tailor-editor-handoff.test.ts`: Vitest suite testing prompt composition order, carried feedback injection, and context clearing (167/167 unit tests passing).
+  - `e2e/phase9-tailor-handoff.spec.ts`: Playwright spec verifying handoff navigation, banner display, context dismissal, and single-use consumption (41/41 specs passing).
+
+### Verification Tests Executed
+- `npm run lint` — Passed with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (167/167 tests passing across 36 test files).
+- `npm run build` — Next.js & Prisma production build succeeded cleanly (35/35 static & dynamic pages rendered).
+- `npx playwright test` — Playwright E2E tests passed cleanly (41/41 specs passing).
+
+### Suggested Next Task
+- **Phase 9 Milestone Completion**: All Phase 9 Tasks (9.1, 9.1b, 9.2, 9.3, 9.4, 9.5, 9.6) are fully complete, verified, and pushed to `main`.
+
+---
+
+## Current Status: Phase 10 Complete — Production Polish, Metadata, Editorial Landing Atmosphere & Typst Repair Assist
+
+- **Phase Completed**: Phase 10 (Task 10.1 Production Polish, Task 10.2 Landing Motion, Task 10.3 Editorial Redesign, Task 10.4 Atmospheric Background & Task 10.5 Typst Repair Assist)
+- **Completed Date**: 2026-08-09
+- **Status Summary**: Implemented brand icon assets (`src/app/icon.tsx`, `src/app/apple-icon.tsx`, `src/app/opengraph-image.tsx`, `src/app/manifest.ts`), complete root layout metadata (`metadataBase`, `openGraph`, `twitter`, `themeColor`), branded App Router error boundaries and loading skeletons (`src/app/not-found.tsx`, `src/app/error.tsx`, `src/app/loading.tsx`), an **Atmospheric Landing Background & Tone Softening** system (`public/landing/editorial-atmosphere.svg`, `src/components/landing/*`), and an **AI-Assisted Typst WASM Repair Assist** loop in the Editor (`src/lib/ai/repair-*`, `src/app/api/ai/repair-typst/route.ts`, `src/components/editor/*`).
+
+### Completed Work in Phase 10
+- **Brand Icon & Metadata Assets (Task 10.1)**:
+  - Created dynamic brand favicon (`src/app/icon.tsx`) and iOS touch icon (`src/app/apple-icon.tsx`) using Next.js `ImageResponse`.
+  - Built OpenGraph social card image generator (`src/app/opengraph-image.tsx`, 1200x630) with gold/amber branding and badge highlights.
+  - Added Web App Manifest (`src/app/manifest.ts`) returning valid JSON manifest at `/manifest.webmanifest`.
+  - Updated `src/app/layout.tsx` with `metadataBase`, complete OpenGraph, Twitter card (`summary_large_image`), and `themeColor: "#f59e0b"`.
+- **Branded Application Route States (Task 10.1)**:
+  - Built branded 404 page (`src/app/not-found.tsx`) with gold/amber accent, helpful message, and "Return to Dashboard" action.
+  - Built client-side error boundary (`src/app/error.tsx`) with error details, "Try again" reset action, and home link.
+  - Added root loading skeleton (`src/app/loading.tsx`) with ambient pulsing glow.
+- **Atmospheric Landing Background & Tone Softening (Task 10.4 & Task 10.5 Part A)**:
+  - Created local SVG background asset (`public/landing/editorial-atmosphere.svg`) featuring dark paper texture, document geometry crop marks, and ambient radial light.
+  - Softened landing page text contrast (Display headings `#f5f5f7`, body text `#cbd5e1`, reserving pure `#ffffff` for primary CTA button).
+  - Quiet surface framing around `ProductProofCard` (`bg-[#161922]/80 border border-slate-800/80 shadow-md`) and softened Silver Inverted tile contrast (`bg-[#d1d5db] text-[#111827]`).
+- **Typst AI Repair Assist Loop (Task 10.5 Part B)**:
+  - Added **Fix with AI** action button (`data-testid="fix-typst-ai-btn"`) on compiler error banners in `preview-panel.tsx`.
+  - Built isolated **Typst Repair Assist Card** in `ai-sidebar.tsx` with dismiss action (`data-testid="close-repair-mode-btn"`), line/column error parsing, and source excerpt preview.
+  - Client pre-compilation validation via WASM `compileTypstToSvg(proposal.replacementSource)` before enabling **Apply Fix** (`data-testid="apply-typst-fix-btn"`).
+  - Payload bounds (20,000 char source limit) and diff-scope warning (>25% lines modified).
+  - Explicit provider adapters (`repairTypstWithOpenAI`, `repairTypstWithAnthropic`, `repairTypstWithGemini`, `repairTypstWithCustom`) in `src/lib/ai/providers/` and dedicated endpoint `POST /api/ai/repair-typst`.
+  - Shared source-update handler (`handleApplyRepair`) executing `handleSourceChange` + `compileSource` for draft storage, SVG recompilation, and Ctrl+S state sync.
+- **Automated Verification**:
+  - `tests/typst-repair.test.ts`: Created Vitest suite testing repair schemas, payload limits, prompt builders, provider adapters, and gateway dispatching (177/177 Vitest tests passing).
+  - `e2e/phase10-repair.spec.ts` & `e2e/phase10-polish.spec.ts`: Created Playwright specs testing compile error repair journey, mock proposal pre-compilation validation, apply fix buffer update, atmospheric SVG rendering, and 375px/768px/1200px responsive viewports without horizontal overflow (55/55 E2E specs passing).
+
+### Verification Tests Executed
+- `npm run lint` — Passed with 0 warnings or errors.
+- `npm run typecheck` — TypeScript compilation (`tsc --noEmit`) passed with 0 errors.
+- `npm run test` — Vitest unit & integration tests passed cleanly (177/177 tests passing across 37 test files).
+- `npm run build` — Next.js production build succeeded cleanly (37/37 static & dynamic pages rendered).
+- `npx playwright test` — Playwright E2E tests passed cleanly (55/55 specs passing).
+
+---
+
+## Phase Update: AI Prompt Docs Sync + Master→Evidence Draft Extract
+
+- **Completed Date**: 2026-08-09
+- **Status Summary**: Prompt markdown specs now mirror runtime TS builders. Opt-in Save-as-Master flow can draft Evidence Bank items (`status: draft`, bullets `verified: false`) via `POST /api/ai/extract-evidence`, with dedupe that never overwrites verified items.
+
+### Completed Work
+- Rewrote/added `prompts/*.md` (master, tailor, qualitative-review, cover letter, pdf-to-typst, typst-repair, evidence-extract); JD parser documented as deterministic; ATS evaluator stub redirects to qualitative-review.
+- Added `evidence-extract-schema.ts`, `evidence-prompt.ts`, `evidence-persist.ts`, gateway `extractEvidenceFromMaster`, and API route.
+- Editor Save-as-Master modal: “Draft Evidence Bank from this resume” (default checked when bank empty).
+- Tests: extended `master-prompt.test.ts`; new `evidence-extract.test.ts` (schema, persist, 400, mocked happy path).
+
+### Verification Tests Executed
+- `npm run lint` — Pass
+- `npm run typecheck` — Pass
+- `npm run test` — Pass (196/196)
+- `npm run build` — Pass
+
+### Known Limitations
+- No auto-verify; no bullet-merge on draft duplicates (skip only).
+- Markdown prompts are documentation mirrors only (not loaded at runtime).
+
+### Suggested Next Task
+- Library bulk verify/reject for Master-extract drafts; optional E2E for the extract toast path.
+
+---
+
+
+
+
+
+
+
+
 

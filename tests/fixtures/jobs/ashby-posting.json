@@ -1,0 +1,10 @@
+{
+  "id": "ashby-job-90418",
+  "title": "Staff Platform Engineer",
+  "department": "Platform & Reliability",
+  "location": "New York, NY (Hybrid)",
+  "jobPosting": {
+    "title": "Staff Platform Engineer",
+    "descriptionHtml": "<h2>About Us</h2><p>Linear Scale builds high-reliability cloud deployment pipelines for enterprise teams.</p><h2>Responsibilities</h2><ul><li>Own developer productivity tooling and CI/CD pipelines.</li><li>Improve deployment velocity from 20 minutes to under 3 minutes.</li></ul><h2>What We're Looking For</h2><ul><li>7+ years of experience in platform engineering or SRE.</li><li>Deep experience with Docker, Kubernetes, and Terraform.</li><li>AWS Certified Solutions Architect certification or equivalent experience.</li></ul><h2>Bonus Qualifications</h2><ul><li>Experience with Rust or WebAssembly compilation pipelines.</li></ul><h2>Compensation</h2><p>Target salary is $215,000 - $250,000 USD plus equity.</p>"
+  }
+}

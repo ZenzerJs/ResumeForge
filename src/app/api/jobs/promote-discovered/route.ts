@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sanitizeError } from "@/lib/ai/redact";
+import { isSafeHref } from "@/lib/security/safe-fetch";
+import { requireUserId } from "@/lib/security/auth-request";
 
 export async function POST(req: Request) {
   try {
+    const gated = await requireUserId(req);
+    if (gated instanceof NextResponse) return gated;
+
     const { discoveredJobId } = await req.json();
 
     if (!discoveredJobId) {
@@ -22,7 +28,7 @@ export async function POST(req: Request) {
       data: {
         company: discovered.company,
         roleTitle: discovered.roleTitle,
-        rawDescription: `${discovered.roleTitle} at ${discovered.company} (${discovered.location}). Application Link: ${discovered.applyUrl}`,
+        rawDescription: `${discovered.roleTitle} at ${discovered.company} (${discovered.location}).${isSafeHref(discovered.applyUrl) ? ` Application Link: ${discovered.applyUrl}` : ""}`,
         source: "pittcsc_auto",
         status: "SAVED",
       },
@@ -32,7 +38,7 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error("Promote discovered job error:", err);
     return NextResponse.json(
-      { success: false, error: "Failed to promote job", message: String(err) },
+      { success: false, error: "Failed to promote job", message: sanitizeError(err) },
       { status: 500 }
     );
   }

@@ -6,6 +6,8 @@ import {
   archiveEvidenceItem,
   deleteEvidenceItem,
 } from "@/lib/db/evidence";
+import { sanitizeError } from "@/lib/ai/redact";
+import { getRequestUserId, requireUserId } from "@/lib/security/auth-request";
 
 const BulletSchema = z.object({
   text: z.string().min(1, "Bullet text is required"),
@@ -31,8 +33,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getRequestUserId(request);
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, error: "Evidence item not found" },
+        { status: 404 }
+      );
+    }
     const { id } = await params;
-    const item = await getEvidenceItemById(id);
+    const item = await getEvidenceItemById(id, userId);
 
     if (!item) {
       return NextResponse.json(
@@ -44,7 +53,7 @@ export async function GET(
     return NextResponse.json({ success: true, data: item });
   } catch (err) {
     return NextResponse.json(
-      { success: false, error: "Failed to fetch evidence item", message: String(err) },
+      { success: false, error: "Failed to fetch evidence item", message: sanitizeError(err) },
       { status: 500 }
     );
   }
@@ -55,7 +64,18 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await requireUserId(request);
+    if (userId instanceof NextResponse) return userId;
+
     const { id } = await params;
+    const existing = await getEvidenceItemById(id, userId);
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: "Evidence item not found" },
+        { status: 404 }
+      );
+    }
+
     const body = await request.json();
     const validation = UpdateEvidenceSchema.safeParse(body);
 
@@ -74,7 +94,7 @@ export async function PUT(
     return NextResponse.json({ success: true, data: updated });
   } catch (err) {
     return NextResponse.json(
-      { success: false, error: "Failed to update evidence item", message: String(err) },
+      { success: false, error: "Failed to update evidence item", message: sanitizeError(err) },
       { status: 500 }
     );
   }
@@ -85,7 +105,18 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await requireUserId(request);
+    if (userId instanceof NextResponse) return userId;
+
     const { id } = await params;
+    const existing = await getEvidenceItemById(id, userId);
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: "Evidence item not found" },
+        { status: 404 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const mode = searchParams.get("mode");
 
@@ -98,7 +129,7 @@ export async function DELETE(
     return NextResponse.json({ success: true, message: "Evidence item processed" });
   } catch (err) {
     return NextResponse.json(
-      { success: false, error: "Failed to delete evidence item", message: String(err) },
+      { success: false, error: "Failed to delete evidence item", message: sanitizeError(err) },
       { status: 500 }
     );
   }

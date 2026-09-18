@@ -1,12 +1,21 @@
 import { NextResponse } from "next/server";
 import { getVariantById } from "@/lib/db/variants";
 import { sanitizeError } from "@/lib/ai/redact";
+import { getRequestUserId } from "@/lib/security/auth-request";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getRequestUserId(request);
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, error: "ResumeVariant not found" },
+        { status: 404 }
+      );
+    }
+
     const { id } = await params;
 
     if (!id || typeof id !== "string" || id.trim().length === 0) {
@@ -16,7 +25,7 @@ export async function GET(
       );
     }
 
-    const variant = await getVariantById(id);
+    const variant = await getVariantById(id, userId);
 
     if (!variant) {
       return NextResponse.json(

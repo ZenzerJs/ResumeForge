@@ -6,6 +6,7 @@ export const JobRequirementsSchema = z.object({
   domainTerms: z.array(z.string()).default([]),
   roleTitle: z.string().optional(),
   company: z.string().optional(),
+  location: z.string().optional(),
 });
 
 export type JobRequirements = z.infer<typeof JobRequirementsSchema>;
@@ -13,7 +14,7 @@ export type JobRequirements = z.infer<typeof JobRequirementsSchema>;
 export const CreateJobSchema = z.object({
   company: z.string().optional(),
   roleTitle: z.string().optional(),
-  rawDescription: z.string().min(1, "Job description cannot be empty"),
+  rawDescription: z.string().min(1, "Job description cannot be empty").max(200_000),
   source: z.enum(["pasted", "manual", "simplify-jobs"]).default("pasted"),
   extractedRequirements: JobRequirementsSchema.optional(),
 });

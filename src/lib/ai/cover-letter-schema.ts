@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ProviderConfigSchema } from "@/lib/ai/types";
 
 /**
  * Zod schema for structured cover letter generation output from BYOK AI gateway.
@@ -28,6 +29,7 @@ export const GenerateCoverLetterInputSchema = z.object({
   extractedRequirements: z.record(z.string(), z.any()).optional(),
   candidateName: z.string().default("Candidate"),
   activeRoleProfile: z.string().default("Full-stack"),
+  providerConfig: ProviderConfigSchema.optional(),
 });
 
 export type GenerateCoverLetterInput = z.infer<typeof GenerateCoverLetterInputSchema>;

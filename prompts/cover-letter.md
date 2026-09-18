@@ -1,35 +1,69 @@
-# Evidence-Grounded Cover Letter Generation Prompt Specification
+# Evidence-Grounded Cover Letter — Output Guide for Models
 
-This document details the system and user prompt templates used by ResumeForge's BYOK AI Gateway to generate evidence-grounded tailored cover letters per ADR-011 and `docs/ai-guardrails.md`.
+Runtime source of truth: [`src/lib/ai/cover-letter-prompt.ts`](../src/lib/ai/cover-letter-prompt.ts)
 
-## System Prompt Contract
+Write a tailored cover letter **only** from Evidence Bank + master resume context. Never invent employers, metrics, or skills.
 
-```markdown
-You are ResumeForge AI Cover Letter Specialist, an expert career advisor and technical writer.
-Your task is to write a highly compelling, professional, tailored cover letter for a candidate applying for a target job.
+---
 
-CRITICAL SECURITY & EVIDENCE GROUNDING CONTRACT:
-1. MANDATORY EVIDENCE GROUNDING: You MUST base all candidate claims, metrics, and experience strictly on the verified Evidence Bank items provided in the prompt.
-2. ZERO HALLUCINATION: You MUST NOT invent companies, years of experience, metric percentages, or technologies that do not exist in the candidate's provided Evidence Bank items.
-3. ADVERSARIAL GAP HANDLING: If a job requirement (e.g. Kubernetes, AWS, Go) is NOT supported by any item in the candidate's Evidence Bank, you MUST NOT claim or fabricate experience with that technology. Either omit the unsupported requirement or explicitly represent it as a gap/review-needed item in the "gapsAddressed" array.
-4. CITATIONS: In the "evidenceCitations" JSON array, return every evidence ID (e.g. "exp-1", "bullet-101") that you referenced or drew from to write the body paragraphs.
-5. STRUCTURED OUTPUT ONLY: You MUST return ONLY valid JSON conforming to the CoverLetterResponse schema without markdown codeblocks or extraneous text outside JSON.
-```
+## Hard rules (failures happen when these are ignored)
 
-## JSON Schema Contract
+1. Return **one JSON object only** — no markdown fences, no preamble.
+2. Every concrete claim must map to an Evidence / Bullet **ID** listed in the user prompt; put those IDs in `evidenceCitations`.
+3. If the Evidence Bank has items, `evidenceCitations` must include **at least one** valid ID.
+4. Unsupported JD requirements → omit from claims or list in `gapsAddressed`. **Never** claim them as experience.
+5. Length floors (schema-enforced):
+   - `openingParagraph` ≥ 20 characters
+   - each `bodyParagraphs[]` entry ≥ 30 characters
+   - `closingParagraph` ≥ 20 characters
+   - `fullMarkdown` ≥ 100 characters
+6. `fullMarkdown` must be the **complete letter** (salutation, blank-line paragraphs, closing, signature).
+7. Prefer verified evidence; treat drafts as unverified if used.
+
+---
+
+## Canonical valid example (copy this shape)
 
 ```json
 {
-  "title": "Cover Letter — [Company] [RoleTitle]",
-  "salutation": "Dear [Hiring Manager / Hiring Team],",
-  "openingParagraph": "Engaging hook referencing target role, company, and core value proposition.",
+  "title": "Cover Letter — Acme Corp Senior Backend Engineer",
+  "salutation": "Dear Hiring Team at Acme Corp,",
+  "openingParagraph": "I am writing to apply for the Senior Backend Engineer role at Acme Corp. My verified backend work building APIs and data systems aligns closely with your reliability and scale priorities.",
   "bodyParagraphs": [
-    "First body paragraph detailing specific technical achievements grounded in cited evidence items...",
-    "Second body paragraph highlighting problem-solving, scale, and role alignment..."
+    "In my recent platform role, I designed service APIs and improved database performance using approaches documented in my Evidence Bank, including measurable latency reductions on production queries.",
+    "I also partnered with infrastructure teammates on containerized deployments, focusing on maintainable services rather than unsupported claims outside my verified experience."
   ],
-  "closingParagraph": "Professional closing statement expressing eagerness for an interview.",
-  "fullMarkdown": "# Cover Letter\n\nDear Hiring Team,\n...",
+  "closingParagraph": "Thank you for considering my application. I would welcome the opportunity to discuss how my verified experience can support Acme Corp's backend roadmap.",
+  "fullMarkdown": "# Cover Letter — Acme Corp Senior Backend Engineer\n\nDear Hiring Team at Acme Corp,\n\nI am writing to apply for the Senior Backend Engineer role at Acme Corp. My verified backend work building APIs and data systems aligns closely with your reliability and scale priorities.\n\nIn my recent platform role, I designed service APIs and improved database performance using approaches documented in my Evidence Bank, including measurable latency reductions on production queries.\n\nI also partnered with infrastructure teammates on containerized deployments, focusing on maintainable services rather than unsupported claims outside my verified experience.\n\nThank you for considering my application. I would welcome the opportunity to discuss how my verified experience can support Acme Corp's backend roadmap.\n\nSincerely,\nJane Candidate",
   "evidenceCitations": ["exp-1", "bullet-101"],
-  "gapsAddressed": ["Candidate lacks verified Kubernetes experience; omitted k8s claims and highlighted Docker containerization foundation instead."]
+  "gapsAddressed": ["No verified Kubernetes production ownership in Evidence Bank."]
 }
 ```
+
+---
+
+## Field checklist
+
+| Field | Requirement |
+|-------|-------------|
+| `title` | Human-readable title with company/role |
+| `salutation` | Real greeting with company when known |
+| `openingParagraph` | Hook with role + company + value (≥20 chars) |
+| `bodyParagraphs` | 1–3 paragraphs, each ≥30 chars, evidence-grounded |
+| `closingParagraph` | Thanks + soft CTA (≥20 chars) |
+| `fullMarkdown` | Full assembled letter (≥100 chars) |
+| `evidenceCitations` | Real IDs from the prompt only |
+| `gapsAddressed` | Array (may be empty) of omitted/unsupported reqs |
+
+---
+
+## Common rejection causes
+
+| Mistake | Fix |
+|--------|-----|
+| Empty `evidenceCitations` while Evidence Bank has items | Cite real IDs you used |
+| Invented citation IDs | Only use IDs from the prompt |
+| Claiming Kubernetes with no evidence | Put it in `gapsAddressed` |
+| Tiny paragraphs under length floors | Write complete sentences |
+| Markdown fences around JSON | Return raw `{...}` |
+| `fullMarkdown` shorter than assembled letter | Mirror all paragraphs into markdown |

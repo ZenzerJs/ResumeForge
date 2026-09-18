@@ -5,15 +5,20 @@ import { createCoverLetter, getCoverLettersByJobId } from "@/lib/db/cover-letter
 import { extractApplyUrlFromNotes } from "@/components/tracker/tracker-feed";
 import { POST as generateCoverLetterRoute } from "@/app/api/cover-letters/generate/route";
 import { GET as getCoverLetterByIdRoute } from "@/app/api/cover-letters/[id]/route";
-import { NextRequest } from "next/server";
+import { authedNextRequest, createTestUser } from "./helpers/auth";
 
 describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", () => {
   let testJobId: string;
   let testMasterResumeId: string;
   let testVariantId: string;
+  let cookie: string;
+  let userId: string;
   const applyUrl = "https://job-boards.eu.greenhouse.io/imc/jobs/4907430101";
 
   beforeEach(async () => {
+    const auth = await createTestUser();
+    cookie = auth.cookie;
+    userId = auth.user.id;
     // Create master resume
     const master = await prisma.resume.create({
       data: {
@@ -21,6 +26,7 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
         typstSource: "#let name = [Jane Candidate]\n#resume-section('Skills')\nPython, Docker, TypeScript",
         isMaster: true,
         isProtected: true,
+        userId,
       },
     });
     testMasterResumeId = master.id;
@@ -31,6 +37,7 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
       roleTitle: "Machine Learning Research Intern",
       rawDescription: "Seeking a Machine Learning Intern with Python and Docker experience.",
       notes: `Tier 1 Bulk Import | Location: Chicago | Apply Link: ${applyUrl}`,
+      userId,
     });
     testJobId = job.id;
 
@@ -83,14 +90,37 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
   });
 
   it("4. Generate Cover Letter sends the correct jobId and selected variantId", async () => {
+    const evidence = await prisma.evidenceItem.create({
+      data: {
+        type: "experience",
+        title: "ML Engineer",
+        organization: "DataLab",
+        verifiedSummary: "Built machine learning pipelines using Python and Docker.",
+        tags: JSON.stringify(["Python", "Docker"]),
+        status: "verified",
+        userId,
+        bullets: {
+          create: [
+            {
+              text: "Built machine learning pipelines using Python and Docker.",
+              technologies: JSON.stringify(["Python", "Docker"]),
+              verified: true,
+              orderIndex: 0,
+            },
+          ],
+        },
+      },
+      include: { bullets: true },
+    });
+
     const mockLlmResponse = JSON.stringify({
       title: "Cover Letter — IMC Trading ML Intern",
       salutation: "Dear IMC Hiring Team,",
       openingParagraph: "I am writing to apply for the Machine Learning Research Intern position.",
       bodyParagraphs: ["Built machine learning pipelines using Python and Docker."],
       closingParagraph: "Sincerely, Candidate.",
-      fullMarkdown: "# Cover Letter\n\nDear IMC Hiring Team,\n\nI am writing to apply for the Machine Learning Research Intern position. Built machine learning pipelines using Python and Docker. Thank you.",
-      evidenceCitations: [],
+      fullMarkdown: "# Cover Letter\n\nDear IMC Hiring Team,\n\nI am writing to apply for the Machine Learning Research Intern position. Built machine learning pipelines using Python and Docker. Thank you.\n\nSincerely,\nCandidate",
+      evidenceCitations: [evidence.id, evidence.bullets[0].id],
       gapsAddressed: [],
     });
 
@@ -103,7 +133,7 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
       )
     );
 
-    const req = new NextRequest("http://localhost:3000/api/cover-letters/generate", {
+    const req = authedNextRequest("http://localhost:3000/api/cover-letters/generate", {
       method: "POST",
       body: JSON.stringify({
         jobId: testJobId,
@@ -113,7 +143,7 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
           apiKey: "sk-proj-test-valid-key-12345",
         },
       }),
-    });
+    }, cookie);
 
     const res = await generateCoverLetterRoute(req);
     const json = await res.json();
@@ -122,6 +152,9 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
     expect(json.success).toBe(true);
     expect(json.data.jobId).toBe(testJobId);
     expect(json.data.variantId).toBe(testVariantId);
+
+    await prisma.bullet.deleteMany({ where: { evidenceId: evidence.id } });
+    await prisma.evidenceItem.deleteMany({ where: { id: evidence.id } });
   });
 
   it("5. An existing cover-letter draft is opened instead of duplicated automatically", async () => {
@@ -170,7 +203,7 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
   });
 
   it("8. A failed cover-letter request produces a recoverable error state", async () => {
-    const req = new NextRequest("http://localhost:3000/api/cover-letters/generate", {
+    const req = authedNextRequest("http://localhost:3000/api/cover-letters/generate", {
       method: "POST",
       body: JSON.stringify({
         jobId: testJobId,
@@ -179,7 +212,7 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
           // missing apiKey
         },
       }),
-    });
+    }, cookie);
 
     const res = await generateCoverLetterRoute(req);
     const json = await res.json();
@@ -205,7 +238,7 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
       fullMarkdown: "Full markdown text",
     });
 
-    const req = new NextRequest(`http://localhost:3000/api/cover-letters/${draft.id}`);
+    const req = authedNextRequest(`http://localhost:3000/api/cover-letters/${draft.id}`, {}, cookie);
     const res = await getCoverLetterByIdRoute(req, { params: Promise.resolve({ id: draft.id }) });
     const json = await res.json();
 

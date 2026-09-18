@@ -59,6 +59,10 @@ export const AtsEvaluateInputSchema = z.object({
   roleProfile: z
     .enum(["Full-stack", "Backend", "AI/LLM", "ML", "Frontend", "Data/Platform"])
     .optional(),
+  /** When true, append non-archived Evidence Bank text into the scored document. */
+  includeEvidenceBank: z.boolean().optional().default(false),
+  /** When true and typstContent is empty, load the saved master resume from DB. */
+  useMasterResume: z.boolean().optional().default(false),
 });
 
 export type AtsEvaluateInput = z.infer<typeof AtsEvaluateInputSchema>;

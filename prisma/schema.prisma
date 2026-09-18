@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -17,21 +17,42 @@ model SystemInfo {
   updatedAt     DateTime @updatedAt
 }
 
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  resumes        Resume[]
+  evidenceItems  EvidenceItem[]
+  jobs           Job[]
+  coverLetters   CoverLetter[]
+}
+
 model Resume {
-  id          String   @id @default(uuid())
-  title       String
-  typstSource String
-  isMaster    Boolean  @default(false)
-  isProtected Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String
+  typstSource  String
+  isMaster     Boolean  @default(false)
+  isProtected  Boolean  @default(true)
+  factSnapshot Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   variants    ResumeVariant[]
   history     MasterHistory[]
+
+  @@index([userId])
 }
 
 model EvidenceItem {
   id              String   @id @default(uuid())
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   type            String   // experience | project | skill | education | award | metric
   title           String
   organization    String?
@@ -43,6 +64,8 @@ model EvidenceItem {
   updatedAt       DateTime @updatedAt
 
   bullets         Bullet[]
+
+  @@index([userId])
 }
 
 model Bullet {
@@ -60,6 +83,8 @@ model Bullet {
 
 model Job {
   id                    String          @id @default(uuid())
+  userId                String?
+  user                  User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
   company               String?
   roleTitle             String?
   rawDescription        String
@@ -68,10 +93,83 @@ model Job {
   status                String          @default("SAVED") // SAVED | APPLIED | INTERVIEWING | OFFER | REJECTED | ARCHIVED
   appliedAt             DateTime?
   notes                 String?
+  normalized            Json?
+  formattedJd           Json?
+  extractFailure        String?
   createdAt             DateTime        @default(now())
 
   variants              ResumeVariant[]
   coverLetters          CoverLetter[]
+  ingestedJob           IngestedJob?
+  dossierId             String?
+  dossier               CompanyDossier? @relation(fields: [dossierId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([dossierId])
+}
+
+enum WorkplaceType {
+  REMOTE
+  HYBRID
+  ON_SITE
+  UNSPECIFIED
+}
+
+enum JobSource {
+  GREENHOUSE
+  LEVER
+  ASHBY
+  ADZUNA_CA
+  JOBICY
+  REMOTIVE
+  REMOTEOK
+  MANUAL
+}
+
+model IngestedJob {
+  id                 String        @id @default(cuid())
+  fingerprint        String        @unique // SHA-256(normalized_company + normalized_title + canonical_url)
+  externalId         String
+  source             JobSource
+  companyName        String
+  title              String
+  location           String
+  workplaceType      WorkplaceType @default(UNSPECIFIED)
+  isCanadianEligible Boolean       @default(true)
+  description        String        // Plain text for AI context & ATS analysis
+  descriptionHtml    String        // Sanitized safe HTML for rendering
+  applyUrl           String
+  postedAt           DateTime?
+  salaryMin          Int?
+  salaryMax          Int?
+  salaryCurrency     String?       @default("CAD")
+  rawMetadata        Json?
+  lat                Float?
+  lng                Float?
+  cityNorm           String?
+  normalized         Json?
+  formattedJd        Json?
+
+  // Link to Phase 11 Tracker
+  trackedJobId       String?       @unique
+  trackedJob         Job?          @relation(fields: [trackedJobId], references: [id], onDelete: SetNull)
+
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([source, createdAt])
+  @@index([companyName])
+  @@index([isCanadianEligible])
+}
+
+model ConnectorSyncLog {
+  id           String    @id @default(cuid())
+  source       JobSource
+  status       String    // "SUCCESS" | "FAILED" | "RATE_LIMITED"
+  jobsFound    Int       @default(0)
+  jobsInserted Int       @default(0)
+  errorMessage String?
+  executedAt   DateTime  @default(now())
 }
 
 // Phase 4.2: Job-specific tailored resume variant
@@ -84,6 +182,7 @@ model ResumeVariant {
   variantTitle    String
   typstContent    String
   status          String        @default("DRAFT") // DRAFT | REVIEWED | EXPORTED
+  factSnapshot    Json?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -111,6 +210,8 @@ model Patch {
 // Phase 5: Evidence-grounded tailored cover letter
 model CoverLetter {
   id                String         @id @default(uuid())
+  userId            String?
+  user              User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
   jobId             String
   job               Job            @relation(fields: [jobId], references: [id], onDelete: Cascade)
   variantId         String?
@@ -125,6 +226,8 @@ model CoverLetter {
   status            String         @default("DRAFT") // DRAFT | FINAL
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
+
+  @@index([userId])
 }
 
 // Pitt CSC / Simplify Summer 2026 Ingestion Feed
@@ -158,4 +261,43 @@ model MasterHistory {
 
   @@index([resumeId])
 }
+
+// Company-Aware Interview Question Bank (OA / Phone Screen / System Design)
+model InterviewProblem {
+  id              String    @id @default(cuid())
+  company         String    // display name, e.g. "Amazon"
+  companyKey      String    // normalized: lowercase, alphanumeric only — joins against Job.company
+  problemTitle    String
+  category        String?   @default("OA") // "OA" | "Phone Screen" | "System Design" | "Behavioral"
+  tags            String[]  @default([])
+  difficulty      String?
+  problemMarkdown String?   @db.Text
+  sourceUrl       String?
+  lastObserved    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([companyKey, problemTitle])
+  @@index([companyKey])
+}
+
+// Company Intelligence & Culture Dossier
+model CompanyDossier {
+  id               String   @id @default(cuid())
+  companySlug      String   @unique // from normalizeCompany()
+  displayName      String
+  interviewStyle   Json?    // { format, primaryEvaluationCriteria[], roundBreakdown[], proTips[] }
+  cultureMetrics   Json?    // { workLifeBalanceRating, deploymentVelocity, remoteCulture, pros[], cons[] }
+  recentSignals    String?  @db.Text
+  referenceNotes   String?  @db.Text // raw excerpts ingested from OSS handbooks
+  processNotes     String?  @db.Text // interview-process blurb from hiring-without-whiteboards
+  isWhiteboardFree Boolean  @default(false)
+  source           String   @default("llm") // "seed" | "llm" | "seed+llm"
+  lastUpdated      DateTime @default(now())
+  jobs             Job[]
+
+  @@index([companySlug])
+}
+
+
 
