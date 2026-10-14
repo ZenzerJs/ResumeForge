@@ -33,6 +33,7 @@ import { AppShell } from "@/components/design-system/app-shell";
 import { PageHeader } from "@/components/design-system/page-header";
 import { StatusPill } from "@/components/design-system/status-pill";
 import { CommandButton } from "@/components/design-system/command-button";
+import { InterviewHub } from "@/components/interview/interview-hub";
 import {
   getAllTopics,
   getAllProblems,
@@ -69,6 +70,9 @@ export function PracticeWorkspace() {
   const topics = useMemo(() => getAllTopics(), []);
   const allProblems = useMemo(() => getAllProblems(), []);
   const allCompanies = useMemo(() => getAllCompanies(), []);
+
+  const initialTab = (searchParams.get("tab") === "runner" || initialSlug) ? "runner" : "questions";
+  const [mainTab, setMainTab] = useState<"questions" | "runner">(initialTab);
 
   // Filter States for Catalog
   const [selectedTopicId, setSelectedTopicId] = useState<string>(initialTopic);
@@ -122,6 +126,13 @@ export function PracticeWorkspace() {
 
     const top = searchParams.get("topic");
     if (top) setSelectedTopicId(top);
+
+    const tab = searchParams.get("tab");
+    if (tab === "runner" || slug) {
+      setMainTab("runner");
+    } else if (tab === "questions") {
+      setMainTab("questions");
+    }
   }, [searchParams]);
 
   // Load starter template when active problem or language changes
@@ -799,18 +810,77 @@ export function PracticeWorkspace() {
             {/* Header Title using PageHeader */}
             <PageHeader
               eyebrow="TECHNICAL INTERVIEW & OA PREP"
-              title="Algorithm Patterns & Problem Solving"
-              description="Learn foundational algorithmic blueprints and intuitive patterns before writing code. Practice on curated problems asked in live assessments and interviews at top tech companies."
+              title="Algorithm Patterns & Technical Interview Prep"
+              description="Master NeetCode 150 algorithms, high-scale System Design architectures, and company Online Assessments with real-time test execution and STAR interview rubrics."
               statusBadge={
                 <StatusPill
                   status="amber"
-                  label={`${allProblems.length} Curated Problems`}
+                  label={mainTab === "questions" ? "175 Technical Questions" : `${allProblems.length} Sandbox Problems`}
                 />
               }
             />
 
-            {/* Filter Toolbar */}
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 p-3.5 rounded-xl bg-rf-surface border border-border shadow-sm">
+            {/* Main Mode Switcher: Technical Questions Catalog vs Algorithmic IDE Runner */}
+            <div className="flex items-center gap-2 border-b border-border/80 pb-3" data-testid="practice-main-tabs">
+              <button
+                type="button"
+                onClick={() => {
+                  setMainTab("questions");
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.set("tab", "questions");
+                  router.push(`/practice?${params.toString()}`);
+                }}
+                data-testid="tab-technical-questions"
+                className={cn(
+                  "px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2",
+                  mainTab === "questions"
+                    ? "bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-sm"
+                    : "bg-surface-container-low hover:bg-surface-container-high text-rf-meta hover:text-rf-cloud border border-border"
+                )}
+              >
+                <span>Technical Questions & Curricula</span>
+                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-mono font-bold">175</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMainTab("runner");
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.set("tab", "runner");
+                  router.push(`/practice?${params.toString()}`);
+                }}
+                data-testid="tab-code-runner"
+                className={cn(
+                  "px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2",
+                  mainTab === "runner"
+                    ? "bg-primary/20 text-primary border border-primary/30 shadow-sm"
+                    : "bg-surface-container-low hover:bg-surface-container-high text-rf-meta hover:text-rf-cloud border border-border"
+                )}
+              >
+                <span>Algorithmic Patterns & Code Runner</span>
+                <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-mono font-bold">IDE Sandbox</span>
+              </button>
+            </div>
+
+            {mainTab === "questions" ? (
+              <InterviewHub
+                onSolveInRunner={(slug) => {
+                  setMainTab("runner");
+                  const prob = getProblemBySlug(slug);
+                  if (prob) {
+                    handleSelectProblem(prob);
+                  } else {
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.set("tab", "runner");
+                    router.push(`/practice?${params.toString()}`);
+                  }
+                }}
+              />
+            ) : (
+              <div className="space-y-8">
+                {/* Filter Toolbar */}
+                <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 p-3.5 rounded-xl bg-rf-surface border border-border shadow-sm">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-2.5 size-4 text-rf-meta" />
                 <input
@@ -1005,12 +1075,14 @@ export function PracticeWorkspace() {
                       </div>
                     );
                   })}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-    </AppShell>
-  );
+          )}
+        </div>
+      )}
+    </div>
+  </AppShell>
+);
 }

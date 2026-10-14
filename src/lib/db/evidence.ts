@@ -122,7 +122,7 @@ export async function createEvidenceItem(input: CreateEvidenceItemInput) {
 }
 
 export async function updateEvidenceItem(id: string, input: UpdateEvidenceItemInput) {
-  return await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     const updateData: Record<string, unknown> = {};
 
     if (input.type !== undefined) updateData.type = input.type;
@@ -162,9 +162,11 @@ export async function updateEvidenceItem(id: string, input: UpdateEvidenceItemIn
         data: updateData,
       });
     }
-
-    return await getEvidenceItemById(id);
   });
+
+  // Transaction committed; re-read outside the transaction callback so the
+  // updated row (including recreated bullets) is returned to callers.
+  return await getEvidenceItemById(id);
 }
 
 export async function archiveEvidenceItem(id: string) {

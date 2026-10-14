@@ -11,7 +11,8 @@ import {
 
 const LoginSchema = z.object({
   email: z.string().min(1).max(200).optional(),
-  username: z.string().min(1).max(24).optional(),
+  username: z.string().min(1).max(200).optional(),
+  identifier: z.string().min(1).max(200).optional(),
   password: z.string().min(1).max(200),
 });
 
@@ -31,13 +32,18 @@ export async function POST(request: Request) {
     } else {
       const form = await request.formData().catch(() => null);
       raw = {
-        email: String(form?.get("email") || form?.get("username") || ""),
+        email: String(form?.get("email") || form?.get("username") || form?.get("identifier") || ""),
         password: String(form?.get("password") || ""),
       };
     }
 
     const parsed = LoginSchema.safeParse(raw);
-    const identifier = (parsed.data?.email || parsed.data?.username || "").trim();
+    const identifier = (
+      parsed.data?.identifier ||
+      parsed.data?.email ||
+      parsed.data?.username ||
+      ""
+    ).trim();
     if (!parsed.success || !identifier) {
       return NextResponse.json({ success: false, error: "Invalid email, username, or password" }, { status: 401 });
     }
@@ -55,7 +61,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Unable to create session" }, { status: 500 });
     }
 
-    const secure = new URL(request.url).protocol === "https:";
+    const secure =
+      new URL(request.url).protocol === "https:" ||
+      request.headers.get("x-forwarded-proto") === "https";
     const response = NextResponse.json({
       success: true,
       data: { id: user.id, email: user.email, username: user.username },

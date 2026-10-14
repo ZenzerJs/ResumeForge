@@ -52,6 +52,200 @@ test.describe("hosted auth and a11y gates", () => {
     await context.close();
   });
 
+  test("login form UI authenticates user and redirects away from login page", async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
+    const unique = Date.now();
+    const email = `ui-login-${unique}@resumeforge.test`;
+    const username = `uilogin_${unique}`;
+    const password = "Password123!";
+
+    // Create user via signup
+    const signup = await page.request.post(`${baseURL}/api/auth/signup`, {
+      data: { email, username, password },
+    });
+    expect(signup.ok()).toBeTruthy();
+
+    // Clear cookies to test logging in from scratch via the UI
+    await context.clearCookies();
+
+    // Navigate to /login and submit credentials using email
+    await page.goto("/login");
+    await page.getByTestId("login-email-input").fill(email);
+    await page.getByTestId("login-password-input").fill(password);
+    await page.getByTestId("login-submit-btn").click();
+
+    // Verify redirected away from /login
+    await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15000 });
+
+    // Verify session is active by requesting an authenticated API endpoint
+    const meRes = await page.request.get(`${baseURL}/api/auth/me`);
+    expect(meRes.status()).toBe(200);
+    const meJson = await meRes.json();
+    expect(meJson.guest).toBe(false);
+    expect(meJson.data?.username).toBe(username);
+
+    await context.close();
+  });
+
+  test("login form UI authenticates user using username instead of email", async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
+    const unique = Date.now() + 1;
+    const email = `ui-user-${unique}@resumeforge.test`;
+    const username = `uiuser_${unique}`;
+    const password = "Password123!";
+
+    // Create user via signup
+    const signup = await page.request.post(`${baseURL}/api/auth/signup`, {
+      data: { email, username, password },
+    });
+    expect(signup.ok()).toBeTruthy();
+
+    // Clear cookies to test logging in using username
+    await context.clearCookies();
+
+    await page.goto("/login");
+    await page.getByTestId("login-email-input").fill(username);
+    await page.getByTestId("login-password-input").fill(password);
+    await page.getByTestId("login-submit-btn").click();
+
+    // Verify redirected away from /login
+    await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15000 });
+
+    // Verify session is active
+    const meRes = await page.request.get(`${baseURL}/api/auth/me`);
+    expect(meRes.status()).toBe(200);
+    const meJson = await meRes.json();
+    expect(meJson.guest).toBe(false);
+    expect(meJson.data?.username).toBe(username);
+
+    await context.close();
+  });
+
+  test("login form UI respects redirect query parameter after authentication", async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
+    const unique = Date.now() + 2;
+    const email = `ui-redirect-${unique}@resumeforge.test`;
+    const username = `uiredirect_${unique}`;
+    const password = "Password123!";
+
+    const signup = await page.request.post(`${baseURL}/api/auth/signup`, {
+      data: { email, username, password },
+    });
+    expect(signup.ok()).toBeTruthy();
+    await context.clearCookies();
+
+    // Navigate to /login with redirect to /tracker
+    await page.goto("/login?redirect=/tracker");
+    await page.getByTestId("login-email-input").fill(email);
+    await page.getByTestId("login-password-input").fill(password);
+    await page.getByTestId("login-submit-btn").click();
+
+    // Verify redirected directly to /tracker
+    await page.waitForURL((url) => url.pathname === "/tracker", { timeout: 15000 });
+
+    await context.close();
+  });
+
+  test("login form UI handles simulated password manager autofill via DOM property assignment", async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
+    const unique = Date.now() + 3;
+    const email = `ui-autofill-${unique}@resumeforge.test`;
+    const username = `uiautofill_${unique}`;
+    const password = "Password123!";
+
+    const signup = await page.request.post(`${baseURL}/api/auth/signup`, {
+      data: { email, username, password },
+    });
+    expect(signup.ok()).toBeTruthy();
+    await context.clearCookies();
+
+    await page.goto("/login");
+    await expect(page.getByTestId("login-email-input")).toBeVisible();
+
+    // Simulate autofill extension injecting value directly onto DOM elements
+    await page.evaluate(
+      ({ userEmail, userPass }) => {
+        const emailInput = document.querySelector('[data-testid="login-email-input"]') as HTMLInputElement;
+        const passInput = document.querySelector('[data-testid="login-password-input"]') as HTMLInputElement;
+        if (emailInput) {
+          emailInput.value = userEmail;
+          emailInput.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        if (passInput) {
+          passInput.value = userPass;
+          passInput.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      },
+      { userEmail: email, userPass: password }
+    );
+
+    // Submit form directly
+    await page.getByTestId("login-submit-btn").click();
+
+    // Verify successful signin despite absence of synthetic keystroke events
+    await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15000 });
+
+    const meRes = await page.request.get(`${baseURL}/api/auth/me`);
+    expect(meRes.status()).toBe(200);
+    const meJson = await meRes.json();
+    expect(meJson.guest).toBe(false);
+    expect(meJson.data?.username).toBe(username);
+
+    await context.close();
+  });
+
+  test("login form UI displays error when invalid credentials are provided", async ({ browser }) => {
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
+
+    await page.goto("/login");
+    await page.getByTestId("login-email-input").fill("nonexistent-user@example.com");
+    await page.getByTestId("login-password-input").fill("WrongPassword999!");
+    await page.getByTestId("login-submit-btn").click();
+
+    // Verify error message is rendered
+    const errorMsg = page.getByTestId("login-error-msg");
+    await expect(errorMsg).toBeVisible({ timeout: 10000 });
+    await expect(errorMsg).toContainText("Invalid email, username, or password");
+
+    await context.close();
+  });
+
+  test("signup form UI creates account and redirects away from login page", async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
+    const unique = Date.now() + 4;
+    const email = `ui-signup-${unique}@resumeforge.test`;
+    const username = `uisignup_${unique}`;
+    const password = "Password123!";
+
+    await page.goto("/login");
+    // Switch to signup mode
+    await page.getByTestId("login-mode-toggle-btn").click();
+    await expect(page.getByTestId("login-username-input")).toBeVisible();
+
+    await page.getByTestId("login-username-input").fill(username);
+    await page.getByTestId("login-email-input").fill(email);
+    await page.getByTestId("login-password-input").fill(password);
+    await page.getByTestId("login-submit-btn").click();
+
+    // Verify redirected away from /login
+    await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15000 });
+
+    // Verify session is active
+    const meRes = await page.request.get(`${baseURL}/api/auth/me`);
+    expect(meRes.status()).toBe(200);
+    const meJson = await meRes.json();
+    expect(meJson.guest).toBe(false);
+    expect(meJson.data?.username).toBe(username);
+
+    await context.close();
+  });
+
   test("signup and login persist a session", async ({ browser, baseURL }) => {
     const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const page = await context.newPage();

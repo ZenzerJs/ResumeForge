@@ -28,6 +28,8 @@ import { LandingAtmosphere } from "@/components/landing/landing-atmosphere";
 import { ProductProofCard } from "@/components/landing/product-proof-card";
 import { CapabilityMarquee } from "@/components/landing/capability-marquee";
 import { LandingFooter } from "@/components/landing/landing-footer";
+import { AtsSandboxSection } from "@/components/landing/ats-sandbox-section";
+import { CompetitiveMatrixSection } from "@/components/landing/competitive-matrix-section";
 import type { DashboardStats } from "@/lib/db/stats";
 
 interface HomeLandingProps {
@@ -176,9 +178,9 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
           <div className="grid md:grid-cols-2 gap-12 items-center relative z-10 w-full">
             {/* Hero Text Left Column */}
             <div className="flex flex-col gap-6">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-[#ff8c00]/30 bg-[#ff8c00]/10 w-fit">
-                <KeyRound className="h-3.5 w-3.5 text-[#ff8c00]" />
-                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#ff8c00]">PRIVATE RESUME WORKSPACE</span>
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#ff8c00]/30 bg-[#ff8c00]/10 w-fit">
+                <KeyRound className="h-4 w-4 text-[#ff8c00]" />
+                <span className="font-mono text-xs uppercase tracking-wider text-[#ff8c00]">PRIVATE RESUME WORKSPACE</span>
               </div>
 
               <h1 className="text-4xl md:text-5xl lg:text-6xl text-white leading-tight font-extrabold tracking-[-0.04em] text-pretty">
@@ -190,7 +192,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                 />
               </h1>
 
-              <p className="text-slate-400 text-base md:text-lg max-w-xl leading-relaxed">
+              <p className="text-slate-300 text-base md:text-lg max-w-xl leading-relaxed">
                 Craft evidence-grounded, job-tailored resume variants from one protected master resume. Zero hallucination. WASM compilation with BYOK keys stored in this browser.
               </p>
 
@@ -260,15 +262,15 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-12">
               <h2 className="text-2xl md:text-3xl text-white font-bold tracking-[-0.03em] mb-2">How ResumeForge Operates</h2>
-              <p className="text-slate-400 font-mono text-xs">Guest-ready workspace. Evidence-grounded output.</p>
+              <p className="text-slate-300 font-mono text-xs md:text-sm">Guest-ready workspace. Evidence-grounded output.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-6" data-testid="workflow-active-panel">
               <div className="flex flex-col items-center text-center p-4">
                 <div className="w-12 h-12 rounded-xl bg-[#162035] flex items-center justify-center border border-slate-700/60 mb-4">
                   <Upload className="h-5 w-5 text-[#ff8c00]" />
                 </div>
-                <h3 className="font-mono text-xs uppercase tracking-[0.15em] text-white font-bold mb-1">1. IMPORT</h3>
-                <p className="text-slate-400 text-xs leading-relaxed">Load your master CV.</p>
+                <h3 className="font-mono text-xs md:text-sm uppercase tracking-wider text-white font-bold mb-1.5">1. IMPORT</h3>
+                <p className="text-slate-300 text-xs md:text-sm leading-relaxed">Load your master CV.</p>
               </div>
 
               <div className="flex flex-col items-center text-center p-4 relative">
@@ -276,8 +278,8 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                 <div className="w-12 h-12 rounded-xl bg-[#162035] flex items-center justify-center border border-slate-700/60 mb-4 relative z-10">
                   <Anchor className="h-5 w-5 text-[#ff8c00]" />
                 </div>
-                <h3 className="font-mono text-xs uppercase tracking-[0.15em] text-white font-bold mb-1">2. GROUND</h3>
-                <p className="text-slate-400 text-xs leading-relaxed">Extract verified facts.</p>
+                <h3 className="font-mono text-xs md:text-sm uppercase tracking-wider text-white font-bold mb-1.5">2. GROUND</h3>
+                <p className="text-slate-300 text-xs md:text-sm leading-relaxed">Extract verified facts.</p>
               </div>
 
               <div className="flex flex-col items-center text-center p-4 relative">
@@ -285,8 +287,8 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                 <div className="w-12 h-12 rounded-xl bg-[#ff8c00]/20 flex items-center justify-center border border-[#ff8c00]/60 mb-4 relative z-10">
                   <Sparkles className="h-5 w-5 text-[#ff8c00]" />
                 </div>
-                <h3 className="font-mono text-xs uppercase tracking-[0.15em] text-white font-bold mb-1">3. TAILOR</h3>
-                <p className="text-slate-400 text-xs leading-relaxed">Align to Job Description.</p>
+                <h3 className="font-mono text-xs md:text-sm uppercase tracking-wider text-white font-bold mb-1.5">3. TAILOR</h3>
+                <p className="text-slate-300 text-xs md:text-sm leading-relaxed">Align to Job Description.</p>
               </div>
 
               <div className="flex flex-col items-center text-center p-4 relative">
@@ -294,8 +296,8 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                 <div className="w-12 h-12 rounded-xl bg-[#162035] flex items-center justify-center border border-slate-700/60 mb-4 relative z-10">
                   <ShieldCheck className="h-5 w-5 text-slate-300" />
                 </div>
-                <h3 className="font-mono text-xs uppercase tracking-[0.15em] text-white font-bold mb-1">4. VERIFY</h3>
-                <p className="text-slate-400 text-xs leading-relaxed">Audit against evidence.</p>
+                <h3 className="font-mono text-xs md:text-sm uppercase tracking-wider text-white font-bold mb-1.5">4. VERIFY</h3>
+                <p className="text-slate-300 text-xs md:text-sm leading-relaxed">Audit against evidence.</p>
               </div>
 
               <div className="flex flex-col items-center text-center p-4 relative">
@@ -303,8 +305,8 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                 <div className="w-12 h-12 rounded-xl bg-[#162035] flex items-center justify-center border border-slate-700/60 mb-4 relative z-10">
                   <Send className="h-5 w-5 text-[#ff8c00]" />
                 </div>
-                <h3 className="font-mono text-xs uppercase tracking-[0.15em] text-white font-bold mb-1">5. APPLY</h3>
-                <p className="text-slate-400 text-xs leading-relaxed">Export tailored PDF.</p>
+                <h3 className="font-mono text-xs md:text-sm uppercase tracking-wider text-white font-bold mb-1.5">5. APPLY</h3>
+                <p className="text-slate-300 text-xs md:text-sm leading-relaxed">Export tailored PDF.</p>
               </div>
             </div>
           </div>
@@ -316,7 +318,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
           data-testid="capability-grid-section"
         >
           <div className="text-center mb-14">
-            <h2 className="text-3xl font-extrabold text-white tracking-[-0.04em]">Workspace Capability Modules</h2>
+            <h2 className="text-3xl md:text-4xl font-extrabold text-white tracking-[-0.04em]">Workspace Capability Modules</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="capability-cards-grid">
             {/* Card 1: Master Resume Editor */}
@@ -325,16 +327,16 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                 <div className="w-10 h-10 rounded-lg bg-[#1a2338] border border-slate-700 flex items-center justify-center mb-6">
                   <FileText className="h-5 w-5 text-[#ff8c00]" />
                 </div>
-                <h3 className="text-lg font-bold text-white mb-2 tracking-tight">Master Resume Editor</h3>
-                <p className="text-slate-400 text-xs leading-relaxed">
+                <h3 className="text-lg md:text-xl font-bold text-white mb-2 tracking-tight">Master Resume Editor</h3>
+                <p className="text-slate-300 text-sm leading-relaxed">
                   Edit your protected Typst master resume with WASM compilation and instant live preview.
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between">
-                <span className="font-mono text-[11px] uppercase tracking-wider px-2.5 py-1 rounded bg-[#172033] border border-slate-700 text-slate-300">
+                <span className="font-mono text-xs uppercase tracking-wider px-3 py-1 rounded bg-[#172033] border border-slate-700 text-slate-300">
                   {`${stats.hasMasterResume ? 1 : 0} MASTER RESUME`}
                 </span>
-                <Link className="text-[#ff8c00] font-mono text-xs flex items-center gap-1 hover:underline" href="/editor">
+                <Link className="text-[#ff8c00] font-mono text-xs md:text-sm flex items-center gap-1 hover:underline" href="/editor">
                   Open <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
@@ -346,16 +348,16 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                 <div className="w-10 h-10 rounded-lg bg-[#1a2338] border border-slate-700 flex items-center justify-center mb-6">
                   <FolderOpen className="h-5 w-5 text-slate-300" />
                 </div>
-                <h3 className="text-lg font-bold text-white mb-2 tracking-tight">Verified Evidence Bank</h3>
-                <p className="text-slate-400 text-xs leading-relaxed">
+                <h3 className="text-lg md:text-xl font-bold text-white mb-2 tracking-tight">Verified Evidence Bank</h3>
+                <p className="text-slate-300 text-sm leading-relaxed">
                   Central repository of career achievements, verified bullets, and skill inventory.
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between">
-                <span className="font-mono text-[11px] uppercase tracking-wider px-2.5 py-1 rounded bg-[#172033] border border-slate-700 text-slate-300">
+                <span className="font-mono text-xs uppercase tracking-wider px-3 py-1 rounded bg-[#172033] border border-slate-700 text-slate-300">
                   {`${stats.evidenceCount} TOTAL ITEMS`}
                 </span>
-                <Link className="text-slate-400 hover:text-white font-mono text-xs flex items-center gap-1 transition-colors" href="/library">
+                <Link className="text-slate-400 hover:text-white font-mono text-xs md:text-sm flex items-center gap-1 transition-colors" href="/library">
                   Open <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
@@ -367,14 +369,14 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                 <div className="w-10 h-10 rounded-lg bg-[#ff8c00]/15 border border-[#ff8c00]/40 flex items-center justify-center mb-6">
                   <Settings className="h-5 w-5 text-[#ff8c00]" />
                 </div>
-                <h3 className="text-xl font-bold text-white mb-3 tracking-tight">Tailor Engine &amp; AI Gateway</h3>
-                <p className="text-slate-400 text-xs leading-relaxed mb-6">
+                <h3 className="text-xl md:text-2xl font-bold text-white mb-3 tracking-tight">Tailor Engine &amp; AI Gateway</h3>
+                <p className="text-slate-300 text-sm leading-relaxed mb-6">
                   Intelligently map evidence to job descriptions. Generate tailored variants while maintaining absolute ground truth. BYOK keys stay in this browser; resume data lives in your hosted database.
                 </p>
                 <div className="bg-[#0b111e] border border-slate-800 rounded-lg p-3.5 font-mono text-xs text-slate-300 mb-4">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-slate-300 font-medium">Variant Generation</span>
-                    <span className="text-slate-400 text-[11px]">Processing...</span>
+                    <span className="text-slate-400 text-xs">Processing...</span>
                   </div>
                   <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
                     <div className="bg-[#ff8c00] h-full w-[70%] rounded-full"></div>
@@ -382,10 +384,10 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                 </div>
               </div>
               <div className="mt-auto pt-4 border-t border-slate-800/80 flex items-center justify-between">
-                <span className="font-mono text-[11px] uppercase tracking-wider px-2.5 py-1 rounded bg-[#172033] border border-slate-700 text-slate-300">
+                <span className="font-mono text-xs uppercase tracking-wider px-3 py-1 rounded bg-[#172033] border border-slate-700 text-slate-300">
                   {`${stats.variantsCount} VARIANTS GENERATED`}
                 </span>
-                <Link className="bg-[#ff8c00] text-black font-bold px-4 py-1.5 rounded flex items-center gap-1.5 hover:bg-[#ffa024] transition-colors text-xs" href="/tailor">
+                <Link className="bg-[#ff8c00] text-black font-bold px-4 py-2 rounded flex items-center gap-1.5 hover:bg-[#ffa024] transition-colors text-xs md:text-sm" href="/tailor">
                   Tailor Now
                 </Link>
               </div>
@@ -397,14 +399,14 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                 <div className="w-10 h-10 rounded-lg bg-[#1a2338] border border-slate-700 flex items-center justify-center mb-6">
                   <KeyRound className="h-5 w-5 text-slate-300" />
                 </div>
-                <h3 className="text-lg font-bold text-white mb-2 tracking-tight">AI Key Vault &amp; Settings</h3>
-                <p className="text-slate-400 text-xs leading-relaxed">
+                <h3 className="text-lg md:text-xl font-bold text-white mb-2 tracking-tight">AI Key Vault &amp; Settings</h3>
+                <p className="text-slate-300 text-sm leading-relaxed">
                   Configure BYOK credentials (OpenAI, Anthropic, Gemini) with local client-side key scrubbing.
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between">
-                <span className="font-mono text-[11px] uppercase tracking-wider px-2.5 py-1 rounded bg-[#172033] border border-slate-700 text-slate-300">ZERO-LEAK REDACTION</span>
-                <Link className="text-slate-400 hover:text-white font-mono text-xs flex items-center gap-1 transition-colors" href="/settings">
+                <span className="font-mono text-xs uppercase tracking-wider px-3 py-1 rounded bg-[#172033] border border-slate-700 text-slate-300">ZERO-LEAK REDACTION</span>
+                <Link className="text-slate-400 hover:text-white font-mono text-xs md:text-sm flex items-center gap-1 transition-colors" href="/settings">
                   Open <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
@@ -416,22 +418,28 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                 <div className="w-10 h-10 rounded-lg bg-[#1a2338] border border-slate-700 flex items-center justify-center mb-6">
                   <Briefcase className="h-5 w-5 text-[#ff8c00]" />
                 </div>
-                <h3 className="text-lg font-bold text-white mb-2 tracking-tight">Job Application Tracker</h3>
-                <p className="text-slate-400 text-xs leading-relaxed">
+                <h3 className="text-lg md:text-xl font-bold text-white mb-2 tracking-tight">Job Application Tracker</h3>
+                <p className="text-slate-300 text-sm leading-relaxed">
                   Kanban &amp; list pipeline for tracking applications, interview notes, and status history.
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between">
-                <span className="font-mono text-[11px] uppercase tracking-wider px-2.5 py-1 rounded bg-[#172033] border border-slate-700 text-slate-300">
+                <span className="font-mono text-xs uppercase tracking-wider px-3 py-1 rounded bg-[#172033] border border-slate-700 text-slate-300">
                   {`${stats.jobsCount} JOBS TRACKED`}
                 </span>
-                <Link className="text-[#ff8c00] font-mono text-xs flex items-center gap-1 hover:underline" href="/tracker">
+                <Link className="text-[#ff8c00] font-mono text-xs md:text-sm flex items-center gap-1 hover:underline" href="/tracker">
                   Open <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
             </motion.div>
           </div>
         </section>
+
+        {/* Phase: Instant ATS Sandbox Interactive Playground */}
+        <AtsSandboxSection />
+
+        {/* Phase: The Engineering Wedge Competitive Matrix */}
+        <CompetitiveMatrixSection />
       </main>
 
       <LandingFooter />

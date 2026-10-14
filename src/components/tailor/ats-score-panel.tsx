@@ -37,6 +37,7 @@ interface AtsScorePanelProps {
   includeEvidenceBank?: boolean;
   initialProfile?: RoleProfile;
   onProfileChange?: (profile: RoleProfile) => void;
+  onEvaluationComplete?: (result: AtsEvaluationResult | null) => void;
   className?: string;
 }
 
@@ -76,6 +77,7 @@ export function AtsScorePanel({
   includeEvidenceBank = true,
   initialProfile = "Backend",
   onProfileChange,
+  onEvaluationComplete,
   className = "",
 }: AtsScorePanelProps) {
   const [selectedProfile, setSelectedProfile] = useState<RoleProfile>(initialProfile);
@@ -112,15 +114,18 @@ export function AtsScorePanel({
       const json = await res.json();
       if (res.ok && json.success) {
         setResult(json.data);
+        onEvaluationComplete?.(json.data);
       } else {
         setEvalError(json.error || "Failed to calculate ATS evaluation score.");
+        onEvaluationComplete?.(null);
       }
     } catch (err) {
       setEvalError(`Evaluation error: ${err instanceof Error ? err.message : String(err)}`);
+      onEvaluationComplete?.(null);
     } finally {
       setIsEvaluating(false);
     }
-  }, [typstContent, extractedRequirements, roleTitle, useMasterResume, includeEvidenceBank]);
+  }, [typstContent, extractedRequirements, roleTitle, useMasterResume, includeEvidenceBank, onEvaluationComplete]);
 
   useEffect(() => {
     runEvaluation(selectedProfile);
