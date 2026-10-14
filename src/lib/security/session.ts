@@ -55,16 +55,21 @@ async function hmacVerify(secret: string, payload: string, signature: string): P
   return mismatch === 0;
 }
 
-export async function createSessionToken(userId: string, now = Date.now()): Promise<string | null> {
+export async function createSessionToken(
+  userId: string,
+  now = Date.now(),
+  sessionVersion = 0
+): Promise<string | null> {
   const secret = getSecret();
   if (!secret) return null;
   if (!userId.trim()) return null;
-  const payload = `uid=${encodeURIComponent(userId)}|exp=${now + SESSION_TTL_MS}`;
+  const version = Number.isInteger(sessionVersion) && sessionVersion >= 0 ? sessionVersion : 0;
+  const payload = `uid=${encodeURIComponent(userId)}|exp=${now + SESSION_TTL_MS}|sv=${version}`;
   const signature = await hmacSign(secret, payload);
   return `${payload}.${signature}`;
 }
 
-export type SessionPayload = { userId: string; exp: number };
+export type SessionPayload = { userId: string; exp: number; sessionVersion: number };
 
 export async function readSessionToken(token: string | undefined | null): Promise<SessionPayload | null> {
   if (!token) return null;
@@ -75,13 +80,15 @@ export async function readSessionToken(token: string | undefined | null): Promis
   const payload = token.slice(0, dot);
   const signature = token.slice(dot + 1);
   if (!(await hmacVerify(secret, payload, signature))) return null;
-  const match = payload.match(/^uid=([^|]+)\|exp=(\d+)$/);
+  const match = payload.match(/^uid=([^|]+)\|exp=(\d+)(?:\|sv=(\d+))?$/);
   if (!match) return null;
   const exp = Number(match[2]);
   if (!Number.isFinite(exp) || exp <= Date.now()) return null;
   const userId = decodeURIComponent(match[1]);
   if (!userId) return null;
-  return { userId, exp };
+  const sessionVersion = match[3] === undefined ? 0 : Number(match[3]);
+  if (!Number.isInteger(sessionVersion)) return null;
+  return { userId, exp, sessionVersion };
 }
 
 export async function verifySessionToken(token: string | undefined | null): Promise<boolean> {
@@ -98,6 +105,11 @@ export function passwordsMatch(provided: string): boolean {
     mismatch |= provided.charCodeAt(i) ^ expected.charCodeAt(i);
   }
   return mismatch === 0;
+}
+
+export function cookieSecure(request: Request): boolean {
+  if (process.env.NODE_ENV === "production") return true;
+  return new URL(request.url).protocol === "https:";
 }
 
 export function buildSessionCookie(token: string, secure: boolean): string {
@@ -125,12 +137,13 @@ export function isPublicPath(pathname: string): boolean {
     pathname === "/discover" ||
     pathname === "/practice" ||
     pathname.startsWith("/practice/") ||
+    pathname === "/interview" ||
+    pathname.startsWith("/interview/") ||
     pathname === "/tracker" ||
     pathname.startsWith("/tracker/") ||
     pathname.startsWith("/api/auth/") ||
     pathname === "/api/connectors/jobs" ||
     pathname === "/api/connectors/status" ||
-    pathname.startsWith("/api/practice/") ||
     (pathname.startsWith("/api/jobs/") && pathname.endsWith("/interview-prep")) ||
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/wasm/") ||

@@ -6,14 +6,10 @@ This repository is governed by strict architecture, security, and scoping rules.
 
 ---
 
-## Mandatory Pre-Task Context Checklist
+## Scoping & Context Rules (Ponytail + Caveman)
 
-BEFORE writing any code, modifying schemas, or planning tasks, you MUST read the following foundational documents in full:
-
-1. [`docs/phase-status.md`](docs/phase-status.md) — Current phase, recent progress, open limitations, and current task focus.
-2. [`docs/decisions.md`](docs/decisions.md) — Architecture Decision Records (ADRs) and design trade-offs.
-3. [`docs/architecture.md`](docs/architecture.md) — System module boundaries, data flows, and architectural constraints.
-4. [`docs/ai-guardrails.md`](docs/ai-guardrails.md) — AI patch object schema, evidence citation rules, and gap handling contracts.
+- **Targeted File Inspection**: When asked to inspect, debug, optimize, or edit specific files, inspect ONLY the target files and their direct imports. DO NOT read foundational docs or run git status.
+- **Reference Docs (On-Demand Only)**: Consult docs/ (phase-status.md, decisions.md, architecture.md) ONLY when explicitly instructed to plan a multi-phase system roadmap. Never load them for file-specific tasks.
 
 ---
 

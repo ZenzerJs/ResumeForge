@@ -42,6 +42,8 @@ export interface TrackerJobItem {
   roleTitle: string;
   jobUrl?: string | null;
   status: string;
+  variants?: { id: string; variantTitle: string }[];
+  appliedVariantId?: string | null;
   source?: string;
   location?: string | null;
   salarySnippet?: string | null;
@@ -58,6 +60,7 @@ interface ApplySheetProps {
   job: TrackerJobItem | null;
   masterTypst?: string;
   masterFacts?: ResumeFacts | null;
+  onVariantChange?: (jobId: string, variantId: string | null) => void;
 }
 
 type ApplyStep = "load" | "tailor" | "guardrail" | "score" | "export";
@@ -68,6 +71,7 @@ export function ApplySheet({
   job,
   masterTypst = "",
   masterFacts,
+  onVariantChange,
 }: ApplySheetProps) {
   const [currentStep, setCurrentStep] = useState<ApplyStep>("load");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -75,6 +79,8 @@ export function ApplySheet({
   const [atsScore, setAtsScore] = useState<AtsEvaluationResult | null>(null);
   const [tailoredTypst, setTailoredTypst] = useState<string>(masterTypst);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [variantError, setVariantError] = useState<string | null>(null);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(job?.appliedVariantId ?? null);
 
   useEffect(() => {
     if (open && job) {
@@ -83,10 +89,42 @@ export function ApplySheet({
       setGuardrailResult(null);
       setAtsScore(null);
       setExportError(null);
+      setVariantError(null);
+      setSelectedVariantId(job.appliedVariantId ?? null);
     }
   }, [open, job, masterTypst]);
 
   if (!job) return null;
+
+  const handleVariantSelectChange = async (variantId: string | null) => {
+    setVariantError(null);
+    const prevVariant = selectedVariantId;
+    setSelectedVariantId(variantId);
+
+    if (onVariantChange) {
+      try {
+        await Promise.resolve(onVariantChange(job.id, variantId));
+      } catch {
+        setSelectedVariantId(prevVariant);
+        setVariantError("Failed to update sent variant.");
+      }
+      return;
+    }
+    try {
+      const res = await fetch(`/api/jobs/${job.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ variantId }),
+      });
+      if (!res.ok) {
+        setSelectedVariantId(prevVariant);
+        setVariantError("Failed to update sent variant.");
+      }
+    } catch {
+      setSelectedVariantId(prevVariant);
+      setVariantError("Network error updating sent variant.");
+    }
+  };
 
   const handleStartTailoring = async () => {
     setIsProcessing(true);
@@ -249,6 +287,28 @@ export function ApplySheet({
               {job.company} {job.location ? `• ${job.location}` : ""}
             </SheetDescription>
           </SheetHeader>
+          {(job.variants?.length ?? 0) > 0 && (
+            <label className="block text-xs text-slate-400">
+              Sent variant
+              <select
+                className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100"
+                value={selectedVariantId ?? ""}
+                aria-label="Sent variant"
+                data-testid="apply-sheet-variant-select"
+                onChange={(e) => {
+                  void handleVariantSelectChange(e.target.value || null);
+                }}
+              >
+                <option value="">No variant recorded</option>
+                {job.variants?.map((variant) => (
+                  <option key={variant.id} value={variant.id}>{variant.variantTitle}</option>
+                ))}
+              </select>
+              {variantError && (
+                <span className="mt-1 block text-xs text-red-400" role="alert">{variantError}</span>
+              )}
+            </label>
+          )}
 
           {/* Progress Indicator */}
           <div className="space-y-1.5">

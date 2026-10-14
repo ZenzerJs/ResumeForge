@@ -63,15 +63,21 @@ describe("AI Model Tool Protocol & Executor", () => {
       },
     ];
 
-    const result = await executeServerTool("apply_patches", {
-      currentTypst,
-      patchIds: ["patch-1"],
-      acceptedPatches,
-      masterFacts,
-    });
+    const result = await executeServerTool(
+      "apply_patches",
+      {
+        currentTypst,
+        patchIds: ["patch-1"],
+        acceptedPatches,
+        masterFacts,
+      },
+      "user-without-that-evidence"
+    );
 
     expect(result.success).toBe(true);
-    expect(result.data.updatedTypst).toContain("Reduced latency by 45ms.");
+    expect(result.data.appliedCount).toBe(0);
+    expect(result.data.updatedTypst).not.toContain("Reduced latency by 45ms.");
+    expect(result.data.rejected.length).toBeGreaterThan(0);
   });
 
   it("executes inspect_layout_budget detecting page limits and overflow", async () => {
@@ -102,12 +108,16 @@ describe("AI Model Tool Protocol & Executor", () => {
   });
 
   it("executes search_evidence with parameter validation", async () => {
-    const result = await executeServerTool("search_evidence", {
-      query: "database postgresql performance",
-      tags: ["database", "backend"],
-      limit: 5,
-      status: "all",
-    });
+    const result = await executeServerTool(
+      "search_evidence",
+      {
+        query: "database postgresql performance",
+        tags: ["database", "backend"],
+        limit: 5,
+        status: "all",
+      },
+      "user-without-evidence"
+    );
 
     expect(result.success).toBe(true);
     expect(result.data).toBeDefined();

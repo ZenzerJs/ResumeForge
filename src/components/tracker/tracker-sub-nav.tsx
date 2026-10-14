@@ -16,6 +16,7 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
   const isFeed = pathname === "/tracker/feed" || pathname.startsWith("/tracker/feed/");
   const isApplied = pathname.startsWith("/tracker/applied");
   const isSaved = pathname.startsWith("/tracker/saved");
+  const isOutcomes = pathname.startsWith("/tracker/outcomes");
   const isAll = pathname === "/tracker" || pathname === "/tracker/";
 
   const linkClass = (active: boolean) =>
@@ -61,6 +62,13 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
             data-testid="tracker-tab-saved"
           >
             Saved
+          </Link>
+          <Link
+            href="/tracker/outcomes"
+            className={linkClass(isOutcomes)}
+            data-testid="tracker-tab-outcomes"
+          >
+            Outcomes
           </Link>
         </div>
 

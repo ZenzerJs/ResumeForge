@@ -62,6 +62,7 @@ interface JobDetailPaneProps {
   isSheet?: boolean;
   onClose?: () => void;
   onStatusChange: (jobId: string, status: JobStatus) => void;
+  onVariantChange?: (jobId: string, variantId: string | null) => void;
   onNotesChange: (jobId: string, value: string) => void;
   onSaveNotes: (jobId: string) => void;
   onFetchFullText: (jobId: string) => void;
@@ -78,6 +79,7 @@ export function JobDetailPane({
   isSheet = false,
   onClose,
   onStatusChange,
+  onVariantChange,
   onNotesChange,
   onSaveNotes,
   onFetchFullText,
@@ -292,6 +294,22 @@ export function JobDetailPane({
                       ))}
                     </select>
                   )}
+                  {onVariantChange && (job.variants?.length ?? 0) > 0 && job.status !== "SAVED" && (
+                    <select
+                      value={job.appliedVariantId ?? ""}
+                      onChange={(e) => onVariantChange(job.id, e.target.value || null)}
+                      className="mt-2 block bg-surface border border-outline-variant rounded px-3 py-1.5 text-xs font-mono-data text-on-surface-variant"
+                      aria-label="Sent variant"
+                      data-testid="sent-variant-select"
+                    >
+                      <option value="">No variant recorded</option>
+                      {job.variants?.map((variant) => (
+                        <option key={variant.id} value={variant.id}>
+                          {variant.variantTitle}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
             </div>
@@ -496,7 +514,7 @@ export function JobDetailPane({
         >
           {content}
         </div>
-        <ApplySheet open={applySheetOpen} onOpenChange={setApplySheetOpen} job={detailJob as any} />
+        <ApplySheet open={applySheetOpen} onOpenChange={setApplySheetOpen} job={detailJob as any} onVariantChange={onVariantChange} />
         <ApplyPrepSheetModal
           isOpen={prepSheetOpen}
           onClose={() => setPrepSheetOpen(false)}
@@ -521,7 +539,7 @@ export function JobDetailPane({
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background/50 relative" data-testid="job-detail-pane">
         {content}
       </div>
-      <ApplySheet open={applySheetOpen} onOpenChange={setApplySheetOpen} job={detailJob as any} />
+      <ApplySheet open={applySheetOpen} onOpenChange={setApplySheetOpen} job={detailJob as any} onVariantChange={onVariantChange} />
       <ApplyPrepSheetModal
         isOpen={prepSheetOpen}
         onClose={() => setPrepSheetOpen(false)}

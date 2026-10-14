@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   createSessionToken,
   isPublicPath,
+  cookieSecure,
   originAllowed,
   passwordsMatch,
   verifySessionToken,
@@ -26,6 +27,20 @@ describe("session helpers", () => {
     expect(isPublicPath("/login")).toBe(true);
     expect(isPublicPath("/privacy")).toBe(true);
     expect(isPublicPath("/api/jobs")).toBe(false);
+  });
+
+  it("forces the Secure cookie flag in production and ignores x-forwarded-proto", () => {
+    const env = process.env as { NODE_ENV?: string };
+    const previous = env.NODE_ENV;
+    env.NODE_ENV = "production";
+    const request = new Request("http://localhost/api/auth/login", {
+      headers: { "x-forwarded-proto": "http" },
+    });
+    expect(cookieSecure(request)).toBe(true);
+    env.NODE_ENV = "test";
+    expect(cookieSecure(new Request("http://localhost/api/auth/login"))).toBe(false);
+    expect(cookieSecure(new Request("https://localhost/api/auth/login"))).toBe(true);
+    env.NODE_ENV = previous;
   });
 
   it("allows mutations when Origin matches the Host header even if the server bound 0.0.0.0", () => {

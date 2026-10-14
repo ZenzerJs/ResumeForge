@@ -4,6 +4,10 @@ import { promisify } from "node:util";
 const scrypt = promisify(scryptCallback);
 const KEY_LEN = 32;
 
+/** Fixed scrypt hash so missing users cost the same work as a real check. */
+export const DUMMY_PASSWORD_HASH =
+  "scrypt:cmVzdW1lZm9yZ2UtbG9naW4tZHVtbXkhIQ:sTcC5mWH3MWW4CLKv2LkeGfc1oBAI8Hh7jFDxZJb3C4";
+
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }

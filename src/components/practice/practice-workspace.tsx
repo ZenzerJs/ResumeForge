@@ -46,7 +46,7 @@ import {
   TopicCurriculum,
   ExecutionResult,
 } from "@/lib/practice/types";
-import { runCodeAgainstTestCases } from "@/lib/practice/code-runner";
+import { runUserCode } from "@/lib/practice/run-user-code";
 
 const TOPIC_ICONS: Record<string, React.ElementType> = {
   Hash,
@@ -176,36 +176,9 @@ export function PracticeWorkspace() {
     setActiveConsoleTab("output");
 
     try {
-      if (selectedLanguage === "typescript" || selectedLanguage === "javascript") {
-        // Fast client-side execution with type-sanitization and timeout protection
-        const res = runCodeAgainstTestCases(code, activeProblem.testCases);
-        setExecutionResult(res);
-      } else {
-        // Post to execute route
-        const res = await fetch("/api/practice/execute", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            problemId: activeProblem.id,
-            problemSlug: activeProblem.slug,
-            code,
-            language: selectedLanguage,
-          }),
-        });
-        const json = await res.json();
-        if (json.success && json.data) {
-          setExecutionResult(json.data);
-        } else {
-          setExecutionResult({
-            status: "ERROR",
-            totalTests: activeProblem.testCases.length,
-            passedTests: 0,
-            executionTimeMs: 0,
-            testResults: [],
-            error: json.error || "Failed to execute code.",
-          });
-        }
-      }
+      // Fast client-side execution with type-sanitization and timeout protection
+      const res = await runUserCode(code, activeProblem.testCases);
+      setExecutionResult(res);
     } catch (err: any) {
       setExecutionResult({
         status: "ERROR",
@@ -218,7 +191,7 @@ export function PracticeWorkspace() {
     } finally {
       setIsRunning(false);
     }
-  }, [activeProblem, code, selectedLanguage]);
+  }, [activeProblem, code]);
 
   const handleToggleHint = (step: number) => {
     setUnlockedHints((prev) =>
@@ -310,9 +283,6 @@ export function PracticeWorkspace() {
                 >
                   <option value="typescript">TypeScript</option>
                   <option value="javascript">JavaScript</option>
-                  <option value="python">Python</option>
-                  <option value="java">Java</option>
-                  <option value="cpp">C++</option>
                 </select>
 
                 <button

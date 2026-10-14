@@ -68,8 +68,11 @@ export function buildPatchUserPrompt(input: GeneratePatchesInput): string {
   const { masterTypst, jobRequirements, evidenceItems, tailorFeedback } = input;
 
   const evidenceSection = evidenceItems
+    .slice(0, 40)
     .map((item) => formatEvidenceItem(item))
-    .join("\n\n");
+    .join("\n\n")
+    .slice(0, 24_000);
+  const masterSource = masterTypst.slice(0, 24_000);
 
   const feedbackSection = tailorFeedback
     ? `\n\n## CARRIED TAILOR REVIEW FEEDBACK CONTEXT\n**Overview Commentary**: ${tailorFeedback.overviewCommentary}`
@@ -78,7 +81,7 @@ export function buildPatchUserPrompt(input: GeneratePatchesInput): string {
   return `## MASTER RESUME (Typst Source)
 
 \`\`\`typst
-${masterTypst}
+${masterSource}
 \`\`\`
 
 ## TARGET JOB REQUIREMENTS

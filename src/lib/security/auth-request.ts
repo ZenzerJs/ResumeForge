@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSessionCookieName, readSessionToken } from "@/lib/security/session";
+import { prisma } from "@/lib/prisma";
+import { getSessionCookieName, readSessionToken, type SessionPayload } from "@/lib/security/session";
 
 export const GUEST_SAVE_ERROR = "Sign in to save your work.";
 
@@ -10,7 +11,7 @@ export function guestSaveResponse() {
   );
 }
 
-function readCookie(request: Request, name: string): string | null {
+export function readCookie(request: Request, name: string): string | null {
   const header = request.headers.get("cookie") || "";
   const parts = header.split(";");
   for (const part of parts) {
@@ -24,9 +25,19 @@ function readCookie(request: Request, name: string): string | null {
   return null;
 }
 
+export async function sessionIsCurrent(session: SessionPayload | null): Promise<SessionPayload | null> {
+  if (!session) return null;
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { sessionVersion: true },
+  });
+  if (!user || user.sessionVersion !== session.sessionVersion) return null;
+  return session;
+}
+
 export async function getRequestUserId(request: Request): Promise<string | null> {
   const token = readCookie(request, getSessionCookieName());
-  const session = await readSessionToken(token);
+  const session = await sessionIsCurrent(await readSessionToken(token));
   return session?.userId ?? null;
 }
 

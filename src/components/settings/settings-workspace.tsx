@@ -3,7 +3,26 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { ProviderType } from "@/lib/ai/types";
-import { CheckCircle2, XCircle, Loader2, Key, Server, ShieldCheck, Trash2, LogOut, LogIn, UserRound } from "lucide-react";
+import {
+  saveKey,
+  getKey,
+  removeKey,
+  getActiveConfig,
+  ByokProvider,
+} from "@/lib/byok-vault";
+import {
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Key,
+  Server,
+  ShieldCheck,
+  Trash2,
+  LogOut,
+  LogIn,
+  UserRound,
+  Lock,
+} from "lucide-react";
 import { AppShell } from "@/components/design-system/app-shell";
 import { PageHeader } from "@/components/design-system/page-header";
 import { Surface } from "@/components/design-system/surface";
@@ -17,11 +36,21 @@ import {
 
 const SETTINGS_STORAGE_KEY = "resumeforge_ai_settings";
 
+const DEFAULT_MODELS: Record<string, string> = {
+  gemini: "gemini-3.8-flash",
+  openai: "gpt-4o",
+  groq: "llama-3.3-70b-versatile",
+  anthropic: "claude-3-5-sonnet-20241022",
+  ollama: "llama3",
+  custom: "llama3",
+};
+
 export function SettingsWorkspace() {
-  const [provider, setProvider] = useState<ProviderType>("openai");
+  const [provider, setProvider] = useState<ProviderType>("gemini");
   const [apiKey, setApiKey] = useState<string>("");
   const [baseUrl, setBaseUrl] = useState<string>("");
-  const [model, setModel] = useState<string>("");
+  const [model, setModel] = useState<string>(DEFAULT_MODELS.gemini);
+  const [hasVaultKey, setHasVaultKey] = useState<boolean>(false);
   const [isTesting, setIsTesting] = useState<boolean>(false);
   const [testResult, setTestResult] = useState<{
     success: boolean;
@@ -35,22 +64,50 @@ export function SettingsWorkspace() {
   const [isSavingUsername, setIsSavingUsername] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
-  // Load saved settings from localStorage
+  // Load saved settings and vault key on mount
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.provider) setProvider(parsed.provider);
-        if (parsed.apiKey) setApiKey(parsed.apiKey);
-        if (parsed.baseUrl) setBaseUrl(parsed.baseUrl);
-        if (parsed.model) setModel(parsed.model);
+    let cancelled = false;
+    async function loadSettings() {
+      try {
+        const config = await getActiveConfig();
+        let activeProvider = (config.provider as ProviderType) || "gemini";
+        let activeModel = config.model || DEFAULT_MODELS[activeProvider] || DEFAULT_MODELS.gemini;
+        let activeBaseUrl = "";
+
+        const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.provider) activeProvider = parsed.provider;
+          if (parsed.model) activeModel = parsed.model;
+          if (parsed.baseUrl) activeBaseUrl = parsed.baseUrl;
+        }
+
+        if (activeProvider === "ollama" && !activeBaseUrl) {
+          activeBaseUrl = "http://localhost:11434";
+        }
+
+        const key = await getKey(activeProvider);
+
+        if (!cancelled) {
+          setProvider(activeProvider);
+          setModel(activeModel);
+          setBaseUrl(activeBaseUrl);
+          setApiKey(key || "");
+          setHasVaultKey(Boolean(key && key.trim().length > 0));
+        }
+      } catch (err) {
+        console.error("Failed to load BYOK settings:", err);
+      } finally {
+        if (!cancelled) {
+          setIsHydrated(true);
+        }
       }
-    } catch (err) {
-      console.error("Failed to load saved settings:", err);
-    } finally {
-      setIsHydrated(true);
     }
+
+    void loadSettings();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -89,14 +146,13 @@ export function SettingsWorkspace() {
     }
   };
 
-  // Save settings to localStorage on change
-  const saveSettingsToStorage = (newProvider: ProviderType, newKey: string, newUrl: string, newModel: string) => {
+  // Save non-sensitive active config to localStorage
+  const saveSettingsToStorage = (newProvider: ProviderType, newUrl: string, newModel: string) => {
     try {
       localStorage.setItem(
         SETTINGS_STORAGE_KEY,
         JSON.stringify({
           provider: newProvider,
-          apiKey: newKey,
           baseUrl: newUrl,
           model: newModel,
         })
@@ -106,38 +162,60 @@ export function SettingsWorkspace() {
     }
   };
 
-  const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleProviderChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const nextProvider = e.target.value as ProviderType;
     setProvider(nextProvider);
     setTestResult(null);
-    saveSettingsToStorage(nextProvider, apiKey, baseUrl, model);
+
+    const nextModel = DEFAULT_MODELS[nextProvider] || "";
+    setModel(nextModel);
+
+    let nextUrl = baseUrl;
+    if (nextProvider === "ollama") {
+      nextUrl = baseUrl || "http://localhost:11434";
+      setBaseUrl(nextUrl);
+    }
+
+    const storedKey = await getKey(nextProvider);
+    setApiKey(storedKey || "");
+    setHasVaultKey(Boolean(storedKey && storedKey.trim().length > 0));
+
+    saveSettingsToStorage(nextProvider, nextUrl, nextModel);
   };
 
-  const handleKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleKeyChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextKey = e.target.value;
     setApiKey(nextKey);
     setTestResult(null);
-    saveSettingsToStorage(provider, nextKey, baseUrl, model);
+
+    if (nextKey.trim()) {
+      await saveKey(provider as ByokProvider, nextKey);
+      setHasVaultKey(true);
+    } else {
+      await removeKey(provider);
+      setHasVaultKey(false);
+    }
   };
 
   const handleBaseUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextUrl = e.target.value;
     setBaseUrl(nextUrl);
     setTestResult(null);
-    saveSettingsToStorage(provider, apiKey, nextUrl, model);
+    saveSettingsToStorage(provider, nextUrl, model);
   };
 
   const handleModelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextModel = e.target.value;
     setModel(nextModel);
     setTestResult(null);
-    saveSettingsToStorage(provider, apiKey, baseUrl, nextModel);
+    saveSettingsToStorage(provider, baseUrl, nextModel);
   };
 
-  const handleClearKey = () => {
+  const handleClearKey = async () => {
     setApiKey("");
+    setHasVaultKey(false);
     setTestResult(null);
-    saveSettingsToStorage(provider, "", baseUrl, model);
+    await removeKey(provider);
   };
 
   const handleTestConnection = async () => {
@@ -188,7 +266,7 @@ export function SettingsWorkspace() {
           <PageHeader
             eyebrow="Control room"
             title="AI Provider Gateway Settings — Bring-Your-Own-Key (BYOK) AI Configuration"
-            description="Configure your preferred LLM provider or local OpenAI-compatible endpoint. API keys stay in this browser and are never written to the database."
+            description="Configure your preferred LLM provider or local OpenAI-compatible endpoint. API keys are encrypted in your browser's Web Crypto vault and never written to the database or server logs."
           />
 
           <Surface variant="primary" className="p-6 space-y-5" data-testid="account-settings">
@@ -281,68 +359,99 @@ export function SettingsWorkspace() {
                 onChange={handleProviderChange}
                 className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
               >
+                <option value="gemini">Google Gemini (Direct API)</option>
                 <option value="openai">OpenAI (Direct API)</option>
                 <option value="anthropic">Anthropic (Direct API)</option>
-                <option value="gemini">Google Gemini (Direct API)</option>
+                <option value="groq">Groq (High-Speed Cloud Inference)</option>
+                <option value="ollama">Ollama (Local Inference)</option>
                 <option value="custom">Custom OpenAI-compatible endpoint (Local / self-hosted endpoint)</option>
               </select>
             </div>
 
-            {/* API Key Input */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label htmlFor="api-key-input" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  API Key {provider === "custom" ? "(Optional)" : ""}
-                </label>
-                {apiKey && (
-                  <button
-                    type="button"
-                    onClick={handleClearKey}
-                    className="flex items-center gap-1 text-xs text-rose-400 hover:text-rose-300 transition-colors"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                    Clear Key
-                  </button>
-                )}
-              </div>
-              <div className="relative">
-                <input
-                  id="api-key-input"
-                  type="password"
-                  value={apiKey}
-                  onChange={handleKeyChange}
-                  placeholder={
-                    provider === "openai"
-                      ? "sk-proj-..."
-                      : provider === "anthropic"
-                      ? "sk-ant-..."
-                      : provider === "gemini"
-                      ? "AIzaSy..."
-                      : "Optional API Key for custom endpoint"
-                  }
-                  className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-mono"
-                />
-              </div>
-              {apiKey && (
-                <div className="mt-1.5 flex items-center gap-2 text-xs text-slate-400">
-                  <Key className="h-3.5 w-3.5 text-amber-400" />
-                  <span>Configured key: <code className="text-slate-300 font-mono">{maskKey(apiKey)}</code></span>
+            {/* API Key Input (Hidden for Ollama) */}
+            {provider !== "ollama" ? (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label htmlFor="api-key-input" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    API Key {provider === "custom" ? "(Optional)" : ""}
+                  </label>
+                  {apiKey && (
+                    <button
+                      type="button"
+                      id="clear-key-btn"
+                      data-testid="clear-key-btn"
+                      onClick={handleClearKey}
+                      className="flex items-center gap-1 text-xs text-rose-400 hover:text-rose-300 transition-colors"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Clear Key
+                    </button>
+                  )}
                 </div>
-              )}
-            </div>
+                <div className="relative">
+                  <input
+                    id="api-key-input"
+                    type="password"
+                    value={apiKey}
+                    onChange={handleKeyChange}
+                    placeholder={
+                      provider === "openai"
+                        ? "sk-proj-..."
+                        : provider === "anthropic"
+                        ? "sk-ant-..."
+                        : provider === "gemini"
+                        ? "AIzaSy..."
+                        : provider === "groq"
+                        ? "gsk_..."
+                        : "Optional API Key for custom endpoint"
+                    }
+                    className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-mono"
+                  />
+                </div>
+                {apiKey && (
+                  <div className="mt-1.5 flex items-center gap-2 text-xs text-slate-400">
+                    <Key className="h-3.5 w-3.5 text-amber-400" />
+                    <span>Configured key: <code className="text-slate-300 font-mono">{maskKey(apiKey)}</code></span>
+                  </div>
+                )}
+                {/* Visual Status Indicator */}
+                <div data-testid="vault-status" className="mt-2 flex items-center gap-2 text-xs">
+                  {hasVaultKey ? (
+                    <div className="flex items-center gap-1.5 text-emerald-400">
+                      <Lock className="h-4 w-4" />
+                      <span>Key encrypted in local storage (AES-GCM vault)</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-slate-400">
+                      <Key className="h-4 w-4 text-slate-500" />
+                      <span>No encrypted key in vault for {provider}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div>
+                {/* Ollama Visual Status Indicator */}
+                <div data-testid="vault-status" className="flex items-center gap-2 text-xs text-emerald-400">
+                  <Server className="h-4 w-4" />
+                  <span>Local daemon endpoint (no API key required)</span>
+                </div>
+              </div>
+            )}
 
-            {/* Custom Endpoint Base URL Input */}
-            {(provider === "custom" || provider === "openai") && (
+            {/* Custom/Ollama Endpoint Base URL Input */}
+            {(provider === "custom" || provider === "openai" || provider === "ollama") && (
               <div>
                 <label htmlFor="base-url-input" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                  Endpoint Base URL {provider === "custom" ? "" : "(Optional Override)"}
+                  {provider === "ollama" ? "Ollama Endpoint" : `Endpoint Base URL ${provider === "custom" ? "" : "(Optional Override)"}`}
                 </label>
                 <input
                   id="base-url-input"
+                  data-testid="ollama-endpoint"
                   type="url"
                   value={baseUrl}
                   onChange={handleBaseUrlChange}
-                  placeholder={provider === "custom" ? "http://localhost:8000" : "https://api.openai.com"}
+                  placeholder={provider === "ollama" ? "http://localhost:11434" : provider === "custom" ? "http://localhost:8000" : "https://api.openai.com"}
                   className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-mono"
                 />
               </div>
@@ -359,18 +468,12 @@ export function SettingsWorkspace() {
                 value={model}
                 onChange={handleModelChange}
                 placeholder={
-                  provider === "openai"
-                    ? "gpt-4o, gpt-4o-mini, gpt-3.5-turbo…"
-                    : provider === "anthropic"
-                    ? "claude-sonnet-4-5, claude-3-haiku-20240307…"
-                    : provider === "gemini"
-                    ? "gemini-2.5-flash, gemini-1.5-pro…"
-                    : "llama3, mistral, codellama…"
+                  DEFAULT_MODELS[provider] || "gemini-3.8-flash"
                 }
                 className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-mono"
               />
               <p className="mt-1.5 text-[11px] text-slate-500">
-                For custom/local endpoints (Ollama, LM Studio, FreeLLMAPI): specify the exact model name your server exposes.
+                Default for {provider}: <code className="text-slate-400 font-mono">{DEFAULT_MODELS[provider]}</code>
               </p>
             </div>
 
@@ -389,7 +492,7 @@ export function SettingsWorkspace() {
 
               <div className="flex items-center gap-2 text-xs text-slate-400">
                 <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                <span>Keys are never written to SQLite or server logs</span>
+                <span>Keys are encrypted client-side and never written to SQLite or server logs</span>
               </div>
             </div>
 
