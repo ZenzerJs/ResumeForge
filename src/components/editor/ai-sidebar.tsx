@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import { QualitativeCategoryFeedback, BulletFeedback } from "@/lib/ai/qualitative-schema";
 import { TypstRepairProposal } from "@/lib/ai/repair-schema";
-import { compileTypstToSvg } from "@/lib/typst/compiler";
 import { ResumeFacts } from "@/lib/facts/types";
 import { checkGuardrail } from "@/lib/guardrail/check";
 import { assertCanApplyPatches } from "@/lib/guardrail/policy";
@@ -398,6 +397,7 @@ export function AiSidebar({
 
         // Pre-validate replacementSource on client with WASM Typst compiler
         setRepairStage("verifying");
+        const { compileTypstToSvg } = await import("@/lib/typst/compiler");
         const valResult = await compileTypstToSvg(prop.replacementSource);
         if (!valResult.success) {
           setPreValidationValid(false);

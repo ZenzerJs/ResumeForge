@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { normalizeCompany } from "@/lib/company";
-import { sanitizeError } from "@/lib/ai/redact";
+import { getRequestUserId } from "@/lib/security/auth-request";
 
 const ORDER: Prisma.InterviewProblemOrderByWithRelationInput[] = [
   { lastObserved: { sort: "desc", nulls: "last" } }, // Postgres sorts NULLs first on DESC otherwise
@@ -21,9 +21,12 @@ export async function GET(
       return NextResponse.json({ error: "Job ID is required" }, { status: 400 });
     }
 
-    const job = await prisma.job.findUnique({
-      where: { id: jobId },
-      select: { company: true, roleTitle: true, rawDescription: true },
+    const userId = await getRequestUserId(_req);
+    const job = await prisma.job.findFirst({
+      where: userId
+        ? { id: jobId, OR: [{ userId }, { userId: null }] }
+        : { id: jobId, userId: null },
+      select: { company: true, roleTitle: true },
     });
 
     if (!job) {
@@ -86,7 +89,7 @@ export async function GET(
     });
   } catch (err) {
     return NextResponse.json(
-      { success: false, error: "Failed to fetch interview prep questions", message: sanitizeError(err) },
+      { success: false, error: "Failed to fetch interview prep questions" },
       { status: 500 }
     );
   }

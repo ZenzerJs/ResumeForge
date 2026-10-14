@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { extractResumeFacts } from "@/lib/facts/extract";
 import { checkGuardrail } from "@/lib/guardrail/check";
 import { assertCanApplyPatches, assertCanExport } from "@/lib/guardrail/policy";
+import { verifyEvidenceCitations, type PatchProposal } from "@/lib/ai/patch-schema";
 import { evaluateAtsScore } from "@/lib/ats-evaluator/evaluator";
 import { generateAtsDocx } from "@/lib/export/docx";
 import {
@@ -22,6 +23,13 @@ export interface ToolExecutionResult {
   error?: string;
 }
 
+function requireOwner(userId: string | undefined): string {
+  if (!userId) {
+    throw new Error("Sign in required.");
+  }
+  return userId;
+}
+
 /**
  * Server-side tool execution dispatcher.
  * Validates against allowlisted schemas and enforces guardrail safety gates.
@@ -37,15 +45,16 @@ export async function executeServerTool(
         const params = GetResumeFactsParamsSchema.parse(rawParams);
         let typstSource = params.typstSource || "";
 
+        const ownerId = requireOwner(userId);
         if (params.resumeId) {
           const res = await prisma.resume.findFirst({
-            where: { id: params.resumeId, ...(userId ? { userId } : {}) },
+            where: { id: params.resumeId, userId: ownerId },
           });
           if (res) typstSource = res.typstSource;
         }
 
         const evidence = await prisma.evidenceItem.findMany({
-          where: { status: "verified", ...(userId ? { userId } : {}) },
+          where: { status: "verified", userId: ownerId },
           include: { bullets: true },
         });
 
@@ -58,11 +67,12 @@ export async function executeServerTool(
         let masterFacts = params.masterFacts;
 
         if (!masterFacts) {
+          const ownerId = requireOwner(userId);
           const master = await prisma.resume.findFirst({
-            where: { isMaster: true, ...(userId ? { userId } : {}) },
+            where: { isMaster: true, userId: ownerId },
           });
           const evidence = await prisma.evidenceItem.findMany({
-            where: { status: "verified", ...(userId ? { userId } : {}) },
+            where: { status: "verified", userId: ownerId },
             include: { bullets: true },
           });
           masterFacts = extractResumeFacts(master?.typstSource || "", evidence as any);
@@ -87,8 +97,9 @@ export async function executeServerTool(
 
       case "get_job": {
         const params = GetJobParamsSchema.parse(rawParams);
-        const job = await prisma.job.findUnique({
-          where: { id: params.jobId },
+        const ownerId = requireOwner(userId);
+        const job = await prisma.job.findFirst({
+          where: { id: params.jobId, userId: ownerId },
         });
         if (!job) {
           return { tool: toolName, success: false, error: `Job not found: ${params.jobId}` };
@@ -98,8 +109,10 @@ export async function executeServerTool(
 
       case "search_saved_jobs": {
         const params = SearchSavedJobsParamsSchema.parse(rawParams);
+        const ownerId = requireOwner(userId);
         const jobs = await prisma.job.findMany({
           where: {
+            userId: ownerId,
             status: params.status ? params.status : undefined,
           },
           orderBy: { createdAt: "desc" },
@@ -119,18 +132,47 @@ export async function executeServerTool(
 
       case "apply_patches": {
         const params = ApplyPatchesParamsSchema.parse(rawParams);
+        const ownerId = requireOwner(userId);
         let updatedTypst = params.currentTypst;
 
-        // Guardrail Gate: verify patches before applying
-        if (params.masterFacts) {
-          assertCanApplyPatches(params.currentTypst, params.masterFacts, params.acceptedPatches);
+        const master = await prisma.resume.findFirst({
+          where: { isMaster: true, userId: ownerId },
+        });
+        const evidence = await prisma.evidenceItem.findMany({
+          where: { status: "verified", userId: ownerId },
+          include: { bullets: true },
+        });
+        const masterFacts = extractResumeFacts(master?.typstSource || "", evidence as any);
+        const validEvidenceIds = new Set(evidence.map((item) => item.id));
+        const validBulletIds = new Set(evidence.flatMap((item) => item.bullets.map((bullet) => bullet.id)));
+
+        const proposals: PatchProposal[] = params.acceptedPatches.map((patch) => ({
+          id: patch.id,
+          operation: patch.operation ?? "MODIFY_BULLET",
+          targetSection: "experience",
+          before: patch.before,
+          after: patch.after,
+          evidenceIds: patch.evidenceIds ?? [],
+          rationale: patch.rationale ?? "",
+          confidence: 1,
+        }));
+
+        const verification = verifyEvidenceCitations(
+          { patches: proposals, gaps: [] },
+          validEvidenceIds,
+          validBulletIds
+        );
+        const allowedIds = new Set(verification.verified.map((patch) => patch.id));
+        if (verification.verified.length > 0) {
+          assertCanApplyPatches(params.currentTypst, masterFacts, verification.verified);
         }
 
+        let appliedCount = 0;
         for (const patch of params.acceptedPatches) {
-          if (params.patchIds.includes(patch.id)) {
-            if (patch.before && updatedTypst.includes(patch.before)) {
-              updatedTypst = updatedTypst.replace(patch.before, patch.after);
-            }
+          if (!params.patchIds.includes(patch.id) || !allowedIds.has(patch.id)) continue;
+          if (patch.before && updatedTypst.includes(patch.before)) {
+            updatedTypst = updatedTypst.replace(patch.before, patch.after);
+            appliedCount += 1;
           }
         }
 
@@ -139,7 +181,11 @@ export async function executeServerTool(
           success: true,
           data: {
             updatedTypst,
-            appliedCount: params.acceptedPatches.filter((p) => params.patchIds.includes(p.id)).length,
+            appliedCount,
+            rejected: verification.rejected.map((item) => ({
+              id: item.patch.id,
+              reason: item.reason,
+            })),
           },
         };
       }
@@ -164,7 +210,7 @@ export async function executeServerTool(
 
       case "search_evidence": {
         const params = (await import("./definitions")).SearchEvidenceParamsSchema.parse(rawParams);
-        const whereClause: any = { ...(userId ? { userId } : {}) };
+        const whereClause: { userId: string; status?: string } = { userId: requireOwner(userId) };
         if (params.status && params.status !== "all") {
           whereClause.status = params.status;
         }
@@ -268,7 +314,10 @@ export async function executeServerTool(
     return {
       tool: toolName,
       success: false,
-      error: err instanceof Error ? err.message : String(err),
+      error:
+        err instanceof Error && err.message === "Sign in required."
+          ? err.message
+          : "Tool failed",
     };
   }
 }

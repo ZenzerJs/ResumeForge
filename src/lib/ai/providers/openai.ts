@@ -4,10 +4,25 @@ import { stripCodeFences } from "../utils";
 import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from "../repair-schema";
 import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
 import type { ChatCompletionResult } from "./custom";
+import { safeFetch } from "@/lib/security/safe-fetch";
+import { resolveProviderCredentials } from "./credentials";
+
+function providerFetch(url: string, init?: RequestInit): Promise<Response> {
+  return safeFetch(url, init ?? {}, {
+    timeoutMs: 130_000,
+    allowLocalhost: process.env.NODE_ENV !== "production",
+  });
+}
 
 export async function testOpenAIConnection(config: ProviderConfig): Promise<TestConnectionResult> {
-  const apiKey = config.apiKey?.trim() || process.env.OPENAI_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.OPENAI_API_KEY,
+    envBaseUrl: process.env.OPENAI_BASE_URL,
+    defaultBaseUrl: "https://api.openai.com",
+    officialHosts: ["api.openai.com"],
+  });
 
   if (!apiKey) {
     return {
@@ -19,7 +34,7 @@ export async function testOpenAIConnection(config: ProviderConfig): Promise<Test
 
   const startTime = Date.now();
   try {
-    const res = await fetch(`${baseUrl}/v1/models`, {
+    const res = await providerFetch(`${baseUrl}/v1/models`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -75,8 +90,14 @@ export async function generateOpenAIPatches(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const apiKey = config.apiKey?.trim() || process.env.OPENAI_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.OPENAI_API_KEY,
+    envBaseUrl: process.env.OPENAI_BASE_URL,
+    defaultBaseUrl: "https://api.openai.com",
+    officialHosts: ["api.openai.com"],
+  });
   const model = config.model?.trim() || "gpt-4o";
 
   if (!apiKey) {
@@ -84,7 +105,7 @@ export async function generateOpenAIPatches(
   }
 
   try {
-    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+    const res = await providerFetch(`${baseUrl}/v1/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -133,8 +154,14 @@ export async function generateOpenAIQualitativeReview(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const apiKey = config.apiKey?.trim() || process.env.OPENAI_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.OPENAI_API_KEY,
+    envBaseUrl: process.env.OPENAI_BASE_URL,
+    defaultBaseUrl: "https://api.openai.com",
+    officialHosts: ["api.openai.com"],
+  });
   const model = config.model?.trim() || "gpt-4o";
 
   if (!apiKey) {
@@ -142,7 +169,7 @@ export async function generateOpenAIQualitativeReview(
   }
 
   try {
-    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+    const res = await providerFetch(`${baseUrl}/v1/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -191,8 +218,14 @@ export async function generateOpenAICoverLetter(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const apiKey = config.apiKey?.trim() || process.env.OPENAI_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.OPENAI_API_KEY,
+    envBaseUrl: process.env.OPENAI_BASE_URL,
+    defaultBaseUrl: "https://api.openai.com",
+    officialHosts: ["api.openai.com"],
+  });
   const model = config.model?.trim() || "gpt-4o";
 
   if (!apiKey) {
@@ -200,7 +233,7 @@ export async function generateOpenAICoverLetter(
   }
 
   try {
-    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+    const res = await providerFetch(`${baseUrl}/v1/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -249,8 +282,14 @@ export async function convertOpenAIPdfTextToTypst(
   systemPrompt: string,
   userPrompt: string
 ): Promise<ConvertPdfResult> {
-  const apiKey = config.apiKey?.trim() || process.env.OPENAI_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.OPENAI_API_KEY,
+    envBaseUrl: process.env.OPENAI_BASE_URL,
+    defaultBaseUrl: "https://api.openai.com",
+    officialHosts: ["api.openai.com"],
+  });
   const model = config.model?.trim() || "gpt-4o";
 
   if (!apiKey) {
@@ -258,7 +297,7 @@ export async function convertOpenAIPdfTextToTypst(
   }
 
   try {
-    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+    const res = await providerFetch(`${baseUrl}/v1/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -304,8 +343,14 @@ export async function repairTypstWithOpenAI(
   config: ProviderConfig,
   input: TypstRepairInput
 ): Promise<{ success: boolean; data?: TypstRepairProposal; error?: string }> {
-  const apiKey = config.apiKey?.trim() || process.env.OPENAI_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.OPENAI_API_KEY,
+    envBaseUrl: process.env.OPENAI_BASE_URL,
+    defaultBaseUrl: "https://api.openai.com",
+    officialHosts: ["api.openai.com"],
+  });
   const model = config.model?.trim() || "gpt-4o";
 
   if (!apiKey) {
@@ -316,7 +361,7 @@ export async function repairTypstWithOpenAI(
   const userPrompt = buildTypstRepairUserPrompt(input);
 
   try {
-    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+    const res = await providerFetch(`${baseUrl}/v1/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -378,8 +423,14 @@ export async function chatOpenAI(
   messages: Array<{ role: string; content: string }>,
   tools: any[],
 ): Promise<ChatCompletionResult> {
-  const apiKey = config.apiKey?.trim() || process.env.OPENAI_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.OPENAI_API_KEY,
+    envBaseUrl: process.env.OPENAI_BASE_URL,
+    defaultBaseUrl: "https://api.openai.com",
+    officialHosts: ["api.openai.com"],
+  });
   const model = config.model?.trim() || "gpt-4o-mini";
 
   if (!apiKey) {
@@ -392,7 +443,7 @@ export async function chatOpenAI(
     body.tool_choice = "auto";
   }
 
-  const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+  const res = await providerFetch(`${baseUrl}/v1/chat/completions`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,

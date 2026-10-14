@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
-import { compileTypstToSvg } from "@/lib/typst/compiler";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { usePanelRef } from "react-resizable-panels";
 import {
@@ -276,7 +275,11 @@ export function EditorWorkspace() {
    * 3. no param: fetch GET /api/resumes to load canonical SQLite master resume
    * 4. fallback: localStorage or starter template only when no DB record exists
    */
+  const loadGeneration = useRef(0);
+
   const loadCanonicalDocument = useCallback(async () => {
+    const generation = ++loadGeneration.current;
+    const current = () => generation === loadGeneration.current;
     setIsLoadingDocument(true);
     setDocumentError(null);
 
@@ -286,6 +289,7 @@ export function EditorWorkspace() {
         const res = await fetch(`/api/variants/${variantIdParam.trim()}`);
         const json = await res.json();
         if (res.ok && json.success && json.data) {
+          if (!current()) return;
           setSource(json.data.typstContent);
           setDocMetadata({
             type: "RESUME_VARIANT",
@@ -295,6 +299,7 @@ export function EditorWorkspace() {
           setIsLoadingDocument(false);
           return;
         } else {
+          if (!current()) return;
           setDocumentError(json.error || `ResumeVariant not found: ${variantIdParam}`);
           setIsLoadingDocument(false);
           return;
@@ -306,6 +311,7 @@ export function EditorWorkspace() {
         const res = await fetch(`/api/resumes/${resumeIdParam.trim()}`);
         const json = await res.json();
         if (res.ok && json.success && json.data) {
+          if (!current()) return;
           setSource(json.data.typstSource);
           setDocMetadata({
             type: json.data.isMaster ? "MASTER_RESUME" : "LOCAL_FALLBACK",
@@ -315,6 +321,7 @@ export function EditorWorkspace() {
           setIsLoadingDocument(false);
           return;
         } else {
+          if (!current()) return;
           setDocumentError(json.error || `Resume not found: ${resumeIdParam}`);
           setIsLoadingDocument(false);
           return;
@@ -325,6 +332,7 @@ export function EditorWorkspace() {
       const res = await fetch("/api/resumes");
       const json = await res.json();
       if (res.ok && json.success && Array.isArray(json.data) && json.data.length > 0) {
+        if (!current()) return;
         const master = json.data.find((r: { isMaster: boolean }) => r.isMaster) || json.data[0];
         setSource(master.typstSource);
         setDocMetadata({
@@ -346,6 +354,7 @@ export function EditorWorkspace() {
       console.error("Database document fetch error:", err);
     }
 
+    if (!current()) return;
     // Priority 4: Fallback to localStorage or starter template only when no DB record exists
     const savedLocal = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
     if (savedLocal && savedLocal.trim().length > 0) {
@@ -385,17 +394,35 @@ export function EditorWorkspace() {
   }, [source, baselineSource]);
 
   useEffect(() => {
-    loadCanonicalDocument();
+    void loadCanonicalDocument();
+    return () => {
+      loadGeneration.current += 1;
+    };
   }, [loadCanonicalDocument]);
 
   const compileGeneration = useRef(0);
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const uiTimers = useRef<number[]>([]);
+
+  const scheduleUiTimer = (fn: () => void, ms: number) => {
+    const id = window.setTimeout(fn, ms);
+    uiTimers.current.push(id);
+  };
+
+  useEffect(() => {
+    const timers = uiTimers.current;
+    return () => {
+      if (persistTimer.current) clearTimeout(persistTimer.current);
+      for (const id of timers) window.clearTimeout(id);
+    };
+  }, []);
 
   const runCompile = useCallback(async (codeToCompile: string) => {
     if (!codeToCompile || codeToCompile.trim().length === 0) return;
     const generation = ++compileGeneration.current;
     setIsCompiling(true);
 
+    const { compileTypstToSvg } = await import("@/lib/typst/compiler");
     const result = await compileTypstToSvg(codeToCompile);
     if (generation !== compileGeneration.current) return;
 
@@ -431,7 +458,7 @@ export function EditorWorkspace() {
       localStorage.setItem(STORAGE_KEY, currentSource);
     }
     setShowShortcutSaveToast(true);
-    setTimeout(() => setShowShortcutSaveToast(false), 2000);
+    scheduleUiTimer(() => setShowShortcutSaveToast(false), 2000);
 
     await runCompile(currentSource);
   }, [runCompile]);
@@ -509,7 +536,7 @@ export function EditorWorkspace() {
       }
       if (!providerConfig?.provider || !providerConfig?.apiKey) {
         setEvidenceExtractToast("Configure an AI provider in Settings to draft Evidence Bank items.");
-        setTimeout(() => setEvidenceExtractToast(null), 8000);
+        scheduleUiTimer(() => setEvidenceExtractToast(null), 8000);
         return;
       }
 
@@ -536,11 +563,11 @@ export function EditorWorkspace() {
         const detailsStr = json.details ? ` (${JSON.stringify(json.details)})` : "";
         setEvidenceExtractToast((json.error || "Evidence extract failed.") + detailsStr);
       }
-      setTimeout(() => setEvidenceExtractToast(null), 8000);
+      scheduleUiTimer(() => setEvidenceExtractToast(null), 8000);
     } catch (err) {
       console.error("Evidence extract failed:", err);
       setEvidenceExtractToast("Evidence extract failed.");
-      setTimeout(() => setEvidenceExtractToast(null), 6000);
+      scheduleUiTimer(() => setEvidenceExtractToast(null), 6000);
     } finally {
       setIsExtractingEvidence(false);
     }
@@ -585,7 +612,7 @@ export function EditorWorkspace() {
           localStorage.removeItem("resumeforge_has_guest_draft");
         }
         setShowSaveConfirm(false);
-        setTimeout(() => setSaveSuccess(false), 3000);
+        scheduleUiTimer(() => setSaveSuccess(false), 3000);
 
         if (shouldExtractEvidence) {
           await runEvidenceExtractAfterSave(source);
@@ -629,7 +656,7 @@ export function EditorWorkspace() {
         }
         setLastSnapshotId(null);
         setUndoSuccess(true);
-        setTimeout(() => setUndoSuccess(false), 3000);
+        scheduleUiTimer(() => setUndoSuccess(false), 3000);
       }
     } catch (err) {
       console.error("Failed to undo master overwrite:", err);

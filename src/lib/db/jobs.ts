@@ -101,17 +101,6 @@ export async function updateJob(id: string, input: UpdateJobInput, viewerUserId?
     dataToUpdate.extractedRequirements = JSON.stringify(input.extractedRequirements);
   }
 
-  if (input.status !== undefined) {
-    dataToUpdate.status = input.status;
-    if (input.status === "APPLIED" && input.appliedAt === undefined && !existing.appliedAt) {
-      dataToUpdate.appliedAt = new Date();
-    }
-  }
-
-  if (input.appliedAt !== undefined) {
-    dataToUpdate.appliedAt = input.appliedAt ? new Date(input.appliedAt) : null;
-  }
-
   const updated = await prisma.job.update({
     where: { id },
     data: dataToUpdate,
@@ -119,8 +108,31 @@ export async function updateJob(id: string, input: UpdateJobInput, viewerUserId?
   });
 
   return {
-    ...updated,
+    ...withViewerOutcome(updated, viewerUserId),
     extractedRequirements: parseRequirementsJson(updated.extractedRequirements),
+  };
+}
+
+const outcomeSelect = { status: true, appliedAt: true, variantId: true } as const;
+
+function applicationInclude(viewerUserId?: string | null) {
+  return {
+    where: { userId: viewerUserId || "__none__" },
+    select: outcomeSelect,
+  };
+}
+
+function withViewerOutcome<T extends { applications?: { status: string; appliedAt: Date | null; variantId: string | null }[] }>(
+  job: T,
+  viewerUserId?: string | null
+) {
+  const { applications, ...rest } = job;
+  const app = viewerUserId ? applications?.[0] : undefined;
+  return {
+    ...rest,
+    status: (app?.status ?? "SAVED") as JobStatus,
+    appliedAt: app?.appliedAt ?? null,
+    appliedVariantId: app?.variantId ?? null,
   };
 }
 
@@ -131,6 +143,7 @@ const jobListInclude = {
   coverLetters: {
     select: { id: true, title: true, status: true, createdAt: true },
   },
+  applications: applicationInclude(),
 } as const;
 
 function jobIncludeForViewer(viewerUserId?: string | null): Prisma.JobInclude {
@@ -154,6 +167,7 @@ function jobIncludeForViewer(viewerUserId?: string | null): Prisma.JobInclude {
         : hide,
       select: { id: true, title: true, status: true, createdAt: true },
     },
+    applications: applicationInclude(viewerUserId),
   };
 }
 
@@ -188,11 +202,6 @@ export async function getJobsList(query: JobListQuery = {}) {
   const limit = Math.min(100, Math.max(1, query.limit ?? 40));
   const where: Prisma.JobWhereInput = {};
 
-  if (query.status && query.status !== "ALL") {
-    const statuses = Array.isArray(query.status) ? query.status : [query.status];
-    where.status = { in: statuses };
-  }
-
   if (query.q?.trim()) {
     const q = query.q.trim();
     where.OR = [
@@ -219,14 +228,68 @@ export async function getJobsList(query: JobListQuery = {}) {
     where.AND = [...existingAnd, locationFilter];
   }
 
+  const rawStatus = query.status;
+  const isAllStatus =
+    !rawStatus ||
+    rawStatus === "ALL" ||
+    (Array.isArray(rawStatus) && (rawStatus.length === 0 || rawStatus.includes("ALL" as any)));
+
+  if (!isAllStatus && rawStatus) {
+    const statuses = (Array.isArray(rawStatus) ? rawStatus : [rawStatus]).filter(
+      (s) => (s as string) !== "ALL"
+    );
+    const includesSaved = statuses.includes("SAVED");
+    if (!query.userId) {
+      if (!includesSaved) {
+        where.id = "__none__";
+      }
+    } else {
+      const statusCondition: Prisma.JobWhereInput = !includesSaved
+        ? {
+            applications: {
+              some: {
+                userId: query.userId,
+                status: { in: statuses },
+              },
+            },
+          }
+        : {
+            OR: [
+              {
+                applications: {
+                  some: {
+                    userId: query.userId,
+                    status: { in: statuses },
+                  },
+                },
+              },
+              {
+                applications: {
+                  none: {
+                    userId: query.userId,
+                  },
+                },
+              },
+            ],
+          };
+      const existingAnd = where.AND
+        ? Array.isArray(where.AND)
+          ? where.AND
+          : [where.AND]
+        : [];
+      where.AND = [...existingAnd, statusCondition];
+    }
+  }
+
   const jobs = await prisma.job.findMany({
     where,
     orderBy: { createdAt: "desc" },
     include: jobIncludeForViewer(query.userId),
+    take: 200,
   });
 
   const mapped = jobs.map((job) => {
-    const { rawDescription, ...rest } = job;
+    const { rawDescription, ...rest } = withViewerOutcome(job, query.userId);
     return {
       ...rest,
       extractedRequirements: parseRequirementsJson(job.extractedRequirements),
@@ -234,12 +297,20 @@ export async function getJobsList(query: JobListQuery = {}) {
     };
   });
 
+  const statusFiltered = mapped.filter((job) => {
+    if (isAllStatus) return true;
+    const statuses = (Array.isArray(rawStatus) ? rawStatus : [rawStatus]).filter(
+      (s) => (s as string) !== "ALL"
+    );
+    return statuses.includes(job.status);
+  });
+
   const postedWithin = query.postedWithin ?? "all";
   const postedFiltered =
     postedWithin === "all"
-      ? mapped
+      ? statusFiltered
       : filterByPostedWithin(
-          mapped,
+          statusFiltered,
           postedWithin,
           (j) => {
             const raw = extractPostingDateFromNotes(j.notes)?.trim() || null;
@@ -272,7 +343,7 @@ export async function getJobById(id: string, viewerUserId?: string | null) {
   if (!job) return null;
 
   return {
-    ...job,
+    ...withViewerOutcome(job, viewerUserId),
     extractedRequirements: parseRequirementsJson(job.extractedRequirements),
   };
 }

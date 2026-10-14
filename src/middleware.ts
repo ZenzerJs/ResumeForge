@@ -35,14 +35,11 @@ export async function middleware(request: NextRequest) {
   } else if (
     pathname === "/api/jobs/bulk-import" ||
     pathname === "/api/resumes/upload-pdf" ||
-    pathname === "/api/connectors/sync"
+    pathname === "/api/connectors/sync" ||
+    (pathname.startsWith("/api/companies/") && pathname.endsWith("/dossier/generate"))
   ) {
     if (!rateLimit(clientKey(request, "heavy"), 10, 60_000)) {
       return NextResponse.json({ success: false, error: "Too many requests" }, { status: 429 });
-    }
-  } else if (pathname === "/api/practice/execute") {
-    if (!rateLimit(clientKey(request, "practice"), 30, 60_000)) {
-      return NextResponse.json({ success: false, error: "Too many code run requests. Please wait a moment." }, { status: 429 });
     }
   }
 

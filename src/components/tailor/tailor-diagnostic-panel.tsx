@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { ResumeDiagnosticReport, ResumeDiagnosticItem } from "@/lib/schema/resumeFeedback";
 import { applyDeterministicPatch } from "@/lib/diagnostics/deterministicPatcher";
 import { validateMetricGrounding } from "@/lib/diagnostics/deterministicPatcher";
-import { BadgeCheck, TriangleAlert } from "lucide-react";
+import { BadgeCheck, TriangleAlert, Save } from "lucide-react";
 
 interface RankedMatchLite {
   id: string;
@@ -13,14 +13,37 @@ interface RankedMatchLite {
   matchedBullets?: Array<{ id: string; text: string }>;
 }
 
+export interface DiagnosticVariantContext {
+  masterResumeId: string | null;
+  jobId: string | null;
+}
+
 interface TailorDiagnosticPanelProps {
   report?: ResumeDiagnosticReport;
   /** Current variant/master Typst source to patch — no fake AST fallback. */
   typstAst: string;
   /** Evidence bank items available for grounding deterministic fixes. */
   evidence?: RankedMatchLite[];
-  /** Called with the patched Typst source so the parent can persist state. */
+  /** Called with the patched Typst source so the parent can update working copy state. */
   onPatchApplied?: (patchedTypstAst: string) => void;
+  /** Context required to persist a patched working copy as a ResumeVariant. */
+  variantContext?: DiagnosticVariantContext;
+}
+
+/** Pure gating helper — exported for unit testing. */
+export function canPersistDiagnosticVariant(
+  context: DiagnosticVariantContext | undefined,
+  patchedTypstAst: string | null
+): { allowed: boolean; reason?: string } {
+  if (!patchedTypstAst) return { allowed: false, reason: "Apply a fix first." };
+  if (!context?.masterResumeId) return { allowed: false, reason: "Save a Master Resume first." };
+  if (!context?.jobId) return { allowed: false, reason: "Save the job posting first." };
+  return { allowed: true };
+}
+
+/** Pure title builder — exported for unit testing. */
+export function buildDiagnosticVariantTitle(now: Date = new Date()): string {
+  return `Deterministic Fix Variant — ${now.toLocaleDateString()}`;
 }
 
 /**
@@ -33,10 +56,14 @@ export const TailorDiagnosticPanel = ({
   typstAst,
   evidence = [],
   onPatchApplied,
+  variantContext,
 }: TailorDiagnosticPanelProps) => {
   const [patchResult, setPatchResult] = useState<string | null>(null);
   const [patchError, setPatchError] = useState<string | null>(null);
   const [appliedIds, setAppliedIds] = useState<string[]>([]);
+  const [isPersisting, setIsPersisting] = useState(false);
+  const [persistedVariantId, setPersistedVariantId] = useState<string | null>(null);
+  const [persistError, setPersistError] = useState<string | null>(null);
 
   if (!report) return <div>No diagnostics</div>;
 
@@ -92,10 +119,62 @@ export const TailorDiagnosticPanel = ({
       }
       setPatchResult(result.patchedTypstAst);
       setAppliedIds((prev) => [...prev, item.id]);
+      setPersistedVariantId(null);
+      setPersistError(null);
       onPatchApplied?.(result.patchedTypstAst);
     } catch (err) {
       console.error(err);
       setPatchError("Unexpected error while applying the deterministic fix.");
+    }
+  };
+
+  /**
+   * Persists the patched working copy as a ResumeVariant via the same
+   * Amendment-2/Amendment-3 guarded pipeline used by AI patch application.
+   * Gated on a real master resume + saved job — never fabricates either.
+   */
+  const handleSaveVariant = async () => {
+    setPersistError(null);
+    const gate = canPersistDiagnosticVariant(variantContext, patchResult);
+    if (!gate.allowed) {
+      setPersistError(gate.reason || "Cannot save variant.");
+      return;
+    }
+
+    setIsPersisting(true);
+    try {
+      // Amendment 2: validate Typst compilation BEFORE persisting.
+      const { compileTypstToSvg } = await import("@/lib/typst/compiler");
+      const compileResult = await compileTypstToSvg(patchResult!);
+      if (!compileResult.success) {
+        const errorMsg =
+          "error" in compileResult ? compileResult.error.message : "Unknown compilation error";
+        setPersistError(
+          `Typst compilation failed — variant not saved. Error: ${errorMsg}`
+        );
+        return;
+      }
+
+      const res = await fetch("/api/ai/apply-patches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          masterResumeId: variantContext!.masterResumeId,
+          jobId: variantContext!.jobId,
+          variantTitle: buildDiagnosticVariantTitle(),
+          mergedTypstContent: patchResult,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        setPersistError(json.error || "Failed to save deterministic fix variant.");
+        return;
+      }
+      setPersistedVariantId(json.data.variantId ?? null);
+    } catch (err) {
+      setPersistError(err instanceof Error ? err.message : "Failed to save deterministic fix variant.");
+    } finally {
+      setIsPersisting(false);
     }
   };
 
@@ -109,6 +188,35 @@ export const TailorDiagnosticPanel = ({
         <div data-testid="diagnostic-patch-success" className="text-xs text-green-500 flex items-center gap-1.5">
           <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
           Patched successfully! Review the change in the editor before saving.
+        </div>
+      )}
+
+      {patchResult && (
+        <div className="flex flex-col gap-1.5">
+          <button
+            type="button"
+            data-testid="save-diagnostic-variant-btn"
+            onClick={handleSaveVariant}
+            disabled={isPersisting || Boolean(persistedVariantId)}
+            className="inline-flex items-center justify-center gap-1.5 rounded-md border border-amber-700/70 bg-amber-900/30 px-3 py-1.5 text-xs font-semibold text-amber-300 hover:bg-amber-900/50 transition disabled:opacity-50 w-fit"
+          >
+            <Save className="h-3.5 w-3.5" aria-hidden />
+            {persistedVariantId ? "Variant saved" : isPersisting ? "Saving variant…" : "Save as variant"}
+          </button>
+          {persistedVariantId && (
+            <div data-testid="diagnostic-variant-saved" className="text-xs text-green-500">
+              Saved as ResumeVariant. Open it from the Editor via ?variantId=.
+            </div>
+          )}
+          {persistError && (
+            <div
+              data-testid="diagnostic-variant-save-error"
+              role="alert"
+              className="text-xs text-rose-400 rounded border border-rose-800/60 bg-rose-950/30 p-2"
+            >
+              {persistError}
+            </div>
+          )}
         </div>
       )}
 

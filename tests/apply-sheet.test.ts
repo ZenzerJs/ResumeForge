@@ -105,6 +105,45 @@ describe("One-Click Apply Pipeline", () => {
       })
     ).rejects.toThrow(GuardrailBlockError);
   });
+
+  it("exports ApplySheet component accepting onVariantChange callback and variants", async () => {
+    const { ApplySheet } = await import("@/components/tracker/apply-sheet");
+    const React = await import("react");
+
+    let changedJobId: string | null = null;
+    let changedVariantId: string | null = null;
+    const onVariantChange = (jobId: string, variantId: string | null) => {
+      changedJobId = jobId;
+      changedVariantId = variantId;
+    };
+
+    const element = React.createElement(ApplySheet, {
+      open: true,
+      onOpenChange: () => {},
+      job: {
+        id: "job-test-1",
+        company: "Stripe",
+        roleTitle: "Software Engineer",
+        status: "SAVED",
+        appliedVariantId: "var-1",
+        variants: [
+          { id: "var-1", variantTitle: "Variant 1" },
+          { id: "var-2", variantTitle: "Variant 2" },
+        ],
+      },
+      onVariantChange,
+    });
+
+    expect(typeof ApplySheet).toBe("function");
+    expect(element.props.job?.id).toBe("job-test-1");
+    expect(element.props.job?.appliedVariantId).toBe("var-1");
+    expect(element.props.job?.variants).toHaveLength(2);
+    expect(typeof element.props.onVariantChange).toBe("function");
+
+    element.props.onVariantChange?.("job-test-1", "var-2");
+    expect(changedJobId).toBe("job-test-1");
+    expect(changedVariantId).toBe("var-2");
+  });
 });
 
 

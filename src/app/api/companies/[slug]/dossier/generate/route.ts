@@ -1,11 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { generateDossier } from "@/lib/company-dossier";
+import { requireUserId } from "@/lib/security/auth-request";
+
+const DOSSIER_REGEN_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+const GenerateDossierBodySchema = z.object({
+  companyName: z.string().trim().min(1).max(120).optional(),
+  jobTitle: z.string().trim().min(1).max(160).optional(),
+});
 
 export async function POST(
   req: NextRequest,
   props: { params: Promise<{ slug: string }> }
 ) {
+  const auth = await requireUserId(req);
+  if (typeof auth !== "string") {
+    return auth;
+  }
+
   const params = await props.params;
   const slug = params.slug;
 
@@ -13,24 +27,35 @@ export async function POST(
     return NextResponse.json({ found: false, error: "Company slug is required" }, { status: 400 });
   }
 
-  let body: any = {};
+  let raw: unknown = {};
   try {
-    body = await req.json();
+    raw = await req.json();
   } catch {
-    body = {};
+    raw = {};
+  }
+
+  const parsed = GenerateDossierBodySchema.safeParse(raw && typeof raw === "object" ? raw : {});
+  if (!parsed.success) {
+    return NextResponse.json(
+      { found: false, error: "Invalid dossier request" },
+      { status: 400 }
+    );
   }
 
   const existing = await prisma.companyDossier.findUnique({
     where: { companySlug: slug },
   });
 
+  if (existing && Date.now() - existing.lastUpdated.getTime() < DOSSIER_REGEN_COOLDOWN_MS) {
+    return NextResponse.json({ found: true, dossier: existing, stale: false, cooldown: true });
+  }
+
   try {
     const dossier = await generateDossier({
-      companyName: body.companyName || existing?.displayName || slug,
-      jobTitle: body.jobTitle,
+      companyName: parsed.data.companyName || existing?.displayName || slug,
+      jobTitle: parsed.data.jobTitle,
       referenceNotes: existing?.referenceNotes ?? undefined,
       processNotes: existing?.processNotes ?? undefined,
-      providerConfig: body.providerConfig,
     });
 
     const data = {

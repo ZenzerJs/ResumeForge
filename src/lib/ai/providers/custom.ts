@@ -4,6 +4,7 @@ import { stripCodeFences } from "../utils";
 import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from "../repair-schema";
 import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
 import { safeFetch } from "@/lib/security/safe-fetch";
+import { resolveProviderCredentials } from "./credentials";
 
 async function customFetch(url: string, init?: RequestInit): Promise<Response> {
   return safeFetch(url, init ?? {}, {
@@ -26,9 +27,14 @@ export async function chatCustom(
   messages: Array<{ role: string; content: string }>,
   tools: any[],
 ): Promise<ChatCompletionResult> {
-  const apiKey = config.apiKey?.trim() || process.env.CUSTOM_OPENAI_API_KEY?.trim();
-  const baseUrlRaw = config.baseUrl?.trim() || process.env.CUSTOM_OPENAI_BASE_URL?.trim() || "http://localhost:8000";
-  const baseUrl = baseUrlRaw.replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.CUSTOM_OPENAI_API_KEY,
+    envBaseUrl: process.env.CUSTOM_OPENAI_BASE_URL,
+    defaultBaseUrl: "http://localhost:8000",
+    officialHosts: [],
+  });
   const model = config.model?.trim() || "default";
 
   const completionsUrl = baseUrl.endsWith("/v1")
@@ -82,9 +88,14 @@ export async function chatCustom(
  * Connects to any local or self-hosted endpoint that implements OpenAI-compatible API schemas.
  */
 export async function testCustomConnection(config: ProviderConfig): Promise<TestConnectionResult> {
-  const apiKey = config.apiKey?.trim() || process.env.CUSTOM_OPENAI_API_KEY?.trim();
-  const baseUrlRaw = config.baseUrl?.trim() || process.env.CUSTOM_OPENAI_BASE_URL?.trim() || "http://localhost:8000";
-  const baseUrl = baseUrlRaw.replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.CUSTOM_OPENAI_API_KEY,
+    envBaseUrl: process.env.CUSTOM_OPENAI_BASE_URL,
+    defaultBaseUrl: "http://localhost:8000",
+    officialHosts: [],
+  });
 
   const startTime = Date.now();
   try {
@@ -162,9 +173,14 @@ export async function generateCustomPatches(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const apiKey = config.apiKey?.trim() || process.env.CUSTOM_OPENAI_API_KEY?.trim();
-  const baseUrlRaw = config.baseUrl?.trim() || process.env.CUSTOM_OPENAI_BASE_URL?.trim() || "http://localhost:8000";
-  const baseUrl = baseUrlRaw.replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.CUSTOM_OPENAI_API_KEY,
+    envBaseUrl: process.env.CUSTOM_OPENAI_BASE_URL,
+    defaultBaseUrl: "http://localhost:8000",
+    officialHosts: [],
+  });
   const model = config.model?.trim() || "default";
 
   const completionsUrl = baseUrl.endsWith("/v1")
@@ -224,9 +240,14 @@ export async function generateCustomQualitativeReview(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const apiKey = config.apiKey?.trim() || process.env.CUSTOM_OPENAI_API_KEY?.trim();
-  const baseUrlRaw = config.baseUrl?.trim() || process.env.CUSTOM_OPENAI_BASE_URL?.trim() || "http://localhost:8000";
-  const baseUrl = baseUrlRaw.replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.CUSTOM_OPENAI_API_KEY,
+    envBaseUrl: process.env.CUSTOM_OPENAI_BASE_URL,
+    defaultBaseUrl: "http://localhost:8000",
+    officialHosts: [],
+  });
   const model = config.model?.trim() || "default";
 
   const completionsUrl = baseUrl.endsWith("/v1")
@@ -286,9 +307,14 @@ export async function generateCustomCoverLetter(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const apiKey = config.apiKey?.trim() || process.env.CUSTOM_OPENAI_API_KEY?.trim();
-  const baseUrlRaw = config.baseUrl?.trim() || process.env.CUSTOM_OPENAI_BASE_URL?.trim() || "http://localhost:8000";
-  const baseUrl = baseUrlRaw.replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.CUSTOM_OPENAI_API_KEY,
+    envBaseUrl: process.env.CUSTOM_OPENAI_BASE_URL,
+    defaultBaseUrl: "http://localhost:8000",
+    officialHosts: [],
+  });
   const model = config.model?.trim() || "default";
 
   const completionsUrl = baseUrl.endsWith("/v1")
@@ -348,9 +374,14 @@ export async function convertCustomPdfTextToTypst(
   systemPrompt: string,
   userPrompt: string
 ): Promise<ConvertPdfResult> {
-  const apiKey = config.apiKey?.trim() || process.env.CUSTOM_OPENAI_API_KEY?.trim();
-  const baseUrlRaw = config.baseUrl?.trim() || process.env.CUSTOM_OPENAI_BASE_URL?.trim() || "http://localhost:8000";
-  const baseUrl = baseUrlRaw.replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.CUSTOM_OPENAI_API_KEY,
+    envBaseUrl: process.env.CUSTOM_OPENAI_BASE_URL,
+    defaultBaseUrl: "http://localhost:8000",
+    officialHosts: [],
+  });
   const model = config.model?.trim() || "default";
 
   const completionsUrl = baseUrl.endsWith("/v1")
@@ -408,9 +439,14 @@ export async function repairTypstWithCustom(
   config: ProviderConfig,
   input: TypstRepairInput
 ): Promise<{ success: boolean; data?: TypstRepairProposal; error?: string }> {
-  const apiKey = config.apiKey?.trim() || process.env.CUSTOM_OPENAI_API_KEY?.trim();
-  const baseUrlRaw = config.baseUrl?.trim() || process.env.CUSTOM_OPENAI_BASE_URL?.trim() || "http://localhost:8000";
-  const baseUrl = baseUrlRaw.replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.CUSTOM_OPENAI_API_KEY,
+    envBaseUrl: process.env.CUSTOM_OPENAI_BASE_URL,
+    defaultBaseUrl: "http://localhost:8000",
+    officialHosts: [],
+  });
   const model = config.model?.trim() || "default";
 
   const systemPrompt = buildTypstRepairSystemPrompt();

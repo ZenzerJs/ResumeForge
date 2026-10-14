@@ -223,23 +223,38 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   };
 
   const handleStatusChange = async (jobId: string, newStatus: JobStatus) => {
+    await patchJob(jobId, { status: newStatus });
+  };
+
+  const handleVariantChange = async (jobId: string, variantId: string | null) => {
+    await patchJob(jobId, { variantId });
+  };
+
+  const patchJob = async (jobId: string, body: { status?: JobStatus; variantId?: string | null }) => {
     setIsUpdatingStatus((p) => ({ ...p, [jobId]: true }));
     try {
       const res = await fetch(`/api/jobs/${jobId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(body),
       });
       const json = await res.json();
       if (res.ok && json.success) {
         setJobs((prev) =>
           prev.map((j) =>
-            j.id === jobId ? { ...j, status: newStatus, appliedAt: json.data.appliedAt } : j,
+            j.id === jobId
+              ? {
+                  ...j,
+                  status: json.data.status,
+                  appliedAt: json.data.appliedAt,
+                  appliedVariantId: json.data.appliedVariantId ?? null,
+                }
+              : j,
           ),
         );
       }
     } catch {
-      console.error("Failed to update status");
+      console.error("Failed to update application");
     } finally {
       setIsUpdatingStatus((p) => ({ ...p, [jobId]: false }));
     }
@@ -680,6 +695,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
               tier2Notice={tier2Notice[selectedJob.id]}
               showNotes
               onStatusChange={handleStatusChange}
+              onVariantChange={handleVariantChange}
               onNotesChange={(id, value) =>
                 setEditingNotes((prev) => ({ ...prev, [id]: value }))
               }
@@ -708,6 +724,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             isSheet
             onClose={handleCloseSheet}
             onStatusChange={handleStatusChange}
+            onVariantChange={handleVariantChange}
             onNotesChange={(id, value) =>
               setEditingNotes((prev) => ({ ...prev, [id]: value }))
             }

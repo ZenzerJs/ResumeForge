@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { normalizeEmail, verifyPassword } from "@/lib/security/passwords";
+import { DUMMY_PASSWORD_HASH, normalizeEmail, verifyPassword } from "@/lib/security/passwords";
 import { isEmailIdentifier, normalizeUsername } from "@/lib/security/usernames";
 import {
   buildSessionCookie,
+  cookieSecure,
   createSessionToken,
   getAppAccessSecret,
 } from "@/lib/security/session";
@@ -52,18 +53,20 @@ export async function POST(request: Request) {
       ? await prisma.user.findUnique({ where: { email: normalizeEmail(identifier) } })
       : await prisma.user.findUnique({ where: { username: normalizeUsername(identifier) } });
 
-    if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
+    const passwordOk = await verifyPassword(
+      parsed.data.password,
+      user?.passwordHash ?? DUMMY_PASSWORD_HASH
+    );
+    if (!user || !passwordOk) {
       return NextResponse.json({ success: false, error: "Invalid email, username, or password" }, { status: 401 });
     }
 
-    const token = await createSessionToken(user.id);
+    const token = await createSessionToken(user.id, Date.now(), user.sessionVersion);
     if (!token) {
       return NextResponse.json({ success: false, error: "Unable to create session" }, { status: 500 });
     }
 
-    const secure =
-      new URL(request.url).protocol === "https:" ||
-      request.headers.get("x-forwarded-proto") === "https";
+    const secure = cookieSecure(request);
     const response = NextResponse.json({
       success: true,
       data: { id: user.id, email: user.email, username: user.username },

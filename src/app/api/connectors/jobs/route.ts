@@ -12,6 +12,8 @@ import {
   type CompatibilityResult,
 } from "@/lib/scoring/compatibility-engine";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
+import { getRequestUserId } from "@/lib/security/auth-request";
+import { loadScoringEvidence } from "@/lib/scoring/user-evidence";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +120,7 @@ export async function GET(req: NextRequest) {
     // Fetch candidate records to calculate scoring and geo-filtering
     const rawJobs = await prisma.ingestedJob.findMany({
       where,
+      orderBy: [{ postedAt: "desc" }, { createdAt: "desc" }],
       take: 200,
       include: {
         trackedJob: {
@@ -126,46 +129,8 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // Fetch candidate Evidence items to calculate personalized compatibility
-    let candidateSkills: string[] = [];
-    let evidenceItemsForMatching: any[] = [];
-    try {
-      const evidenceRecords = await prisma.evidenceItem.findMany({
-        where: { status: { not: "archived" } },
-        include: { bullets: true },
-      });
-      evidenceItemsForMatching = evidenceRecords.map((e) => ({
-        id: e.id,
-        type: e.type,
-        title: e.title,
-        organization: e.organization,
-        dates: e.dates,
-        verifiedSummary: e.verifiedSummary,
-        tags: typeof e.tags === "string" ? JSON.parse(e.tags || "[]") : e.tags,
-        status: e.status,
-        bullets: e.bullets.map((b) => ({
-          id: b.id,
-          text: b.text,
-          technologies:
-            typeof b.technologies === "string"
-              ? JSON.parse(b.technologies || "[]")
-              : b.technologies,
-          roleAffinity:
-            typeof b.roleAffinity === "string"
-              ? JSON.parse(b.roleAffinity || "[]")
-              : b.roleAffinity,
-          verified: b.verified,
-        })),
-      }));
-      candidateSkills = evidenceItemsForMatching.flatMap((e) => [
-        ...(Array.isArray(e.tags) ? e.tags : []),
-        ...(Array.isArray(e.bullets)
-          ? e.bullets.flatMap((b: any) => (Array.isArray(b.technologies) ? b.technologies : []))
-          : []),
-      ]);
-    } catch {
-      // Non-blocking fallback
-    }
+    const userId = await getRequestUserId(req);
+    const { candidateSkills, evidenceItemsForMatching } = await loadScoringEvidence(userId);
 
     const targetCityKey = city.toLowerCase();
     const hasCityFilter = targetCityKey !== "all" && targetCityKey !== "all canada" && targetCityKey !== "";
@@ -264,12 +229,13 @@ export async function GET(req: NextRequest) {
         limit,
         total,
         totalPages: Math.ceil(total / limit) || 1,
+        capped: rawJobs.length === 200,
       },
     });
   } catch (err: any) {
     console.error("[API connectors/jobs] Error:", err);
     return NextResponse.json(
-      { success: false, error: err?.message || "Failed to fetch ingested jobs" },
+      { success: false, error: "Failed to fetch ingested jobs" },
       { status: 500 }
     );
   }

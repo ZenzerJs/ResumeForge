@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { deleteJob, getJobById, updateJob } from "@/lib/db/jobs";
+import { ApplicationInputError, upsertApplication } from "@/lib/db/applications";
 import { JobRequirementsSchema } from "@/lib/jd-parser/types";
 import { sanitizeError } from "@/lib/ai/redact";
 import { getRequestUserId, requireUserId } from "@/lib/security/auth-request";
@@ -12,6 +13,7 @@ const UpdateJobSchema = z.object({
   extractedRequirements: JobRequirementsSchema.optional(),
   status: z.enum(["SAVED", "APPLIED", "INTERVIEWING", "OFFER", "REJECTED", "ARCHIVED"]).optional(),
   appliedAt: z.union([z.string(), z.date(), z.null()]).optional(),
+  variantId: z.string().nullable().optional(),
   notes: z.union([z.string(), z.null()]).optional(),
 });
 
@@ -63,15 +65,35 @@ export async function PATCH(
       );
     }
 
-    const updatedJob = await updateJob(id, validation.data, userId);
-    if (!updatedJob) {
-      return NextResponse.json(
-        { success: false, error: "Job posting not found" },
-        { status: 404 }
-      );
+    const { status, appliedAt, variantId, ...catalog } = validation.data;
+    if (status !== undefined || appliedAt !== undefined || variantId !== undefined) {
+      try {
+        const application = await upsertApplication(userId, id, { status, appliedAt, variantId });
+        if (!application) {
+          return NextResponse.json({ success: false, error: "Job posting not found" }, { status: 404 });
+        }
+      } catch (err) {
+        if (err instanceof ApplicationInputError) {
+          return NextResponse.json({ success: false, error: err.message }, { status: 400 });
+        }
+        throw err;
+      }
     }
 
-    return NextResponse.json({ success: true, data: updatedJob });
+    const hasCatalogUpdate = Object.values(catalog).some((value) => value !== undefined);
+    if (hasCatalogUpdate) {
+      const updatedJob = await updateJob(id, catalog, userId);
+      if (!updatedJob) {
+        return NextResponse.json({ success: false, error: "Job posting not found" }, { status: 404 });
+      }
+    }
+
+    const job = await getJobById(id, userId);
+    if (!job) {
+      return NextResponse.json({ success: false, error: "Job posting not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, data: job });
   } catch (err) {
     return NextResponse.json(
       { success: false, error: "Failed to update job", message: sanitizeError(err) },

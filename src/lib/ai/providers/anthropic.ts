@@ -4,10 +4,25 @@ import { stripCodeFences } from "../utils";
 import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from "../repair-schema";
 import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
 import type { ChatCompletionResult } from "./custom";
+import { safeFetch } from "@/lib/security/safe-fetch";
+import { resolveProviderCredentials } from "./credentials";
+
+function providerFetch(url: string, init?: RequestInit): Promise<Response> {
+  return safeFetch(url, init ?? {}, {
+    timeoutMs: 130_000,
+    allowLocalhost: process.env.NODE_ENV !== "production",
+  });
+}
 
 export async function testAnthropicConnection(config: ProviderConfig): Promise<TestConnectionResult> {
-  const apiKey = config.apiKey?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.ANTHROPIC_BASE_URL?.trim() || "https://api.anthropic.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.ANTHROPIC_API_KEY,
+    envBaseUrl: process.env.ANTHROPIC_BASE_URL,
+    defaultBaseUrl: "https://api.anthropic.com",
+    officialHosts: ["api.anthropic.com"],
+  });
 
   if (!apiKey) {
     return {
@@ -19,7 +34,7 @@ export async function testAnthropicConnection(config: ProviderConfig): Promise<T
 
   const startTime = Date.now();
   try {
-    const res = await fetch(`${baseUrl}/v1/models`, {
+    const res = await providerFetch(`${baseUrl}/v1/models`, {
       method: "GET",
       headers: {
         "x-api-key": apiKey,
@@ -73,8 +88,14 @@ export async function generateAnthropicPatches(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const apiKey = config.apiKey?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.ANTHROPIC_BASE_URL?.trim() || "https://api.anthropic.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.ANTHROPIC_API_KEY,
+    envBaseUrl: process.env.ANTHROPIC_BASE_URL,
+    defaultBaseUrl: "https://api.anthropic.com",
+    officialHosts: ["api.anthropic.com"],
+  });
   const model = config.model?.trim() || "claude-sonnet-4-20250514";
 
   if (!apiKey) {
@@ -82,7 +103,7 @@ export async function generateAnthropicPatches(
   }
 
   try {
-    const res = await fetch(`${baseUrl}/v1/messages`, {
+    const res = await providerFetch(`${baseUrl}/v1/messages`, {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
@@ -131,8 +152,14 @@ export async function generateAnthropicQualitativeReview(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const apiKey = config.apiKey?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.ANTHROPIC_BASE_URL?.trim() || "https://api.anthropic.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.ANTHROPIC_API_KEY,
+    envBaseUrl: process.env.ANTHROPIC_BASE_URL,
+    defaultBaseUrl: "https://api.anthropic.com",
+    officialHosts: ["api.anthropic.com"],
+  });
   const model = config.model?.trim() || "claude-3-5-sonnet-20241022";
 
   if (!apiKey) {
@@ -140,7 +167,7 @@ export async function generateAnthropicQualitativeReview(
   }
 
   try {
-    const res = await fetch(`${baseUrl}/v1/messages`, {
+    const res = await providerFetch(`${baseUrl}/v1/messages`, {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
@@ -189,8 +216,14 @@ export async function generateAnthropicCoverLetter(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const apiKey = config.apiKey?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.ANTHROPIC_BASE_URL?.trim() || "https://api.anthropic.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.ANTHROPIC_API_KEY,
+    envBaseUrl: process.env.ANTHROPIC_BASE_URL,
+    defaultBaseUrl: "https://api.anthropic.com",
+    officialHosts: ["api.anthropic.com"],
+  });
   const model = config.model?.trim() || "claude-3-5-sonnet-20241022";
 
   if (!apiKey) {
@@ -198,7 +231,7 @@ export async function generateAnthropicCoverLetter(
   }
 
   try {
-    const res = await fetch(`${baseUrl}/v1/messages`, {
+    const res = await providerFetch(`${baseUrl}/v1/messages`, {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
@@ -247,8 +280,14 @@ export async function convertAnthropicPdfTextToTypst(
   systemPrompt: string,
   userPrompt: string
 ): Promise<ConvertPdfResult> {
-  const apiKey = config.apiKey?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.ANTHROPIC_BASE_URL?.trim() || "https://api.anthropic.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.ANTHROPIC_API_KEY,
+    envBaseUrl: process.env.ANTHROPIC_BASE_URL,
+    defaultBaseUrl: "https://api.anthropic.com",
+    officialHosts: ["api.anthropic.com"],
+  });
   const model = config.model?.trim() || "claude-3-5-sonnet-20241022";
 
   if (!apiKey) {
@@ -256,7 +295,7 @@ export async function convertAnthropicPdfTextToTypst(
   }
 
   try {
-    const res = await fetch(`${baseUrl}/v1/messages`, {
+    const res = await providerFetch(`${baseUrl}/v1/messages`, {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
@@ -303,8 +342,14 @@ export async function repairTypstWithAnthropic(
   config: ProviderConfig,
   input: TypstRepairInput
 ): Promise<{ success: boolean; data?: TypstRepairProposal; error?: string }> {
-  const apiKey = config.apiKey?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.ANTHROPIC_BASE_URL?.trim() || "https://api.anthropic.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.ANTHROPIC_API_KEY,
+    envBaseUrl: process.env.ANTHROPIC_BASE_URL,
+    defaultBaseUrl: "https://api.anthropic.com",
+    officialHosts: ["api.anthropic.com"],
+  });
   const model = config.model?.trim() || "claude-3-5-sonnet-20241022";
 
   if (!apiKey) {
@@ -315,7 +360,7 @@ export async function repairTypstWithAnthropic(
   const userPrompt = buildTypstRepairUserPrompt(input);
 
   try {
-    const res = await fetch(`${baseUrl}/v1/messages`, {
+    const res = await providerFetch(`${baseUrl}/v1/messages`, {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
@@ -379,8 +424,14 @@ export async function chatAnthropic(
   messages: Array<{ role: string; content: string }>,
   tools: any[],
 ): Promise<ChatCompletionResult> {
-  const apiKey = config.apiKey?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.ANTHROPIC_BASE_URL?.trim() || "https://api.anthropic.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.ANTHROPIC_API_KEY,
+    envBaseUrl: process.env.ANTHROPIC_BASE_URL,
+    defaultBaseUrl: "https://api.anthropic.com",
+    officialHosts: ["api.anthropic.com"],
+  });
   const model = config.model?.trim() || "claude-sonnet-4-20250514";
 
   if (!apiKey) {
@@ -412,7 +463,7 @@ export async function chatAnthropic(
   if (systemMsg) body.system = systemMsg.content;
   if (anthropicTools.length > 0) body.tools = anthropicTools;
 
-  const res = await fetch(`${baseUrl}/v1/messages`, {
+  const res = await providerFetch(`${baseUrl}/v1/messages`, {
     method: "POST",
     headers: {
       "x-api-key": apiKey,

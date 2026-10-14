@@ -15,6 +15,8 @@ export interface MockStore {
   masterHistory: any[];
   interviewProblem: any[];
   companyDossier: any[];
+  jobApplication: any[];
+  applicationEvent: any[];
   systemInfo: any[];
   [key: string]: any[];
 }
@@ -35,6 +37,8 @@ export function createMockStore(): MockStore {
     masterHistory: [],
     interviewProblem: [],
     companyDossier: [],
+    jobApplication: [],
+    applicationEvent: [],
     systemInfo: [],
   };
 }
@@ -50,38 +54,50 @@ function matchCondition(itemVal: any, condVal: any): boolean {
     return itemVal === null || itemVal === undefined;
   }
   if (typeof condVal === "object" && !Array.isArray(condVal) && !(condVal instanceof Date)) {
+    let hasKnownOp = false;
     for (const [op, val] of Object.entries(condVal)) {
       if (op === "equals") {
+        hasKnownOp = true;
         if (itemVal !== val) return false;
       } else if (op === "not") {
+        hasKnownOp = true;
         if (itemVal === val) return false;
       } else if (op === "in") {
+        hasKnownOp = true;
         if (!Array.isArray(val) || !val.includes(itemVal)) return false;
       } else if (op === "notIn") {
+        hasKnownOp = true;
         if (Array.isArray(val) && val.includes(itemVal)) return false;
       } else if (op === "contains") {
+        hasKnownOp = true;
         const itemStr = String(itemVal ?? "").toLowerCase();
         const searchStr = String(val ?? "").toLowerCase();
         if (!itemStr.includes(searchStr)) return false;
       } else if (op === "startsWith") {
+        hasKnownOp = true;
         const itemStr = String(itemVal ?? "").toLowerCase();
         const searchStr = String(val ?? "").toLowerCase();
         if (!itemStr.startsWith(searchStr)) return false;
       } else if (op === "endsWith") {
+        hasKnownOp = true;
         const itemStr = String(itemVal ?? "").toLowerCase();
         const searchStr = String(val ?? "").toLowerCase();
         if (!itemStr.endsWith(searchStr)) return false;
       } else if (op === "gt") {
+        hasKnownOp = true;
         if (!(itemVal > (val as any))) return false;
       } else if (op === "gte") {
+        hasKnownOp = true;
         if (!(itemVal >= (val as any))) return false;
       } else if (op === "lt") {
+        hasKnownOp = true;
         if (!(itemVal < (val as any))) return false;
       } else if (op === "lte") {
+        hasKnownOp = true;
         if (!(itemVal <= (val as any))) return false;
       }
     }
-    return true;
+    return hasKnownOp;
   }
   return itemVal === condVal;
 }
@@ -104,6 +120,35 @@ function matchesWhere(item: any, where?: any): boolean {
 
   for (const [key, cond] of Object.entries(where)) {
     if (key === "AND" || key === "OR" || key === "NOT") continue;
+    if (key === "masterResume" && item.masterResumeId) {
+      const parent = activeStore.resume?.find((r: any) => r.id === item.masterResumeId);
+      if (!parent || !matchesWhere(parent, cond)) return false;
+      continue;
+    }
+    if (key === "job" && item.jobId) {
+      const parent = activeStore.job?.find((j: any) => j.id === item.jobId);
+      if (!parent || !matchesWhere(parent, cond)) return false;
+      continue;
+    }
+    if (key === "user" && item.userId) {
+      const parent = activeStore.user?.find((u: any) => u.id === item.userId);
+      if (!parent || !matchesWhere(parent, cond)) return false;
+      continue;
+    }
+    if (key === "variant" && item.variantId) {
+      const parent = activeStore.resumeVariant?.find((v: any) => v.id === item.variantId);
+      if (!parent || !matchesWhere(parent, cond)) return false;
+      continue;
+    }
+    if (key === "applications") {
+      const apps = activeStore.jobApplication?.filter((a: any) => a.jobId === item.id) || [];
+      const condAny = cond as any;
+      if (condAny && typeof condAny === "object") {
+        if (condAny.some && !apps.some((a: any) => matchesWhere(a, condAny.some))) return false;
+        if (condAny.none && apps.some((a: any) => matchesWhere(a, condAny.none))) return false;
+        continue;
+      }
+    }
     if (!matchCondition(item[key], cond)) return false;
   }
   return true;
@@ -144,6 +189,15 @@ function resolveIncludes(table: string, item: any, include?: any) {
   if (include.dossier && (table === "job" || table === "Job")) {
     result.dossier = activeStore.companyDossier.find((d) => d.id === item.dossierId) ?? null;
   }
+  if (include.applications && (table === "job" || table === "Job")) {
+    const spec = include.applications;
+    let apps = (activeStore.jobApplication || []).filter((a) => a.jobId === item.id);
+    if (spec.where) apps = apps.filter((a) => matchesWhere(a, spec.where));
+    result.applications = apps.map((a) => ({ ...a }));
+  }
+  if (include.events && (table === "jobApplication" || table === "JobApplication")) {
+    result.events = (activeStore.applicationEvent || []).filter((e) => e.applicationId === item.id);
+  }
   if (include.user && item.userId) {
     result.user = activeStore.user.find((u) => u.id === item.userId) ?? null;
   }
@@ -154,6 +208,20 @@ function resolveIncludes(table: string, item: any, include?: any) {
 function normalizeTableName(name: string): string {
   if (!name) return "";
   return name.charAt(0).toLowerCase() + name.slice(1);
+}
+
+function applyWriteData(existing: Record<string, unknown>, data: Record<string, unknown>) {
+  const next: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value && typeof value === "object" && "increment" in (value as object)) {
+      next[key] = (Number(existing[key]) || 0) + Number((value as { increment: number }).increment);
+    } else if (value && typeof value === "object" && "decrement" in (value as object)) {
+      next[key] = (Number(existing[key]) || 0) - Number((value as { decrement: number }).decrement);
+    } else {
+      next[key] = value;
+    }
+  }
+  return next;
 }
 
 export function createModelMock(modelName: string) {
@@ -229,6 +297,9 @@ export function createModelMock(modelName: string) {
       };
 
       // Model-specific default fields
+      if (tableKey === "user") {
+        if (row.sessionVersion === undefined) row.sessionVersion = 0;
+      }
       if (tableKey === "resume") {
         if (row.isMaster === undefined) row.isMaster = false;
         if (row.isProtected === undefined) row.isProtected = true;
@@ -258,6 +329,12 @@ export function createModelMock(modelName: string) {
         if (!row.status) row.status = "DRAFT";
         if (!row.salutation) row.salutation = "Dear Hiring Team,";
         if (!row.evidenceCitations) row.evidenceCitations = "[]";
+      }
+      if (tableKey === "applicationEvent") {
+        if (!row.at) row.at = new Date();
+      }
+      if (tableKey === "jobApplication") {
+        if (row.variantId === undefined) row.variantId = null;
       }
 
       activeStore[tableKey].push(row);
@@ -314,7 +391,7 @@ export function createModelMock(modelName: string) {
       const existing = table[index];
       const updated = {
         ...existing,
-        ...dataCopy,
+        ...applyWriteData(existing, dataCopy),
         updatedAt: new Date(),
       };
       table[index] = updated;
@@ -347,7 +424,7 @@ export function createModelMock(modelName: string) {
         if (matchesWhere(table[i], args?.where)) {
           table[i] = {
             ...table[i],
-            ...args.data,
+            ...applyWriteData(table[i], args.data),
             updatedAt: new Date(),
           };
           count++;

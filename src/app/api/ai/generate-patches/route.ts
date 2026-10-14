@@ -12,16 +12,16 @@ const GeneratePatchesRequestSchema = z.object({
   providerConfig: ProviderConfigSchema,
   jobId: z.string().optional(),
   jobRequirements: z.object({
-    requiredSkills: z.array(z.string()),
-    preferredSkills: z.array(z.string()),
-    domainTerms: z.array(z.string()),
-    roleTitle: z.string().optional(),
-    company: z.string().optional(),
+    requiredSkills: z.array(z.string().max(80)).max(40),
+    preferredSkills: z.array(z.string().max(80)).max(40),
+    domainTerms: z.array(z.string().max(80)).max(40),
+    roleTitle: z.string().max(160).optional(),
+    company: z.string().max(120).optional(),
   }),
   tailorFeedback: z
     .object({
-      overviewCommentary: z.string(),
-      nextStepsAdvice: z.array(z.string()).optional(),
+      overviewCommentary: z.string().max(4000),
+      nextStepsAdvice: z.array(z.string().max(500)).max(12).optional(),
     })
     .optional(),
 });
@@ -60,45 +60,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch active evidence items (exclude archived)
     const allEvidence = await getEvidenceItems(undefined, userId);
-    let activeEvidence = allEvidence.filter((e) => e.status !== "archived");
+    const activeEvidence = allEvidence.filter((e) => e.status === "verified");
 
     if (activeEvidence.length === 0) {
-      // Fallback draft evidence item for prompt evaluation
-      activeEvidence = [
-        {
-          id: "ev-starter-1",
-          type: "experience",
-          title: "Senior Backend Engineer",
-          organization: "Acme Corp",
-          dates: "2021 - Present",
-          status: "verified",
-          isDraft: false,
-          verifiedSummary: "Architected microservices in Go and Python with Docker & Kubernetes.",
-          tags: ["Go", "Python", "Kubernetes", "Docker", "RESTful APIs", "PostgreSQL"],
-          bullets: [
-            {
-              id: "b-starter-1",
-              evidenceId: "ev-starter-1",
-              text: "Engineered scalable REST microservices using Go and Python.",
-              technologies: ["Go", "Python", "RESTful APIs"],
-              verified: true,
-              roleAffinity: "Backend",
-              orderIndex: 0,
-            },
-            {
-              id: "b-starter-2",
-              evidenceId: "ev-starter-1",
-              text: "Containerized backend services with Docker and deployed to Kubernetes clusters.",
-              technologies: ["Docker", "Kubernetes"],
-              verified: true,
-              roleAffinity: "Backend",
-              orderIndex: 1,
-            },
-          ],
-        } as any,
-      ];
+      return NextResponse.json(
+        { success: false, error: "Add evidence first" },
+        { status: 422 }
+      );
     }
 
     // Build valid ID sets for citation verification

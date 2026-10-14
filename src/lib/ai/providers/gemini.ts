@@ -4,6 +4,15 @@ import { stripCodeFences } from "../utils";
 import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from "../repair-schema";
 import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
 import type { ChatCompletionResult } from "./custom";
+import { safeFetch } from "@/lib/security/safe-fetch";
+import { resolveProviderCredentials } from "./credentials";
+
+function providerFetch(url: string, init?: RequestInit): Promise<Response> {
+  return safeFetch(url, init ?? {}, {
+    timeoutMs: 130_000,
+    allowLocalhost: process.env.NODE_ENV !== "production",
+  });
+}
 
 function geminiHeaders(apiKey: string): HeadersInit {
   return {
@@ -13,8 +22,14 @@ function geminiHeaders(apiKey: string): HeadersInit {
 }
 
 export async function testGeminiConnection(config: ProviderConfig): Promise<TestConnectionResult> {
-  const apiKey = config.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.GEMINI_BASE_URL?.trim() || "https://generativelanguage.googleapis.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.GEMINI_API_KEY,
+    envBaseUrl: process.env.GEMINI_BASE_URL,
+    defaultBaseUrl: "https://generativelanguage.googleapis.com",
+    officialHosts: ["generativelanguage.googleapis.com"],
+  });
 
   if (!apiKey) {
     return {
@@ -26,7 +41,7 @@ export async function testGeminiConnection(config: ProviderConfig): Promise<Test
 
   const startTime = Date.now();
   try {
-    const res = await fetch(`${baseUrl}/v1beta/models`, {
+    const res = await providerFetch(`${baseUrl}/v1beta/models`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -82,8 +97,14 @@ export async function generateGeminiPatches(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const apiKey = config.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.GEMINI_BASE_URL?.trim() || "https://generativelanguage.googleapis.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.GEMINI_API_KEY,
+    envBaseUrl: process.env.GEMINI_BASE_URL,
+    defaultBaseUrl: "https://generativelanguage.googleapis.com",
+    officialHosts: ["generativelanguage.googleapis.com"],
+  });
   const model = config.model?.trim() || "gemini-2.5-flash";
 
   if (!apiKey) {
@@ -91,7 +112,7 @@ export async function generateGeminiPatches(
   }
 
   try {
-    const res = await fetch(
+    const res = await providerFetch(
       `${baseUrl}/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
@@ -139,8 +160,14 @@ export async function generateGeminiQualitativeReview(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const apiKey = config.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.GEMINI_BASE_URL?.trim() || "https://generativelanguage.googleapis.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.GEMINI_API_KEY,
+    envBaseUrl: process.env.GEMINI_BASE_URL,
+    defaultBaseUrl: "https://generativelanguage.googleapis.com",
+    officialHosts: ["generativelanguage.googleapis.com"],
+  });
   const model = config.model?.trim() || "gemini-2.5-flash";
 
   if (!apiKey) {
@@ -148,7 +175,7 @@ export async function generateGeminiQualitativeReview(
   }
 
   try {
-    const res = await fetch(
+    const res = await providerFetch(
       `${baseUrl}/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
@@ -196,8 +223,14 @@ export async function generateGeminiCoverLetter(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const apiKey = config.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.GEMINI_BASE_URL?.trim() || "https://generativelanguage.googleapis.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.GEMINI_API_KEY,
+    envBaseUrl: process.env.GEMINI_BASE_URL,
+    defaultBaseUrl: "https://generativelanguage.googleapis.com",
+    officialHosts: ["generativelanguage.googleapis.com"],
+  });
   const model = config.model?.trim() || "gemini-2.5-flash";
 
   if (!apiKey) {
@@ -205,7 +238,7 @@ export async function generateGeminiCoverLetter(
   }
 
   try {
-    const res = await fetch(
+    const res = await providerFetch(
       `${baseUrl}/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
@@ -253,8 +286,14 @@ export async function convertGeminiPdfTextToTypst(
   systemPrompt: string,
   userPrompt: string
 ): Promise<ConvertPdfResult> {
-  const apiKey = config.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.GEMINI_BASE_URL?.trim() || "https://generativelanguage.googleapis.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.GEMINI_API_KEY,
+    envBaseUrl: process.env.GEMINI_BASE_URL,
+    defaultBaseUrl: "https://generativelanguage.googleapis.com",
+    officialHosts: ["generativelanguage.googleapis.com"],
+  });
   const model = config.model?.trim() || "gemini-2.5-flash";
 
   if (!apiKey) {
@@ -262,7 +301,7 @@ export async function convertGeminiPdfTextToTypst(
   }
 
   try {
-    const res = await fetch(
+    const res = await providerFetch(
       `${baseUrl}/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
@@ -307,8 +346,14 @@ export async function repairTypstWithGemini(
   config: ProviderConfig,
   input: TypstRepairInput
 ): Promise<{ success: boolean; data?: TypstRepairProposal; error?: string }> {
-  const apiKey = config.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.GEMINI_BASE_URL?.trim() || "https://generativelanguage.googleapis.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.GEMINI_API_KEY,
+    envBaseUrl: process.env.GEMINI_BASE_URL,
+    defaultBaseUrl: "https://generativelanguage.googleapis.com",
+    officialHosts: ["generativelanguage.googleapis.com"],
+  });
   const model = config.model?.trim() || "gemini-1.5-pro";
 
   if (!apiKey) {
@@ -319,7 +364,7 @@ export async function repairTypstWithGemini(
   const userPrompt = buildTypstRepairUserPrompt(input);
 
   try {
-    const res = await fetch(
+    const res = await providerFetch(
       `${baseUrl}/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
@@ -382,8 +427,14 @@ export async function chatGemini(
   messages: Array<{ role: string; content: string }>,
   tools: any[],
 ): Promise<ChatCompletionResult> {
-  const apiKey = config.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
-  const baseUrl = (config.baseUrl?.trim() || process.env.GEMINI_BASE_URL?.trim() || "https://generativelanguage.googleapis.com").replace(/\/+$/, "");
+  const { apiKey, baseUrl } = resolveProviderCredentials({
+    configApiKey: config.apiKey,
+    configBaseUrl: config.baseUrl,
+    envApiKey: process.env.GEMINI_API_KEY,
+    envBaseUrl: process.env.GEMINI_BASE_URL,
+    defaultBaseUrl: "https://generativelanguage.googleapis.com",
+    officialHosts: ["generativelanguage.googleapis.com"],
+  });
   const model = config.model?.trim() || "gemini-2.0-flash";
 
   if (!apiKey) {
@@ -414,7 +465,7 @@ export async function chatGemini(
     body.tools = [{ functionDeclarations }];
   }
 
-  const res = await fetch(
+  const res = await providerFetch(
     `${baseUrl}/v1beta/models/${model}:generateContent`,
     {
       method: "POST",

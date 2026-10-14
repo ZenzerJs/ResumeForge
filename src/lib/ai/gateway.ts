@@ -41,6 +41,18 @@ export async function testProviderConnection(rawConfig: ProviderConfig): Promise
         return await testAnthropicConnection(config);
       case "gemini":
         return await testGeminiConnection(config);
+      case "groq":
+        return await testCustomConnection({
+          ...config,
+          baseUrl: config.baseUrl || "https://api.groq.com/openai",
+          model: config.model || "llama-3.3-70b-versatile",
+        });
+      case "ollama":
+        return await testCustomConnection({
+          ...config,
+          baseUrl: config.baseUrl || "http://localhost:11434",
+          model: config.model || "llama3",
+        });
       case "custom":
         return await testCustomConnection(config);
       default:

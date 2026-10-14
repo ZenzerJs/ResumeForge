@@ -28,6 +28,7 @@ export interface JobItem {
   };
   status: JobStatus;
   appliedAt?: string | null;
+  appliedVariantId?: string | null;
   notes?: string | null;
   createdAt: string;
   variants?: JobVariant[];

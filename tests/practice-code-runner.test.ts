@@ -4,6 +4,7 @@ import {
   runCodeAgainstTestCases,
   sanitizeTypeScriptCode,
 } from "@/lib/practice/code-runner";
+import { runUserCode } from "@/lib/practice/run-user-code";
 import { getProblemBySlug } from "@/lib/practice/practice-curriculum";
 
 describe("Practice Code Runner & Test Execution Engine", () => {
@@ -129,6 +130,20 @@ describe("Practice Code Runner & Test Execution Engine", () => {
       `;
       const result = runCodeAgainstTestCases(codeWithHelper, twoSum.testCases, "twoSum");
       expect(result.status).toBe("PASS");
+    });
+
+    it("terminates a worker that does not finish", async () => {
+      const result = await runUserCode("function twoSum(){return []}", [], undefined, {
+        timeoutMs: 30,
+        createWorker: () => ({
+          postMessage() {},
+          terminate() {},
+          onmessage: null,
+          onerror: null,
+        }),
+      });
+      expect(result.status).toBe("ERROR");
+      expect(result.error).toBe("Time limit exceeded");
     });
   });
 });

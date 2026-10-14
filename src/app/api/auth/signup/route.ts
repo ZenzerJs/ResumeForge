@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, normalizeEmail } from "@/lib/security/passwords";
 import { UsernameSchema } from "@/lib/security/usernames";
 import {
   buildSessionCookie,
+  cookieSecure,
   createSessionToken,
   getAppAccessSecret,
 } from "@/lib/security/session";
@@ -47,15 +49,9 @@ export async function POST(request: Request) {
     const existing = await prisma.user.findFirst({
       where: { OR: [{ email }, { username }] },
     });
-    if (existing?.email === email) {
+    if (existing) {
       return NextResponse.json(
-        { success: false, error: "An account with that email already exists" },
-        { status: 409 }
-      );
-    }
-    if (existing?.username === username) {
-      return NextResponse.json(
-        { success: false, error: "That username is already taken" },
+        { success: false, error: "Could not create that account" },
         { status: 409 }
       );
     }
@@ -68,14 +64,12 @@ export async function POST(request: Request) {
       },
     });
 
-    const token = await createSessionToken(user.id);
+    const token = await createSessionToken(user.id, Date.now(), user.sessionVersion);
     if (!token) {
       return NextResponse.json({ success: false, error: "Unable to create session" }, { status: 500 });
     }
 
-    const secure =
-      new URL(request.url).protocol === "https:" ||
-      request.headers.get("x-forwarded-proto") === "https";
+    const secure = cookieSecure(request);
     const response = NextResponse.json({
       success: true,
       data: publicUser(user),
@@ -83,6 +77,12 @@ export async function POST(request: Request) {
     response.headers.set("Set-Cookie", buildSessionCookie(token, secure));
     return response;
   } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return NextResponse.json(
+        { success: false, error: "Could not create that account" },
+        { status: 409 }
+      );
+    }
     const isDbError = err instanceof Error && (err.message.includes("Can't reach database") || err.message.includes("PrismaClient"));
     return NextResponse.json(
       {

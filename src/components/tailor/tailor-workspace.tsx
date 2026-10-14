@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useDeferredValue, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Sparkles,
@@ -151,12 +151,13 @@ export function TailorWorkspace() {
   const [newUserReqText, setNewUserReqText] = useState("");
   const [customUserReqs, setCustomUserReqs] = useState<ProvenanceRequirement[]>([]);
 
-  const jobDoc = React.useMemo(() => {
+  const deferredDescription = useDeferredValue(rawDescription);
+  const jobDoc = useMemo(() => {
     return parseJobDescriptionDocument({
-      text: rawDescription,
+      text: deferredDescription,
       sourceKind: "PASTED",
     });
-  }, [rawDescription]);
+  }, [deferredDescription]);
 
   const [gapSkillToResolve, setGapSkillToResolve] = useState<string | null>(null);
   const [isAutoScanning, setIsAutoScanning] = useState(false);
@@ -176,6 +177,12 @@ export function TailorWorkspace() {
   const [activeVariantContent, setActiveVariantContent] = useState<string>("");
   const [patchError, setPatchError] = useState<string | null>(null);
   const [savedJobId, setSavedJobId] = useState<string | null>(null);
+  const savedJobIdRef = useRef<string | null>(null);
+  const userEditedRef = useRef(false);
+  const saveQueueRef = useRef(Promise.resolve());
+  const roleTitleRef = useRef(roleTitle);
+  const scanGenerationRef = useRef(0);
+  roleTitleRef.current = roleTitle;
 
   const [isTier2Fetching, setIsTier2Fetching] = useState<boolean>(false);
   const [tier2Status, setTier2Status] = useState<{ type: "loading" | "success" | "error"; message: string } | null>(null);
@@ -183,13 +190,14 @@ export function TailorWorkspace() {
 
   const [atsResult, setAtsResult] = useState<AtsEvaluationResult | null>(null);
 
-  const diagnosticReport = React.useMemo(() => {
+  const diagnosticReport = useMemo(() => {
+    if (activeTab !== "diagnostic") return undefined;
     return auditResume({
       resumeText: activeVariantContent || masterTypstSource || "",
       requiredSkills: extractedRequirements?.requiredSkills || [],
       preferredSkills: extractedRequirements?.preferredSkills || [],
     });
-  }, [activeVariantContent, masterTypstSource, extractedRequirements]);
+  }, [activeTab, activeVariantContent, masterTypstSource, extractedRequirements]);
 
   useEffect(() => {
     async function loadMasterOrStarterResume() {
@@ -264,6 +272,8 @@ export function TailorWorkspace() {
 
   useEffect(() => {
     if (!jobIdParam) return;
+    savedJobIdRef.current = jobIdParam;
+    setSavedJobId(jobIdParam);
     async function loadJobById() {
       try {
         const res = await fetch(`/api/jobs/${jobIdParam}`);
@@ -273,7 +283,10 @@ export function TailorWorkspace() {
           if (job.company) setCompany(job.company);
           if (job.roleTitle) setRoleTitle(job.roleTitle);
           if (job.rawDescription) setRawDescription(convertHtmlToCleanMarkdown(job.rawDescription));
-          if (job.id) setSavedJobId(job.id);
+          if (job.id) {
+            savedJobIdRef.current = job.id;
+            setSavedJobId(job.id);
+          }
           sessionStorage.setItem("resumeforge_active_job_id", job.id);
 
           if (isPlaceholderDescription(job.rawDescription)) {
@@ -285,7 +298,7 @@ export function TailorWorkspace() {
     loadJobById();
   }, [jobIdParam]);
 
-  const ensureJobSaved = async (opts?: {
+  const saveJobNow = async (opts?: {
     forceUpdate?: boolean;
     requirements?: JobRequirements | null;
   }): Promise<string | null> => {
@@ -298,11 +311,11 @@ export function TailorWorkspace() {
       extractedRequirements: opts?.requirements ?? extractedRequirements ?? undefined,
     };
 
-    // Update existing saved job with latest posting fields (safe to keep in SQLite)
-    if (savedJobId) {
+    const existingId = savedJobIdRef.current;
+    if (existingId) {
       if (opts?.forceUpdate !== false) {
         try {
-          const updateRes = await fetch(`/api/jobs/${savedJobId}`, {
+          const updateRes = await fetch(`/api/jobs/${existingId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
@@ -310,13 +323,13 @@ export function TailorWorkspace() {
           const updateJson = await updateRes.json();
           if (updateRes.ok && updateJson.success) {
             setSaveStatus("Job posting saved to database.");
-            return savedJobId;
+            return existingId;
           }
         } catch {
           // fall through to create if update fails unexpectedly
         }
       }
-      return savedJobId;
+      return existingId;
     }
 
     const saveRes = await fetch("/api/jobs", {
@@ -329,12 +342,25 @@ export function TailorWorkspace() {
     });
     const saveJson = await saveRes.json();
     if (saveRes.ok && saveJson.success) {
+      savedJobIdRef.current = saveJson.data.id;
       setSavedJobId(saveJson.data.id);
       sessionStorage.setItem("resumeforge_active_job_id", saveJson.data.id);
       setSaveStatus("Job posting saved to database.");
       return saveJson.data.id as string;
     }
     return null;
+  };
+
+  const ensureJobSaved = (opts?: {
+    forceUpdate?: boolean;
+    requirements?: JobRequirements | null;
+  }): Promise<string | null> => {
+    const run = saveQueueRef.current.then(() => saveJobNow(opts));
+    saveQueueRef.current = run.then(
+      () => undefined,
+      () => undefined
+    );
+    return run;
   };
 
   const handleGeneratePatches = async () => {
@@ -467,20 +493,23 @@ export function TailorWorkspace() {
     }
   };
 
-  const fetchMatches = async (reqs: JobRequirements) => {
+  const fetchMatches = async (reqs: JobRequirements, signal?: AbortSignal) => {
     setIsMatching(true);
     try {
       const res = await fetch("/api/jobs/match", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(reqs),
+        signal,
       });
+      if (signal?.aborted) return;
 
       const json = await res.json();
       if (res.ok && json.success) {
         setMatches(json.data);
       }
     } catch (err) {
+      if (signal?.aborted) return;
       console.error("Match error:", err);
     } finally {
       setIsMatching(false);
@@ -523,6 +552,7 @@ export function TailorWorkspace() {
   // Ensure a job record exists so CoverLetterPanel can generate,
   // and keep company / role / description / requirements synced in SQLite.
   useEffect(() => {
+    if (!userEditedRef.current) return;
     if (!rawDescription.trim()) return;
     const timer = setTimeout(() => {
       void ensureJobSaved({ forceUpdate: true });
@@ -533,8 +563,11 @@ export function TailorWorkspace() {
 
   // Auto-rescan debounce when rawDescription changes
   useEffect(() => {
+    if (!userEditedRef.current) return;
     if (!rawDescription.trim() || rawDescription.length < 50) return;
 
+    const generation = ++scanGenerationRef.current;
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
         setIsAutoScanning(true);
@@ -542,23 +575,29 @@ export function TailorWorkspace() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ rawDescription }),
+          signal: controller.signal,
         });
         const json = await res.json();
+        if (generation !== scanGenerationRef.current) return;
         if (res.ok && json.success && json.data) {
           setExtractedRequirements(json.data);
-          if (json.data.roleTitle && !roleTitle) {
+          if (json.data.roleTitle && !roleTitleRef.current) {
             setRoleTitle(json.data.roleTitle);
           }
-          await fetchMatches(json.data);
+          await fetchMatches(json.data, controller.signal);
         }
       } catch (err) {
+        if (controller.signal.aborted) return;
         console.error("Auto-rescan error:", err);
       } finally {
-        setIsAutoScanning(false);
+        if (generation === scanGenerationRef.current) setIsAutoScanning(false);
       }
     }, 1200);
 
-    return () => clearTimeout(timer);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawDescription]);
 
@@ -997,6 +1036,7 @@ export function TailorWorkspace() {
                   report={diagnosticReport}
                   typstAst={activeVariantContent}
                   evidence={matches}
+                  variantContext={{ masterResumeId, jobId: savedJobId }}
                   onPatchApplied={(patchedTypstAst) => {
                     setActiveVariantContent(patchedTypstAst);
                     setSaveStatus("Deterministic fix applied to working copy — review, then save or re-run guardrail.");
@@ -1198,7 +1238,10 @@ export function TailorWorkspace() {
                             type="text"
                             autoComplete="organization"
                             value={company}
-                            onChange={(e) => setCompany(e.target.value)}
+                            onChange={(e) => {
+                              userEditedRef.current = true;
+                              setCompany(e.target.value);
+                            }}
                             className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
                           />
                         </div>
@@ -1210,7 +1253,10 @@ export function TailorWorkspace() {
                             type="text"
                             autoComplete="off"
                             value={roleTitle}
-                            onChange={(e) => setRoleTitle(e.target.value)}
+                            onChange={(e) => {
+                              userEditedRef.current = true;
+                              setRoleTitle(e.target.value);
+                            }}
                             className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
                           />
                         </div>
@@ -1230,7 +1276,10 @@ export function TailorWorkspace() {
                         </label>
                         <textarea
                           value={rawDescription}
-                          onChange={(e) => setRawDescription(e.target.value)}
+                          onChange={(e) => {
+                            userEditedRef.current = true;
+                            setRawDescription(e.target.value);
+                          }}
                           rows={8}
                           data-testid="jd-textarea"
                           aria-label="Job description"
@@ -1247,6 +1296,7 @@ export function TailorWorkspace() {
                             type="button"
                             data-testid="sample-backend-btn"
                             onClick={() => {
+                              userEditedRef.current = true;
                               setCompany("Nova Labs");
                               setRoleTitle("Senior Backend Engineer");
                               setRawDescription(SAMPLE_BACKEND_JD);
@@ -1259,6 +1309,7 @@ export function TailorWorkspace() {
                             type="button"
                             data-testid="sample-frontend-btn"
                             onClick={() => {
+                              userEditedRef.current = true;
                               setCompany("WebCraft Systems");
                               setRoleTitle("Frontend Engineer");
                               setRawDescription(SAMPLE_FRONTEND_JD);

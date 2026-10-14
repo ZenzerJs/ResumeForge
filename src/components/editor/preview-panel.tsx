@@ -3,9 +3,7 @@
 import React, { useState } from "react";
 import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2, BarChart3, Sparkles, FileText, ChevronDown, Package } from "lucide-react";
 import dynamic from "next/dynamic";
-import { compileTypstToPdf } from "@/lib/typst/compiler";
-import { generateAtsDocx } from "@/lib/export/docx";
-import { generateApplicationPackageZip, cleanTypstToText, sanitizeZipFilename } from "@/lib/export/zip";
+import { cleanTypstToText, sanitizeZipFilename } from "@/lib/export/zip";
 import { assertCanExport } from "@/lib/guardrail/policy";
 import { ResumeFacts } from "@/lib/facts/types";
 import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
@@ -71,6 +69,7 @@ export function PreviewPanel({
       // Phase 11.2 Mechanical Guardrail Gate
       assertCanExport(source, masterFacts);
 
+      const { compileTypstToPdf } = await import("@/lib/typst/compiler");
       const pdfBytes = await compileTypstToPdf(source);
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
@@ -96,6 +95,7 @@ export function PreviewPanel({
       // Phase 11.2 Mechanical Guardrail Gate
       assertCanExport(source, masterFacts);
 
+      const { generateAtsDocx } = await import("@/lib/export/docx");
       const docxBytes = await generateAtsDocx(source, { facts: masterFacts || undefined });
       const blob = new Blob([docxBytes.buffer as ArrayBuffer], {
         type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -187,6 +187,7 @@ export function PreviewPanel({
       setIsExporting(true);
       setExportError(null);
 
+      const { generateApplicationPackageZip } = await import("@/lib/export/zip");
       const zipBytes = await generateApplicationPackageZip({
         typstSource: source,
         masterFacts: masterFacts || undefined,

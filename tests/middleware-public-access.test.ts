@@ -12,11 +12,9 @@ describe("Middleware & Public Path Access for Jobs Board & Practice", () => {
     expect(isPublicPath("/privacy")).toBe(true);
   });
 
-  it("allows unauthenticated guest access to public job connectors and practice APIs", () => {
+  it("allows unauthenticated guest access to public job connectors and public APIs", () => {
     expect(isPublicPath("/api/connectors/jobs")).toBe(true);
     expect(isPublicPath("/api/connectors/status")).toBe(true);
-    expect(isPublicPath("/api/practice/problems")).toBe(true);
-    expect(isPublicPath("/api/practice/execute")).toBe(true);
     expect(isPublicPath("/api/jobs/sample-123/interview-prep")).toBe(true);
   });
 
@@ -30,5 +28,7 @@ describe("Middleware & Public Path Access for Jobs Board & Practice", () => {
     expect(isPublicPath("/library")).toBe(false);
     expect(isPublicPath("/api/resumes")).toBe(false);
     expect(isPublicPath("/api/evidence")).toBe(false);
+    expect(isPublicPath("/api/practice/execute")).toBe(false);
+    expect(isPublicPath("/api/practice/problems")).toBe(false);
   });
 });
