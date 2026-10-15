@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
 import {
   EvidenceExtractResponseSchema,
@@ -10,13 +10,11 @@ import { createEvidenceItem, getEvidenceItems } from "@/lib/db/evidence";
 import { POST as extractEvidenceRoute } from "@/app/api/ai/extract-evidence/route";
 import { authedRequest, createTestUser } from "./helpers/auth";
 
-beforeEach(async () => {
-  await prisma.bullet.deleteMany();
-  await prisma.evidenceItem.deleteMany();
-});
-
-afterEach(() => {
+afterEach(async () => {
   vi.restoreAllMocks();
+  await prisma.evidenceItem.deleteMany({
+    where: { title: { in: ["New Project", "Backend Engineer"] } },
+  });
 });
 
 describe("Evidence extract schema & persist", () => {

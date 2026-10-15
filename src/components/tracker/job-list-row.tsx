@@ -34,19 +34,8 @@ const STATUS_LABELS: Record<JobStatus, string> = {
 
 const ALL_STATUSES = Object.keys(STATUS_LABELS) as JobStatus[];
 
-const AVATAR_COLORS = [
-  "bg-sky-500",
-  "bg-rose-400",
-  "bg-emerald-400",
-  "bg-amber-500 text-rf-bg",
-  "bg-cyan-400",
-  "bg-orange-400",
-  "bg-teal-400",
-];
-
-export function companyAvatarClass(company?: string | null): string {
-  const seed = (company || "J").charCodeAt(0) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[seed];
+export function companyAvatarClass(_company?: string | null): string {
+  return "border border-slate-700 bg-slate-800 text-slate-200";
 }
 
 interface JobListRowProps {
@@ -118,7 +107,7 @@ export function JobListRow({
     >
       <div
         className={cn(
-          "flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg text-sm font-bold text-rf-bg",
+          "flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg text-sm font-bold",
           companyAvatarClass(job.company),
         )}
       >
@@ -190,7 +179,12 @@ export function JobListRow({
             onClick={() => {
               sessionStorage.setItem("resumeforge_active_job_id", job.id);
             }}
-            className="rounded-md bg-amber-500 px-2.5 py-1.5 text-xs font-bold text-rf-bg transition-colors duration-150 hover:bg-amber-400"
+            className={cn(
+              "rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors duration-150",
+              isSelected
+                ? "bg-amber-500 text-rf-bg hover:bg-amber-400"
+                : "border border-slate-600 text-slate-200 hover:border-slate-400 hover:text-white"
+            )}
           >
             Tailor Resume
           </Link>
@@ -238,7 +232,7 @@ export function JobListRow({
                   }}
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-rf-cloud transition-colors duration-150 hover:bg-slate-800"
                 >
-                  <FileText className="h-3.5 w-3.5 text-amber-400" />
+                  <FileText className="h-3.5 w-3.5 text-slate-400" />
                   {hasCoverLetter ? "Open Cover Letter" : "Cover Letter"}
                 </Link>
 
@@ -255,7 +249,7 @@ export function JobListRow({
                     {isFetchingFullText ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <DownloadCloud className="h-3.5 w-3.5 text-amber-400" />
+                      <DownloadCloud className="h-3.5 w-3.5 text-slate-400" />
                     )}
                     Pull Full Description
                   </button>

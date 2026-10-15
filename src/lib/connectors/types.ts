@@ -46,9 +46,17 @@ export interface ConnectorClient {
   healthCheck(): Promise<boolean>;
 }
 
+export class ConnectorSkippedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConnectorSkippedError";
+  }
+}
+
 export interface SyncResult {
   source: SourceConnector;
   success: boolean;
+  skipped?: boolean;
   jobsFound: number;
   jobsInserted: number;
   error?: string;

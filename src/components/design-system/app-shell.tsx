@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { TopNav } from "@/components/navigation/top-nav";
 import { GuestMigrationModal } from "@/components/auth/guest-migration-modal";
+import { fetchSessionPayload } from "@/components/auth/session-user";
 import { cn } from "@/lib/utils";
 
 /** Kept for layout/testid affinity; no longer drives decorative atmosphere. */
@@ -34,14 +35,9 @@ function GuestBanner() {
 
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((json) => {
-        if (!cancelled) setGuest(Boolean(json?.guest) || !json?.data);
-      })
-      .catch(() => {
-        if (!cancelled) setGuest(true);
-      });
+    void fetchSessionPayload().then((json) => {
+      if (!cancelled) setGuest(Boolean(json?.guest) || !json?.data);
+    });
     return () => {
       cancelled = true;
     };
@@ -51,11 +47,11 @@ function GuestBanner() {
 
   return (
     <div
-      className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-center text-sm text-amber-100"
+      className="border-b border-slate-800 bg-slate-900/80 px-4 py-2 text-center text-sm text-slate-300"
       data-testid="guest-banner"
     >
       You’re using a guest session. Work stays in this browser until you{" "}
-      <Link href="/login" className="font-semibold text-amber-300 underline-offset-2 hover:underline">
+      <Link href="/login" className="font-semibold text-amber-400 underline-offset-2 hover:underline">
         sign in
       </Link>{" "}
       to save.
@@ -72,6 +68,8 @@ export function AppShell({
   hideNav = false,
 }: AppShellProps) {
   const lockViewport = variant === "editor" || variant === "tracker";
+  /** Editor actions are too wide for the global header; give them their own bar. */
+  const useToolbar = variant === "editor" && Boolean(actions || badge);
   const [showMigrationModal, setShowMigrationModal] = useState(false);
   const [guestDraft, setGuestDraft] = useState<string | null>(null);
 
@@ -82,8 +80,7 @@ export function AppShell({
     const isMigrated = localStorage.getItem("resumeforge_draft_migrated") === "true";
     if (isDismissed || isMigrated) return;
 
-    fetch("/api/auth/me")
-      .then((res) => res.json())
+    fetchSessionPayload()
       .then(async (json) => {
         const isAuthUser = json?.data && !json.guest;
         if (isAuthUser) {
@@ -138,7 +135,12 @@ export function AppShell({
       )}
       data-testid={`app-shell-${variant}`}
     >
-      {!hideNav ? <TopNav badge={badge} actions={actions} /> : null}
+      {!hideNav ? (
+        <TopNav
+          badge={useToolbar ? undefined : badge}
+          actions={useToolbar ? undefined : actions}
+        />
+      ) : null}
 
       <main
         id="main-content"
@@ -150,6 +152,15 @@ export function AppShell({
         )}
       >
         {!hideNav ? <GuestBanner /> : null}
+        {!hideNav && useToolbar ? (
+          <div
+            className="relative z-40 flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-slate-800/80 bg-rf-bg px-4 py-2 md:px-8"
+            data-testid="workspace-toolbar"
+          >
+            <div className="flex min-w-0 items-center gap-3">{badge}</div>
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">{actions}</div>
+          </div>
+        ) : null}
         {children}
       </main>
 

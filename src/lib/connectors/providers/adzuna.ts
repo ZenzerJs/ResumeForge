@@ -1,6 +1,6 @@
 import { safeFetch } from "../http";
 import { sanitizeJobPayload } from "../sanitize";
-import { ConnectorClient, RawJobListing } from "../types";
+import { ConnectorClient, ConnectorSkippedError, RawJobListing } from "../types";
 
 export class AdzunaCaConnector implements ConnectorClient {
   readonly id = "adzuna_ca" as const;
@@ -16,8 +16,9 @@ export class AdzunaCaConnector implements ConnectorClient {
   async fetchJobs(params?: { page?: number; query?: string }): Promise<RawJobListing[]> {
     const creds = this.getCredentials();
     if (!creds) {
-      console.info("[AdzunaCA] Skipping: ADZUNA_APP_ID or ADZUNA_APP_KEY not set in environment.");
-      return [];
+      throw new ConnectorSkippedError(
+        "ADZUNA_APP_ID or ADZUNA_APP_KEY not set in environment."
+      );
     }
 
     const page = params?.page ?? 1;

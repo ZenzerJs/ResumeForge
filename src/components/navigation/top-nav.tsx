@@ -29,7 +29,6 @@ const NAV_LINKS = [
   { href: "/library", label: "Evidence Bank", icon: Database },
   { href: "/tracker", label: "Jobs", icon: Briefcase },
   { href: "/tailor", label: "Tailor", icon: Sparkles },
-  { href: "/interview/dsa", label: "DSA", icon: Terminal },
   { href: "/practice", label: "Practice", icon: Code2 },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
@@ -178,7 +177,7 @@ export function TopNav({ actions, badge }: TopNavProps) {
         ) : null}
 
         <nav
-          className="hidden md:flex items-center gap-6 text-sm"
+          className="hidden md:flex items-center gap-1 text-sm"
           aria-label="Primary navigation"
         >
           {NAV_LINKS.map(({ href, label, icon: Icon }) => {
@@ -187,15 +186,17 @@ export function TopNav({ actions, badge }: TopNavProps) {
               <Link
                 key={href}
                 href={href}
+                title={label}
+                aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "transition-colors flex items-center gap-2 px-3 py-1.5 rounded hover:bg-slate-800/40 focus-visible:ring-2 focus-visible:ring-amber-500/60",
+                  "flex items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 transition-colors hover:bg-slate-800/40 focus-visible:ring-2 focus-visible:ring-amber-500/60 xl:px-3",
                   isActive
-                    ? "text-white bg-slate-800/40"
+                    ? "text-white bg-slate-800/60"
                     : "text-slate-400 hover:text-white"
                 )}
               >
-                <Icon className="h-4 w-4" aria-hidden />
-                {label}
+                <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                <span className="sr-only xl:not-sr-only">{label}</span>
               </Link>
             );
           })}

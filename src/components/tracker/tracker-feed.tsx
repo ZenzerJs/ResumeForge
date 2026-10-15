@@ -102,25 +102,12 @@ interface TrackerFeedProps {
   filterStatuses?: JobStatus[];
 }
 
-async function runWithConcurrency<T>(
-  items: T[],
-  concurrency: number,
-  worker: (item: T) => Promise<void>,
-): Promise<void> {
-  let index = 0;
-  const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-    while (index < items.length) {
-      const current = items[index++];
-      await worker(current);
-    }
-  });
-  await Promise.all(runners);
-}
-
 export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const [jobs, setJobs] = useState<JobItem[]>([]);
   const [totalJobs, setTotalJobs] = useState(0);
+  const [pipelineCounts, setPipelineCounts] = useState({ applied: 0, interviewing: 0 });
   const [totalPages, setTotalPages] = useState(1);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -141,7 +128,9 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const [tier2Notice, setTier2Notice] = useState<Record<string, string>>({});
   const [isImporting, setIsImporting] = useState(false);
   const [importNotice, setImportNotice] = useState<string | null>(null);
-  const [isBulkImportingDescriptions, setIsBulkImportingDescriptions] = useState(false);
+  const [hydrateProgress, setHydrateProgress] = useState<{ done: number; total: number } | null>(null);
+  const hydrateAttemptedRef = useRef<Set<string>>(new Set());
+  const mountedRef = useRef(true);
   const activeCardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -181,6 +170,9 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         setJobs(json.data);
         setTotalJobs(json.meta?.total ?? json.data.length);
         setTotalPages(json.meta?.totalPages ?? 1);
+        setPipelineCounts(
+          json.meta?.counts ?? { applied: 0, interviewing: 0 }
+        );
         const notesMap: { [id: string]: string } = {};
         json.data.forEach((j: JobItem) => {
           notesMap[j.id] = j.notes || "";
@@ -197,6 +189,94 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   useEffect(() => {
     fetchJobs();
   }, [fetchJobs]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Desktop: open the first job so the detail pane is never an empty void.
+  useEffect(() => {
+    if (isLoading || activeJobId || jobs.length === 0) return;
+    if (window.matchMedia("(min-width: 1024px)").matches) {
+      setActiveJobId(jobs[0].id);
+    }
+  }, [isLoading, activeJobId, jobs]);
+
+  // Automatically fetch + persist descriptions for placeholder rows on the current page.
+  // The server stores them on the Job row, so each posting is fetched at most once.
+  useEffect(() => {
+    if (isLoading) return;
+    const attempted = hydrateAttemptedRef.current;
+    const pending = jobs
+      .filter((j) => (j.isPlaceholder ?? isPlaceholderDescription(j.rawDescription)) && !attempted.has(j.id))
+      .sort((a, b) => Number(b.id === activeJobId) - Number(a.id === activeJobId))
+      .map((j) => j.id);
+    if (pending.length === 0) return;
+    pending.forEach((id) => attempted.add(id));
+
+    void (async () => {
+      const BATCH = 6;
+      let done = 0;
+      setHydrateProgress({ done: 0, total: pending.length });
+      for (let i = 0; i < pending.length; i += BATCH) {
+        if (!mountedRef.current) return;
+        const ids = pending.slice(i, i + BATCH);
+        try {
+          const res = await fetch("/api/jobs/hydrate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids }),
+          });
+          const json = await res.json();
+          if (!mountedRef.current) return;
+          if (res.ok && json.success) {
+            const filled = new Map<string, string>(
+              (json.results as Array<{ id: string; rawDescription?: string }>)
+                .filter((r) => r.rawDescription)
+                .map((r) => [r.id, r.rawDescription as string]),
+            );
+            if (filled.size > 0) {
+              setJobs((prev) =>
+                prev.map((j) =>
+                  filled.has(j.id)
+                    ? { ...j, rawDescription: filled.get(j.id), isPlaceholder: false }
+                    : j,
+                ),
+              );
+            }
+          }
+        } catch {
+          // Best effort; the manual "Pull Full Description" button remains in the detail pane.
+        }
+        done += ids.length;
+        if (mountedRef.current) setHydrateProgress({ done, total: pending.length });
+      }
+      if (mountedRef.current) setHydrateProgress(null);
+    })();
+  }, [jobs, isLoading, activeJobId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/connectors/status")
+      .then((res) => res.json())
+      .then((json) => {
+        if (cancelled || !json?.success) return;
+        const times = (json.data?.providers ?? [])
+          .map((provider: { lastSyncAt?: string | null }) => provider.lastSyncAt)
+          .filter((value: string | null | undefined): value is string => Boolean(value))
+          .sort();
+        setLastSyncAt(times.at(-1) ?? null);
+      })
+      .catch(() => {
+        // Status is optional chrome.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isImporting]);
 
   useEffect(() => {
     if (!isLoading && activeJobId && activeCardRef.current) {
@@ -329,7 +409,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const handleRefreshFromSource = async () => {
     try {
       setIsImporting(true);
-      setImportNotice("Syncing live feeds from public connectors & source listings...");
+      setImportNotice("Syncing live feeds from public connectors & source listings…");
 
       const [bulkRes, syncRes] = await Promise.allSettled([
         fetch("/api/jobs/bulk-import", {
@@ -342,21 +422,31 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         }),
       ]);
 
-      let message = "Refresh complete.";
+      let trackerPart = "Tracker: import failed.";
       if (bulkRes.status === "fulfilled" && bulkRes.value.ok) {
         const bulkJson = await bulkRes.value.json();
-        if (bulkJson.success) {
-          message = `Imported ${bulkJson.createdCount} new jobs (${bulkJson.skippedCount} existing skipped).`;
-        }
+        trackerPart = bulkJson.success
+          ? `Tracker: ${bulkJson.createdCount} new (${bulkJson.skippedCount} already saved).`
+          : "Tracker: import failed.";
       }
+
+      let feedPart = "Discover feed: sync failed.";
       if (syncRes.status === "fulfilled" && syncRes.value.ok) {
         const syncJson = await syncRes.value.json();
-        if (syncJson.success && syncJson.data?.summary) {
-          message += ` Synced ${syncJson.data.summary.totalFound} jobs across ${syncJson.data.summary.providerCount} connectors.`;
+        const summary = syncJson.data?.summary;
+        const results: Array<{ source: string; skipped?: boolean; success?: boolean }> =
+          syncJson.data?.results ?? [];
+        const skipped = results.filter((result) => result.skipped);
+        if (syncJson.success && summary) {
+          const ran = Math.max(0, summary.providerCount - skipped.length);
+          feedPart = `Discover feed: ${summary.totalInserted} new of ${summary.totalFound} from ${ran} sources.`;
+          if (skipped.length > 0) {
+            feedPart += ` Skipped: ${skipped.map((result) => result.source).join(", ")}.`;
+          }
         }
       }
 
-      setImportNotice(message);
+      setImportNotice(`${trackerPart} ${feedPart}`);
       fetchJobs();
       setTimeout(() => setImportNotice(null), 6000);
     } catch (err) {
@@ -375,79 +465,31 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const pageJobs = jobs;
   const selectedJob = activeJobId ? jobs.find((j) => j.id === activeJobId) ?? null : null;
 
-  const placeholderFiltered = jobs.filter(
-    (j) => j.isPlaceholder ?? isPlaceholderDescription(j.rawDescription),
-  );
-
-  const handleBulkImportDescriptions = async () => {
-    if (placeholderFiltered.length === 0) {
-      setImportNotice("No placeholder jobs in the current filter to import.");
-      setTimeout(() => setImportNotice(null), 4000);
-      return;
-    }
-
-    setIsBulkImportingDescriptions(true);
-    let success = 0;
-    let failed = 0;
-    const total = placeholderFiltered.length;
-    setImportNotice(`Importing descriptions: 0 / ${total}…`);
-
-    await runWithConcurrency(placeholderFiltered, 3, async (job) => {
-      try {
-        const res = await fetch(`/api/jobs/${job.id}/fetch-fulltext`, { method: "POST" });
-        const json = await res.json();
-        if (res.ok && json.success && json.data) {
-          success += 1;
-          setJobs((prev) =>
-            prev.map((j) =>
-              j.id === job.id
-                ? { ...j, rawDescription: json.data.rawDescription, isPlaceholder: false }
-                : j,
-            ),
-          );
-        } else {
-          failed += 1;
-        }
-      } catch {
-        failed += 1;
-      }
-      setImportNotice(
-        `Importing descriptions: ${success + failed} / ${total} (${success} ok, ${failed} failed)…`,
-      );
-    });
-
-    setImportNotice(
-      `Imported descriptions: ${success} succeeded, ${failed} failed of ${total}.`,
-    );
-    setIsBulkImportingDescriptions(false);
-    setTimeout(() => setImportNotice(null), 6000);
-  };
-
-  const pipelineApplied = jobs.filter(
-    (j) => j.status === "APPLIED" || j.status === "INTERVIEWING" || j.status === "OFFER",
-  ).length;
-  const pipelineInterviewing = jobs.filter((j) => j.status === "INTERVIEWING").length;
+  const pipelineApplied = pipelineCounts.applied;
+  const pipelineInterviewing = pipelineCounts.interviewing;
 
   return (
     <AppShell variant="tracker">
       <TrackerSubNav
         actions={
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              data-testid="bulk-import-descriptions-btn"
-              onClick={handleBulkImportDescriptions}
-              disabled={isBulkImportingDescriptions || isLoading}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-rf-surface px-3 py-1.5 text-xs font-medium text-rf-cloud transition-colors duration-150 hover:bg-rf-elevated disabled:opacity-50"
-              title="Pull full descriptions for filtered placeholder jobs"
-            >
-              {isBulkImportingDescriptions ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : null}
-              <span className="hidden sm:inline">Import descriptions</span>
-              <span className="sm:hidden">Import</span>
-            </button>
-            <TrackerRefreshButton onClick={handleRefreshFromSource} isImporting={isImporting} />
+            {hydrateProgress ? (
+              <span
+                role="status"
+                aria-live="polite"
+                data-testid="hydrate-status"
+                className="hidden items-center gap-1.5 text-xs tabular-nums text-slate-400 sm:inline-flex"
+                title="Descriptions are fetched automatically and saved, so each posting is only fetched once."
+              >
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                Saving descriptions {hydrateProgress.done}/{hydrateProgress.total}
+              </span>
+            ) : null}
+            <TrackerRefreshButton
+              onClick={handleRefreshFromSource}
+              isImporting={isImporting}
+              lastSyncAt={lastSyncAt}
+            />
           </div>
         }
       />
@@ -580,15 +622,19 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         </select>
 
         <div className="ml-auto flex flex-wrap items-center gap-3 text-[12.5px] text-slate-500">
-          <span className="hidden md:inline">
-            Pipeline: <span className="text-rf-cloud">{totalJobs}</span>
-            {" · "}
+          <span className="tabular-nums">
+            {isLoading ? (
+              "Loading…"
+            ) : (
+              <>
+                <span className="text-rf-cloud">{totalJobs}</span> job{totalJobs !== 1 ? "s" : ""}
+              </>
+            )}
+          </span>
+          <span className="hidden tabular-nums md:inline">
             Applied <span className="text-amber-400">{pipelineApplied}</span>
             {" · "}
             Interviewing <span className="text-emerald-400">{pipelineInterviewing}</span>
-          </span>
-          <span>
-            {isLoading ? "Loading…" : `${totalJobs} job${totalJobs !== 1 ? "s" : ""}`}
           </span>
           <Link
             href="/tailor"

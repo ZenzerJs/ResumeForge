@@ -1,5 +1,6 @@
 import { safeFetch } from "../http";
 import { sanitizeJobPayload } from "../sanitize";
+import { filterInternshipListings } from "../internship-filter";
 import { ConnectorClient, RawJobListing } from "../types";
 
 function isCanadianOrWorldwide(locationStr: string): boolean {
@@ -18,7 +19,7 @@ export class RemotiveConnector implements ConnectorClient {
   readonly id = "remotive" as const;
   readonly name = "Remotive Software Dev Feed";
 
-  async fetchJobs(): Promise<RawJobListing[]> {
+  async fetchJobs(params?: { includeAllRoles?: boolean }): Promise<RawJobListing[]> {
     const url = "https://remotive.com/api/remote-jobs?category=software-dev";
 
     try {
@@ -56,7 +57,7 @@ export class RemotiveConnector implements ConnectorClient {
         });
       }
 
-      return listings;
+      return filterInternshipListings(listings, { includeAllRoles: params?.includeAllRoles });
     } catch (err) {
       console.error("[Remotive] Fetch error:", err);
       return [];

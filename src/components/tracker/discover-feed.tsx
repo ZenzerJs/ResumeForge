@@ -17,8 +17,6 @@ import {
   ChevronRight,
   DollarSign,
   Globe2,
-  SlidersHorizontal,
-  Compass,
 } from "lucide-react";
 import { AppShell } from "@/components/design-system/app-shell";
 import { PageHeader } from "@/components/design-system/page-header";
@@ -148,8 +146,7 @@ export function DiscoverFeed() {
   const [sourceFilter, setSourceFilter] = useState("ALL");
   const [workplaceFilter, setWorkplaceFilter] = useState("ALL");
   const [cityFilter, setCityFilter] = useState("ALL");
-  const [locationSearchInput, setLocationSearchInput] = useState("");
-  const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
+  const [hasEvidence, setHasEvidence] = useState(false);
   const [radiusFilter, setRadiusFilter] = useState("100");
   const [minSalaryFilter, setMinSalaryFilter] = useState("0");
   const [minScoreFilter, setMinScoreFilter] = useState("0");
@@ -192,6 +189,7 @@ export function DiscoverFeed() {
         setJobs(json.data || []);
         setTotalJobs(json.meta?.total ?? 0);
         setTotalPages(json.meta?.totalPages ?? 1);
+        setHasEvidence(Boolean(json.hasEvidence));
       }
     } catch (err) {
       console.error("Failed to fetch connector jobs:", err);
@@ -318,9 +316,9 @@ export function DiscoverFeed() {
             {isSyncing ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <RefreshCw className="h-3.5 w-3.5 text-amber-400" />
+              <RefreshCw className="h-3.5 w-3.5" />
             )}
-            {isSyncing ? "Syncing Feeds..." : "Sync Public Feeds"}
+            {isSyncing ? "Syncing Feeds…" : "Sync Public Feeds"}
           </CommandButton>
         }
       />
@@ -330,7 +328,7 @@ export function DiscoverFeed() {
           eyebrow="Browse live listings"
           title="Discovered Jobs"
           description="Live tech listings ingested from Greenhouse, Lever, Ashby, Adzuna, Jobicy, Remotive, and RemoteOK. Save roles directly into your application tracker."
-          statusBadge={<StatusPill status="amber" label={`${totalJobs} Ingested`} />}
+          statusBadge={<StatusPill status="slate" label={`${totalJobs} Ingested`} />}
         />
 
         {notification ? (
@@ -356,111 +354,30 @@ export function DiscoverFeed() {
 
         {/* Filter Toolbar */}
         <div className="flex flex-col gap-3 rounded-xl border border-slate-800/80 bg-rf-surface p-4">
-          <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
-            <div className="relative max-w-md flex-1">
-              <label htmlFor="discover-search-input" className="sr-only">
-                Search company, role, or keywords
-              </label>
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
-              <input
-                id="discover-search-input"
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search company, title, keywords..."
-                className="h-11 w-full rounded-md border border-slate-800 bg-rf-bg pl-9 pr-3 text-xs text-rf-cloud placeholder:text-slate-500 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
-                data-testid="discover-search-input"
-              />
-            </div>
+          <div className="relative w-full">
+            <label htmlFor="discover-search-input" className="sr-only">
+              Search company, role, or keywords
+            </label>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+            <input
+              id="discover-search-input"
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search company, title, keywords…"
+              className="h-11 w-full rounded-md border border-slate-800 bg-rf-bg pl-9 pr-3 text-xs text-rf-cloud placeholder:text-slate-500 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+              data-testid="discover-search-input"
+            />
+          </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Location Search Input with Live Suggestions */}
-              <div className="relative">
-                <div className="flex items-center">
-                  <MapPin className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
-                  <input
-                    type="text"
-                    value={locationSearchInput}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setLocationSearchInput(val);
-                      setIsLocationDropdownOpen(true);
-                      const match = CANADIAN_CITIES.find(
-                        (c) =>
-                          c.label.toLowerCase().includes(val.toLowerCase()) ||
-                          c.value.toLowerCase().includes(val.toLowerCase())
-                      );
-                      if (val.trim() === "") {
-                        setCityFilter("ALL");
-                      } else if (match && match.value !== "ALL") {
-                        setCityFilter(match.value);
-                      }
-                    }}
-                    onFocus={() => setIsLocationDropdownOpen(true)}
-                    onBlur={() => setTimeout(() => setIsLocationDropdownOpen(false), 250)}
-                    placeholder="Location / City (e.g. Toronto)..."
-                    className="h-11 w-48 rounded-md border border-slate-700 bg-rf-elevated pl-9 pr-3 text-xs text-rf-cloud placeholder:text-slate-500 outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
-                    data-testid="discover-location-input"
-                  />
-                  {cityFilter !== "ALL" && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCityFilter("ALL");
-                        setLocationSearchInput("");
-                      }}
-                      className="absolute right-2 text-slate-500 hover:text-slate-300"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-
-                {isLocationDropdownOpen && (
-                  <div className="absolute left-0 top-full z-50 mt-1 max-h-56 w-56 overflow-auto rounded-lg border border-slate-700 bg-slate-900 p-1 shadow-2xl">
-                    {CANADIAN_CITIES.filter(
-                      (c) =>
-                        c.label.toLowerCase().includes(locationSearchInput.toLowerCase()) ||
-                        c.value.toLowerCase().includes(locationSearchInput.toLowerCase())
-                    ).map((c) => (
-                      <button
-                        key={c.value}
-                        type="button"
-                        onMouseDown={() => {
-                          setCityFilter(c.value);
-                          setLocationSearchInput(c.value === "ALL" ? "" : c.label);
-                          setIsLocationDropdownOpen(false);
-                        }}
-                        className={`flex w-full items-center gap-2 rounded px-3 py-1.5 text-left text-xs transition hover:bg-amber-500/15 hover:text-amber-300 ${
-                          cityFilter === c.value
-                            ? "bg-amber-500/20 text-amber-300 font-bold"
-                            : "text-slate-300"
-                        }`}
-                      >
-                        <MapPin className="h-3 w-3 shrink-0 text-slate-500" />
-                        <span>{c.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* City Select */}
+          <div className="flex flex-wrap items-center gap-2">
               <label htmlFor="discover-city-select" className="sr-only">
                 Filter by City
               </label>
               <select
                 id="discover-city-select"
                 value={cityFilter}
-                onChange={(e) => {
-                  setCityFilter(e.target.value);
-                  const found = CANADIAN_CITIES.find((c) => c.value === e.target.value);
-                  if (found && found.value !== "ALL") {
-                    setLocationSearchInput(found.label);
-                  } else {
-                    setLocationSearchInput("");
-                  }
-                }}
+                onChange={(e) => setCityFilter(e.target.value)}
                 className={`${FILTER_CONTROL} cursor-pointer text-rf-meta`}
                 data-testid="discover-city-select"
               >
@@ -537,7 +454,7 @@ export function DiscoverFeed() {
                 id="discover-sort-select"
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value)}
-                className={`${FILTER_CONTROL} cursor-pointer font-medium text-amber-300 border-amber-500/40`}
+                className={`${FILTER_CONTROL} cursor-pointer text-rf-meta`}
                 data-testid="discover-sort-select"
               >
                 {SORT_OPTIONS.map((s) => (
@@ -589,16 +506,15 @@ export function DiscoverFeed() {
                 onClick={() => setCanadianOnly((prev) => !prev)}
                 className={`flex min-h-11 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors ${
                   canadianOnly
-                    ? "border-amber-500/40 bg-amber-500/15 text-amber-300"
+                    ? "border-slate-500 bg-slate-700 text-white"
                     : "border-slate-700 bg-rf-elevated text-slate-400 hover:text-white"
                 }`}
                 data-testid="discover-canadian-toggle"
               >
                 <Globe2 className="h-3.5 w-3.5" />
-                <span>🇨🇦 Canada Only</span>
+                <span>Canada Only</span>
               </button>
             </div>
-          </div>
 
           <div className="flex flex-wrap items-center gap-2 border-t border-slate-800/80 pt-3">
             <span className="text-[11px] font-mono uppercase tracking-wider text-rf-meta">
@@ -611,7 +527,7 @@ export function DiscoverFeed() {
                 onClick={() => setPostedWithin(opt.value)}
                 className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
                   postedWithin === opt.value
-                    ? "border border-amber-500/40 bg-amber-500/15 text-amber-300"
+                    ? "border border-slate-500 bg-slate-700 text-white"
                     : "border border-transparent text-slate-400 hover:bg-slate-800 hover:text-white"
                 }`}
                 data-testid={`posted-within-${opt.value}`}
@@ -654,21 +570,22 @@ export function DiscoverFeed() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {jobs.map((j) => {
               const salaryStr = formatSalary(j);
               const isAlreadyTracked = Boolean(j.trackedJob);
-              const matchScore = j.blendedScore ?? 75;
+              const matchScore = typeof j.blendedScore === "number" ? j.blendedScore : null;
+              const requiredCount = j.compatibility?.totalRequiredCount ?? 0;
 
               return (
                 <div
                   key={j.id}
-                  className="flex flex-col justify-between gap-4 rounded-xl border border-slate-800/80 bg-rf-surface p-4 transition-all duration-200 hover:border-amber-500/40"
+                  className="flex flex-col justify-between gap-4 rounded-xl border border-slate-800/80 bg-rf-surface p-4 transition-colors duration-200 hover:border-slate-600"
                   data-testid={`job-card-${j.id}`}
                 >
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
                         <Building2 className="h-3.5 w-3.5 text-slate-400" />
                         {j.companyName}
                       </span>
@@ -685,16 +602,35 @@ export function DiscoverFeed() {
                       const fundingBadge = formatFundingBadge(intel.fundingIntel);
                       const h1bBadge = formatH1BBadge(intel.h1bIntel);
                       return (
-                        <div className="flex flex-wrap items-center gap-1.5 my-0.5">
-                          <FitPercentageDial compositeScore={matchScore} breakdown={j.scoreBreakdown as any} size={40} />
+                        <div className="flex flex-wrap items-center gap-2 my-0.5">
+                          {hasEvidence && matchScore !== null ? (
+                            <div className="flex items-center gap-2">
+                              <FitPercentageDial
+                                compositeScore={matchScore}
+                                breakdown={j.scoreBreakdown as any}
+                                size={28}
+                                showLabel={false}
+                              />
+                              <span className="font-mono text-xs text-slate-200">{matchScore}%</span>
+                            </div>
+                          ) : (
+                            <Link
+                              href="/library"
+                              className="text-[11px] font-medium text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline"
+                            >
+                              Add evidence to score
+                            </Link>
+                          )}
+                          {hasEvidence ? (
                           <JobCardSignalBadge
-                            compositeScore={matchScore}
+                            compositeScore={matchScore ?? undefined}
                             compatibility={j.compatibility}
                             fundingBadge={fundingBadge}
                             h1bBadge={h1bBadge}
                             companyName={j.companyName}
                             jobId={j.id}
                           />
+                          ) : null}
                         </div>
                       );
                     })()}
@@ -729,14 +665,14 @@ export function DiscoverFeed() {
                       ) : null}
                     </div>
 
-                    {j.compatibility && (
+                    {j.compatibility && requiredCount > 0 && (
                       <div className="mt-2 space-y-1.5">
                         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
                           <span className="rounded bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-emerald-300">
-                            {j.compatibility.matchedSkills.length}/{j.compatibility.totalRequiredCount || j.compatibility.matchedSkills.length || 1} Skills Matched
+                            {j.compatibility.matchedSkills.length}/{requiredCount} Skills Matched
                           </span>
                           {j.compatibility.matchedEvidenceCount > 0 && (
-                            <span className="rounded bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 text-cyan-300">
+                            <span className="rounded border border-slate-700 bg-slate-800 px-2 py-0.5 text-slate-300">
                               {j.compatibility.matchedEvidenceCount} Evidence Items
                             </span>
                           )}
@@ -780,7 +716,7 @@ export function DiscoverFeed() {
                         type="button"
                         disabled={promotingId === j.id}
                         onClick={() => handlePromoteJob(j)}
-                        className="flex items-center gap-1.5 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-950 shadow-sm transition-colors hover:bg-amber-400 disabled:opacity-50"
+                        className="flex items-center gap-1.5 rounded-md border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:border-amber-500 hover:bg-amber-500 hover:text-slate-950 focus-visible:border-amber-500 focus-visible:bg-amber-500 focus-visible:text-slate-950 disabled:opacity-50"
                         data-testid={`promote-btn-${j.id}`}
                       >
                         {promotingId === j.id ? (

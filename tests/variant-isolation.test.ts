@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { prisma } from "../src/lib/prisma";
 import { createResume } from "../src/lib/db/resumes";
 import { createVariant, updateVariant, assertNotProtectedResume } from "../src/lib/db/variants";
@@ -8,12 +8,6 @@ describe("Amendment 3: Master Resume Isolation & Variant Protection", () => {
   let jobId: string;
 
   beforeEach(async () => {
-    // Clean up test data
-    await prisma.patch.deleteMany();
-    await prisma.resumeVariant.deleteMany();
-    await prisma.job.deleteMany();
-    await prisma.resume.deleteMany();
-
     // Create a protected master resume
     const master = await createResume({
       title: "Test Master Resume",
@@ -31,6 +25,16 @@ describe("Amendment 3: Master Resume Isolation & Variant Protection", () => {
       },
     });
     jobId = job.id;
+  });
+
+  afterEach(async () => {
+    if (masterResumeId) {
+      await prisma.resumeVariant.deleteMany({ where: { masterResumeId } });
+      await prisma.resume.deleteMany({ where: { id: masterResumeId } });
+    }
+    if (jobId) {
+      await prisma.job.deleteMany({ where: { id: jobId } });
+    }
   });
 
   it("master resume has isProtected=true by default", async () => {

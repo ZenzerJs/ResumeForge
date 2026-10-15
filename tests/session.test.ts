@@ -30,17 +30,25 @@ describe("session helpers", () => {
   });
 
   it("forces the Secure cookie flag in production and ignores x-forwarded-proto", () => {
-    const env = process.env as { NODE_ENV?: string };
-    const previous = env.NODE_ENV;
+    const env = process.env as { NODE_ENV?: string; NEXT_PUBLIC_APP_URL?: string };
+    const previousEnv = env.NODE_ENV;
+    const previousUrl = env.NEXT_PUBLIC_APP_URL;
+
     env.NODE_ENV = "production";
-    const request = new Request("http://localhost/api/auth/login", {
-      headers: { "x-forwarded-proto": "http" },
-    });
-    expect(cookieSecure(request)).toBe(true);
-    env.NODE_ENV = "test";
+    env.NEXT_PUBLIC_APP_URL = "http://localhost:3000";
     expect(cookieSecure(new Request("http://localhost/api/auth/login"))).toBe(false);
-    expect(cookieSecure(new Request("https://localhost/api/auth/login"))).toBe(true);
-    env.NODE_ENV = previous;
+
+    env.NEXT_PUBLIC_APP_URL = "https://resumeforge.app";
+    expect(cookieSecure(new Request("http://localhost/api/auth/login"))).toBe(true);
+
+    env.NEXT_PUBLIC_APP_URL = "not a url";
+    expect(cookieSecure()).toBe(false);
+    delete env.NEXT_PUBLIC_APP_URL;
+    expect(cookieSecure()).toBe(false);
+
+    env.NODE_ENV = previousEnv;
+    if (previousUrl === undefined) delete env.NEXT_PUBLIC_APP_URL;
+    else env.NEXT_PUBLIC_APP_URL = previousUrl;
   });
 
   it("allows mutations when Origin matches the Host header even if the server bound 0.0.0.0", () => {

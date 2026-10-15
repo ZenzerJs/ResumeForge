@@ -1,5 +1,6 @@
 import { safeFetch } from "../http";
 import { sanitizeJobPayload } from "../sanitize";
+import { filterInternshipListings } from "../internship-filter";
 import { ConnectorClient, RawJobListing } from "../types";
 
 const TECH_TAGS = new Set([
@@ -40,7 +41,7 @@ export class RemoteOkConnector implements ConnectorClient {
   readonly id = "remoteok" as const;
   readonly name = "RemoteOK API";
 
-  async fetchJobs(): Promise<RawJobListing[]> {
+  async fetchJobs(params?: { includeAllRoles?: boolean }): Promise<RawJobListing[]> {
     const url = "https://remoteok.com/api";
 
     try {
@@ -99,7 +100,7 @@ export class RemoteOkConnector implements ConnectorClient {
         });
       }
 
-      return listings;
+      return filterInternshipListings(listings, { includeAllRoles: params?.includeAllRoles });
     } catch (err) {
       console.error("[RemoteOK] Fetch error:", err);
       return [];

@@ -14,9 +14,10 @@ interface Props {
   compositeScore: number;
   breakdown?: Breakdown;
   size?: number;
+  showLabel?: boolean;
 }
 
-export function FitPercentageDial({ compositeScore, breakdown, size = 120 }: Props) {
+export function FitPercentageDial({ compositeScore, breakdown, size = 120, showLabel = true }: Props) {
   const strokeWidth = 10;
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
@@ -47,10 +48,12 @@ export function FitPercentageDial({ compositeScore, breakdown, size = 120 }: Pro
               cy={size / 2}
             />
           </svg>
-          <div className="absolute flex flex-col items-center justify-center text-center">
-            <span className="text-xl font-bold text-foreground">{compositeScore}%</span>
-            <span className="text-xs text-muted-foreground">Fit</span>
-          </div>
+          {showLabel ? (
+            <div className="absolute flex flex-col items-center justify-center text-center">
+              <span className="text-xl font-bold text-foreground">{compositeScore}%</span>
+              <span className="text-xs text-muted-foreground">Fit</span>
+            </div>
+          ) : null}
         </div>
       </PopoverTrigger>
       {breakdown && (

@@ -7,7 +7,13 @@ import { JobicyConnector } from "./providers/jobicy";
 import { LeverConnector } from "./providers/lever";
 import { RemotiveConnector } from "./providers/remotive";
 import { RemoteOkConnector } from "./providers/remoteok";
-import { ConnectorClient, RawJobListing, SourceConnector, SyncResult } from "./types";
+import {
+  ConnectorClient,
+  ConnectorSkippedError,
+  RawJobListing,
+  SourceConnector,
+  SyncResult,
+} from "./types";
 import { JobSource as PrismaJobSource, WorkplaceType as PrismaWorkplaceType } from "@prisma/client";
 
 export const CONNECTORS: Record<SourceConnector, ConnectorClient> = {
@@ -138,13 +144,18 @@ export async function syncSingleConnector(
       jobsInserted: insertedCount,
     };
   } catch (err: any) {
+    const skipped = err instanceof ConnectorSkippedError || err?.name === "ConnectorSkippedError";
     const errorMsg = err?.message || String(err);
-    console.error(`[Orchestrator] Connector ${source} failed:`, err);
+    if (!skipped) {
+      console.error(`[Orchestrator] Connector ${source} failed:`, err);
+    } else {
+      console.info(`[Orchestrator] Connector ${source} skipped: ${errorMsg}`);
+    }
 
     await prisma.connectorSyncLog.create({
       data: {
         source: prismaSource,
-        status: "FAILED",
+        status: skipped ? "SKIPPED" : "FAILED",
         jobsFound: 0,
         jobsInserted: 0,
         errorMessage: errorMsg,
@@ -154,6 +165,7 @@ export async function syncSingleConnector(
     return {
       source,
       success: false,
+      skipped,
       jobsFound: 0,
       jobsInserted: 0,
       error: errorMsg,
