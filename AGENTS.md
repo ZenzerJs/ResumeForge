@@ -6,6 +6,26 @@ This repository is governed by strict architecture, security, and scoping rules.
 
 ---
 
+## Invariants
+
+Hard rules for every agent. Sprint 1 signed decisions sit under them so later tasks do not relitigate them.
+
+1. Postgres is the only source of truth. No SQLite runtime. Fix any doc that says otherwise. `scripts/migrate-sqlite-to-postgres.ts` is a one-time historical copy tool.
+2. All AI/LLM output is Zod-validated before it touches the DB.
+3. API keys (BYOK) never persist server-side. Never log request bodies that may contain keys. `src/lib/security/safe-fetch.ts` keeps its private-IP block.
+4. No destructive migration runs without a verified `--dry-run` report committed to the PR. Do not drop `Patch.evidenceCitations` in the same PR that adds `PatchCitation`.
+5. Every task ends with passing `npm run typecheck`, `npm run lint`, `npm run test`, and `npm run build`. `npm run check:env` must pass when env reads change.
+6. One branch, one concern. Conventional commits (`feat:`, `fix:`, `chore:`, `test:`).
+
+Signed Sprint 1 decisions:
+
+- Patch citations store `evidenceId` and/or `bulletId`. At least one is required. If both are set and `bullet.evidenceId !== evidenceId`, reject the citation. `onDelete: Restrict` blocks hard delete only. Archive stays application logic.
+- Better Auth models are `AuthUser`, `Session`, `Account`, and `Verification`. `AuthUser.id === User.id`. Do not delete legacy `User` rows until `docs/user-fk-map.md` lists every relation and its cascade behavior.
+- `calculateMatchScore` with empty requirements keeps core-stack at 100. Ticket `RF-SCORE-NULL` (later sprint) introduces `scorable: false` instead of flipping that number.
+- `APP_ACCESS_SECRET` stays the session signing secret until the Better Auth cutover.
+
+---
+
 ## Scoping & Context Rules (Ponytail + Caveman)
 
 - **Targeted File Inspection**: When asked to inspect, debug, optimize, or edit specific files, inspect ONLY the target files and their direct imports. DO NOT read foundational docs or run git status.
