@@ -9,6 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "check:env": "tsx scripts/check-env-parity.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "sync:oa": "tsx scripts/sync-oa-bank.ts",

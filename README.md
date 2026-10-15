@@ -8,7 +8,8 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![Prisma](https://img.shields.io/badge/Prisma-SQLite-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
+[![Prisma](https://img.shields.io/badge/Prisma-PostgreSQL-2D3748?logo=postgresql&logoColor=white)](https://www.prisma.io/)
+[![CI](https://github.com/ZenzerJs/ResumeForge/actions/workflows/ci.yml/badge.svg)](https://github.com/ZenzerJs/ResumeForge/actions/workflows/ci.yml)
 [![Typst](https://img.shields.io/badge/Typst-WASM_Engine-239DAD)](https://typst.app/)
 [![Tests](https://img.shields.io/badge/tests-Vitest_%2B_Playwright-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
 [![License](https://img.shields.io/badge/license-Private-lightgrey)]()
@@ -114,7 +115,7 @@ All AI calls route through a **client-side BYOK gateway** — no resume content 
 |---|---|
 | Framework | Next.js 15 (App Router) + React 19 + TypeScript |
 | Styling | Tailwind CSS + shadcn/ui — custom **"Forge Terminal"** dark design system (obsidian background, amber/emerald accents, glassmorphic panels) |
-| Database | SQLite via Prisma ORM |
+| Database | PostgreSQL 16 via Prisma ORM (`docker compose`) |
 | Document Engine | Typst (`typst.ts` WASM browser compiler) |
 | Code Editor | CodeMirror 6 |
 | AI Integration | BYOK gateway — OpenAI, Anthropic, Gemini — client-side key scrubbing |
@@ -147,15 +148,20 @@ npm install
 ```bash
 cp .env.example .env
 ```
-Fill in any required values (database URL, BYOK provider settings, etc.).
+
+`DATABASE_URL` must be a Postgres URL. `APP_ACCESS_SECRET` signs the session cookie. Provider keys in this file are optional server fallbacks. The browser BYOK vault does not read them.
 </details>
 
 <details>
-<summary><strong>4. Set up the database</strong></summary>
+<summary><strong>4. Start Postgres, migrate, and seed</strong></summary>
 
 ```bash
-npx prisma migrate dev --name init
+docker compose up -d
+npx prisma migrate deploy
+npx prisma db seed
 ```
+
+`docker compose` starts Postgres 16 on `127.0.0.1:5432` with user, password, and database `resumeforge`. Seed is idempotent.
 </details>
 
 <details>
@@ -179,6 +185,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | `npm run lint` | Run ESLint |
 | `npm run typecheck` | Run the TypeScript compiler in check-only mode |
 | `npm run test` | Run the Vitest unit/integration suite |
+| `npm run check:env` | Fail if code reads a `process.env` name missing from `.env.example` |
 
 ---
 
