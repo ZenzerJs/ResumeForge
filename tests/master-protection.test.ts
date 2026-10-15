@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { PUT } from "@/app/api/resumes/[id]/route";
 import { POST as generatePatches } from "@/app/api/ai/generate-patches/route";
 import { createResume, getMasterResume, saveMasterResume } from "@/lib/db/resumes";
@@ -6,8 +6,12 @@ import { prisma } from "@/lib/prisma";
 import { authedRequest, createTestUser } from "./helpers/auth";
 
 describe("master resume protection", () => {
-  beforeEach(async () => {
-    await prisma.resume.deleteMany();
+  const createdIds: string[] = [];
+
+  afterEach(async () => {
+    if (createdIds.length === 0) return;
+    const ids = createdIds.splice(0, createdIds.length);
+    await prisma.resume.deleteMany({ where: { id: { in: ids } } });
   });
 
   it("rejects unauthenticated PUT with 401", async () => {
@@ -16,6 +20,7 @@ describe("master resume protection", () => {
       typstSource: "= Master\n",
       isMaster: true,
     });
+    createdIds.push(created.id);
 
     const req = new Request(`http://localhost/api/resumes/${created.id}`, {
       method: "PUT",
@@ -34,6 +39,7 @@ describe("master resume protection", () => {
       isMaster: true,
       userId: user.id,
     });
+    createdIds.push(created.id);
 
     const req = authedRequest(
       `http://localhost/api/resumes/${created.id}`,
@@ -52,7 +58,7 @@ describe("master resume protection", () => {
   });
 
   it("does not auto-create a master from generate-patches", async () => {
-    const { cookie } = await createTestUser();
+    const { user, cookie } = await createTestUser();
     const req = authedRequest(
       "http://localhost/api/ai/generate-patches",
       {
@@ -67,7 +73,7 @@ describe("master resume protection", () => {
     );
     const res = await generatePatches(req);
     expect(res.status).toBe(404);
-    expect(await getMasterResume()).toBeNull();
+    expect(await getMasterResume(user.id)).toBeNull();
   });
 
   it("save-master still overwrites with confirmation", async () => {
@@ -78,6 +84,7 @@ describe("master resume protection", () => {
       isMaster: true,
       userId: user.id,
     });
+    createdIds.push(created.id);
     const result = await saveMasterResume({
       id: created.id,
       title: "Protected Master",

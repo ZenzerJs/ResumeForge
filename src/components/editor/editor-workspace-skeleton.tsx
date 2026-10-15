@@ -156,7 +156,7 @@ export function EditorWorkspaceSkeleton({
             <div className="flex items-center gap-1.5">
               <Skeleton className="h-6 w-14 rounded-md bg-slate-200" />
               <Skeleton className="h-6 w-14 rounded-md bg-slate-200" />
-              <Skeleton className="h-6 w-16 rounded-md bg-violet-500/80" />
+              <Skeleton className="h-6 w-16 rounded-md bg-amber-500/60" />
               <Skeleton className="h-6 w-12 rounded-md bg-slate-200" />
             </div>
           </div>

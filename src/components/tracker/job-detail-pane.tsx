@@ -36,8 +36,16 @@ import type { EvidenceItemWithBullets } from "@/lib/matching/matcher";
 import type { JobItem } from "@/components/tracker/job-types";
 import { isSafeHref } from "@/lib/security/safe-fetch";
 import { JobDescriptionMarkdown } from "@/components/tracker/job-description-markdown";
-import { ApplySheet } from "@/components/tracker/apply-sheet";
-import { ApplyPrepSheetModal } from "@/components/tracker/apply-prep-sheet-modal";
+import dynamic from "next/dynamic";
+
+// Heavy, open-on-demand dialogs: keep them out of the initial tracker bundle.
+const ApplySheet = dynamic(() => import("@/components/tracker/apply-sheet").then((m) => m.ApplySheet), {
+  ssr: false,
+});
+const ApplyPrepSheetModal = dynamic(
+  () => import("@/components/tracker/apply-prep-sheet-modal").then((m) => m.ApplyPrepSheetModal),
+  { ssr: false },
+);
 import { ShieldCheck, ClipboardList } from "lucide-react";
 
 const STATUS_LABELS: Record<JobStatus, string> = {
@@ -189,9 +197,9 @@ export function JobDetailPane({
         )}
 
         {/* Detail Header Card */}
-        <div className="bg-surface/80 backdrop-blur-md border border-outline-variant rounded-xl p-6 shadow-[0_0_15px_rgba(255,140,0,0.05)]">
+        <div className="bg-rf-surface border border-outline-variant rounded-xl p-6">
           <div className="flex gap-6 items-start">
-            <div className="w-16 h-16 rounded-lg bg-surface-variant border border-outline flex items-center justify-center shrink-0 text-3xl font-bold text-primary shadow-[0_0_15px_rgba(255,140,0,0.1)]">
+            <div className="w-16 h-16 rounded-lg bg-surface-variant border border-outline flex items-center justify-center shrink-0 text-3xl font-bold text-primary">
               {companyInitial}
             </div>
             <div className="flex-1">
@@ -223,7 +231,7 @@ export function JobDetailPane({
                   type="button"
                   onClick={() => setApplySheetOpen(true)}
                   data-testid="one-click-apply-btn"
-                  className="px-4 py-2 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-section-label text-xs font-bold transition-colors flex items-center gap-2 shadow-sm"
+                  className="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 font-section-label text-xs font-semibold transition-colors flex items-center gap-2"
                 >
                   <ShieldCheck className="w-4 h-4" />
                   1-Click Apply
@@ -242,7 +250,7 @@ export function JobDetailPane({
                 <Link
                   href={`/tailor?jobId=${job.id}`}
                   onClick={() => sessionStorage.setItem("resumeforge_active_job_id", job.id)}
-                  className="px-5 py-2 rounded bg-primary text-on-primary font-section-label text-xs font-bold hover:bg-primary-fixed hover:shadow-[0_0_15px_rgba(255,140,0,0.3)] transition-all flex items-center gap-2"
+                  className="px-5 py-2 rounded bg-primary text-on-primary font-section-label text-xs font-bold hover:bg-primary-fixed hover:shadow-[0_0_15px_rgba(255,140,0,0.3)] transition-[background-color,box-shadow] flex items-center gap-2"
                 >
                   <Sparkles className="w-4 h-4" />
                   Tailor Resume
@@ -284,7 +292,7 @@ export function JobDetailPane({
                     <select
                       value={job.status}
                       onChange={(e) => onStatusChange(job.id, e.target.value as JobStatus)}
-                      className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-xs font-mono-data text-on-surface-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all cursor-pointer"
+                      className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-xs font-mono-data text-on-surface-variant focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer"
                       aria-label="Job status"
                     >
                       {ALL_STATUSES.map((s) => (
@@ -321,9 +329,9 @@ export function JobDetailPane({
           {/* Left Sub-column: Match & Notes */}
           <div className="xl:col-span-1 space-y-6">
             {/* Match Score Module */}
-            <div className="bg-surface/80 backdrop-blur-md border border-outline-variant rounded-xl p-5 shadow-[0_0_15px_rgba(255,140,0,0.05)]">
+            <div className="bg-rf-surface border border-outline-variant rounded-xl p-5">
               <details className="group" open>
-                <summary className="flex justify-between items-center cursor-pointer mb-4 border-b border-outline-variant/50 pb-2 outline-none">
+                <summary className="flex justify-between items-center cursor-pointer mb-4 border-b border-outline-variant/50 pb-2 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-primary">
                   <h3 className="font-section-label text-xs text-on-surface-variant uppercase tracking-widest">
                     EVIDENCE MATCH &amp; GAPS
                   </h3>
@@ -363,7 +371,7 @@ export function JobDetailPane({
             </div>
 
             {/* Technical Interview & OA Practice Problems Module */}
-            <div className="bg-surface/80 backdrop-blur-md border border-outline-variant rounded-xl p-5 shadow-[0_0_15px_rgba(255,140,0,0.05)]">
+            <div className="bg-rf-surface border border-outline-variant rounded-xl p-5">
               <div className="flex justify-between items-center mb-3 border-b border-outline-variant/50 pb-2">
                 <h3 className="font-section-label text-xs text-on-surface-variant uppercase tracking-widest flex items-center gap-1.5">
                   <Code2 className="w-3.5 h-3.5 text-primary" />
@@ -431,7 +439,7 @@ export function JobDetailPane({
 
             {/* Notes Module */}
             {showNotes && (
-              <div className="bg-surface/80 backdrop-blur-md border border-outline-variant rounded-xl p-5 shadow-[0_0_15px_rgba(255,140,0,0.05)] flex flex-col">
+              <div className="bg-rf-surface border border-outline-variant rounded-xl p-5 flex flex-col">
                 <h3 className="font-section-label text-xs text-on-surface-variant mb-3 border-b border-outline-variant/50 pb-2 uppercase tracking-widest">
                   NOTES
                 </h3>
@@ -466,8 +474,8 @@ export function JobDetailPane({
 
           {/* Right Sub-column: Job Details */}
           <div className="xl:col-span-2">
-            <div className="bg-surface/80 backdrop-blur-md border border-outline-variant rounded-xl p-6 shadow-[0_0_15px_rgba(255,140,0,0.05)] h-full flex flex-col">
-              <div className="flex justify-between items-center mb-4 border-b border-outline-variant/50 pb-2 sticky top-0 bg-surface/90 backdrop-blur-md z-10 py-2">
+            <div className="bg-rf-surface border border-outline-variant rounded-xl p-6 h-full flex flex-col">
+              <div className="flex justify-between items-center mb-4 border-b border-outline-variant/50 pb-2">
                 <h3 className="font-section-label text-xs text-on-surface-variant uppercase tracking-widest">
                   JOB DETAILS
                 </h3>
@@ -494,7 +502,22 @@ export function JobDetailPane({
               )}
 
               <div className="pr-2">
-                <JobDescriptionMarkdown markdown={detailJob.rawDescription ?? ""} hideLeadingHeader />
+                {isPlaceholder ? (
+                  <div
+                    data-testid="job-description-placeholder"
+                    className="rounded-lg border border-dashed border-outline-variant bg-rf-bg/60 p-5 text-sm text-on-surface-variant"
+                  >
+                    <p className="font-semibold text-on-surface">Full description not saved yet</p>
+                    <p className="mt-1 leading-relaxed">
+                      ResumeForge fetches descriptions in the background and saves them once found. This
+                      posting could not be read automatically. Try{" "}
+                      <span className="text-on-surface">Pull Full Description</span> above, or open Tailor
+                      and paste the text once.
+                    </p>
+                  </div>
+                ) : (
+                  <JobDescriptionMarkdown markdown={detailJob.rawDescription ?? ""} hideLeadingHeader />
+                )}
               </div>
             </div>
           </div>

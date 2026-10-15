@@ -54,9 +54,9 @@ export function JobCardSignalBadge({
   const effectiveScoreResult = useMemo<MatchScoreResult | null>(() => {
     if (scoreResult) return scoreResult;
     if (compatibility) {
-      const coreStack = compatibility.requiredScore ?? 75;
-      const seniority = 100;
-      const tools = compatibility.preferredScore ?? 80;
+      const coreStack = compatibility.requiredScore ?? 0;
+      const seniority = compatibility.totalRequiredCount > 0 ? 100 : 0;
+      const tools = compatibility.preferredScore ?? 0;
       const coverage =
         compatibility.totalRequiredCount > 0
           ? Math.min(
@@ -65,7 +65,7 @@ export function JobCardSignalBadge({
                 (compatibility.matchedEvidenceCount / compatibility.totalRequiredCount) * 100
               )
             )
-          : 100;
+          : 0;
       const composite = Math.min(
         100,
         Math.max(
@@ -75,7 +75,7 @@ export function JobCardSignalBadge({
       );
 
       const derivation: string[] = [
-        `+${(0.5 * coreStack).toFixed(1)} pts (Core Stack: 50% weight) — ${coreStack}% based on ${compatibility.matchedSkills.length}/${compatibility.totalRequiredCount || compatibility.matchedSkills.length} required skills matched`,
+        `+${(0.5 * coreStack).toFixed(1)} pts (Core Stack: 50% weight) — ${coreStack}% based on ${compatibility.matchedSkills.length}/${compatibility.totalRequiredCount} required skills matched`,
         `+${(0.2 * seniority).toFixed(1)} pts (Seniority: 20% weight) — Candidate qualifications verified`,
         `+${(0.15 * tools).toFixed(1)} pts (Tools & Preferred: 15% weight) — ${tools}% across tooling requirements`,
         `+${(0.15 * coverage).toFixed(1)} pts (Evidence Coverage: 15% weight) — ${compatibility.matchedEvidenceCount} verified evidence bank items backing skills`,
@@ -108,7 +108,8 @@ export function JobCardSignalBadge({
     return null;
   }, [scoreResult, compatibility, directScore]);
 
-  const score = effectiveScoreResult?.compositeScore ?? directScore ?? 75;
+  const score = effectiveScoreResult?.compositeScore ?? directScore;
+  if (score == null) return null;
 
   const badgeColorClass =
     score >= 80
@@ -157,7 +158,7 @@ export function JobCardSignalBadge({
             type="button"
             onClick={handleClick}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-xs font-bold transition-all cursor-pointer shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40",
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-xs font-bold transition-colors cursor-pointer shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40",
               badgeColorClass
             )}
             title="Hover or click to view explainable point derivation"
@@ -212,7 +213,7 @@ export function JobCardSignalBadge({
                   </div>
                   <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-emerald-400 rounded-full transition-all duration-300"
+                      className="h-full bg-emerald-400 rounded-full transition-[width] duration-300"
                       style={{ width: `${effectiveScoreResult.breakdown.coreStackScore}%` }}
                     />
                   </div>
@@ -228,7 +229,7 @@ export function JobCardSignalBadge({
                   </div>
                   <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-amber-400 rounded-full transition-all duration-300"
+                      className="h-full bg-amber-400 rounded-full transition-[width] duration-300"
                       style={{ width: `${effectiveScoreResult.breakdown.seniorityScore}%` }}
                     />
                   </div>
@@ -244,7 +245,7 @@ export function JobCardSignalBadge({
                   </div>
                   <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-sky-400 rounded-full transition-all duration-300"
+                      className="h-full bg-sky-400 rounded-full transition-[width] duration-300"
                       style={{ width: `${effectiveScoreResult.breakdown.toolsScore}%` }}
                     />
                   </div>
@@ -260,7 +261,7 @@ export function JobCardSignalBadge({
                   </div>
                   <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-cyan-400 rounded-full transition-all duration-300"
+                      className="h-full bg-cyan-400 rounded-full transition-[width] duration-300"
                       style={{ width: `${effectiveScoreResult.breakdown.evidenceCoverageScore}%` }}
                     />
                   </div>
@@ -356,7 +357,7 @@ export function JobCardSignalBadge({
       {/* Sub-badge: H1B Status */}
       {h1bBadge && (
         <span
-          className="inline-flex items-center gap-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-indigo-300 shadow-sm"
+          className="inline-flex items-center gap-1 rounded-full border border-slate-600 bg-slate-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-300 shadow-sm"
           title={`US DOL LCA H1B Sponsorship: ${h1bBadge}`}
           data-testid="h1b-badge"
         >

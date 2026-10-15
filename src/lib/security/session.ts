@@ -107,9 +107,20 @@ export function passwordsMatch(provided: string): boolean {
   return mismatch === 0;
 }
 
-export function cookieSecure(request: Request): boolean {
-  if (process.env.NODE_ENV === "production") return true;
-  return new URL(request.url).protocol === "https:";
+/**
+ * `Secure` follows the scheme of the app's public URL, not NODE_ENV.
+ * `NEXT_PUBLIC_APP_URL=https://...` (deployed) sets it; `http://localhost`
+ * (local dev and local `next start`) does not. This stays correct behind a
+ * TLS-terminating proxy, which forwards plain HTTP internally.
+ */
+export function cookieSecure(_request?: Request): boolean {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (!appUrl) return false;
+  try {
+    return new URL(appUrl).protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 export function buildSessionCookie(token: string, secure: boolean): string {

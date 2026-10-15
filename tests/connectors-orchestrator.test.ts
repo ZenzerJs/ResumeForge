@@ -7,10 +7,18 @@ import {
 import { ConnectorClient, RawJobListing } from "@/lib/connectors/types";
 
 describe("Phase 12 Orchestrator & Promotion Pipeline", () => {
+  const mockExternalIds = ["mock_gh_1", "mock_lever_1", "mock_ashby_1"];
+
   beforeEach(async () => {
-    // Clear test tables
-    await prisma.connectorSyncLog.deleteMany({});
-    await prisma.ingestedJob.deleteMany({});
+    const seeded = await prisma.ingestedJob.findMany({
+      where: { externalId: { in: mockExternalIds } },
+      select: { id: true, trackedJobId: true },
+    });
+    const trackedIds = seeded.map((row) => row.trackedJobId).filter((id): id is string => Boolean(id));
+    await prisma.ingestedJob.deleteMany({ where: { externalId: { in: mockExternalIds } } });
+    if (trackedIds.length > 0) {
+      await prisma.job.deleteMany({ where: { id: { in: trackedIds } } });
+    }
   });
 
   it("1. syncSingleConnector parses and upserts listings, creating IngestedJob and ConnectorSyncLog", async () => {
@@ -41,13 +49,17 @@ describe("Phase 12 Orchestrator & Promotion Pipeline", () => {
     expect(result.jobsFound).toBe(1);
     expect(result.jobsInserted).toBe(1);
 
-    const jobs = await prisma.ingestedJob.findMany({});
+    const jobs = await prisma.ingestedJob.findMany({ where: { externalId: "mock_gh_1" } });
     expect(jobs.length).toBe(1);
     expect(jobs[0].companyName).toBe("Shopify");
     expect(jobs[0].isCanadianEligible).toBe(true);
     expect(jobs[0].fingerprint).toHaveLength(64);
 
-    const logs = await prisma.connectorSyncLog.findMany({});
+    const logs = await prisma.connectorSyncLog.findMany({
+      where: { source: "GREENHOUSE" },
+      orderBy: { executedAt: "desc" },
+      take: 1,
+    });
     expect(logs.length).toBe(1);
     expect(logs[0].status).toBe("SUCCESS");
     expect(logs[0].jobsInserted).toBe(1);
@@ -85,7 +97,7 @@ describe("Phase 12 Orchestrator & Promotion Pipeline", () => {
     expect(res2.jobsFound).toBe(1);
     expect(res2.jobsInserted).toBe(0);
 
-    const count = await prisma.ingestedJob.count();
+    const count = await prisma.ingestedJob.count({ where: { externalId: "mock_lever_1" } });
     expect(count).toBe(1);
   });
 
@@ -113,7 +125,9 @@ describe("Phase 12 Orchestrator & Promotion Pipeline", () => {
     };
 
     await syncSingleConnector(mockClient);
-    const ingested = await prisma.ingestedJob.findFirstOrThrow({});
+    const ingested = await prisma.ingestedJob.findFirstOrThrow({
+      where: { externalId: "mock_ashby_1" },
+    });
 
     const tracked = await promoteIngestedJobToTrackedJob(ingested.id);
     expect(tracked.id).toBeDefined();

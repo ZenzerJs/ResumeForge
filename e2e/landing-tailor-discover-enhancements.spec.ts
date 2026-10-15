@@ -194,6 +194,7 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
           total: 1,
           page: 1,
           totalPages: 1,
+          hasEvidence: true,
         }),
       });
     });

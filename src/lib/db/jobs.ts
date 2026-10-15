@@ -285,7 +285,6 @@ export async function getJobsList(query: JobListQuery = {}) {
     where,
     orderBy: { createdAt: "desc" },
     include: jobIncludeForViewer(query.userId),
-    take: 200,
   });
 
   const mapped = jobs.map((job) => {
@@ -328,9 +327,23 @@ export async function getJobsList(query: JobListQuery = {}) {
 
   const total = filtered.length;
   const start = (page - 1) * limit;
+  let applied = 0;
+  let interviewing = 0;
+  for (const job of filtered) {
+    if (job.status === "APPLIED" || job.status === "INTERVIEWING" || job.status === "OFFER") {
+      applied += 1;
+    }
+    if (job.status === "INTERVIEWING") interviewing += 1;
+  }
   return {
     data: filtered.slice(start, start + limit),
-    meta: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+      counts: { applied, interviewing },
+    },
   };
 }
 

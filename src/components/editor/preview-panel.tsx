@@ -260,7 +260,7 @@ export function PreviewPanel({
                 type="button"
                 disabled={isExporting || Boolean(error)}
                 data-testid="export-dropdown-btn"
-                className="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1 text-xs font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-3 py-1 text-xs font-semibold text-slate-950 shadow-sm hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isExporting ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -277,7 +277,7 @@ export function PreviewPanel({
                 data-testid="export-pdf-menu-item"
                 className="cursor-pointer text-xs flex items-center gap-2"
               >
-                <Download className="size-3.5 text-indigo-500" />
+                <Download className="size-3.5 text-amber-500" />
                 <span>Compiled PDF (.pdf)</span>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -309,7 +309,7 @@ export function PreviewPanel({
                 data-testid="export-json-menu-item"
                 className="cursor-pointer text-xs flex items-center gap-2"
               >
-                <FileText className="size-3.5 text-purple-500" />
+                <FileText className="size-3.5 text-slate-500" />
                 <span>JSON Resume (.json)</span>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -441,7 +441,7 @@ export function PreviewPanel({
                 type="button"
                 onClick={handleExportPdf}
                 data-testid="fallback-download-pdf-btn"
-                className="px-2 py-0.5 rounded bg-white border border-amber-300 text-indigo-700 hover:bg-indigo-50 font-medium text-[11px] inline-flex items-center gap-1 shadow-xs"
+                className="px-2 py-0.5 rounded bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 font-medium text-[11px] inline-flex items-center gap-1 shadow-xs"
               >
                 <Download className="size-3" />
                 <span>PDF</span>
@@ -470,7 +470,7 @@ export function PreviewPanel({
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-            <Loader2 className="h-8 w-8 animate-spin mb-2 text-indigo-500" />
+            <Loader2 className="h-8 w-8 animate-spin mb-2 text-amber-500" />
             <p className="text-xs">Initializing Typst WASM compiler...</p>
           </div>
         )}

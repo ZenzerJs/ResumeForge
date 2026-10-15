@@ -2,11 +2,11 @@ import { test, expect } from "@playwright/test";
 
 test.describe("WS9 In-Browser DSA Execution Sandbox", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/interview/dsa");
+    await page.goto("/practice?tab=runner");
   });
 
   test("1. renders default problem Two Sum, constraints, and starter code", async ({ page }) => {
-    await expect(page.locator("h1")).toContainText("Two Sum");
+    await expect(page.getByRole("heading", { name: "Two Sum", level: 1 })).toBeVisible();
 
     const problemSelect = page.locator('[data-testid="dsa-problem-select"]');
     await expect(problemSelect).toBeVisible();
@@ -24,6 +24,7 @@ test.describe("WS9 In-Browser DSA Execution Sandbox", () => {
   });
 
   test("2. ranks and displays recommended problems with match reasons from JD", async ({ page }) => {
+    await page.getByRole("button", { name: /Match with Job Description/i }).click();
     const jdInput = page.locator('[data-testid="dsa-jd-filter-input"]');
     await expect(jdInput).toBeVisible();
 

@@ -794,6 +794,10 @@ export async function fetchAndCacheJobFullText(jobId: string) {
   });
 
   if (!extractRes.success) {
+    // Remember the failure so background hydration does not hammer the same dead link.
+    await prisma.job
+      .update({ where: { id: jobId }, data: { extractFailure: extractRes.failureCode } })
+      .catch(() => undefined);
     return {
       success: false,
       error: extractRes.message,
@@ -827,6 +831,7 @@ export async function fetchAndCacheJobFullText(jobId: string) {
       rawDescription: extractRes.rawDescription,
       extractedRequirements: JSON.stringify(reqs),
       notes: updatedNotes,
+      extractFailure: null,
     },
   });
 

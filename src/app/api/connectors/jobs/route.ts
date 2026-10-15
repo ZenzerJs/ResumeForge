@@ -121,7 +121,6 @@ export async function GET(req: NextRequest) {
     const rawJobs = await prisma.ingestedJob.findMany({
       where,
       orderBy: [{ postedAt: "desc" }, { createdAt: "desc" }],
-      take: 200,
       include: {
         trackedJob: {
           select: { id: true, status: true },
@@ -131,6 +130,7 @@ export async function GET(req: NextRequest) {
 
     const userId = await getRequestUserId(req);
     const { candidateSkills, evidenceItemsForMatching } = await loadScoringEvidence(userId);
+    const hasEvidence = candidateSkills.length > 0 || evidenceItemsForMatching.length > 0;
 
     const targetCityKey = city.toLowerCase();
     const hasCityFilter = targetCityKey !== "all" && targetCityKey !== "all canada" && targetCityKey !== "";
@@ -229,8 +229,9 @@ export async function GET(req: NextRequest) {
         limit,
         total,
         totalPages: Math.ceil(total / limit) || 1,
-        capped: rawJobs.length === 200,
+        capped: false,
       },
+      hasEvidence,
     });
   } catch (err: any) {
     console.error("[API connectors/jobs] Error:", err);

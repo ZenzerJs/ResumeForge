@@ -1,27 +1,21 @@
-import React, { Suspense } from "react";
-import { DsaWorkspace } from "@/components/interview/dsa-workspace";
-import { TopNav } from "@/components/navigation/top-nav";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "In-Browser DSA Sandbox — ResumeForge",
-  description: "Un-paywalled in-browser DSA practice environment with target role JD pattern matching.",
+type DsaSearchParams = {
+  problem?: string;
+  slug?: string;
+  jd?: string;
 };
 
-export default function DsaPage() {
-  return (
-    <div className="min-h-screen bg-slate-950 flex flex-col">
-      <TopNav />
-      <main className="flex-1 flex flex-col">
-        <Suspense
-          fallback={
-            <div className="flex-1 flex items-center justify-center p-12 text-slate-400 text-sm font-mono">
-              Loading DSA Execution Sandbox...
-            </div>
-          }
-        >
-          <DsaWorkspace />
-        </Suspense>
-      </main>
-    </div>
-  );
+export default async function DsaPage({
+  searchParams,
+}: {
+  searchParams: Promise<DsaSearchParams>;
+}) {
+  const params = await searchParams;
+  const next = new URLSearchParams();
+  next.set("tab", "runner");
+  const problem = params.problem || params.slug;
+  if (problem) next.set("problem", problem);
+  if (params.jd) next.set("jd", params.jd);
+  redirect(`/practice?${next.toString()}`);
 }

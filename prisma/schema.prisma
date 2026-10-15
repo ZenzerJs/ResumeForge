@@ -168,7 +168,7 @@ model IngestedJob {
 model ConnectorSyncLog {
   id           String    @id @default(cuid())
   source       JobSource
-  status       String    // "SUCCESS" | "FAILED" | "RATE_LIMITED"
+  status       String    // "SUCCESS" | "FAILED" | "RATE_LIMITED" | "SKIPPED"
   jobsFound    Int       @default(0)
   jobsInserted Int       @default(0)
   errorMessage String?

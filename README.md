@@ -16,6 +16,8 @@
 
 *Zero hallucination. Zero data leaks. Every resume bullet is a reviewable, evidence-backed patch.*
 
+> Built after a season of silent rejections as a first-year. This tool carried my own search into a Google technical interview as a second-year.
+
 </div>
 
 ---
@@ -43,6 +45,15 @@ Most AI resume tools invent experience you don't have, or silently overwrite you
 | ❌ Silent overwrites destroy your original resume | ✅ Your **Master Resume** is protected; changes are reviewable patches |
 | ❌ Cloud AI providers see your resume + API keys | ✅ **Local-first, BYOK** — keys and documents never leave your machine |
 | ❌ "ATS score" is just an LLM guess | ✅ **Deterministic scoring engine** with auditable, rule-based checks |
+
+---
+
+### 🚫 What ResumeForge refuses to do
+
+- **Never auto-submits** an application. You press the button.
+- **Never persists your API keys.** Keys are scrubbed client-side and read from the environment only.
+- **Never invents experience.** If a job requirement has no matching evidence, you get an explicit *Gap*, not a made-up bullet.
+- **Never overwrites your master resume.** It is write-protected; every change is a reviewable patch.
 
 ---
 
@@ -197,6 +208,9 @@ ResumeForge/
 │   ├── app/            # Next.js App Router pages (Editor, Evidence Bank, Jobs, Tailor, Settings)
 │   ├── components/     # UI components — landing/, tracker/, shared design-system primitives
 │   └── lib/            # AI gateway logic, theme/animation config, utilities
+├── packages/
+│   ├── core/src/       # Deterministic engines — scoring/ (ATS score), intel/
+│   └── schema/src/     # Shared schemas/types
 ├── prisma/             # Database schema and migrations
 ├── e2e/ & tests/        # Playwright and Vitest test suites
 ├── DESIGN.md           # Design system reference

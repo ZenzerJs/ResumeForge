@@ -1,12 +1,13 @@
 import { safeFetch } from "../http";
 import { sanitizeJobPayload } from "../sanitize";
+import { filterInternshipListings } from "../internship-filter";
 import { ConnectorClient, RawJobListing } from "../types";
 
 export class JobicyConnector implements ConnectorClient {
   readonly id = "jobicy" as const;
   readonly name = "Jobicy Canada Remote Feed";
 
-  async fetchJobs(params?: { count?: number }): Promise<RawJobListing[]> {
+  async fetchJobs(params?: { count?: number; includeAllRoles?: boolean }): Promise<RawJobListing[]> {
     const count = params?.count ?? 50;
     const url = `https://jobicy.com/api/v2/remote-jobs?count=${count}&geo=canada&industry=dev`;
 
@@ -50,7 +51,7 @@ export class JobicyConnector implements ConnectorClient {
         });
       }
 
-      return listings;
+      return filterInternshipListings(listings, { includeAllRoles: params?.includeAllRoles });
     } catch (err) {
       console.error("[Jobicy] Fetch error:", err);
       return [];

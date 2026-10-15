@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { RawJobListingSchema } from "../types";
+import { ConnectorSkippedError, RawJobListingSchema } from "../types";
 import { GreenhouseConnector } from "../providers/greenhouse";
 import { LeverConnector } from "../providers/lever";
 import { AshbyConnector } from "../providers/ashby";
@@ -198,7 +198,7 @@ describe("Phase 12 Job Connectors — Parsing & Schema Validation", () => {
     );
 
     const client = new JobicyConnector();
-    const jobs = await client.fetchJobs();
+    const jobs = await client.fetchJobs({ includeAllRoles: true });
 
     expect(jobs.length).toBe(1);
     const parsed = RawJobListingSchema.parse(jobs[0]);
@@ -216,7 +216,7 @@ describe("Phase 12 Job Connectors — Parsing & Schema Validation", () => {
     );
 
     const client = new RemotiveConnector();
-    const jobs = await client.fetchJobs();
+    const jobs = await client.fetchJobs({ includeAllRoles: true });
 
     expect(jobs.length).toBe(1);
     const parsed = RawJobListingSchema.parse(jobs[0]);
@@ -233,7 +233,7 @@ describe("Phase 12 Job Connectors — Parsing & Schema Validation", () => {
     );
 
     const client = new RemoteOkConnector();
-    const jobs = await client.fetchJobs();
+    const jobs = await client.fetchJobs({ includeAllRoles: true });
 
     expect(jobs.length).toBe(1);
     const parsed = RawJobListingSchema.parse(jobs[0]);
@@ -242,5 +242,59 @@ describe("Phase 12 Job Connectors — Parsing & Schema Validation", () => {
     expect(parsed.title).toBe("AI Systems Engineer");
     expect(parsed.compensation?.min).toBe(140000);
     expect(parsed.compensation?.max).toBe(190000);
+  });
+
+  it("8. Jobicy, Remotive, and RemoteOK drop non-internship titles by default", async () => {
+    (global.fetch as any).mockImplementation((url: string) => {
+      if (String(url).includes("jobicy.com")) {
+        return Promise.resolve(new Response(JSON.stringify(loadFixture("jobicy.json")), { status: 200 }));
+      }
+      if (String(url).includes("remotive.com")) {
+        return Promise.resolve(new Response(JSON.stringify(loadFixture("remotive.json")), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify(loadFixture("remoteok.json")), { status: 200 }));
+    });
+
+    expect(await new JobicyConnector().fetchJobs()).toEqual([]);
+    expect(await new RemotiveConnector().fetchJobs()).toEqual([]);
+    expect(await new RemoteOkConnector().fetchJobs()).toEqual([]);
+  });
+
+  it("8b. Jobicy, Remotive, and RemoteOK keep internship titles", async () => {
+    const jobicy = loadFixture("jobicy.json");
+    jobicy.jobs[0].jobTitle = "Fullstack Cloud Developer Intern";
+    const remotive = loadFixture("remotive.json");
+    remotive.jobs[0].title = "TypeScript Engineering Intern";
+    const remoteok = loadFixture("remoteok.json");
+    remoteok[1].position = "AI Systems Engineer Intern";
+
+    (global.fetch as any).mockImplementation((url: string) => {
+      if (String(url).includes("jobicy.com")) {
+        return Promise.resolve(new Response(JSON.stringify(jobicy), { status: 200 }));
+      }
+      if (String(url).includes("remotive.com")) {
+        return Promise.resolve(new Response(JSON.stringify(remotive), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify(remoteok), { status: 200 }));
+    });
+
+    expect((await new JobicyConnector().fetchJobs())[0]?.title).toBe("Fullstack Cloud Developer Intern");
+    expect((await new RemotiveConnector().fetchJobs())[0]?.title).toBe("TypeScript Engineering Intern");
+    expect((await new RemoteOkConnector().fetchJobs())[0]?.title).toBe("AI Systems Engineer Intern");
+  });
+
+  it("9. Adzuna reports skipped when credentials are missing", async () => {
+    const prevId = process.env.ADZUNA_APP_ID;
+    const prevKey = process.env.ADZUNA_APP_KEY;
+    delete process.env.ADZUNA_APP_ID;
+    delete process.env.ADZUNA_APP_KEY;
+    try {
+      await expect(new AdzunaCaConnector().fetchJobs()).rejects.toBeInstanceOf(ConnectorSkippedError);
+    } finally {
+      if (prevId === undefined) delete process.env.ADZUNA_APP_ID;
+      else process.env.ADZUNA_APP_ID = prevId;
+      if (prevKey === undefined) delete process.env.ADZUNA_APP_KEY;
+      else process.env.ADZUNA_APP_KEY = prevKey;
+    }
   });
 });

@@ -29,7 +29,7 @@ export function PageHeader({
     >
       <div className="space-y-1">
         {eyebrow ? (
-          <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-400">
+          <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-400">
             {eyebrow}
           </div>
         ) : null}
