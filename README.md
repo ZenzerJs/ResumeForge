@@ -15,11 +15,9 @@
 
 *Evidence-grounded. Local-first. Every resume bullet is a reviewable, evidence-backed patch.*
 
-<!-- TODO (@ZenzerJs): Replace this placeholder with a real demo GIF or screenshot.
-     Record the editor workflow (paste JD → generate patches → accept → preview PDF)
-     and save the file as docs/demo.gif or docs/demo.png, then uncomment the img tag below. -->
-<!-- <img src="docs/demo.gif" alt="ResumeForge demo — paste a job description, review evidence-backed patches, export a tailored PDF" width="800" /> -->
-<p align="center"><em>🎬 Demo GIF coming soon</em></p>
+<!-- TODO: Replace this screenshot with an animated demo GIF (docs/demo.gif)
+     showing the full workflow: paste JD → generate patches → accept → preview PDF. -->
+<img src="docs/screenshot.png" alt="ResumeForge landing page — evidence-grounded resume workspace with live Typst preview" width="800" />
 
 > Built after a season of silent rejections as a first-year. This tool carried my own search into a Google technical interview as a second-year.
 
