@@ -12,9 +12,14 @@
 [![CI](https://github.com/ZenzerJs/ResumeForge/actions/workflows/ci.yml/badge.svg)](https://github.com/ZenzerJs/ResumeForge/actions/workflows/ci.yml)
 [![Typst](https://img.shields.io/badge/Typst-WASM_Engine-239DAD)](https://typst.app/)
 [![Tests](https://img.shields.io/badge/tests-Vitest_%2B_Playwright-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
-[![License](https://img.shields.io/badge/license-Private-lightgrey)]()
 
-*Zero hallucination. Zero data leaks. Every resume bullet is a reviewable, evidence-backed patch.*
+*Evidence-grounded. Local-first. Every resume bullet is a reviewable, evidence-backed patch.*
+
+<!-- TODO (@ZenzerJs): Replace this placeholder with a real demo GIF or screenshot.
+     Record the editor workflow (paste JD → generate patches → accept → preview PDF)
+     and save the file as docs/demo.gif or docs/demo.png, then uncomment the img tag below. -->
+<!-- <img src="docs/demo.gif" alt="ResumeForge demo — paste a job description, review evidence-backed patches, export a tailored PDF" width="800" /> -->
+<p align="center"><em>🎬 Demo GIF coming soon</em></p>
 
 > Built after a season of silent rejections as a first-year. This tool carried my own search into a Google technical interview as a second-year.
 
@@ -43,7 +48,7 @@ Most AI resume tools invent experience you don't have, or silently overwrite you
 |---|---|
 | ❌ LLM invents skills/metrics you never had | ✅ Every bullet traces back to a **verified Evidence Bank** item |
 | ❌ Silent overwrites destroy your original resume | ✅ Your **Master Resume** is protected; changes are reviewable patches |
-| ❌ Cloud AI providers see your resume + API keys | ✅ **Local-first, BYOK** — keys and documents never leave your machine |
+| ❌ Cloud AI providers see your resume + API keys | ✅ **Local-first, BYOK** — keys stay in your browser, AI calls go direct to your provider |
 | ❌ "ATS score" is just an LLM guess | ✅ **Deterministic scoring engine** with auditable, rule-based checks |
 
 ---
@@ -51,8 +56,8 @@ Most AI resume tools invent experience you don't have, or silently overwrite you
 ### 🚫 What ResumeForge refuses to do
 
 - **Never auto-submits** an application. You press the button.
-- **Never persists your API keys.** Keys are scrubbed client-side and read from the environment only.
-- **Never invents experience.** If a job requirement has no matching evidence, you get an explicit *Gap*, not a made-up bullet.
+- **Never stores your API keys server-side.** Keys live in your browser's local storage and are scrubbed from all server logs.
+- **Designed to avoid inventing experience.** If a job requirement has no matching evidence, you get an explicit *Gap*, not a made-up bullet.
 - **Never overwrites your master resume.** It is write-protected; every change is a reviewable patch.
 
 ---
@@ -116,7 +121,7 @@ flowchart LR
     style H fill:#0b1326,stroke:#4edea3,color:#fff
 ```
 
-All AI calls route through a **client-side BYOK gateway** — no resume content or API key ever touches a ResumeForge server.
+AI calls route through a **BYOK gateway** — you supply your own API key, and it stays in your browser's local storage.
 
 ---
 
@@ -224,7 +229,7 @@ ResumeForge/
 
 > **Truthfulness over persuasion.**
 
-The AI never invents experience — it only rephrases, restructures, or highlights what already exists in your verified Evidence Bank. Every AI-assisted change is a **diffable, reviewable patch**, and every score or recommendation traces back to a concrete, auditable reason.
+The AI is constrained to rephrase, restructure, or highlight what already exists in your verified Evidence Bank. Every AI-assisted change is a **diffable, reviewable patch**, and every score or recommendation traces back to a concrete, auditable reason.
 
 <div align="center">
 
