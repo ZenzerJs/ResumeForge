@@ -13,7 +13,7 @@
 [![Typst](https://img.shields.io/badge/Typst-WASM_Engine-239DAD)](https://typst.app/)
 [![Tests](https://img.shields.io/badge/tests-Vitest_%2B_Playwright-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
 
-*Evidence-grounded. Local-first. Every resume bullet is a reviewable, evidence-backed patch.*
+*Zero hallucination. Zero data leaks. Every resume bullet is a reviewable, evidence-backed patch.*
 
 <!-- TODO: Replace this screenshot with an animated demo GIF (docs/demo.gif)
      showing the full workflow: paste JD → generate patches → accept → preview PDF. -->
@@ -55,7 +55,7 @@ Most AI resume tools invent experience you don't have, or silently overwrite you
 
 - **Never auto-submits** an application. You press the button.
 - **Never stores your API keys server-side.** Keys live in your browser's local storage and are scrubbed from all server logs.
-- **Designed to avoid inventing experience.** If a job requirement has no matching evidence, you get an explicit *Gap*, not a made-up bullet.
+- **Never invents experience.** If a job requirement has no matching evidence, you get an explicit *Gap*, not a made-up bullet.
 - **Never overwrites your master resume.** It is write-protected; every change is a reviewable patch.
 
 ---
@@ -227,7 +227,7 @@ ResumeForge/
 
 > **Truthfulness over persuasion.**
 
-The AI is constrained to rephrase, restructure, or highlight what already exists in your verified Evidence Bank. Every AI-assisted change is a **diffable, reviewable patch**, and every score or recommendation traces back to a concrete, auditable reason.
+The AI never invents experience — it only rephrases, restructures, or highlights what already exists in your verified Evidence Bank. Every AI-assisted change is a **diffable, reviewable patch**, and every score or recommendation traces back to a concrete, auditable reason.
 
 <div align="center">
 
