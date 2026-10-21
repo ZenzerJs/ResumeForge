@@ -13,7 +13,7 @@ test.describe("T5 Browser Smoke Check", () => {
       }
     });
     page.on("pageerror", (err: Error) => {
-      consoleLogs[surface].push(`[pageerror] ${err.message}`);
+      consoleLogs[surface].push(`[pageerror] ${err.message}\n${err.stack || ""}`);
     });
   }
 
@@ -58,6 +58,16 @@ test.describe("T5 Browser Smoke Check", () => {
     await expect(nameInput).toBeVisible();
     await nameInput.fill("Sarah Connor");
 
+    // Edit location field
+    const locationInput = page.getByTestId("form-input-location");
+    await expect(locationInput).toBeVisible();
+    await locationInput.fill("Berlin, Germany");
+
+    // Edit phone field
+    const phoneInput = page.getByTestId("form-input-phone");
+    await expect(phoneInput).toBeVisible();
+    await phoneInput.fill("+49 30 123456");
+
     // Edit summary field
     const summaryInput = page.getByTestId("form-input-summary");
     await summaryInput.fill("Cybernetic defense engineer specializing in temporal resilience.");
@@ -86,6 +96,8 @@ test.describe("T5 Browser Smoke Check", () => {
     await expect.poll(getCodeMirrorDoc, { timeout: 5000 }).toContain("Sarah Connor");
     const doc1 = await getCodeMirrorDoc();
     expect(doc1).toContain("Cybernetic defense engineer");
+    expect(doc1).toContain("Berlin, Germany");
+    expect(doc1).toContain("+49 30 123456");
 
     // Also confirm preview SVG updates
     const previewSvg = page.getByTestId("typst-preview-svg");
@@ -97,6 +109,8 @@ test.describe("T5 Browser Smoke Check", () => {
     await expect(formBuilder).toBeVisible();
     await page.getByTestId("form-builder-tab-contact").click();
     await expect(page.getByTestId("form-input-fullname")).toHaveValue("Sarah Connor");
+    await expect(page.getByTestId("form-input-location")).toHaveValue("Berlin, Germany");
+    await expect(page.getByTestId("form-input-phone")).toHaveValue("+49 30 123456");
     await expect(page.getByTestId("form-input-summary")).toHaveValue(
       "Cybernetic defense engineer specializing in temporal resilience."
     );
@@ -107,6 +121,8 @@ test.describe("T5 Browser Smoke Check", () => {
     await expect.poll(getCodeMirrorDoc, { timeout: 5000 }).toContain("Sarah Connor");
     const doc2 = await getCodeMirrorDoc();
     expect(doc2).toContain("Cybernetic defense engineer");
+    expect(doc2).toContain("Berlin, Germany");
+    expect(doc2).toContain("+49 30 123456");
   });
 
   test("3. /library dark dropzone, checkboxes, Keep Both / Merge survive reload", async ({ page }) => {
