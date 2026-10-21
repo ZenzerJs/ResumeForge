@@ -116,7 +116,7 @@ Run `npm run build`. If it fails, fix the root cause and re-run all 4 checks. Co
 
 ### T4: Default model, one line
 Set `src/lib/byok-vault.ts:13` to `gemini: "gemini-2.5-flash"`. Keep the normalization shims at `byok-vault.ts:269`, `settings-workspace.tsx:85`, `providers/gemini.ts:26` and `ai-provider.ts:130,159`; they migrate old saved values. Commit: `fix(byok): default gemini-2.5-flash`.
-- [ ] done
+- [x] done: Set default model to gemini-2.5-flash in byok-vault.ts:13; shims preserved; tests passing.
 
 ### T5: Browser smoke check (Playwright must run in a subagent, per AGENTS.md)
 Run `npm run dev`, then check:

@@ -10,7 +10,7 @@ const VAULT_KEY_PREFIX = "rf_byok_key_";
 const SETTINGS_STORAGE_KEY = "resumeforge_ai_settings";
 
 const DEFAULT_MODELS: Record<string, string> = {
-  gemini: "gemini-3.8-flash",
+  gemini: "gemini-2.5-flash",
   openai: "gpt-4o",
   anthropic: "claude-3-5-sonnet-20241022",
   groq: "llama-3.3-70b-versatile",
