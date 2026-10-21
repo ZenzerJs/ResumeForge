@@ -67,7 +67,7 @@ export function parseTypstToStructuredModel(source: string): StructuredResumeMod
   // Name extraction
   let fullName = "Alex Morgan";
   const headerNameMatch =
-    source.match(/#text\([^)]*size:\s*1[68]pt[^)]*\)\[([^\]]+)\]/) ||
+    source.match(/#text\([\s\S]*?size:\s*1[68]pt[\s\S]*?\)\s*\[([^\]]+)\]/) ||
     source.match(/^=\s+(.+)$/m);
   if (headerNameMatch?.[1]) {
     fullName = headerNameMatch[1].trim();
