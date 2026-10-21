@@ -1,4 +1,5 @@
-import { ExtractedPdfEvidence, extractTechnologies } from "./pdfExtractor";
+import type { ExtractedPdfEvidence } from "./pdfExtractor";
+import { extractTechnologies } from "./tech-extractor";
 
 export interface CreateEvidencePayload {
   type: string;
