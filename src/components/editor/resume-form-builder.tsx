@@ -67,7 +67,7 @@ export function parseTypstToStructuredModel(source: string): StructuredResumeMod
   // Name extraction
   let fullName = "Alex Morgan";
   const headerNameMatch =
-    source.match(/#text\([\s\S]*?size:\s*1[68]pt[\s\S]*?\)\s*\[([^\]]+)\]/) ||
+    source.match(/#text\([\s\S]*?size:\s*(?:1[4-9]|2[0-9])pt[\s\S]*?\)\s*\[([^\]]+)\]/) ||
     source.match(/^=\s+(.+)$/m);
   if (headerNameMatch?.[1]) {
     fullName = headerNameMatch[1].trim();
@@ -76,17 +76,21 @@ export function parseTypstToStructuredModel(source: string): StructuredResumeMod
   const emailMatch = source.match(/mailto:([^\s"\]]+)/) || source.match(/([\w.+-]+@[\w-]+\.[\w.-]+)/);
   const email = emailMatch?.[1]?.replace(/\\@/g, "@") || "alex.morgan@example.com";
 
-  const phoneMatch = source.match(/(\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4})/);
-  const phone = phoneMatch?.[1] || "(555) 019-2834";
+  const phoneMatch =
+    source.match(/#sym\.dot\s*(\+?[\d\s().-]{7,25})\s*#sym\.dot/) ||
+    source.match(/(\+?\d[\d\s().-]{7,}\d)/);
+  const phone = phoneMatch?.[1]?.trim() || "(555) 019-2834";
 
-  const githubMatch = source.match(/github\.com\/([A-Za-z0-9_-]+)/i);
+  const githubMatch = source.match(/github\.com\/([A-Za-z0-9_.-]+)/i);
   const github = githubMatch?.[1] ? `github.com/${githubMatch[1]}` : "github.com/alexmorgan";
 
-  const linkedinMatch = source.match(/linkedin\.com\/in\/([A-Za-z0-9_-]+)/i);
+  const linkedinMatch = source.match(/linkedin\.com\/in\/([A-Za-z0-9_.-]+)/i);
   const linkedin = linkedinMatch?.[1] ? `linkedin.com/in/${linkedinMatch[1]}` : "linkedin.com/in/alexmorgan";
 
   let location = "San Francisco, CA";
-  const locMatch = source.match(/\[[\s\n]*([A-Za-z .]+,\s*[A-Z]{2})\s*#sym\.dot/);
+  const locMatch =
+    source.match(/#text\([^)]*size:\s*9pt[^)]*\)\[\s*([^#\n]+?)\s*#sym\.dot/) ||
+    source.match(/\[\s*([^#\n\[\]]+?)\s*#sym\.dot/);
   if (locMatch?.[1]) {
     location = locMatch[1].trim();
   }
@@ -100,11 +104,15 @@ export function parseTypstToStructuredModel(source: string): StructuredResumeMod
 
     while ((match = entryRegex.exec(block)) !== null) {
       const body = match[1];
-      const title = body.match(/title:\s*"([^"]*)"/)?.[1] ?? "";
-      const role = body.match(/role:\s*"([^"]*)"/)?.[1] ?? "";
-      const loc = body.match(/location:\s*"([^"]*)"/)?.[1] ?? "";
-      const date = body.match(/date:\s*"([^"]*)"/)?.[1] ?? "";
-      const detailsMatch = body.match(/details:\s*\[([\s\S]*?)\]/);
+      const title =
+        body.match(/title:\s*"((?:[^"\\]|\\.)*)"/)?.[1]?.replace(/\\"/g, '"').replace(/\\\\/g, "\\") ?? "";
+      const role =
+        body.match(/role:\s*"((?:[^"\\]|\\.)*)"/)?.[1]?.replace(/\\"/g, '"').replace(/\\\\/g, "\\") ?? "";
+      const loc =
+        body.match(/location:\s*"((?:[^"\\]|\\.)*)"/)?.[1]?.replace(/\\"/g, '"').replace(/\\\\/g, "\\") ?? "";
+      const date =
+        body.match(/date:\s*"((?:[^"\\]|\\.)*)"/)?.[1]?.replace(/\\"/g, '"').replace(/\\\\/g, "\\") ?? "";
+      const detailsMatch = body.match(/details:\s*\[([\s\S]*)\]/);
       const bulletsRaw = detailsMatch?.[1] ?? "";
       const bullets = bulletsRaw
         .split("\n")
@@ -184,11 +192,14 @@ export function parseTypstToStructuredModel(source: string): StructuredResumeMod
         .filter((l) => l.startsWith("- "));
       skills = skillLines.map((line, sIdx) => {
         const clean = line.replace(/^-\s+/, "");
-        const catMatch = clean.match(/^\*([^*:]+):?\*\s*(.*)$/) || clean.match(/^([^:]+):\s*(.*)$/);
+        const catMatch =
+          clean.match(/^\*([^*]+)\*:\s*(.*)$/) ||
+          clean.match(/^\*([^*:]+):?\*\s*(.*)$/) ||
+          clean.match(/^([^:]+):\s*(.*)$/);
         if (catMatch) {
           return {
             id: makeId("skill", sIdx),
-            category: catMatch[1].replace(/:$/, "").trim(),
+            category: catMatch[1].replace(/^\*+|\*+$/g, "").replace(/:$/, "").trim(),
             items: catMatch[2].trim(),
           };
         }
