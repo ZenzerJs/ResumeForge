@@ -131,6 +131,21 @@ const POSTED_OPTIONS: { value: PostedWithin; label: string }[] = [
   { value: "30d", label: "Last 30 days" },
 ];
 
+const CURATED_COMPANIES: { label: string; query: string }[] = [
+  { label: "All Companies", query: "" },
+  { label: "Stripe", query: "Stripe" },
+  { label: "Shopify", query: "Shopify" },
+  { label: "Linear", query: "Linear" },
+  { label: "Vercel", query: "Vercel" },
+  { label: "Anthropic", query: "Anthropic" },
+  { label: "OpenAI", query: "OpenAI" },
+  { label: "Cloudflare", query: "Cloudflare" },
+  { label: "Datadog", query: "Datadog" },
+  { label: "Wealthsimple", query: "Wealthsimple" },
+  { label: "Cohere", query: "Cohere" },
+  { label: "Tailscale", query: "Tailscale" },
+];
+
 const FILTER_CONTROL =
   "min-h-11 rounded-md border border-slate-700 bg-rf-elevated px-2.5 text-[12.5px] text-rf-cloud placeholder-slate-500 transition-colors duration-150 focus:border-amber-500/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60";
 
@@ -147,6 +162,7 @@ export function DiscoverFeed() {
   const [workplaceFilter, setWorkplaceFilter] = useState("ALL");
   const [cityFilter, setCityFilter] = useState("ALL");
   const [hasEvidence, setHasEvidence] = useState(false);
+  const [clientSkills, setClientSkills] = useState<string[]>([]);
   const [radiusFilter, setRadiusFilter] = useState("100");
   const [minSalaryFilter, setMinSalaryFilter] = useState("0");
   const [minScoreFilter, setMinScoreFilter] = useState("0");
@@ -162,6 +178,44 @@ export function DiscoverFeed() {
     const timer = window.setTimeout(() => setDebouncedSearch(searchQuery.trim()), 250);
     return () => window.clearTimeout(timer);
   }, [searchQuery]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadSkills() {
+      const skillSet = new Set<string>();
+      try {
+        const res = await fetch("/api/evidence");
+        const json = await res.json();
+        if (json?.success && Array.isArray(json.data)) {
+          for (const item of json.data) {
+            if (Array.isArray(item.tags)) {
+              item.tags.forEach((t: string) => skillSet.add(t.toLowerCase()));
+            }
+          }
+        }
+      } catch {}
+      if (typeof window !== "undefined") {
+        try {
+          const guestRaw = localStorage.getItem("resumeforge_guest_evidence");
+          const guestList = guestRaw ? JSON.parse(guestRaw) : [];
+          if (Array.isArray(guestList)) {
+            for (const item of guestList) {
+              if (Array.isArray(item.tags)) {
+                item.tags.forEach((t: string) => skillSet.add(t.toLowerCase()));
+              }
+            }
+          }
+        } catch {}
+      }
+      if (!cancelled && skillSet.size > 0) {
+        setClientSkills(Array.from(skillSet));
+      }
+    }
+    void loadSkills();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const fetchIngestedJobs = useCallback(async () => {
     try {
@@ -351,6 +405,34 @@ export function DiscoverFeed() {
             </button>
           </div>
         ) : null}
+
+        {/* Curated Company Quick-Filter Chips */}
+        <div
+          className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-800/80 bg-rf-surface/60 px-4 py-2.5"
+          data-testid="curated-company-chips"
+        >
+          <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 mr-1">
+            Featured Boards:
+          </span>
+          {CURATED_COMPANIES.map((company) => {
+            const isActive = searchQuery.toLowerCase() === company.query.toLowerCase();
+            return (
+              <button
+                key={company.label}
+                type="button"
+                onClick={() => setSearchQuery(isActive && company.query !== "" ? "" : company.query)}
+                data-testid={`curated-chip-${(company.query || "all").toLowerCase()}`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                  isActive
+                    ? "border border-amber-500/50 bg-amber-500/15 text-amber-300"
+                    : "border border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700 hover:text-white"
+                }`}
+              >
+                <span>{company.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
         {/* Filter Toolbar */}
         <div className="flex flex-col gap-3 rounded-xl border border-slate-800/80 bg-rf-surface p-4">
@@ -601,6 +683,22 @@ export function DiscoverFeed() {
                       const intel = normalizeCompanyIntel(j.companyName);
                       const fundingBadge = formatFundingBadge(intel.fundingIntel);
                       const h1bBadge = formatH1BBadge(intel.h1bIntel);
+                      const haystack = `${j.title} ${j.description || ""}`.toLowerCase();
+                      const matchedClientSkills = clientSkills.filter(
+                        (s) => s.length >= 2 && haystack.includes(s)
+                      );
+                      const clientSkillPct =
+                        clientSkills.length > 0
+                          ? Math.min(
+                              98,
+                              Math.max(
+                                15,
+                                Math.round(
+                                  (matchedClientSkills.length / Math.min(clientSkills.length, 8)) * 100
+                                )
+                              )
+                            )
+                          : null;
                       return (
                         <div className="flex flex-wrap items-center gap-2 my-0.5">
                           {hasEvidence && matchScore !== null ? (
@@ -614,12 +712,23 @@ export function DiscoverFeed() {
                               <span className="font-mono text-xs text-slate-200">{matchScore}%</span>
                             </div>
                           ) : (
-                            <Link
-                              href="/library"
-                              className="text-[11px] font-medium text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline"
-                            >
-                              Add evidence to score
-                            </Link>
+                            <div className="flex items-center gap-2">
+                              {clientSkillPct !== null && matchedClientSkills.length > 0 && (
+                                <span
+                                  data-testid="discover-skill-match-badge"
+                                  className="rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-emerald-300"
+                                  title={`Matched skills: ${matchedClientSkills.slice(0, 5).join(", ")}`}
+                                >
+                                  {clientSkillPct}% Skill Match
+                                </span>
+                              )}
+                              <Link
+                                href="/library"
+                                className="text-[11px] font-medium text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline"
+                              >
+                                Add evidence to score
+                              </Link>
+                            </div>
                           )}
                           {hasEvidence ? (
                           <JobCardSignalBadge

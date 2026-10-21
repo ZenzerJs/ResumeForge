@@ -10,6 +10,8 @@ import {
   ChevronRight,
   Loader2,
   MapPin,
+  Columns3,
+  LayoutList,
 } from "lucide-react";
 import { JobStatus, type WorkplaceFilter } from "@/lib/db/jobs";
 import { AppShell } from "@/components/design-system/app-shell";
@@ -27,6 +29,7 @@ import type {
 } from "@/components/tracker/job-types";
 import {
   extractLocationFromNotes,
+  normalizeLocation,
   extractApplyUrlFromNotes,
   extractPostingDateFromNotes,
   extractSalaryFromNotes,
@@ -38,6 +41,7 @@ export type { JobItem, JobVariant, JobCoverLetter };
 
 export {
   extractLocationFromNotes,
+  normalizeLocation,
   extractApplyUrlFromNotes,
   extractPostingDateFromNotes,
   extractSalaryFromNotes,
@@ -129,6 +133,8 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const [isImporting, setIsImporting] = useState(false);
   const [importNotice, setImportNotice] = useState<string | null>(null);
   const [hydrateProgress, setHydrateProgress] = useState<{ done: number; total: number } | null>(null);
+  const [viewMode, setViewMode] = useState<"split" | "kanban">("split");
+  const [draggedJobId, setDraggedJobId] = useState<string | null>(null);
   const hydrateAttemptedRef = useRef<Set<string>>(new Set());
   const mountedRef = useRef(true);
   const activeCardRef = useRef<HTMLDivElement | null>(null);
@@ -211,7 +217,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
     if (isLoading) return;
     const attempted = hydrateAttemptedRef.current;
     const pending = jobs
-      .filter((j) => (j.isPlaceholder ?? isPlaceholderDescription(j.rawDescription)) && !attempted.has(j.id))
+      .filter((j) => (j.isPlaceholder ?? isPlaceholderDescription(j.rawDescription)) && !j.extractFailure && !attempted.has(j.id))
       .sort((a, b) => Number(b.id === activeJobId) - Number(a.id === activeJobId))
       .map((j) => j.id);
     if (pending.length === 0) return;
@@ -233,18 +239,26 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           const json = await res.json();
           if (!mountedRef.current) return;
           if (res.ok && json.success) {
+            const results = (json.results ?? []) as Array<{ id: string; status: string; rawDescription?: string }>;
             const filled = new Map<string, string>(
-              (json.results as Array<{ id: string; rawDescription?: string }>)
+              results
                 .filter((r) => r.rawDescription)
                 .map((r) => [r.id, r.rawDescription as string]),
             );
-            if (filled.size > 0) {
+            const failedIds = new Set<string>(
+              results.filter((r) => r.status === "failed").map((r) => r.id),
+            );
+            if (filled.size > 0 || failedIds.size > 0) {
               setJobs((prev) =>
-                prev.map((j) =>
-                  filled.has(j.id)
-                    ? { ...j, rawDescription: filled.get(j.id), isPlaceholder: false }
-                    : j,
-                ),
+                prev.map((j) => {
+                  if (filled.has(j.id)) {
+                    return { ...j, rawDescription: filled.get(j.id), isPlaceholder: false, extractFailure: null };
+                  }
+                  if (failedIds.has(j.id)) {
+                    return { ...j, extractFailure: "failed" };
+                  }
+                  return j;
+                }),
               );
             }
           }
@@ -622,6 +636,43 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         </select>
 
         <div className="ml-auto flex flex-wrap items-center gap-3 text-[12.5px] text-slate-500">
+          <div
+            className="flex items-center rounded-md border border-slate-700 bg-rf-elevated p-0.5"
+            role="tablist"
+            aria-label="Tracker display mode"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === "split"}
+              onClick={() => setViewMode("split")}
+              data-testid="tracker-view-split"
+              className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-mono font-semibold transition ${
+                viewMode === "split"
+                  ? "bg-amber-500 text-rf-bg shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <LayoutList className="h-3.5 w-3.5" />
+              <span>Split View</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === "kanban"}
+              onClick={() => setViewMode("kanban")}
+              data-testid="tracker-view-kanban"
+              className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-mono font-semibold transition ${
+                viewMode === "kanban"
+                  ? "bg-amber-500 text-rf-bg shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Columns3 className="h-3.5 w-3.5" />
+              <span>Kanban Board</span>
+            </button>
+          </div>
+
           <span className="tabular-nums">
             {isLoading ? (
               "Loading…"
@@ -646,6 +697,103 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         </div>
       </div>
 
+      {viewMode === "kanban" ? (
+        <div
+          data-testid="tracker-kanban-board"
+          className="flex min-h-0 flex-1 gap-4 overflow-x-auto bg-rf-bg p-4"
+        >
+          {(["SAVED", "APPLIED", "INTERVIEWING", "OFFER", "REJECTED"] as JobStatus[]).map(
+            (stage) => {
+              const stageJobs = pageJobs.filter((j) => j.status === stage);
+              return (
+                <div
+                  key={stage}
+                  data-testid={`kanban-col-${stage}`}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => {
+                    if (draggedJobId) {
+                      void handleStatusChange(draggedJobId, stage);
+                      setDraggedJobId(null);
+                    }
+                  }}
+                  className="flex h-full w-72 shrink-0 flex-col rounded-xl border border-slate-800 bg-rf-surface/90 overflow-hidden"
+                >
+                  <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/80 px-3.5 py-2.5">
+                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">
+                      {STATUS_LABELS[stage]}
+                    </span>
+                    <span className="rounded-full bg-slate-800 border border-slate-700 px-2 py-0.5 font-mono text-[11px] font-semibold text-amber-300">
+                      {stageJobs.length}
+                    </span>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+                    {stageJobs.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-slate-800/80 p-6 text-center text-xs font-mono text-slate-500">
+                        Drop job card here
+                      </div>
+                    ) : (
+                      stageJobs.map((job) => (
+                        <div
+                          key={job.id}
+                          draggable
+                          onDragStart={() => setDraggedJobId(job.id)}
+                          data-testid={`kanban-card-${job.id}`}
+                          className="rounded-lg border border-slate-800 bg-rf-elevated p-3 shadow-sm hover:border-amber-500/40 transition cursor-grab active:cursor-grabbing space-y-2"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveJobId(job.id);
+                                setViewMode("split");
+                              }}
+                              className="text-left group"
+                            >
+                              <h3 className="text-xs font-bold text-white group-hover:text-amber-300 transition line-clamp-2">
+                                {job.roleTitle}
+                              </h3>
+                              <p className="text-[11px] font-mono text-slate-400 mt-0.5">
+                                {job.company}
+                              </p>
+                            </button>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800/80">
+                            <select
+                              value={job.status}
+                              onChange={(e) =>
+                                void handleStatusChange(job.id, e.target.value as JobStatus)
+                              }
+                              aria-label={`Change status for ${job.roleTitle}`}
+                              className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-[10px] font-mono text-slate-200 focus:border-amber-500 focus:outline-none"
+                            >
+                              {(["SAVED", "APPLIED", "INTERVIEWING", "OFFER", "REJECTED"] as JobStatus[]).map(
+                                (st) => (
+                                  <option key={st} value={st}>
+                                    {STATUS_LABELS[st]}
+                                  </option>
+                                )
+                              )}
+                            </select>
+
+                            <Link
+                              href={`/tailor?jobId=${job.id}&tab=overview`}
+                              className="text-[10px] font-mono font-semibold text-amber-400 hover:underline"
+                            >
+                              Tailor →
+                            </Link>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              );
+            }
+          )}
+        </div>
+      ) : (
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* List pane — independent scroll */}
         <div className="flex min-h-0 w-full flex-col border-r border-slate-800 lg:w-[400px] lg:shrink-0">
@@ -747,6 +895,9 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
               }
               onSaveNotes={handleSaveNotes}
               onFetchFullText={handleFetchFullText}
+              onJobLoaded={(loaded) =>
+                setJobs((prev) => prev.map((j) => (j.id === loaded.id ? { ...j, ...loaded } : j)))
+              }
             />
           ) : (
             <div className="flex h-full items-center justify-center bg-rf-surface px-6 text-center">
@@ -755,6 +906,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           )}
         </div>
       </div>
+      )}
 
       {/* Mobile full-screen detail sheet */}
       {mobileSheetOpen && selectedJob && (
@@ -776,6 +928,9 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             }
             onSaveNotes={handleSaveNotes}
             onFetchFullText={handleFetchFullText}
+            onJobLoaded={(loaded) =>
+              setJobs((prev) => prev.map((j) => (j.id === loaded.id ? { ...j, ...loaded } : j)))
+            }
           />
         </div>
       )}
