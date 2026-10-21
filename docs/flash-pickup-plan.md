@@ -130,13 +130,16 @@ Run `npm run dev`, then check:
 - `/settings`: Test Connection works with `gemini-2.5-flash`.
 
 Log every failure here as root cause → fix → re-test. Commit fixes separately.
-- [ ] done
+- Root Cause 1: `resume-form-builder.tsx` `#text` regex stopped at nested parens like `rgb(...)`, resetting user's name to "Alex Morgan" on Source -> Visual toggle. Fix: updated regex to `/#text\([\s\S]*?size:\s*1[68]pt[\s\S]*?\)\s*\[([^\]]+)\]/`. Re-test: passed round-trip without loss.
+- Root Cause 2: In-memory mock store `activeStore` was module-scoped in `db-mock.ts`, causing Next.js dev server API routes to have isolated stores in dev mode when Postgres was inactive. Fix: attached mock store to `globalThis.__resumeForgeMockStore` with Proxy interface. Re-test: user session, job creation, and Kanban status drag-and-drop persisted cleanly across reloads.
+- Root Cause 3: `/tracker/discover` returned 404 because Discover feed was consolidated into `/tracker/feed`. Fix: added redirect alias in `src/app/tracker/discover/page.tsx`. Re-test: /tracker/discover navigates to /tracker/feed and displays curated company chips and match score.
+- [x] done: All 8 surfaces verified in real Chromium browser via Playwright smoke suite (8 passed, 0 uncaught errors).
 
 ### T6: Scope shortfalls (ask the user before building)
-- P1.1: is the checklist enough, or build the full 3-step wizard?
-- P2.3: Tailor now has more tabs, not fewer. Restructure to 3?
-- P1.2: check whether the form builder has **Projects**. If it's missing, add it using the same pattern as Experience. This one doesn't need the user's sign-off.
-- [ ] reviewed
+- P1.1: User decided: the checklist is enough for onboarding; do not build the 3-step wizard.
+- P2.3: User decided: the Tailor tabs stay as they are; retain dedicated Cover Letter tab.
+- P1.2: Checked `resume-form-builder.tsx` — confirmed Projects section already exists with full model support, parsing, serialization, and guided UI inputs matching Experience.
+- [x] reviewed: User decisions recorded for P1.1 (checklist confirmed) and P2.3 (tabs retained); P1.2 verified existing Projects section.
 
 ### T7: Finish
 1. `npm run lint; npm run typecheck; npm run test; npm run build`: all green.
