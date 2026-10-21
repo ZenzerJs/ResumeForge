@@ -194,7 +194,7 @@ function detectServerProviderConfig(): ProviderConfig | undefined {
  */
 export async function generateDossierWithSource(
   input: GenerateDossierInput
-): Promise<{ dossier: CompanyIntelligenceDossier; source: "llm" | "offline" }> {
+): Promise<{ dossier: CompanyIntelligenceDossier; source: "llm" | "seed" }> {
   const rawConfig = input.providerConfig || detectServerProviderConfig();
   const resolvedConfig = rawConfig ? resolveServerProviderConfig(rawConfig) : undefined;
 
@@ -204,7 +204,7 @@ export async function generateDossierWithSource(
   ) {
     return {
       dossier: generateOfflineDossier(input),
-      source: "offline",
+      source: "seed",
     };
   }
 
@@ -233,14 +233,14 @@ export async function generateDossierWithSource(
     // If live call fails, fallback gracefully to structured offline dossier
     return {
       dossier: generateOfflineDossier(input),
-      source: "offline",
+      source: "seed",
     };
   }
 }
 
 export type GenerateDossierOutput = CompanyIntelligenceDossier & {
   llmUsed: boolean;
-  source: "llm" | "offline";
+  source: "llm" | "seed";
 };
 
 /**

@@ -45,7 +45,7 @@ test.describe("Phase 4 BYOK AI Gateway Settings UI", () => {
 
     // Select Gemini
     await page.selectOption("#provider-select", "gemini");
-    await expect(page.locator("#model-input")).toHaveValue("gemini-3.8-flash");
+    await expect(page.locator("#model-input")).toHaveValue("gemini-2.5-flash");
 
     // Enter key
     await page.fill("#api-key-input", rawGeminiKey);
@@ -72,7 +72,7 @@ test.describe("Phase 4 BYOK AI Gateway Settings UI", () => {
     // 1. Configure Gemini
     await page.selectOption("#provider-select", "gemini");
     await page.fill("#api-key-input", "AIzaSyGeminiKey999");
-    await expect(page.locator("#model-input")).toHaveValue("gemini-3.8-flash");
+    await expect(page.locator("#model-input")).toHaveValue("gemini-2.5-flash");
 
     // 2. Switch to Groq
     await page.selectOption("#provider-select", "groq");
@@ -91,7 +91,7 @@ test.describe("Phase 4 BYOK AI Gateway Settings UI", () => {
 
     // 4. Switch back to Gemini and assert retrieved decrypted key
     await page.selectOption("#provider-select", "gemini");
-    await expect(page.locator("#model-input")).toHaveValue("gemini-3.8-flash");
+    await expect(page.locator("#model-input")).toHaveValue("gemini-2.5-flash");
     await expect(page.locator("#api-key-input")).toHaveValue("AIzaSyGeminiKey999");
 
     // 5. Switch back to Groq and assert retrieved decrypted key

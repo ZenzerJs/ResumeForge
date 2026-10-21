@@ -443,7 +443,7 @@ export async function chatGemini(
     defaultBaseUrl: "https://generativelanguage.googleapis.com",
     officialHosts: ["generativelanguage.googleapis.com"],
   });
-  const model = resolveGeminiModel(config.model, "gemini-2.0-flash");
+  const model = resolveGeminiModel(config.model, "gemini-2.5-flash");
 
   if (!apiKey) {
     throw new Error("Gemini API key is missing.");

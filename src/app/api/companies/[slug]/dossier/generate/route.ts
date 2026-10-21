@@ -64,17 +64,18 @@ export async function POST(
     });
 
     const isLlm = Boolean(dossier.llmUsed);
-    const source = isLlm
-      ? existing?.referenceNotes || existing?.processNotes
-        ? "seed+llm"
-        : "llm"
-      : "seed";
+    const effectiveReferenceNotes = parsed.data.referenceNotes ?? existing?.referenceNotes ?? undefined;
+    const effectiveProcessNotes = parsed.data.processNotes ?? existing?.processNotes ?? undefined;
+    const hasNotes = Boolean(effectiveReferenceNotes || effectiveProcessNotes);
+    const source = isLlm ? (hasNotes ? "seed+llm" : "llm") : "seed";
 
     const data = {
       displayName: dossier.companyName,
       interviewStyle: dossier.interviewStyle as any,
       cultureMetrics: dossier.engineeringCulture as any,
       recentSignals: dossier.recentSignals,
+      ...(parsed.data.referenceNotes !== undefined ? { referenceNotes: parsed.data.referenceNotes } : {}),
+      ...(parsed.data.processNotes !== undefined ? { processNotes: parsed.data.processNotes } : {}),
       source,
       lastUpdated: new Date(),
     };

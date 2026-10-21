@@ -116,4 +116,34 @@ describe("dossier generate guard", () => {
     expect(generateDossier).not.toHaveBeenCalled();
     expect(upsert).not.toHaveBeenCalled();
   });
+
+  it("persists caller-provided notes and labels source as 'seed+llm' on successful generation", async () => {
+    findUnique.mockResolvedValue(null);
+    generateDossier.mockResolvedValue({
+      companyName: "Acme",
+      interviewStyle: {},
+      engineeringCulture: {},
+      recentSignals: "none",
+      llmUsed: true,
+      source: "llm",
+    });
+    let capturedCreate: any;
+    upsert.mockImplementation(async ({ create }: { create: any }) => {
+      capturedCreate = create;
+      return {
+        companySlug: "acme",
+        ...create,
+      };
+    });
+
+    const res = await post({
+      companyName: "Acme",
+      referenceNotes: "Engineering blog: remote-first async culture",
+      processNotes: "Pair programming session on PR",
+    });
+    expect(res.status).toBe(200);
+    expect(capturedCreate.source).toBe("seed+llm");
+    expect(capturedCreate.referenceNotes).toBe("Engineering blog: remote-first async culture");
+    expect(capturedCreate.processNotes).toBe("Pair programming session on PR");
+  });
 });

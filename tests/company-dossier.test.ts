@@ -112,7 +112,7 @@ describe("Company Dossier Schema & Lenient Coercions (lib/company-dossier.ts)", 
     expect(fallback.recentSignals).toContain("Hiring Without Whiteboards listed");
   });
 
-  it("reports llmUsed false and offline source when generating dossier without live LLM", async () => {
+  it("reports llmUsed false and seed source when generating dossier without live LLM", async () => {
     const result = await generateDossier({
       companyName: "Linear",
       processNotes: "Pair programming on real issue in private fork. No LeetCode.",
@@ -120,7 +120,7 @@ describe("Company Dossier Schema & Lenient Coercions (lib/company-dossier.ts)", 
 
     expect(result.companyName).toBe("Linear");
     expect(result.llmUsed).toBe(false);
-    expect(result.source).toBe("offline");
+    expect(result.source).toBe("seed");
   });
 });
 
