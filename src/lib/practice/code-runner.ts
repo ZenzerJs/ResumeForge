@@ -6,6 +6,8 @@ import { ExecutionResult, TestCase, TestRunItemResult } from "./types";
 export function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
 
+  if (typeof a === "number" && typeof b === "number" && isNaN(a) && isNaN(b)) return true;
+
   if (typeof a !== typeof b) return false;
 
   if (a === null || b === null || a === undefined || b === undefined) {
@@ -14,17 +16,31 @@ export function deepEqual(a: unknown, b: unknown): boolean {
 
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) {
-      if (!deepEqual(a[i], b[i])) return false;
+    const exactMatch = a.every((val, idx) => deepEqual(val, b[idx]));
+    if (exactMatch) return true;
+    if (a.length > 0 && a.every(Array.isArray) && b.every(Array.isArray)) {
+      const sortInner = (arr: unknown[]) =>
+        [...arr].sort((x, y) =>
+          typeof x === "number" && typeof y === "number"
+            ? x - y
+            : String(x).localeCompare(String(y))
+        );
+      const serializeRow = (row: unknown[]) => JSON.stringify(sortInner(row));
+      const sortedA = a.map(serializeRow).sort();
+      const sortedB = b.map(serializeRow).sort();
+      return sortedA.every((val, idx) => val === sortedB[idx]);
     }
-    return true;
+    return false;
   }
+
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
 
   if (typeof a === "object" && typeof b === "object") {
     const keysA = Object.keys(a as Record<string, unknown>);
     const keysB = Object.keys(b as Record<string, unknown>);
     if (keysA.length !== keysB.length) return false;
     for (const key of keysA) {
+      if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
       if (!deepEqual((a as any)[key], (b as any)[key])) return false;
     }
     return true;
@@ -43,22 +59,24 @@ export function sanitizeTypeScriptCode(code: string): string {
   cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, "");
   // Strip line comments
   cleaned = cleaned.replace(/(^|[^:])\/\/.*$/gm, "$1");
-  // Strip simple import / export statements
-  cleaned = cleaned.replace(/^\s*(import|export)\s+.*$/gm, "");
+  // Strip import statements
+  cleaned = cleaned.replace(/^\s*import\s+.*$/gm, "");
+  // Strip export prefixes
+  cleaned = cleaned.replace(/^\s*export\s+(?:default\s+)?/gm, "");
   // Strip interface and type alias statements
   cleaned = cleaned.replace(/^\s*(?:type|interface)\s+[A-Za-z0-9_$]+[\s\S]*?(?:;|\})\s*$/gm, "");
+  // Strip type casting: e.g. "x as number"
+  cleaned = cleaned.replace(/\s+as\s+[A-Za-z0-9_<>\[\]| ]+/g, "");
+  // Strip non-null assertions: e.g. "val!"
+  cleaned = cleaned.replace(/([a-zA-Z0-9_\]\)])!(?=[,\s\.;\)=])/g, "$1");
   // Strip function return type annotations: e.g. "): number[] {" or "): void =>"
   cleaned = cleaned.replace(/\)\s*:\s*[A-Za-z0-9_<>\[\]|,\s]+(\s*\{|\s*=>)/g, ")$1");
   // Strip generic call type arguments: e.g. new Map<number, number>() or new Set<string>()
   cleaned = cleaned.replace(/<[A-Za-z0-9_\[\],\s|]+>(?=\s*\()/g, "");
-  // Strip variable declaration types: e.g. "const x: number = 5"
-  cleaned = cleaned.replace(/((?:let|const|var)\s+[a-zA-Z0-9_$]+)\s*:\s*[A-Za-z0-9_<>\[\]| ]+\s*=/g, "$1 =");
-  // Strip parameter type annotations: e.g. "nums: number[]"
-  cleaned = cleaned.replace(/:\s*([A-Za-z0-9_<>\[\]| ]+)(?=[,)=])/g, "");
-  // Strip non-null assertions: e.g. "val!"
-  cleaned = cleaned.replace(/([a-zA-Z0-9_\]\)])!(?=[,\s\.;\)=])/g, "$1");
-  // Strip type casting: e.g. "x as number"
-  cleaned = cleaned.replace(/\s+as\s+[A-Za-z0-9_<>\[\]| ]+/g, "");
+  // Strip variable declaration types: e.g. "const x: number = 5" or "let ans: number[];"
+  cleaned = cleaned.replace(/(const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*[^=;]+(?=[=;])/g, "$1 $2");
+  // Strip parameter type annotations safely without affecting object literal properties: e.g. "nums: number[]"
+  cleaned = cleaned.replace(/:\s*(?:number|string|boolean|any|unknown|void|never|object|Record<[^>]+>|Array<[^>]+>|Map<[^>]+>|Set<[^>]+>|ListNode|TreeNode|Node|[A-Z][A-Za-z0-9_<>]*)(?:\[\])*(?:\s*\|\s*(?:number|string|boolean|null|undefined|[A-Z][A-Za-z0-9_<>]*)(?:\[\])*)*(?=\s*[,)=])/g, "");
   return cleaned;
 }
 

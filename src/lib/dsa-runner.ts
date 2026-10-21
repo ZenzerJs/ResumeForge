@@ -33,16 +33,22 @@ export function deepEqual(a: unknown, b: unknown): boolean {
     if (a.length !== b.length) return false;
     const exactMatch = a.every((val, idx) => deepEqual(val, b[idx]));
     if (exactMatch) return true;
-    if (
-      a.every((x) => typeof x === 'number' || typeof x === 'string') &&
-      b.every((x) => typeof x === 'number' || typeof x === 'string')
-    ) {
-      const sortedA = [...a].sort();
-      const sortedB = [...b].sort();
+    if (a.length > 0 && a.every(Array.isArray) && b.every(Array.isArray)) {
+      const sortInner = (arr: unknown[]) =>
+        [...arr].sort((x, y) =>
+          typeof x === 'number' && typeof y === 'number'
+            ? x - y
+            : String(x).localeCompare(String(y))
+        );
+      const serializeRow = (row: unknown[]) => JSON.stringify(sortInner(row));
+      const sortedA = a.map(serializeRow).sort();
+      const sortedB = b.map(serializeRow).sort();
       return sortedA.every((val, idx) => val === sortedB[idx]);
     }
     return false;
   }
+
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
 
   if (typeof a === 'object' && typeof b === 'object') {
     const keysA = Object.keys(a as Record<string, unknown>);
@@ -67,14 +73,15 @@ export function sanitizeTypeScriptCode(code: string): string {
   let cleaned = code;
   cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
   cleaned = cleaned.replace(/(^|[^:])\/\/.*$/gm, '$1');
-  cleaned = cleaned.replace(/^\s*(import|export)\s+.*$/gm, '');
+  cleaned = cleaned.replace(/^\s*import\s+.*$/gm, '');
+  cleaned = cleaned.replace(/^\s*export\s+(?:default\s+)?/gm, '');
   cleaned = cleaned.replace(/^\s*(?:type|interface)\s+[A-Za-z0-9_$]+[\s\S]*?(?:;|\})\s*$/gm, '');
   cleaned = cleaned.replace(/\s+as\s+[A-Za-z0-9_<>\[\]| ]+/g, '');
   cleaned = cleaned.replace(/([a-zA-Z0-9_\]\)])!(?=[,\s\.;\)=])/g, '$1');
   cleaned = cleaned.replace(/\)\s*:\s*[A-Za-z0-9_<>\[\]|,\s]+(\s*\{|\s*=>)/g, ')$1');
-  cleaned = cleaned.replace(/<[A-Za-z0-9_\[\],\s|]+>/g, '');
-  cleaned = cleaned.replace(/((?:let|const|var)\s+[a-zA-Z0-9_$]+)\s*:\s*[A-Za-z0-9_\[\]| ]+\s*=/g, '$1 =');
-  cleaned = cleaned.replace(/:\s*([A-Za-z0-9_\[\]| ]+)(?=[,)=])/g, '');
+  cleaned = cleaned.replace(/<[A-Za-z0-9_\[\],\s|]+>(?=\s*\()/g, '');
+  cleaned = cleaned.replace(/(const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*[^=;]+(?=[=;])/g, '$1 $2');
+  cleaned = cleaned.replace(/:\s*(?:number|string|boolean|any|unknown|void|never|object|Record<[^>]+>|Array<[^>]+>|Map<[^>]+>|Set<[^>]+>|ListNode|TreeNode|Node|[A-Z][A-Za-z0-9_<>]*)(?:\[\])*(?:\s*\|\s*(?:number|string|boolean|null|undefined|[A-Z][A-Za-z0-9_<>]*)(?:\[\])*)*(?=\s*[,)=])/g, '');
   return cleaned;
 }
 
@@ -125,14 +132,21 @@ function runInBrowserWorker(
             if (a.length !== b.length) return false;
             const exact = a.every((v, i) => deepEqual(v, b[i]));
             if (exact) return true;
-            if (a.every(x => typeof x === 'number' || typeof x === 'string') &&
-                b.every(x => typeof x === 'number' || typeof x === 'string')) {
-              const sa = [...a].sort();
-              const sb = [...b].sort();
+            if (a.length > 0 && a.every(Array.isArray) && b.every(Array.isArray)) {
+              const sortInner = (arr) =>
+                [...arr].sort((x, y) =>
+                  typeof x === 'number' && typeof y === 'number'
+                    ? x - y
+                    : String(x).localeCompare(String(y))
+                );
+              const serializeRow = (row) => JSON.stringify(sortInner(row));
+              const sa = a.map(serializeRow).sort();
+              const sb = b.map(serializeRow).sort();
               return sa.every((v, i) => v === sb[i]);
             }
             return false;
           }
+          if (Array.isArray(a) !== Array.isArray(b)) return false;
           if (typeof a === 'object' && typeof b === 'object') {
             const ka = Object.keys(a);
             const kb = Object.keys(b);
@@ -552,10 +566,15 @@ for tc in test_cases:
         duration_ms = (time.perf_counter() - start_t) * 1000
         passed = (actual == expected)
         if not passed and isinstance(actual, (list, tuple)) and isinstance(expected, (list, tuple)):
-            try:
-                passed = sorted(actual) == sorted(expected)
-            except Exception:
-                pass
+            if len(actual) == len(expected) and len(actual) > 0 and all(isinstance(x, (list, tuple)) for x in actual) and all(isinstance(x, (list, tuple)) for x in expected):
+                try:
+                    def sort_key(v):
+                        return (0, v) if isinstance(v, (int, float)) else (1, str(v))
+                    norm_a = sorted([json.dumps(sorted(list(row), key=sort_key)) for row in actual])
+                    norm_b = sorted([json.dumps(sorted(list(row), key=sort_key)) for row in expected])
+                    passed = (norm_a == norm_b)
+                except Exception:
+                    pass
     except Exception as e:
         duration_ms = (time.perf_counter() - start_t) * 1000
         err_str = str(e)
