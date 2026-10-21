@@ -27,13 +27,13 @@
     --secondary: #4edea3;
     --secondary-foreground: #003824;
     --muted: #2d3449;
-    --muted-foreground: #ddc1ae;
+    --muted-foreground: #94a3b8;
     --accent: #222a3d;
     --accent-foreground: #ff8c00;
     --destructive: #ffb4ab;
     --destructive-foreground: #690005;
-    --border: #564334;
-    --input: #564334;
+    --border: rgba(148, 163, 184, 0.22);
+    --input: #1e293b;
     --ring: #ff8c00;
     --radius: 0.25rem;
   }

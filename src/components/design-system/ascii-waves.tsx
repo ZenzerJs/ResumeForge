@@ -39,7 +39,7 @@ export function AsciiWaves({
   waveTwist = 0.1,
   invert = false,
   noiseScale = 1.0,
-  elementSize = 16,
+  elementSize = 20,
   speed = 1.0,
   hasCursorInteraction = false,
   intensity = 1.0,
@@ -127,8 +127,43 @@ export function AsciiWaves({
       return v * intensity;
     };
 
+    const fpsInterval = 1000 / 30;
+    let lastFrameTime = performance.now();
+    let isIntersecting = true;
+    let observer: IntersectionObserver | null = null;
+
+    if (typeof IntersectionObserver !== "undefined") {
+      observer = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[0];
+          const nextIntersecting = entry ? entry.isIntersecting : true;
+          if (nextIntersecting && !isIntersecting) {
+            isIntersecting = true;
+            if (!prefersReduced && !disposed) {
+              lastFrameTime = performance.now();
+              cancelAnimationFrame(animationFrameId);
+              animationFrameId = requestAnimationFrame(draw);
+            }
+          } else {
+            isIntersecting = nextIntersecting;
+          }
+        },
+        { threshold: 0 }
+      );
+      observer.observe(canvas);
+    }
+
     const draw = (now: number) => {
-      if (disposed) return;
+      if (disposed || !isIntersecting) return;
+
+      const elapsed = now - lastFrameTime;
+      if (elapsed < fpsInterval) {
+        if (!prefersReduced && isIntersecting && !disposed) {
+          animationFrameId = requestAnimationFrame(draw);
+        }
+        return;
+      }
+      lastFrameTime = now - (elapsed % fpsInterval);
 
       const t = ((now - start) / 1000) * speed;
       const cols = Math.ceil(width / cell) + 1;
@@ -168,7 +203,7 @@ export function AsciiWaves({
       }
 
       ctx.globalAlpha = 1;
-      if (!prefersReduced) {
+      if (!prefersReduced && isIntersecting && !disposed) {
         animationFrameId = requestAnimationFrame(draw);
       }
     };
@@ -178,6 +213,7 @@ export function AsciiWaves({
     return () => {
       disposed = true;
       cancelAnimationFrame(animationFrameId);
+      observer?.disconnect();
       window.removeEventListener("resize", resize);
       if (hasCursorInteraction) {
         window.removeEventListener("pointermove", onPointerMove);

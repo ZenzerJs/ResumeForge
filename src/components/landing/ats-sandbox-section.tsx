@@ -21,7 +21,6 @@ import {
   JobRequirementInput,
 } from "@/lib/matchScore";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
-import { compileTypstToSvg } from "@/lib/typst/compiler";
 
 interface PresetRole {
   id: string;
@@ -179,12 +178,26 @@ AI/Infra: PyTorch, Docker, Kubernetes, Distributed Inference Systems
   },
 ];
 
+const PRESET_DEFAULT_SNIPPETS: Record<string, string> = {
+  backend: PRESETS[0].typstSnippet,
+  frontend: PRESETS[1].typstSnippet,
+  "ai-platform": PRESETS[2].typstSnippet,
+};
+
+const PRESET_STATIC_SVGS: Record<string, string> = {
+  backend: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">CORE SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">Languages:</tspan> Go, Python, TypeScript, SQL (PostgreSQL)</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">Infrastructure:</tspan> Docker, Kubernetes, Redis, RESTful APIs</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#0f172a"><tspan font-weight="700">Senior Software Engineer</tspan> | Nova Labs</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#64748b" text-anchor="end">2022 – Present</text><circle cx="42" cy="184" r="2" fill="#334155"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Engineered scalable Go microservices processing 12,000 req/sec with PostgreSQL persistence.</text><circle cx="42" cy="206" r="2" fill="#334155"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Automated containerized deployment pipelines using Docker and Kubernetes cluster nodes.</text></svg>`,
+  frontend: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">Frontend:</tspan> React, Next.js, TypeScript, Tailwind CSS, WebAssembly (WASM)</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">Tooling:</tspan> Vitest, Playwright, Docker, Webpack, Turbopack</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#0f172a"><tspan font-weight="700">Frontend Systems Lead</tspan> | WebCraft Systems</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#64748b" text-anchor="end">2021 – Present</text><circle cx="42" cy="184" r="2" fill="#334155"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Architected high-performance Next.js and TypeScript frontend interfaces serving 1.5M monthly users.</text><circle cx="42" cy="206" r="2" fill="#334155"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Reduced initial bundle payloads by 42% utilizing responsive component code splitting.</text></svg>`,
+  "ai-platform": `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">TECHNICAL SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">Languages:</tspan> Python, Go, C++</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">AI/Infra:</tspan> PyTorch, Docker, Kubernetes, Distributed Inference Systems</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#0f172a"><tspan font-weight="700">Infrastructure &amp; Backend Engineer</tspan> | Nova Labs</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#64748b" text-anchor="end">2021 – Present</text><circle cx="42" cy="184" r="2" fill="#334155"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Designed automated distributed training pipeline jobs utilizing Python, Docker, and Kubernetes.</text><circle cx="42" cy="206" r="2" fill="#334155"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Maintained low-latency inference endpoints with 99.98% operational uptime.</text></svg>`,
+};
+
 export function AtsSandboxSection() {
   const [selectedPresetId, setSelectedPresetId] = useState<string>("backend");
   const [activePreset, setActivePreset] = useState<PresetRole>(PRESETS[0]);
   const [customDescription, setCustomDescription] = useState<string>(PRESETS[0].description);
+  const [customSnippet, setCustomSnippet] = useState<string>(PRESETS[0].typstSnippet);
+  const [isEditingSnippet, setIsEditingSnippet] = useState<boolean>(false);
   const [previewTab, setPreviewTab] = useState<"svg" | "source">("svg");
-  const [svgOutput, setSvgOutput] = useState<string | null>(null);
+  const [svgOutput, setSvgOutput] = useState<string | null>(PRESET_STATIC_SVGS.backend);
   const [isCompiling, setIsCompiling] = useState<boolean>(false);
   const [compileError, setCompileError] = useState<string | null>(null);
   const [showDerivationLog, setShowDerivationLog] = useState<boolean>(false);
@@ -194,39 +207,60 @@ export function AtsSandboxSection() {
     setSelectedPresetId(preset.id);
     setActivePreset(preset);
     setCustomDescription(preset.description);
+    setCustomSnippet(preset.typstSnippet);
+    setIsEditingSnippet(false);
+    if (PRESET_STATIC_SVGS[preset.id]) {
+      setSvgOutput(PRESET_STATIC_SVGS[preset.id]);
+      setCompileError(null);
+    }
   };
 
-  // Compile Typst when preset changes with cancellation to prevent race conditions
+  // Compile Typst only when custom code differs from preset defaults
   useEffect(() => {
+    const isDefault =
+      PRESET_STATIC_SVGS[activePreset.id] &&
+      customSnippet.trim() === PRESET_DEFAULT_SNIPPETS[activePreset.id]?.trim();
+
+    if (isDefault) {
+      setSvgOutput(PRESET_STATIC_SVGS[activePreset.id]);
+      setIsCompiling(false);
+      setCompileError(null);
+      return;
+    }
+
     if (typeof window === "undefined") return;
     let cancelled = false;
     setIsCompiling(true);
     setCompileError(null);
 
-    compileTypstToSvg(activePreset.typstSnippet)
-      .then((result) => {
-        if (cancelled) return;
-        if (result.success) {
-          setSvgOutput(result.svg);
-        } else {
-          setCompileError(result.error?.message || "Typst compilation failed");
-        }
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        const msg = err instanceof Error ? err.message : String(err);
-        setCompileError(msg);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsCompiling(false);
-        }
-      });
+    const timer = setTimeout(() => {
+      import("@/lib/typst/compiler")
+        .then(({ compileTypstToSvg }) => compileTypstToSvg(customSnippet))
+        .then((result) => {
+          if (cancelled) return;
+          if (result.success) {
+            setSvgOutput(result.svg);
+          } else {
+            setCompileError(result.error?.message || "Typst compilation failed");
+          }
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          const msg = err instanceof Error ? err.message : String(err);
+          setCompileError(msg);
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsCompiling(false);
+          }
+        });
+    }, 300);
 
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
-  }, [activePreset.typstSnippet]);
+  }, [activePreset.id, customSnippet]);
 
   // Compute dynamic deterministic match score against sample candidate evidence bank
   const effectiveJob = useMemo<JobRequirementInput>(() => {
@@ -577,12 +611,53 @@ export function AtsSandboxSection() {
                   )}
                 </div>
               ) : (
-                <pre
-                  data-testid="sandbox-typst-source-view"
-                  className="flex-1 p-4 md:p-6 bg-[#030712] border border-slate-800 rounded-xl font-mono text-xs md:text-sm text-slate-300 leading-relaxed overflow-auto max-h-[620px] whitespace-pre-wrap selection:bg-amber-500/30"
-                >
-                  {activePreset.typstSnippet}
-                </pre>
+                <div data-testid="sandbox-typst-source-view" className="flex-1 flex flex-col min-h-0">
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-xs font-mono">
+                    <span className="text-slate-400">
+                      {isEditingSnippet ? "Live Typst editor (on-demand compile):" : "Typst AST Source Preview:"}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        data-testid="sandbox-edit-snippet-btn"
+                        onClick={() => setIsEditingSnippet((prev) => !prev)}
+                        className="px-2.5 py-1 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 text-xs font-semibold cursor-pointer transition"
+                      >
+                        {isEditingSnippet ? "Done Editing" : "Edit Snippet"}
+                      </button>
+                      {customSnippet.trim() !== PRESET_DEFAULT_SNIPPETS[activePreset.id]?.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomSnippet(activePreset.typstSnippet);
+                            setIsEditingSnippet(false);
+                          }}
+                          className="text-slate-400 hover:text-white flex items-center gap-1 text-xs cursor-pointer"
+                        >
+                          <RotateCcw className="h-3 w-3" /> Reset
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {isEditingSnippet ? (
+                    <textarea
+                      data-testid="sandbox-typst-textarea"
+                      value={customSnippet}
+                      onChange={(e) => setCustomSnippet(e.target.value)}
+                      rows={14}
+                      className="w-full flex-1 p-4 bg-[#030712] border border-slate-800 rounded-xl font-mono text-xs md:text-sm text-slate-200 leading-relaxed resize-none focus:outline-none focus:border-amber-500/60"
+                      spellCheck={false}
+                    />
+                  ) : (
+                    <pre
+                      onClick={() => setIsEditingSnippet(true)}
+                      title="Click to edit snippet"
+                      className="flex-1 p-4 md:p-6 bg-[#030712] border border-slate-800 rounded-xl font-mono text-xs md:text-sm text-slate-300 leading-relaxed overflow-auto max-h-[620px] whitespace-pre-wrap selection:bg-amber-500/30 cursor-pointer hover:border-slate-700 transition-colors"
+                    >
+                      {customSnippet}
+                    </pre>
+                  )}
+                </div>
               )}
             </div>
           </div>
