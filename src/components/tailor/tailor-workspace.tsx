@@ -17,10 +17,34 @@ import {
 import { JobRequirements } from "@/lib/jd-parser/types";
 import { RoleProfile, ROLE_PROFILES, AtsEvaluationResult } from "@/lib/ats-evaluator/types";
 import { auditResume } from "@/lib/diagnostics/auditResume";
+import { resolveClientProviderConfig } from "@/lib/byok-vault";
+import dynamic from "next/dynamic";
 import { PatchDiffReview } from "./patch-diff-review";
 import { AtsScorePanel } from "./ats-score-panel";
-import { CoverLetterPanel } from "./cover-letter-panel";
-import { TailorDiagnosticPanel } from "./tailor-diagnostic-panel";
+
+const CoverLetterPanel = dynamic(
+  () => import("./cover-letter-panel").then((mod) => mod.CoverLetterPanel),
+  {
+    loading: () => (
+      <div className="p-6 flex items-center justify-center text-slate-500 font-mono text-xs">
+        <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading Cover Letter Panel...
+      </div>
+    ),
+    ssr: false,
+  }
+);
+
+const TailorDiagnosticPanel = dynamic(
+  () => import("./tailor-diagnostic-panel").then((mod) => mod.TailorDiagnosticPanel),
+  {
+    loading: () => (
+      <div className="p-6 flex items-center justify-center text-slate-500 font-mono text-xs">
+        <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading Diagnostics...
+      </div>
+    ),
+    ssr: false,
+  }
+);
 import { FitPercentageDial } from "@/components/tracker/fit-percentage-dial";
 import type { PatchProposal, Gap, RejectedPatch } from "@/lib/ai/patch-schema";
 import { AppShell } from "@/components/design-system/app-shell";
@@ -136,15 +160,32 @@ export function TailorWorkspace() {
   const tabParam = searchParams.get("tab");
   type TailorWorkspaceTab = "overview" | "job-info" | "3-pane" | "diagnostic";
   const [activeTab, setActiveTab] = useState<TailorWorkspaceTab>(
-    tabParam === "overview" ? "overview" : tabParam === "3-pane" ? "3-pane" : tabParam === "diagnostic" ? "diagnostic" : "job-info"
+    tabParam === "overview" || tabParam === "cover-letter"
+      ? "overview"
+      : tabParam === "3-pane"
+      ? "3-pane"
+      : tabParam === "diagnostic"
+      ? "diagnostic"
+      : "job-info"
   );
   const [previousTab, setPreviousTab] = useState<TailorWorkspaceTab>(
     tabParam === "3-pane" ? "3-pane" : "overview"
   );
+  const [highlightCoverLetter, setHighlightCoverLetter] = useState(tabParam === "cover-letter");
 
   useEffect(() => {
+    if (tabParam === "cover-letter") {
+      setActiveTab("overview");
+      setHighlightCoverLetter(true);
+      const timer = setTimeout(() => {
+        const el = document.getElementById("cover-letter-section");
+        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
     if (tabParam === "overview" || tabParam === "3-pane" || tabParam === "job-info" || tabParam === "diagnostic") {
       setActiveTab(tabParam);
+      setHighlightCoverLetter(false);
     }
   }, [tabParam]);
   const [jobInfoSubTab, setJobInfoSubTab] = useState<"structured" | "original" | "details">("original");
@@ -332,22 +373,45 @@ export function TailorWorkspace() {
       return existingId;
     }
 
-    const saveRes = await fetch("/api/jobs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...payload,
-        source: "pasted",
-      }),
-    });
-    const saveJson = await saveRes.json();
-    if (saveRes.ok && saveJson.success) {
-      savedJobIdRef.current = saveJson.data.id;
-      setSavedJobId(saveJson.data.id);
-      sessionStorage.setItem("resumeforge_active_job_id", saveJson.data.id);
-      setSaveStatus("Job posting saved to database.");
-      return saveJson.data.id as string;
-    }
+    try {
+      const saveRes = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...payload,
+          source: "pasted",
+        }),
+      });
+      const saveJson = await saveRes.json().catch(() => ({}));
+      if (saveRes.ok && saveJson.success) {
+        savedJobIdRef.current = saveJson.data.id;
+        setSavedJobId(saveJson.data.id);
+        sessionStorage.setItem("resumeforge_active_job_id", saveJson.data.id);
+        setSaveStatus("Job posting saved to database.");
+        return saveJson.data.id as string;
+      }
+      if (saveRes.status === 401 || saveJson?.code === "GUEST_READ_ONLY") {
+        const guestId = `guest-job-${Date.now()}`;
+        savedJobIdRef.current = guestId;
+        setSavedJobId(guestId);
+        sessionStorage.setItem("resumeforge_active_job_id", guestId);
+        try {
+          const raw = localStorage.getItem("resumeforge_guest_jobs");
+          const list = raw ? JSON.parse(raw) : [];
+          const next = Array.isArray(list) ? list : [];
+          next.unshift({
+            id: guestId,
+            company: payload.company || "Target Company",
+            roleTitle: payload.roleTitle || "Target Role",
+            rawDescription: payload.rawDescription,
+            status: "SAVED",
+          });
+          localStorage.setItem("resumeforge_guest_jobs", JSON.stringify(next));
+        } catch {}
+        setSaveStatus("Job saved to local workspace.");
+        return guestId;
+      }
+    } catch {}
     return null;
   };
 
@@ -370,15 +434,9 @@ export function TailorWorkspace() {
       return;
     }
 
-    let aiSettings;
-    try {
-      const stored = localStorage.getItem("resumeforge_ai_settings");
-      aiSettings = stored ? JSON.parse(stored) : null;
-    } catch {
-      aiSettings = null;
-    }
+    const aiSettings = await resolveClientProviderConfig();
 
-    if (!aiSettings?.provider || !aiSettings?.apiKey) {
+    if (!aiSettings) {
       setPatchError("No AI provider configured. Please configure your API key in Settings.");
       setPatchStage("error");
       return;
@@ -777,8 +835,33 @@ export function TailorWorkspace() {
           <button
             type="button"
             role="tab"
+            aria-selected={activeTab === "overview" && highlightCoverLetter}
+            onClick={() => {
+              setActiveTab("overview");
+              setHighlightCoverLetter(true);
+              setTimeout(() => {
+                document.getElementById("cover-letter-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }, 60);
+            }}
+            data-testid="tailor-tab-cover-letter"
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-mono font-semibold transition shrink-0 ${
+              activeTab === "overview" && highlightCoverLetter
+                ? "bg-amber-500/15 border border-amber-500/40 text-amber-300 shadow-sm"
+                : "border border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-white"
+            }`}
+          >
+            <FileText className="h-3.5 w-3.5" />
+            Cover Letter
+          </button>
+
+          <button
+            type="button"
+            role="tab"
             aria-selected={activeTab === "diagnostic"}
-            onClick={() => setActiveTab("diagnostic")}
+            onClick={() => {
+              setHighlightCoverLetter(false);
+              setActiveTab("diagnostic");
+            }}
             data-testid="tailor-tab-diagnostic"
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-mono font-semibold transition shrink-0 ${
               activeTab === "diagnostic"
@@ -1008,12 +1091,25 @@ export function TailorWorkspace() {
                     />
                   )}
 
-                <section className="glass-panel rounded-lg p-5 flex flex-col glow-effect transition-shadow">
-                  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800/60">
-                    <FileText className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
-                    <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">
-                      Generated Cover Letter
-                    </h2>
+                <section
+                  id="cover-letter-section"
+                  data-testid="tailor-cover-letter-section"
+                  className={`glass-panel rounded-lg p-5 flex flex-col glow-effect transition-all ${
+                    highlightCoverLetter ? "ring-2 ring-amber-500/60 border-amber-500/50" : ""
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-4 pb-2 border-b border-slate-800/60">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
+                      <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">
+                        Generated Cover Letter
+                      </h2>
+                    </div>
+                    {highlightCoverLetter && (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/40 text-amber-300">
+                        Active Section
+                      </span>
+                    )}
                   </div>
                   {savedJobId ? (
                     <CoverLetterPanel
@@ -1024,9 +1120,20 @@ export function TailorWorkspace() {
                       extractedRequirements={extractedRequirements || undefined}
                     />
                   ) : (
-                    <p className="text-xs text-slate-400">
-                      Paste a job description to create a saved job, then generate an evidence-grounded cover letter.
-                    </p>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-slate-800 bg-[#060e20] p-4">
+                      <p className="text-xs text-slate-300">
+                        Save the current job posting to generate an evidence-grounded cover letter tailored to{" "}
+                        <span className="text-amber-300 font-semibold">{company || "this role"}</span>.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void handleSaveJob()}
+                        data-testid="unlock-cover-letter-btn"
+                        className="shrink-0 rounded-md bg-[#ff8c00] px-3 py-1.5 font-mono text-xs font-bold text-slate-950 hover:bg-amber-400 transition"
+                      >
+                        Save Job &amp; Unlock Cover Letter
+                      </button>
+                    </div>
                   )}
                 </section>
               </>
@@ -1103,15 +1210,15 @@ export function TailorWorkspace() {
                   </div>
 
                   {/* Sub-tab Selector */}
-                  <div className="flex items-center gap-1 border-b border-slate-800/80 mb-4 pb-2">
+                  <div className="flex items-center gap-1.5 border-b border-slate-800/80 mb-4 pb-2">
                     <button
                       type="button"
                       onClick={() => setJobInfoSubTab("structured")}
                       data-testid="job-subtab-structured"
-                      className={`px-3 py-1 text-xs font-mono rounded transition-colors ${
+                      className={`px-3 py-1.5 text-xs font-mono rounded-lg transition-colors border ${
                         jobInfoSubTab === "structured"
-                          ? "bg-[#ff8c00] text-slate-950 font-bold"
-                          : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+                          ? "bg-amber-500/15 border-amber-500/40 text-amber-300 font-semibold"
+                          : "border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50"
                       }`}
                     >
                       Structured Breakdown
@@ -1120,10 +1227,10 @@ export function TailorWorkspace() {
                       type="button"
                       onClick={() => setJobInfoSubTab("original")}
                       data-testid="job-subtab-original"
-                      className={`px-3 py-1 text-xs font-mono rounded transition-colors ${
+                      className={`px-3 py-1.5 text-xs font-mono rounded-lg transition-colors border ${
                         jobInfoSubTab === "original"
-                          ? "bg-[#ff8c00] text-slate-950 font-bold"
-                          : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+                          ? "bg-amber-500/15 border-amber-500/40 text-amber-300 font-semibold"
+                          : "border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50"
                       }`}
                     >
                       Original Source
@@ -1132,10 +1239,10 @@ export function TailorWorkspace() {
                       type="button"
                       onClick={() => setJobInfoSubTab("details")}
                       data-testid="job-subtab-details"
-                      className={`px-3 py-1 text-xs font-mono rounded transition-colors ${
+                      className={`px-3 py-1.5 text-xs font-mono rounded-lg transition-colors border ${
                         jobInfoSubTab === "details"
-                          ? "bg-[#ff8c00] text-slate-950 font-bold"
-                          : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+                          ? "bg-amber-500/15 border-amber-500/40 text-amber-300 font-semibold"
+                          : "border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50"
                       }`}
                     >
                       Extraction Details
@@ -1325,6 +1432,17 @@ export function TailorWorkspace() {
                             className="text-[10px] font-mono px-2 py-1 rounded border border-emerald-700/60 text-emerald-300 hover:text-white"
                           >
                             Save Job
+                          </button>
+                          <button
+                            type="button"
+                            data-testid="open-3pane-tailor-btn"
+                            onClick={() => {
+                              setPreviousTab("job-info");
+                              setActiveTab("3-pane");
+                            }}
+                            className="text-[10px] font-mono px-2.5 py-1 rounded bg-amber-500/15 border border-amber-500/40 text-amber-300 font-semibold hover:bg-amber-500/25 transition"
+                          >
+                            Open in 3-Pane Tailor →
                           </button>
                         </div>
                       </div>
