@@ -37,7 +37,7 @@ import {
 const SETTINGS_STORAGE_KEY = "resumeforge_ai_settings";
 
 const DEFAULT_MODELS: Record<string, string> = {
-  gemini: "gemini-3.8-flash",
+  gemini: "gemini-2.5-flash",
   openai: "gpt-4o",
   groq: "llama-3.3-70b-versatile",
   anthropic: "claude-3-5-sonnet-20241022",
@@ -80,6 +80,10 @@ export function SettingsWorkspace() {
           if (parsed.provider) activeProvider = parsed.provider;
           if (parsed.model) activeModel = parsed.model;
           if (parsed.baseUrl) activeBaseUrl = parsed.baseUrl;
+        }
+
+        if (activeProvider === "gemini" && activeModel === "gemini-3.8-flash") {
+          activeModel = "gemini-2.5-flash";
         }
 
         if (activeProvider === "ollama" && !activeBaseUrl) {
@@ -191,6 +195,7 @@ export function SettingsWorkspace() {
     if (nextKey.trim()) {
       await saveKey(provider as ByokProvider, nextKey);
       setHasVaultKey(true);
+      saveSettingsToStorage(provider, baseUrl, model);
     } else {
       await removeKey(provider);
       setHasVaultKey(false);
@@ -468,7 +473,7 @@ export function SettingsWorkspace() {
                 value={model}
                 onChange={handleModelChange}
                 placeholder={
-                  DEFAULT_MODELS[provider] || "gemini-3.8-flash"
+                  DEFAULT_MODELS[provider] || "gemini-2.5-flash"
                 }
                 className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-mono"
               />

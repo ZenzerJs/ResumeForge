@@ -21,6 +21,7 @@ import { normalizeCompany } from "@/lib/company";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { isSafeHref } from "@/lib/security/safe-fetch";
+import { resolveClientProviderConfig } from "@/lib/byok-vault";
 
 export interface CompanyDossierData {
   id?: string;
@@ -73,7 +74,7 @@ export function CompanyIntelDossierPanel({
     setErrorMessage(null);
 
     try {
-      const res = await fetch(`/api/companies/${slug}/dossier`);
+      const res = await fetch(`/api/companies/${encodeURIComponent(slug)}/dossier`);
       const json = await res.json();
       if (res.ok && json.found && json.dossier) {
         setDossier(json.dossier);
@@ -99,10 +100,15 @@ export function CompanyIntelDossierPanel({
     setErrorMessage(null);
 
     try {
-      const res = await fetch(`/api/companies/${slug}/dossier/generate`, {
+      const providerConfig = (await resolveClientProviderConfig()) || undefined;
+      const res = await fetch(`/api/companies/${encodeURIComponent(slug)}/dossier/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyName: company, jobTitle }),
+        body: JSON.stringify({
+          companyName: company,
+          jobTitle,
+          providerConfig,
+        }),
       });
       const json = await res.json();
       if (res.ok && json.found && json.dossier) {

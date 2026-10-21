@@ -13,28 +13,9 @@ import {
 import { AiMarkdownRenderer } from "@/components/editor/ai-markdown-renderer";
 import { ToolBadge } from "@/components/editor/tool-badge";
 import type { ChatMessage, ChatStreamChunk, ToolCallRecord } from "@/lib/ai/chat-types";
+import { resolveClientProviderConfig } from "@/lib/byok-vault";
 
 const STORAGE_KEY = "resumeforge_chat_messages";
-
-interface ProviderSettings {
-  provider: string;
-  apiKey: string;
-  baseUrl?: string;
-  model?: string;
-}
-
-function loadAiSettings(): ProviderSettings | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem("resumeforge_ai_settings");
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed?.provider || !parsed?.apiKey) return null;
-    return parsed as ProviderSettings;
-  } catch {
-    return null;
-  }
-}
 
 function newId(): string {
   return crypto.randomUUID();
@@ -106,7 +87,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
       const text = (rawText ?? input).trim();
       if (!text || isStreaming) return;
 
-      const aiSettings = loadAiSettings();
+      const aiSettings = await resolveClientProviderConfig();
       if (!aiSettings) {
         setNoKeyError(true);
         setError("AI provider not configured. Please enter your API key in Settings.");

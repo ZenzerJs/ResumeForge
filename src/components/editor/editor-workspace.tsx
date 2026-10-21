@@ -45,6 +45,7 @@ import { ConfirmMasterDialog } from "./confirm-master-dialog";
 import { AiAssistantWindow } from "./ai-assistant-window";
 import { ResumeFacts } from "@/lib/facts/types";
 import { extractResumeFacts } from "@/lib/facts/extract";
+import { resolveClientProviderConfig } from "@/lib/byok-vault";
 
 const CodeEditor = dynamic(() => import("./code-editor").then((m) => ({ default: m.CodeEditor })), {
   ssr: false,
@@ -527,14 +528,8 @@ export function EditorWorkspace() {
   const runEvidenceExtractAfterSave = async (typstSource: string) => {
     try {
       setIsExtractingEvidence(true);
-      let providerConfig: Record<string, unknown> | undefined;
-      if (typeof window !== "undefined") {
-        const stored = localStorage.getItem("resumeforge_ai_settings");
-        if (stored) {
-          providerConfig = JSON.parse(stored);
-        }
-      }
-      if (!providerConfig?.provider || !providerConfig?.apiKey) {
+      const providerConfig = await resolveClientProviderConfig();
+      if (!providerConfig) {
         setEvidenceExtractToast("Configure an AI provider in Settings to draft Evidence Bank items.");
         scheduleUiTimer(() => setEvidenceExtractToast(null), 8000);
         return;

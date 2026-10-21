@@ -9,6 +9,8 @@ const DOSSIER_REGEN_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const GenerateDossierBodySchema = z.object({
   companyName: z.string().trim().min(1).max(120).optional(),
   jobTitle: z.string().trim().min(1).max(160).optional(),
+  referenceNotes: z.string().optional(),
+  processNotes: z.string().optional(),
 });
 
 export async function POST(
@@ -46,7 +48,7 @@ export async function POST(
     where: { companySlug: slug },
   });
 
-  if (existing && Date.now() - existing.lastUpdated.getTime() < DOSSIER_REGEN_COOLDOWN_MS) {
+  if (existing && Date.now() - new Date(existing.lastUpdated).getTime() < DOSSIER_REGEN_COOLDOWN_MS) {
     return NextResponse.json({ found: true, dossier: existing, stale: false, cooldown: true });
   }
 
@@ -54,8 +56,8 @@ export async function POST(
     const dossier = await generateDossier({
       companyName: parsed.data.companyName || existing?.displayName || slug,
       jobTitle: parsed.data.jobTitle,
-      referenceNotes: existing?.referenceNotes ?? undefined,
-      processNotes: existing?.processNotes ?? undefined,
+      referenceNotes: parsed.data.referenceNotes ?? existing?.referenceNotes ?? undefined,
+      processNotes: parsed.data.processNotes ?? existing?.processNotes ?? undefined,
     });
 
     const data = {

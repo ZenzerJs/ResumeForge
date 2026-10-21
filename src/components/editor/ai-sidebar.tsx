@@ -30,6 +30,7 @@ import { GuardrailFeedback } from "@/components/ui/guardrail-feedback";
 import { AiMarkdownRenderer } from "@/components/editor/ai-markdown-renderer";
 import { ChatPanel } from "@/components/editor/chat-panel";
 import { AiProgress, type AiJobStage } from "@/components/ui/ai-progress";
+import { resolveClientProviderConfig } from "@/lib/byok-vault";
 
 interface AiSidebarProps {
   /** Current Typst source in the editor buffer */
@@ -59,13 +60,6 @@ interface AiSidebarProps {
   onModeChange?: (mode: "chat" | "tailor") => void;
 }
 
-interface ProviderSettings {
-  provider: string;
-  apiKey: string;
-  baseUrl?: string;
-  model?: string;
-}
-
 interface PatchSuggestion {
   id: string;
   operation: string;
@@ -81,19 +75,6 @@ interface GapItem {
   requirement: string;
   severity: "CRITICAL" | "MODERATE" | "MINOR";
   recommendation: string;
-}
-
-function loadAiSettings(): ProviderSettings | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem("resumeforge_ai_settings");
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed?.provider || !parsed?.apiKey) return null;
-    return parsed as ProviderSettings;
-  } catch {
-    return null;
-  }
 }
 
 const SEVERITY_COLORS = {
@@ -195,7 +176,7 @@ export function AiSidebar({
       return;
     }
 
-    const aiSettings = loadAiSettings();
+    const aiSettings = await resolveClientProviderConfig();
     if (!aiSettings) {
       setNoKeyError(true);
       setError("AI provider not configured. Please enter your API key in Settings.");
@@ -374,7 +355,7 @@ export function AiSidebar({
     setConfirmLargeRepair(false);
 
     try {
-      const providerConfig = loadAiSettings();
+      const providerConfig = await resolveClientProviderConfig();
 
       setRepairStage("writing");
       const res = await fetch("/api/ai/repair-typst", {

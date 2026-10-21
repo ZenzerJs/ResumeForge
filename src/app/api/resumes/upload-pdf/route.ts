@@ -5,7 +5,7 @@ import { convertPdfTextToTypst } from "@/lib/ai/gateway";
 import { ProviderConfig, ProviderConfigSchema } from "@/lib/ai/types";
 import { sanitizeTypstSource } from "@/lib/typst/sanitizer";
 import { ensureTypstLinks } from "@/lib/typst/ensure-links";
-import { sanitizeError } from "@/lib/ai/redact";
+import { redactError, sanitizeError } from "@/lib/ai/redact";
 import { requireUserId } from "@/lib/security/auth-request";
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
@@ -78,6 +78,12 @@ export async function POST(request: Request) {
 
       if (body.pdfBase64) {
         const base64Data = body.pdfBase64.replace(/^data:application\/pdf;base64,/, "");
+        if (base64Data.length > Math.ceil((MAX_PDF_BYTES * 4) / 3) + 16) {
+          return NextResponse.json(
+            { success: false, error: "PDF exceeds the 10 MB upload limit" },
+            { status: 413 }
+          );
+        }
         buffer = Buffer.from(base64Data, "base64");
       } else if (typeof body.rawText === "string") {
         if (body.rawText.length > 200_000) {
@@ -172,7 +178,7 @@ export async function POST(request: Request) {
           convertedSource = aiResult.typstSource;
         }
       } catch (aiErr) {
-        console.warn("AI PDF conversion failed, falling back to heuristic parser:", aiErr);
+        console.warn("AI PDF conversion failed, falling back to heuristic parser:", redactError(aiErr));
       }
     }
 
@@ -210,7 +216,7 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (err) {
-    console.error("PDF upload error:", err);
+    console.error("PDF upload error:", redactError(err));
     return NextResponse.json(
       {
         success: false,

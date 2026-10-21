@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { GenerateCoverLetterInputSchema, CoverLetterResponseSchema } from "@/lib/ai/cover-letter-schema";
-import { generateCoverLetter } from "@/lib/ai/gateway";
+import { generateCoverLetter, resolveServerProviderConfig } from "@/lib/ai/gateway";
 import { verifyCoverLetterGrounding } from "@/lib/ai/cover-letter-verifier";
 import { extractJsonObject, normalizeCoverLetterPayload } from "@/lib/ai/json-response";
 import { getEvidenceItems } from "@/lib/db/evidence";
@@ -30,7 +30,18 @@ export async function POST(request: Request) {
     const input = parseResult.data;
     const providerConfig = input.providerConfig;
 
-    if (!providerConfig?.provider || (!providerConfig.apiKey && providerConfig.provider !== "custom")) {
+    if (!providerConfig?.provider) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "No AI provider configured. Please configure your API key in Settings.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const resolvedConfig = resolveServerProviderConfig(providerConfig);
+    if (!resolvedConfig.apiKey && resolvedConfig.provider !== "custom" && resolvedConfig.provider !== "ollama") {
       return NextResponse.json(
         {
           success: false,
@@ -59,7 +70,7 @@ export async function POST(request: Request) {
 
     // Invoke BYOK AI Gateway
     const gatewayResult = await generateCoverLetter(
-      providerConfig,
+      resolvedConfig,
       input,
       activeEvidenceItems,
       master?.typstSource

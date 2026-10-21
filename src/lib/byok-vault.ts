@@ -224,3 +224,61 @@ export async function getActiveConfig(): Promise<{ provider: string; model: stri
 
   return { provider, model, hasKey };
 }
+
+export interface ClientProviderConfig {
+  provider: ByokProvider | "custom";
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+}
+
+/**
+ * Resolves the active client-side BYOK provider configuration, decrypting the API key
+ * from the Web Crypto AES-GCM vault (or migrating a legacy key from resumeforge_ai_settings).
+ * Returns null if no key is configured for a provider that requires one.
+ */
+export async function resolveClientProviderConfig(): Promise<ClientProviderConfig | null> {
+  if (!isBrowser()) return null;
+
+  let provider: ByokProvider | "custom" = "gemini";
+  let model = "";
+  let baseUrl = "";
+  let legacyApiKey = "";
+
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.provider) provider = parsed.provider;
+      if (typeof parsed.model === "string") model = parsed.model.trim();
+      if (typeof parsed.baseUrl === "string") baseUrl = parsed.baseUrl.trim();
+      if (typeof parsed.apiKey === "string") legacyApiKey = parsed.apiKey.trim();
+    }
+  } catch {
+    // Ignore parse errors
+  }
+
+  const vaultKey = await getKey(provider);
+  const apiKey = vaultKey || legacyApiKey || "";
+
+  if (provider !== "ollama" && provider !== "custom" && !apiKey) {
+    return null;
+  }
+
+  let resolvedModel = model || DEFAULT_MODELS[provider] || "";
+  if (provider === "gemini" && resolvedModel === "gemini-3.8-flash") {
+    resolvedModel = "gemini-2.5-flash";
+  }
+
+  if (provider === "ollama" && !baseUrl) {
+    baseUrl = "http://localhost:11434";
+  }
+
+  return {
+    provider,
+    apiKey: apiKey || undefined,
+    baseUrl: baseUrl || undefined,
+    model: resolvedModel || undefined,
+  };
+}
+

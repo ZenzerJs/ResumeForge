@@ -1,7 +1,7 @@
-export const runtime = "edge";
+import { assertSafePublicUrl, UnsafeUrlError } from "@/lib/security/safe-fetch";
 
 /**
- * Edge runtime proxy for BYOK requests requiring CORS bypass.
+ * Proxy for BYOK requests requiring CORS bypass.
  * Strips authorization headers from all logs and streams upstream payload directly.
  */
 export async function POST(req: Request): Promise<Response> {
@@ -36,6 +36,18 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
+  try {
+    await assertSafePublicUrl(targetUrl.toString());
+  } catch (err) {
+    if (err instanceof UnsafeUrlError || (err as Error)?.name === "UnsafeUrlError") {
+      return new Response(
+        JSON.stringify({ error: { code: "SSRF_BLOCKED", message: (err as Error).message } }),
+        { status: 403, headers: { "content-type": "application/json" } }
+      );
+    }
+    throw err;
+  }
+
   // Build upstream forwarding headers without logging secrets
   const forwardHeaders = new Headers();
   forwardHeaders.set("Content-Type", req.headers.get("content-type") || "application/json");
@@ -60,10 +72,11 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   try {
-    const upstreamRes = await fetch(parsedUrl.toString(), {
+    const upstreamRes = await fetch(targetUrl.toString(), {
       method: "POST",
       headers: forwardHeaders,
       body: req.body,
+      redirect: "error",
       // @ts-expect-error duplex required in Node/Edge for streaming bodies
       duplex: "half",
     });
@@ -77,6 +90,12 @@ export async function POST(req: Request): Promise<Response> {
       },
     });
   } catch (err) {
+    if (err instanceof UnsafeUrlError || (err as Error)?.name === "UnsafeUrlError") {
+      return new Response(
+        JSON.stringify({ error: { code: "SSRF_BLOCKED", message: (err as Error).message } }),
+        { status: 403, headers: { "content-type": "application/json" } }
+      );
+    }
     // Zero server logging of authorization details; return sanitized error
     const msg = err instanceof Error ? err.message : "Upstream proxy request failed";
     return new Response(
@@ -93,10 +112,9 @@ export async function OPTIONS(): Promise<Response> {
   return new Response(null, {
     status: 204,
     headers: {
-      "access-control-allow-origin": "*",
       "access-control-allow-methods": "POST, OPTIONS",
       "access-control-allow-headers":
-        "Content-Type, Authorization, x-byok-target-url, x-byok-auth, x-byok-provider, x-goog-api-key",
+        "content-type, authorization, x-api-key, x-goog-api-key, anthropic-version, x-byok-target-url, x-target-url",
     },
   });
 }
