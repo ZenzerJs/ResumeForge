@@ -2,6 +2,7 @@ import { remark } from "remark";
 import remarkGfm from "remark-gfm";
 import { visit } from "unist-util-visit";
 import crypto from "crypto";
+import { normalizeLocation } from "@/lib/ingestion/helpers";
 
 export interface ParsedJobRow {
   externalId: string;
@@ -31,7 +32,7 @@ export function parsePittCSCMarkdown(markdownContent: string): ParsedJobRow[] {
 
     const rawCompany = extractTextAndState(cells[0]);
     const rawRole = extractTextAndState(cells[1]);
-    const location = extractTextAndState(cells[2]).text;
+    const location = normalizeLocation(cleanText(extractTextAndState(cells[2]).text)).replace(/\|/g, "; ");
     const applyUrl = extractHref(cells[3]);
     const datePosted = extractTextAndState(cells[4] || {}).text;
 
@@ -76,6 +77,8 @@ function extractTextAndState(cellNode: unknown): { text: string; isStrikethrough
   visit(cellNode as AstNode, (node: unknown) => {
     const astNode = node as AstNode;
     if (astNode.type === "delete") isStrikethrough = true;
+    if (astNode.type === "break") text += "; ";
+    if (astNode.type === "html" && /<br\s*\/?>/i.test(astNode.value || "")) text += "; ";
     if (astNode.type === "text" && astNode.value) text += astNode.value + " ";
   });
 

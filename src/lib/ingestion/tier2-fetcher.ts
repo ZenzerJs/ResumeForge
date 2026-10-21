@@ -8,7 +8,13 @@
 
 import { prisma } from "@/lib/prisma";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
-import { extractApplyUrlFromNotes, extractSalaryFromNotes, isPlaceholderDescription } from "@/lib/ingestion/helpers";
+import {
+  extractApplyUrlFromNotes,
+  extractSalaryFromNotes,
+  extractLocationFromNotes,
+  isPlaceholderDescription,
+  normalizeLocation,
+} from "@/lib/ingestion/helpers";
 import { isSafeHref, safeFetch, UnsafeUrlError } from "@/lib/security/safe-fetch";
 import {
   formatCanonicalJobDescription,
@@ -310,8 +316,37 @@ function salaryFromGreenhouseJob(json: Record<string, unknown>): string | undefi
     if (typeof minCents !== "number") continue;
     const min = minCents / 100;
     const max = typeof maxCents === "number" ? maxCents / 100 : min;
-    const fmt = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
-    return min === max ? fmt(min) : `${fmt(min)}-${fmt(max)}`;
+    const curr = typeof row.currency === "string" && row.currency.toUpperCase() === "CAD" ? "CA$" : "$";
+    const unit = typeof row.unit_of_pay === "string" ? row.unit_of_pay.toLowerCase() : "";
+    const isHourly = unit.includes("hour") || min < 500;
+    const fmt = (n: number) => (isHourly ? (Number.isInteger(n) ? `${curr}${n}` : `${curr}${n.toFixed(2)}`) : `${curr}${Math.round(n).toLocaleString("en-US")}`);
+    const suffix = isHourly ? "/hr" : "";
+    return min === max ? `${fmt(min)}${suffix}` : `${fmt(min)}-${fmt(max)}${suffix}`;
+  }
+  return undefined;
+}
+
+function salaryFromLeverJob(json: Record<string, unknown>): string | undefined {
+  const range = (json.salaryRange ?? json.salary_range) as Record<string, unknown> | undefined;
+  if (!range || typeof range !== "object") return undefined;
+  const min = typeof range.min === "number" ? range.min : undefined;
+  if (min === undefined) return undefined;
+  const max = typeof range.max === "number" ? range.max : min;
+  const curr = typeof range.currency === "string" && range.currency.toUpperCase() === "CAD" ? "CA$" : "$";
+  const interval = typeof range.interval === "string" ? range.interval.toLowerCase() : "";
+  const isHourly = interval.includes("hour") || min < 500;
+  const fmt = (n: number) => (isHourly ? (Number.isInteger(n) ? `${curr}${n}` : `${curr}${n.toFixed(2)}`) : `${curr}${Math.round(n).toLocaleString("en-US")}`);
+  const suffix = isHourly ? "/hr" : "";
+  return min === max ? `${fmt(min)}${suffix}` : `${fmt(min)}-${fmt(max)}${suffix}`;
+}
+
+function salaryFromAshbyJob(json: Record<string, unknown>): string | undefined {
+  if (typeof json.compensationTierSummary === "string" && json.compensationTierSummary.trim()) {
+    return json.compensationTierSummary.trim();
+  }
+  const comp = json.compensation as Record<string, unknown> | undefined;
+  if (comp && typeof comp.summary === "string" && comp.summary.trim()) {
+    return comp.summary.trim();
   }
   return undefined;
 }
@@ -322,8 +357,20 @@ function canonicalIfValid(
 ): ExtractResultSuccess | null {
   const description = convertHtmlToCleanMarkdown(fields.description);
   const salary = fields.salary || extractSalaryFromNotes(null, description) || undefined;
-  const formatted = formatCanonicalJobDescription({ ...fields, description, salary });
-  if (!validateExtractedTextQuality(description) && !validateExtractedTextQuality(formatted)) {
+  const location = fields.location ? normalizeLocation(fields.location) : undefined;
+
+  let bodyWithSalary = description;
+  if (salary && !/(?:salary|compensation)\s*:/i.test(bodyWithSalary)) {
+    bodyWithSalary = `${bodyWithSalary}\n\nSalary: ${salary}`;
+  }
+
+  const formatted = formatCanonicalJobDescription({
+    ...fields,
+    location,
+    description: bodyWithSalary,
+    salary,
+  });
+  if (!validateExtractedTextQuality(bodyWithSalary) && !validateExtractedTextQuality(formatted)) {
     return null;
   }
   if (!validateExtractedTextQuality(formatted)) return null;
@@ -369,7 +416,7 @@ async function extractFromAtsJsonApis(
     const fetched = await fetchJsonOrHtml(leverApi, "application/json");
     if (fetched.ok) {
       try {
-        const json = JSON.parse(fetched.body) as {
+        const json = JSON.parse(fetched.body) as Record<string, unknown> & {
           text?: string;
           description?: string;
           descriptionPlain?: string;
@@ -386,6 +433,7 @@ async function extractFromAtsJsonApis(
               title: json.text || meta?.roleTitle,
               company: meta?.company,
               location: json.categories?.location,
+              salary: salaryFromLeverJob(json),
               description,
             },
             pageUrl
@@ -403,13 +451,12 @@ async function extractFromAtsJsonApis(
     const fetched = await fetchJsonOrHtml(ashbyApi, "application/json");
     if (fetched.ok) {
       try {
-        const json = JSON.parse(fetched.body) as {
+        const json = JSON.parse(fetched.body) as Record<string, unknown> & {
           title?: string;
           descriptionHtml?: string;
           descriptionPlain?: string;
           department?: string;
           location?: string;
-          compensation?: { summary?: string };
         };
         const description =
           json.descriptionPlain?.trim() ||
@@ -420,7 +467,7 @@ async function extractFromAtsJsonApis(
               title: json.title || meta?.roleTitle,
               company: meta?.company,
               location: json.location,
-              salary: json.compensation?.summary,
+              salary: salaryFromAshbyJob(json),
               description,
             },
             pageUrl
@@ -518,6 +565,39 @@ async function fetchWithJinaReader(
   return null;
 }
 
+function salaryFromJsonLd(baseSalary: unknown): string | undefined {
+  if (!baseSalary) return undefined;
+  if (typeof baseSalary === "string") return baseSalary.trim();
+  if (typeof baseSalary === "number") return `$${baseSalary.toLocaleString("en-US")}`;
+  if (typeof baseSalary === "object") {
+    const obj = baseSalary as Record<string, unknown>;
+    const curr = typeof obj.currency === "string" && obj.currency.toUpperCase() === "CAD" ? "CA$" : "$";
+    const val = obj.value as Record<string, unknown> | number | undefined;
+    if (typeof val === "number") return `${curr}${val.toLocaleString("en-US")}`;
+    if (val && typeof val === "object") {
+      const min = typeof val.minValue === "number" ? val.minValue : (typeof val.value === "number" ? val.value : undefined);
+      if (min !== undefined) {
+        const max = typeof val.maxValue === "number" ? val.maxValue : min;
+        const unit = typeof val.unitText === "string" ? val.unitText.toLowerCase() : "";
+        const isHourly = unit.includes("hour") || min < 500;
+        const suffix = isHourly ? "/hr" : "";
+        const fmt = (n: number) => (isHourly ? `${curr}${n}` : `${curr}${Math.round(n).toLocaleString("en-US")}`);
+        return min === max ? `${fmt(min)}${suffix}` : `${fmt(min)}-${fmt(max)}${suffix}`;
+      }
+    }
+    const minDirect = typeof obj.minValue === "number" ? obj.minValue : (typeof obj.value === "number" ? obj.value : undefined);
+    if (minDirect !== undefined) {
+      const maxDirect = typeof obj.maxValue === "number" ? obj.maxValue : minDirect;
+      const unit = typeof obj.unitText === "string" ? obj.unitText.toLowerCase() : "";
+      const isHourly = unit.includes("hour") || minDirect < 500;
+      const suffix = isHourly ? "/hr" : "";
+      const fmt = (n: number) => (isHourly ? `${curr}${n}` : `${curr}${Math.round(n).toLocaleString("en-US")}`);
+      return minDirect === maxDirect ? `${fmt(minDirect)}${suffix}` : `${fmt(minDirect)}-${fmt(maxDirect)}${suffix}`;
+    }
+  }
+  return undefined;
+}
+
 function extractFromJsonLd(
   html: string,
   sourceUrl: string,
@@ -540,6 +620,7 @@ function extractFromJsonLd(
           title: typeof target.title === "string" ? target.title : meta?.roleTitle,
           company: organizationName(target.hiringOrganization) || meta?.company,
           location: locationName(target.jobLocation),
+          salary: salaryFromJsonLd(target.baseSalary),
           description: convertHtmlToCleanMarkdown(description),
         },
         sourceUrl

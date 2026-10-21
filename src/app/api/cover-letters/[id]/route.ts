@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getCoverLetterById, updateCoverLetter, deleteCoverLetter } from "@/lib/db/cover-letters";
 import { sanitizeError } from "@/lib/ai/redact";
 import { getRequestUserId, requireUserId } from "@/lib/security/auth-request";
+
+const UpdateCoverLetterSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  proseMarkdown: z.string().max(100000).optional(),
+  typstSource: z.string().max(200000).optional(),
+  tone: z.enum(["FORMAL", "CONVERSATIONAL", "TECHNICAL", "EXECUTIVE"]).optional(),
+  targetWordCount: z.number().int().min(50).max(2000).optional(),
+});
 
 export async function GET(
   request: Request,
@@ -63,7 +72,19 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const updated = await updateCoverLetter(id, body, userId);
+    const validation = UpdateCoverLetterSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid update payload",
+          details: validation.error.issues,
+        },
+        { status: 400 }
+      );
+    }
+
+    const updated = await updateCoverLetter(id, validation.data, userId);
     return NextResponse.json({ success: true, data: updated });
   } catch (err) {
     return NextResponse.json(

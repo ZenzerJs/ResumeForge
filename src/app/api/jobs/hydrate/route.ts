@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchAndCacheJobFullText } from "@/lib/ingestion/tier2-fetcher";
 import { isPlaceholderDescription } from "@/lib/ingestion/helpers";
 import { getJobById } from "@/lib/db/jobs";
-import { requireUserId } from "@/lib/security/auth-request";
+import { getRequestUserId } from "@/lib/security/auth-request";
 import { sanitizeError } from "@/lib/ai/redact";
 
 const MAX_IDS_PER_REQUEST = 8;
@@ -23,8 +23,7 @@ interface HydrateResult {
  */
 export async function POST(req: NextRequest) {
   try {
-    const userId = await requireUserId(req);
-    if (userId instanceof NextResponse) return userId;
+    const userId = await getRequestUserId(req);
 
     const body = (await req.json().catch(() => ({}))) as { ids?: unknown; retry?: unknown };
     const ids = Array.isArray(body.ids)
@@ -46,6 +45,10 @@ export async function POST(req: NextRequest) {
         try {
           const job = await getJobById(id);
           if (!job) {
+            results.push({ id, status: "skipped" });
+            continue;
+          }
+          if (job.userId !== null && job.userId !== userId) {
             results.push({ id, status: "skipped" });
             continue;
           }

@@ -50,7 +50,8 @@ export function resetMockStore() {
 }
 
 function matchCondition(itemVal: any, condVal: any): boolean {
-  if (condVal === null || condVal === undefined) {
+  if (condVal === undefined) return true;
+  if (condVal === null) {
     return itemVal === null || itemVal === undefined;
   }
   if (typeof condVal === "object" && !Array.isArray(condVal) && !(condVal instanceof Date)) {
@@ -98,6 +99,9 @@ function matchCondition(itemVal: any, condVal: any): boolean {
       }
     }
     return hasKnownOp;
+  }
+  if (itemVal instanceof Date && condVal instanceof Date) {
+    return itemVal.getTime() === condVal.getTime();
   }
   return itemVal === condVal;
 }
@@ -161,18 +165,27 @@ function resolveIncludes(table: string, item: any, include?: any) {
   if (include.bullets && (table === "evidenceItem" || table === "EvidenceItem")) {
     result.bullets = activeStore.bullet.filter((b) => b.evidenceId === item.id);
   }
-  if (include.variants) {
+  const inc = include;
+  if (inc.variants) {
     if (table === "resume" || table === "Resume") {
       result.variants = activeStore.resumeVariant.filter((v) => v.masterResumeId === item.id);
     } else if (table === "job" || table === "Job") {
-      result.variants = activeStore.resumeVariant.filter((v) => v.jobId === item.id);
+      let variants = activeStore.resumeVariant.filter((v) => v.jobId === item.id);
+      if (typeof inc.variants === "object" && inc.variants?.where) {
+        variants = variants.filter((r: any) => matchesWhere(r, inc.variants.where));
+      }
+      result.variants = variants;
     }
   }
-  if (include.patches && (table === "resumeVariant" || table === "ResumeVariant")) {
+  if (inc.patches && (table === "resumeVariant" || table === "ResumeVariant")) {
     result.patches = activeStore.patch.filter((p) => p.variantId === item.id);
   }
-  if (include.coverLetters && (table === "job" || table === "Job")) {
-    result.coverLetters = activeStore.coverLetter.filter((c) => c.jobId === item.id);
+  if (inc.coverLetters && (table === "job" || table === "Job")) {
+    let cls = activeStore.coverLetter.filter((c) => c.jobId === item.id);
+    if (typeof inc.coverLetters === "object" && inc.coverLetters?.where) {
+      cls = cls.filter((r: any) => matchesWhere(r, inc.coverLetters.where));
+    }
+    result.coverLetters = cls;
   }
   if (include.job) {
     result.job = activeStore.job.find((j) => j.id === item.jobId) ?? null;

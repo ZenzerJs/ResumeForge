@@ -40,7 +40,15 @@ function probePostgresPort(urlStr?: string): Promise<boolean> {
 }
 
 async function getActiveClient(): Promise<any> {
-  if (dbAvailable === null) {
+  if (process.env.VITEST && process.env.NODE_ENV !== "production") {
+    dbAvailable = false;
+    if (!mockClient) {
+      mockClient = createPrismaMockClient();
+    }
+    return mockClient;
+  }
+
+  if (dbAvailable === null || !probePromise) {
     if (!probePromise) {
       probePromise = probePostgresPort();
     }

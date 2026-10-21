@@ -69,15 +69,17 @@ export function verifyEvidenceCitations(
   response: PatchResponse,
   validEvidenceIds: Set<string>,
   validBulletIds: Set<string>
-): VerificationResult {
+): VerificationResult & { patches: PatchProposal[] } {
   const verified: PatchProposal[] = [];
+  const validPatches = verified;
   const rejected: RejectedPatch[] = [];
+  const gaps: Gap[] = [...response.gaps];
 
   for (const patch of response.patches) {
     // REPORT_GAP operations don't need evidence citations — they ARE gap reports
     if (patch.operation === "REPORT_GAP") {
       // Convert REPORT_GAP patches into gap entries instead
-      response.gaps.push({
+      gaps.push({
         requirement: patch.before || patch.after,
         severity: "MODERATE",
         recommendation: patch.rationale,
@@ -114,5 +116,5 @@ export function verifyEvidenceCitations(
     verified.push(patch);
   }
 
-  return { verified, rejected, gaps: response.gaps };
+  return { ...response, verified, rejected, patches: validPatches, gaps };
 }

@@ -288,11 +288,11 @@ export async function getJobsList(query: JobListQuery = {}) {
   });
 
   const mapped = jobs.map((job) => {
-    const { rawDescription, ...rest } = withViewerOutcome(job, query.userId);
+    const item = withViewerOutcome(job, query.userId);
     return {
-      ...rest,
+      ...item,
       extractedRequirements: parseRequirementsJson(job.extractedRequirements),
-      isPlaceholder: isPlaceholderDescription(rawDescription),
+      isPlaceholder: isPlaceholderDescription(item.rawDescription),
     };
   });
 
@@ -361,11 +361,46 @@ export async function getJobById(id: string, viewerUserId?: string | null) {
   };
 }
 
-export async function deleteJob(id: string) {
+export async function deleteJob(id: string, userId?: string) {
   const existing = await prisma.job.findFirst({
-    where: { id },
+    where: { id, ...(userId ? { OR: [{ userId }, { userId: null }] } : {}) },
   });
-  if (!existing) return null;
+  if (!existing) {
+    throw new Error("Job not found");
+  }
+
+  if (userId && existing.userId === null) {
+    const [otherApps, otherVariants, otherLetters] = await Promise.all([
+      prisma.jobApplication.findFirst({
+        where: { jobId: id, NOT: { userId } },
+      }),
+      prisma.resumeVariant.findFirst({
+        where: { jobId: id, NOT: { masterResume: { userId } } },
+      }),
+      prisma.coverLetter.findFirst({
+        where: {
+          jobId: id,
+          NOT: {
+            OR: [{ userId }, { variant: { masterResume: { userId } } }],
+          },
+        },
+      }),
+    ]);
+
+    const isReferencedByOthers = Boolean(otherApps || otherVariants || otherLetters);
+    if (isReferencedByOthers) {
+      await Promise.all([
+        prisma.jobApplication.deleteMany({ where: { jobId: id, userId } }),
+        prisma.coverLetter.deleteMany({ where: { jobId: id, userId } }),
+        prisma.resumeVariant.deleteMany({ where: { jobId: id, masterResume: { userId } } }),
+      ]);
+      return existing;
+    }
+  }
+
+  await prisma.jobApplication.deleteMany({ where: { jobId: id } });
+  await prisma.coverLetter.deleteMany({ where: { jobId: id } });
+  await prisma.resumeVariant.deleteMany({ where: { jobId: id } });
   await prisma.job.delete({ where: { id } });
   return existing;
 }

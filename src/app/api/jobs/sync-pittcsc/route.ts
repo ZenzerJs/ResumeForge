@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { parsePittCSCMarkdown } from "@/lib/ingestion/pittcsc-parser";
 import { sanitizeError } from "@/lib/ai/redact";
@@ -8,15 +9,30 @@ export async function POST(req: Request) {
   try {
     const requiredSecret = process.env.JOB_SYNC_SECRET?.trim();
     if (!requiredSecret) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const authHeader = req.headers.get("Authorization");
-    if (authHeader && authHeader !== `Bearer ${requiredSecret}`) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    const expectedHeader = `Bearer ${requiredSecret}`;
+    const authBuf = Buffer.from(authHeader || "");
+    const expBuf = Buffer.from(expectedHeader);
+
+    if (
+      !authHeader ||
+      authBuf.length !== expBuf.length ||
+      !timingSafeEqual(authBuf, expBuf)
+    ) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { rawMarkdown, jobType = "Internship" } = await req.json();
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const { rawMarkdown, jobType = "Internship" } = body || {};
     if (!rawMarkdown || typeof rawMarkdown !== "string") {
       return NextResponse.json({ error: "rawMarkdown is required" }, { status: 400 });
     }

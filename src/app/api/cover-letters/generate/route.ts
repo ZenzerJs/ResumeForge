@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { CoverLetterResponseSchema } from "@/lib/ai/cover-letter-schema";
-import { generateCoverLetter } from "@/lib/ai/gateway";
+import { generateCoverLetter, resolveServerProviderConfig } from "@/lib/ai/gateway";
 import { verifyCoverLetterGrounding } from "@/lib/ai/cover-letter-verifier";
 import { extractJsonObject, normalizeCoverLetterPayload } from "@/lib/ai/json-response";
 import { getEvidenceItems } from "@/lib/db/evidence";
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     // Verify job exists
     const job = await prisma.job.findFirst({
-      where: { id: jobId },
+      where: { id: jobId, OR: [{ userId }, { userId: null }] },
     });
 
     if (!job) {
@@ -41,8 +41,8 @@ export async function POST(req: NextRequest) {
 
     // Verify variant exists if provided
     if (variantId && typeof variantId === "string") {
-      const variant = await prisma.resumeVariant.findUnique({
-        where: { id: variantId },
+      const variant = await prisma.resumeVariant.findFirst({
+        where: { id: variantId, jobId, masterResume: { userId } },
       });
       if (!variant) {
         return NextResponse.json(
@@ -53,10 +53,20 @@ export async function POST(req: NextRequest) {
     }
 
     const parsedConfig = ProviderConfigSchema.safeParse(rawProviderConfig || body.provider);
+    if (!parsedConfig.success || !parsedConfig.data.provider) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "No AI provider configured. Please configure your API key in Settings.",
+        },
+        { status: 400 }
+      );
+    }
+    const resolvedConfig = resolveServerProviderConfig(parsedConfig.data);
     if (
-      !parsedConfig.success ||
-      !parsedConfig.data.provider ||
-      (!parsedConfig.data.apiKey && parsedConfig.data.provider !== "custom")
+      !resolvedConfig.apiKey &&
+      resolvedConfig.provider !== "custom" &&
+      resolvedConfig.provider !== "ollama"
     ) {
       return NextResponse.json(
         {
@@ -66,7 +76,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const providerConfig = parsedConfig.data;
+    const providerConfig = resolvedConfig;
 
     // Gather active evidence items
     const evidenceItems = await getEvidenceItems(undefined, userId);

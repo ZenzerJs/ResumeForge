@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { ProtectedResumeError } from "@/lib/security/protected-resume";
 import { extractResumeFacts } from "@/lib/facts/extract";
+
+export const parseTypstDeterministic = (source: string) => extractResumeFacts(source);
 
 export interface CreateResumeInput {
   title?: string;
@@ -75,7 +78,7 @@ export async function updateResume(id: string, input: UpdateResumeInput) {
   if (input.isMaster) {
     return await prisma.$transaction(async (tx) => {
       await tx.resume.updateMany({
-        where: { isMaster: true, NOT: { id } },
+        where: { userId: existing.userId, isMaster: true, NOT: { id } },
         data: { isMaster: false },
       });
 
@@ -180,7 +183,7 @@ export async function saveMasterResume(input: SaveMasterInput): Promise<SaveMast
     });
     const factSnapshot = extractResumeFacts(input.typstSource, evidence);
 
-    if (targetId && currentMaster) {
+    if (targetId) {
       await tx.resume.updateMany({
         where: { isMaster: true, ...ownerFilter, NOT: { id: targetId } },
         data: { isMaster: false },
@@ -259,7 +262,14 @@ export async function restoreMasterSnapshot(snapshotId: string, userId?: string)
     }
   }
 
+  const factSnapshot = parseTypstDeterministic(snapshot.typstSource) as unknown as Prisma.InputJsonValue;
+
   return await prisma.$transaction(async (tx) => {
+    await tx.resume.updateMany({
+      where: { ...(userId ? { userId } : {}), isMaster: true, NOT: { id: snapshot.resumeId } },
+      data: { isMaster: false },
+    });
+
     // Restore the snapshot typstSource to the master resume
     const restored = await tx.resume.update({
       where: { id: snapshot.resumeId },
@@ -268,6 +278,7 @@ export async function restoreMasterSnapshot(snapshotId: string, userId?: string)
         title: snapshot.title,
         isMaster: true,
         isProtected: true,
+        factSnapshot,
       },
     });
 

@@ -83,7 +83,7 @@ export function checkGuardrail(
   for (const title of candidateFacts.titles) {
     if (!masterTitles.has(title.normalized)) {
       const matchesMaster = Array.from(masterTitles).some(
-        (m) => title.normalized.includes(m) || m.includes(title.normalized)
+        (m) => title.normalized.length > 0 && (title.normalized.includes(m) || m.includes(title.normalized))
       );
       if (!matchesMaster) {
         violations.push({
@@ -140,10 +140,11 @@ export function checkGuardrail(
   const hasHardViolations = violations.some((v) => v.severity === "HARD");
   const hasSoftViolations = violations.some((v) => v.severity === "SOFT");
   const passed = !hasHardViolations;
+  const status = hasHardViolations ? "blocked" : "clean";
 
   return {
     passed,
-    status: passed ? (hasSoftViolations ? "clean" : "clean") : "blocked",
+    status,
     hasHardViolations,
     hasSoftViolations,
     violations,
