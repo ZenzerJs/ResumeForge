@@ -62,6 +62,15 @@ export const activeStore: MockStore = new Proxy({} as MockStore, {
     getActiveStore()[prop as string] = value;
     return true;
   },
+  has(_target, prop: string | symbol) {
+    return prop in getActiveStore();
+  },
+  ownKeys(_target) {
+    return Reflect.ownKeys(getActiveStore());
+  },
+  getOwnPropertyDescriptor(_target, prop: string | symbol) {
+    return Object.getOwnPropertyDescriptor(getActiveStore(), prop);
+  },
 });
 
 export function resetMockStore() {
