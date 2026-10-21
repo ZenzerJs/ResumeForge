@@ -112,11 +112,11 @@ Run `npm run build`. If it fails, fix the root cause and re-run all 4 checks. Co
 3. Have `generateDossier()` report whether the LLM was actually used. On fallback, set `source` to the existing non-LLM value (grep the schema/enum first).
 4. Add one vitest case for the fallback label.
 5. Commit: `fix(dossier): accept BYOK providerConfig, label heuristic fallback`.
-- [x] done: Accepted BYOK providerConfig in route, generateDossier reports llmUsed, labeled fallback as seed, added vitest tests.
+- [x] done: Accepted BYOK providerConfig in route, generateDossier reports llmUsed, labeled fallback as seed (matching schema enum), preserved caller notes, added vitest tests.
 
 ### T4: Default model, one line
 Set `src/lib/byok-vault.ts:13` to `gemini: "gemini-2.5-flash"`. Keep the normalization shims at `byok-vault.ts:269`, `settings-workspace.tsx:85`, `providers/gemini.ts:26` and `ai-provider.ts:130,159`; they migrate old saved values. Commit: `fix(byok): default gemini-2.5-flash`.
-- [x] done: Set default model to gemini-2.5-flash in byok-vault.ts:13; shims preserved; tests passing.
+- [x] done: Set default model to gemini-2.5-flash in byok-vault.ts:13; shims preserved; chatGemini fallback and E2E assertions updated; all tests passing.
 
 ### T5: Browser smoke check (Playwright must run in a subagent, per AGENTS.md)
 Run `npm run dev`, then check:
