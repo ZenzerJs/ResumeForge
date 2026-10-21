@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { generateDossier } from "@/lib/company-dossier";
 import { requireUserId } from "@/lib/security/auth-request";
+import { ProviderConfigSchema } from "@/lib/ai/types";
 
 const DOSSIER_REGEN_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
@@ -11,6 +12,7 @@ const GenerateDossierBodySchema = z.object({
   jobTitle: z.string().trim().min(1).max(160).optional(),
   referenceNotes: z.string().optional(),
   processNotes: z.string().optional(),
+  providerConfig: ProviderConfigSchema.optional(),
 });
 
 export async function POST(
@@ -58,14 +60,22 @@ export async function POST(
       jobTitle: parsed.data.jobTitle,
       referenceNotes: parsed.data.referenceNotes ?? existing?.referenceNotes ?? undefined,
       processNotes: parsed.data.processNotes ?? existing?.processNotes ?? undefined,
+      providerConfig: parsed.data.providerConfig,
     });
+
+    const isLlm = Boolean(dossier.llmUsed);
+    const source = isLlm
+      ? existing?.referenceNotes || existing?.processNotes
+        ? "seed+llm"
+        : "llm"
+      : "seed";
 
     const data = {
       displayName: dossier.companyName,
       interviewStyle: dossier.interviewStyle as any,
       cultureMetrics: dossier.engineeringCulture as any,
       recentSignals: dossier.recentSignals,
-      source: existing?.referenceNotes || existing?.processNotes ? "seed+llm" : "llm",
+      source,
       lastUpdated: new Date(),
     };
 

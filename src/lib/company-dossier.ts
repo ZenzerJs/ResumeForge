@@ -238,11 +238,20 @@ export async function generateDossierWithSource(
   }
 }
 
+export type GenerateDossierOutput = CompanyIntelligenceDossier & {
+  llmUsed: boolean;
+  source: "llm" | "offline";
+};
+
 /**
  * Synthesize company intelligence dossier with BYOK LLM or deterministic fallback.
  * Validates strictly with Zod schema.
  */
-export async function generateDossier(input: GenerateDossierInput): Promise<CompanyIntelligenceDossier> {
+export async function generateDossier(input: GenerateDossierInput): Promise<GenerateDossierOutput> {
   const result = await generateDossierWithSource(input);
-  return result.dossier;
+  return {
+    ...result.dossier,
+    llmUsed: result.source === "llm",
+    source: result.source,
+  };
 }

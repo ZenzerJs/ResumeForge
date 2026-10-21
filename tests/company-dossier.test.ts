@@ -3,6 +3,7 @@ import {
   dossierSchema,
   generateOfflineDossier,
   buildCompanyDossierPrompt,
+  generateDossier,
 } from "@/lib/company-dossier";
 import {
   parseHwwLine,
@@ -109,6 +110,17 @@ describe("Company Dossier Schema & Lenient Coercions (lib/company-dossier.ts)", 
     expect(fallback.interviewStyle.format).toBe("Practical / Systems");
     expect(fallback.engineeringCulture.workLifeBalanceRating).toBeGreaterThanOrEqual(1);
     expect(fallback.recentSignals).toContain("Hiring Without Whiteboards listed");
+  });
+
+  it("reports llmUsed false and offline source when generating dossier without live LLM", async () => {
+    const result = await generateDossier({
+      companyName: "Linear",
+      processNotes: "Pair programming on real issue in private fork. No LeetCode.",
+    });
+
+    expect(result.companyName).toBe("Linear");
+    expect(result.llmUsed).toBe(false);
+    expect(result.source).toBe("offline");
   });
 });
 
