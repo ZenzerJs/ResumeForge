@@ -43,10 +43,29 @@ export function createMockStore(): MockStore {
   };
 }
 
-let activeStore = createMockStore();
+const globalForMock = globalThis as unknown as {
+  __resumeForgeMockStore?: MockStore;
+};
+
+function getActiveStore(): MockStore {
+  if (!globalForMock.__resumeForgeMockStore) {
+    globalForMock.__resumeForgeMockStore = createMockStore();
+  }
+  return globalForMock.__resumeForgeMockStore;
+}
+
+export const activeStore: MockStore = new Proxy({} as MockStore, {
+  get(_target, prop: string | symbol) {
+    return getActiveStore()[prop as string];
+  },
+  set(_target, prop: string | symbol, value: any) {
+    getActiveStore()[prop as string] = value;
+    return true;
+  },
+});
 
 export function resetMockStore() {
-  activeStore = createMockStore();
+  globalForMock.__resumeForgeMockStore = createMockStore();
 }
 
 function matchCondition(itemVal: any, condVal: any): boolean {
