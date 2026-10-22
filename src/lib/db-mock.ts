@@ -114,16 +114,16 @@ function matchCondition(itemVal: any, condVal: any): boolean {
         if (!itemStr.endsWith(searchStr)) return false;
       } else if (op === "gt") {
         hasKnownOp = true;
-        if (!(itemVal > (val as any))) return false;
+        if (itemVal == null || !(itemVal > (val as any))) return false;
       } else if (op === "gte") {
         hasKnownOp = true;
-        if (!(itemVal >= (val as any))) return false;
+        if (itemVal == null || !(itemVal >= (val as any))) return false;
       } else if (op === "lt") {
         hasKnownOp = true;
-        if (!(itemVal < (val as any))) return false;
+        if (itemVal == null || !(itemVal < (val as any))) return false;
       } else if (op === "lte") {
         hasKnownOp = true;
-        if (!(itemVal <= (val as any))) return false;
+        if (itemVal == null || !(itemVal <= (val as any))) return false;
       }
     }
     return hasKnownOp;

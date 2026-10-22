@@ -1,4 +1,5 @@
 import { prisma } from "../prisma";
+import { cleanupStalePositions } from "../db/jobs";
 import { generateJobFingerprint } from "./dedupe";
 import { AdzunaCaConnector } from "./providers/adzuna";
 import { AshbyConnector } from "./providers/ashby";
@@ -174,7 +175,8 @@ export async function syncSingleConnector(
 }
 
 /**
- * Runs all active connectors in parallel using Promise.allSettled.
+ * Runs all active connectors in parallel using Promise.allSettled,
+ * then purges positions older than 30 days (1 month).
  */
 export async function syncAllConnectors(options?: {
   sources?: SourceConnector[];
@@ -185,6 +187,8 @@ export async function syncAllConnectors(options?: {
 
   const tasks = targetKeys.map((key) => syncSingleConnector(CONNECTORS[key]));
   const settlements = await Promise.allSettled(tasks);
+
+  await cleanupStalePositions().catch(() => null);
 
   return settlements.map((s, idx) => {
     const key = targetKeys[idx];

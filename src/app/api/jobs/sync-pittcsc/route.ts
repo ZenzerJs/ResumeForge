@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { parsePittCSCMarkdown } from "@/lib/ingestion/pittcsc-parser";
 import { sanitizeError } from "@/lib/ai/redact";
 import { isSafeHref } from "@/lib/security/safe-fetch";
+import { cleanupStalePositions } from "@/lib/db/jobs";
 
 export async function POST(req: Request) {
   try {
@@ -68,7 +69,13 @@ export async function POST(req: Request) {
       upsertCount++;
     }
 
-    return NextResponse.json({ success: true, processed: upsertCount });
+    const cleanup = await cleanupStalePositions().catch(() => null);
+
+    return NextResponse.json({
+      success: true,
+      processed: upsertCount,
+      ...(cleanup ? { cleanup } : {}),
+    });
   } catch (err) {
     console.error("Pitt CSC Sync error:", sanitizeError(err));
     return NextResponse.json(

@@ -64,14 +64,18 @@
    - `src/components/tracker/discover-feed.tsx`: Added pre-seeded curated company filter chips (`Stripe`, `Shopify`, `Linear`, `Vercel`, `Anthropic`, `OpenAI`, `Cloudflare`, `Datadog`, `Wealthsimple`, `Cohere`, `Tailscale`) (`data-testid="curated-company-chips"`) and client-side Evidence skill match % badges (`data-testid="discover-skill-match-badge"`).
 3. **P3.3: Contextual Interview Prep (`/practice`)**
    - `src/components/practice/practice-workspace.tsx` & `src/components/interview/interview-hub.tsx`: Fixed `/api/jobs` response parsing (`data.data` + guest jobs fallback) and URL query parameter auto-selection (`?jobId=` / `?company=`) for the Tracked Job Context Selector (`data-testid="practice-job-context-select"`) and target role banner (`data-testid="practice-target-job-banner"`).
+4. **P3.4: Automated DB Cleanup for Stale Positions (> 1 Month / 30 Days)**
+   - `src/lib/db/jobs.ts`: Added `cleanupStalePositions({ maxAgeDays: 30, preserveActiveApplications: true })` purging stale `IngestedJob`, `DiscoveredJob`, and untracked/unapplied `Job` rows older than 30 days while preserving active user applications (`APPLIED`, `INTERVIEWING`, `OFFER`), tailored resume variants, and cover letters.
+   - `src/lib/connectors/orchestrator.ts` & `src/app/api/jobs/sync-pittcsc/route.ts`: Wired automatic 30-day cleanup into connector and feed syncs.
+   - `src/app/api/jobs/cleanup/route.ts` & `tests/job-cleanup.test.ts`: Added `POST /api/jobs/cleanup` endpoint and unit tests.
 
 ---
 
 ## Automated Verification Results
 - `npm run lint`: ✅ Passed (`✔ No ESLint warnings or errors`)
 - `npm run typecheck`: ✅ Passed (`tsc --noEmit` exit code 0)
-- `npm run test`: ✅ Passed (`108 passed (108)` test files, `624 passed (624)` unit & smoke tests)
-- `npm run build`: ✅ Passed (`prisma generate && next build`, all 55 routes compiled cleanly)
+- `npm run test`: ✅ Passed (`109 passed (109)` test files, `626 passed (626)` unit & smoke tests)
+- `npm run build`: ✅ Passed (`prisma generate && next build`, all 56 routes compiled cleanly)
 - `npx playwright test --config playwright.smoke.config.ts`: ✅ Passed (`8 passed (8)` E2E browser smoke tests across `/`, `/editor`, `/library`, `/tracker`, `/tracker/discover`, `/tailor`, `/practice`, `/settings`)
 
 ## Deferred / User-Confirmed Scope Decisions

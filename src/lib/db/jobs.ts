@@ -418,3 +418,153 @@ function parseRequirementsJson(jsonStr: string): JobRequirements {
   }
 }
 
+
+import { resolvePostedAgeDays } from "@/lib/jobs/posted-within";
+
+export interface CleanupStalePositionsOptions {
+  /** Maximum age in days before a position is purged. Defaults to 30 (1 month). */
+  maxAgeDays?: number;
+  /** Reference time for age comparison. Defaults to new Date(). */
+  now?: Date;
+  /**
+   * When true (default), preserves tracked Job rows that have active user applications
+   * (APPLIED, INTERVIEWING, OFFER), tailored resume variants, or cover letters.
+   */
+  preserveActiveApplications?: boolean;
+}
+
+export interface CleanupStalePositionsResult {
+  deletedIngestedJobs: number;
+  deletedDiscoveredJobs: number;
+  deletedJobs: number;
+  totalDeleted: number;
+  cutoffDate: string;
+  maxAgeDays: number;
+}
+
+const ACTIVE_APPLICATION_STATUSES = new Set(["APPLIED", "INTERVIEWING", "OFFER"]);
+
+/**
+ * Purges positions older than `maxAgeDays` (default: 30 days / 1 month) across
+ * `IngestedJob`, `DiscoveredJob`, and untracked/unapplied `Job` records.
+ */
+export async function cleanupStalePositions(
+  options: CleanupStalePositionsOptions = {}
+): Promise<CleanupStalePositionsResult> {
+  const maxAgeDays = Math.max(1, options.maxAgeDays ?? 30);
+  const now = options.now ?? new Date();
+  const preserveActive = options.preserveActiveApplications ?? true;
+  const cutoffMs = now.getTime() - maxAgeDays * 24 * 60 * 60 * 1000;
+  const cutoffDate = new Date(cutoffMs);
+
+  // 1. Clean stale Job rows first so any linked IngestedJob rows can also be cleaned
+  const candidateJobs = await prisma.job.findMany({
+    include: {
+      variants: { select: { id: true } },
+      coverLetters: { select: { id: true } },
+      applications: { select: { id: true, status: true } },
+    },
+  });
+
+  const staleJobIds: string[] = [];
+  for (const job of candidateJobs) {
+    if (preserveActive) {
+      if (ACTIVE_APPLICATION_STATUSES.has(job.status)) continue;
+      if (job.variants && job.variants.length > 0) continue;
+      if (job.coverLetters && job.coverLetters.length > 0) continue;
+      if (job.applications?.some((app) => ACTIVE_APPLICATION_STATUSES.has(app.status))) {
+        continue;
+      }
+    }
+
+    const rawPosted = extractPostingDateFromNotes(job.notes)?.trim() || null;
+    const cleanedPosted = rawPosted && !/^apply$/i.test(rawPosted) ? rawPosted : null;
+    const ageDays = resolvePostedAgeDays(cleanedPosted, now, job.createdAt);
+    const createdMs = new Date(job.createdAt).getTime();
+    const isStale =
+      (ageDays !== null && ageDays > maxAgeDays) ||
+      (!Number.isNaN(createdMs) && createdMs < cutoffMs);
+
+    if (isStale) {
+      staleJobIds.push(job.id);
+    }
+  }
+
+  let deletedJobs = 0;
+  if (staleJobIds.length > 0) {
+    await prisma.ingestedJob.updateMany({
+      where: { trackedJobId: { in: staleJobIds } },
+      data: { trackedJobId: null },
+    });
+    await prisma.jobApplication.deleteMany({
+      where: { jobId: { in: staleJobIds } },
+    });
+    await prisma.coverLetter.deleteMany({
+      where: { jobId: { in: staleJobIds } },
+    });
+    await prisma.resumeVariant.deleteMany({
+      where: { jobId: { in: staleJobIds } },
+    });
+    const delJobsRes = await prisma.job.deleteMany({
+      where: { id: { in: staleJobIds } },
+    });
+    deletedJobs = delJobsRes.count;
+  }
+
+  // 2. Clean stale IngestedJob rows (unlinked to active tracked jobs)
+  const candidateIngested = await prisma.ingestedJob.findMany({
+    where: preserveActive ? { trackedJobId: null } : {},
+    select: { id: true, postedAt: true, createdAt: true },
+  });
+
+  const staleIngestedIds: string[] = [];
+  for (const item of candidateIngested) {
+    const effectiveDate = item.postedAt ?? item.createdAt;
+    const effectiveMs = new Date(effectiveDate).getTime();
+    if (!Number.isNaN(effectiveMs) && effectiveMs < cutoffMs) {
+      staleIngestedIds.push(item.id);
+    }
+  }
+
+  let deletedIngestedJobs = 0;
+  if (staleIngestedIds.length > 0) {
+    const delIngestedRes = await prisma.ingestedJob.deleteMany({
+      where: { id: { in: staleIngestedIds } },
+    });
+    deletedIngestedJobs = delIngestedRes.count;
+  }
+
+  // 3. Clean stale DiscoveredJob rows
+  const candidateDiscovered = await prisma.discoveredJob.findMany({
+    select: { id: true, datePosted: true, createdAt: true },
+  });
+
+  const staleDiscoveredIds: string[] = [];
+  for (const item of candidateDiscovered) {
+    const ageDays = resolvePostedAgeDays(item.datePosted, now, item.createdAt);
+    const createdMs = new Date(item.createdAt).getTime();
+    if (
+      (ageDays !== null && ageDays > maxAgeDays) ||
+      (!Number.isNaN(createdMs) && createdMs < cutoffMs)
+    ) {
+      staleDiscoveredIds.push(item.id);
+    }
+  }
+
+  let deletedDiscoveredJobs = 0;
+  if (staleDiscoveredIds.length > 0) {
+    const delDiscoveredRes = await prisma.discoveredJob.deleteMany({
+      where: { id: { in: staleDiscoveredIds } },
+    });
+    deletedDiscoveredJobs = delDiscoveredRes.count;
+  }
+
+  return {
+    deletedIngestedJobs,
+    deletedDiscoveredJobs,
+    deletedJobs,
+    totalDeleted: deletedIngestedJobs + deletedDiscoveredJobs + deletedJobs,
+    cutoffDate: cutoffDate.toISOString(),
+    maxAgeDays,
+  };
+}
