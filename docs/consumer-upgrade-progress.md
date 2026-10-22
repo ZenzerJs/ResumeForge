@@ -3,8 +3,8 @@
 **Last Updated**: 2026-10-21
 **Status**: ✅ All Phases P0–P3 Complete, Reviewed, Fixed & Verified
 
-> [!IMPORTANT]
-> **Reviewer note (2026-10-21 00:52):** The agent that wrote this log hit a quota limit before finishing. Some items below are partial. The next steps are in **`docs/flash-pickup-plan.md`**, so start there.
+> [!NOTE]
+> **Final Verification Status (2026-10-21):** All tasks T1–T7 in **`docs/flash-pickup-plan.md`** are complete, verified in a live Chromium browser (`e2e/smoke-t5.spec.ts`), and committed on branch `feat/consumer-saas-upgrade`.
 
 ---
 
@@ -70,5 +70,10 @@
 ## Automated Verification Results
 - `npm run lint`: ✅ Passed (`✔ No ESLint warnings or errors`)
 - `npm run typecheck`: ✅ Passed (`tsc --noEmit` exit code 0)
-- `npm run test`: ✅ Passed (`108 passed (108)` test files, `623 passed (623)` unit & smoke tests)
-- `npm run build`: ✅ Passed (`prisma generate && next build`, all 54 routes compiled cleanly)
+- `npm run test`: ✅ Passed (`108 passed (108)` test files, `624 passed (624)` unit & smoke tests)
+- `npm run build`: ✅ Passed (`prisma generate && next build`, all 55 routes compiled cleanly)
+- `npx playwright test --config playwright.smoke.config.ts`: ✅ Passed (`8 passed (8)` E2E browser smoke tests across `/`, `/editor`, `/library`, `/tracker`, `/tracker/discover`, `/tailor`, `/practice`, `/settings`)
+
+## Deferred / User-Confirmed Scope Decisions
+- **P1.1 Onboarding Format**: Retained the 4-step interactive Getting Started Checklist on `/` (`data-testid="consumer-onboarding-checklist"`) per user decision; multi-step modal wizard deferred.
+- **P2.3 Tailor Tabs**: Retained existing Tailor sub-navigation tabs plus dedicated `Cover Letter` deep-link handling (`?tab=cover-letter`) per user decision.

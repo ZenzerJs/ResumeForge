@@ -147,7 +147,7 @@ Log every failure here as root cause → fix → re-test. Commit fixes separatel
 2. Update `docs/consumer-upgrade-progress.md` with the honest status and the deferred items.
 3. Write `walkthrough.md` in the artifact dir (AGENTS.md): deliverables, files, check results, limits, next task.
 4. Commit.
-- [ ] done
+- [x] done: All 4 checks (lint, typecheck, 624 unit tests, 55-route build) + 8/8 Playwright T5 browser smoke tests verified green; progress log & walkthrough artifact updated and committed.
 
 ---
 
