@@ -6,6 +6,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { cleanupStalePositions } from "@/lib/db/jobs";
 import { CreateJobSchema } from "@/lib/jd-parser/types";
 import { getImportAllowlist, isSafeHref, safeFetch, UnsafeUrlError } from "@/lib/security/safe-fetch";
 import { normalizeLocation } from "@/lib/ingestion/helpers";
@@ -324,6 +325,8 @@ export async function importTier1Jobs(input: ImportTier1Input = {}): Promise<Imp
       await tx.job.createMany({ data: payloads });
     });
   }
+
+  await cleanupStalePositions().catch(() => null);
 
   createdCount = payloads.length;
   const createdJobs =

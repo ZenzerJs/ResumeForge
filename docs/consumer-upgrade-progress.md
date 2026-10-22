@@ -66,7 +66,7 @@
    - `src/components/practice/practice-workspace.tsx` & `src/components/interview/interview-hub.tsx`: Fixed `/api/jobs` response parsing (`data.data` + guest jobs fallback) and URL query parameter auto-selection (`?jobId=` / `?company=`) for the Tracked Job Context Selector (`data-testid="practice-job-context-select"`) and target role banner (`data-testid="practice-target-job-banner"`).
 4. **P3.4: Automated DB Cleanup for Stale Positions (> 1 Month / 30 Days)**
    - `src/lib/db/jobs.ts`: Added `cleanupStalePositions({ maxAgeDays: 30, preserveActiveApplications: true })` purging stale `IngestedJob`, `DiscoveredJob`, and untracked/unapplied `Job` rows older than 30 days while preserving active user applications (`APPLIED`, `INTERVIEWING`, `OFFER`), tailored resume variants, and cover letters.
-   - `src/lib/connectors/orchestrator.ts` & `src/app/api/jobs/sync-pittcsc/route.ts`: Wired automatic 30-day cleanup into connector and feed syncs.
+   - `src/lib/connectors/orchestrator.ts`, `src/lib/ingestion/tier1-importer.ts` & `src/app/api/jobs/sync-pittcsc/route.ts`: Wired automatic 30-day cleanup into all connector and feed syncs.
    - `src/app/api/jobs/cleanup/route.ts` & `tests/job-cleanup.test.ts`: Added `POST /api/jobs/cleanup` endpoint and unit tests.
 
 ---
