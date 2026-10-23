@@ -18,6 +18,7 @@ import type { PatchProposal, Gap, RejectedPatch } from "@/lib/ai/patch-schema";
 import { extractResumeFacts } from "@/lib/facts/extract";
 import { checkGuardrail } from "@/lib/guardrail/check";
 import { assertCanApplyPatches, markDocumentAsPatched } from "@/lib/guardrail/policy";
+import { applyPatchProposals } from "@/lib/ai/patch-application";
 
 /**
  * Pure helper that merges accepted patches into Typst source and stamps the document
@@ -40,9 +41,9 @@ interface PatchDiffReviewProps {
   verified: PatchProposal[];
   rejected: RejectedPatch[];
   gaps: Gap[];
-  masterResumeId: string;
   masterTypstSource: string;
   jobId: string;
+  batch: { batchId: string; revisionToken: string; baseTypstSource: string; jobId: string } | null;
   onApplySuccess?: (variantId: string, mergedContent: string) => void;
 }
 
@@ -74,9 +75,9 @@ export function PatchDiffReview({
   verified,
   rejected,
   gaps,
-  masterResumeId,
   masterTypstSource,
   jobId,
+  batch,
   onApplySuccess,
 }: PatchDiffReviewProps) {
   const [decisions, setDecisions] = useState<Record<string, PatchDecision>>(() => {
@@ -160,6 +161,13 @@ export function PatchDiffReview({
     setApplySuccess(null);
 
     try {
+      if (!batch || batch.jobId !== jobId) {
+        throw new Error("This proposal has no saved server batch. Generate patches again before applying.");
+      }
+      if (masterTypstSource !== batch.baseTypstSource) {
+        throw new Error("The resume changed after these patches were generated. Generate patches again to protect your edits.");
+      }
+
       // Step 0: Guardrail verification (including per-skill acknowledgment for unverified skills)
       if (masterFacts) {
         assertCanApplyPatches(masterTypstSource, masterFacts, acceptedPatches, {
@@ -168,7 +176,12 @@ export function PatchDiffReview({
       }
 
       // Step 1: Compute merged Typst content with persistent patch marker
-      const mergedContent = mergeAndMarkAcceptedPatches(masterTypstSource, acceptedPatches);
+      const reconstructed = applyPatchProposals(batch.baseTypstSource, acceptedPatches);
+      const acceptedIds = acceptedPatches.map((patch) => patch.id);
+      if (reconstructed.appliedIds.length !== acceptedIds.length || acceptedIds.some((id) => !reconstructed.appliedIds.includes(id))) {
+        throw new Error("The server proposal set changed. Generate patches again before applying.");
+      }
+      const mergedContent = markDocumentAsPatched(reconstructed.typstSource);
 
       // Step 2: Amendment 2 — Typst compile validation
       // Import compiler dynamically (browser-only WASM)
@@ -190,10 +203,11 @@ export function PatchDiffReview({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          masterResumeId,
-          jobId,
+          batchId: batch.batchId,
+          revisionToken: batch.revisionToken,
+          acceptedPatchIds: acceptedIds,
+          acknowledgedSkills: Array.from(acknowledgedSkills),
           variantTitle: `AI Tailored Variant — ${new Date().toLocaleDateString()}`,
-          mergedTypstContent: mergedContent,
         }),
       });
 
@@ -209,7 +223,7 @@ export function PatchDiffReview({
       setApplySuccess(
         `Tailored variant "${json.data.variantTitle}" created successfully.`
       );
-      onApplySuccess?.(json.data.variantId, mergedContent);
+      onApplySuccess?.(json.data.variantId, json.data.typstContent);
     } catch (err) {
       setApplyError(`Error applying patches: ${err instanceof Error ? err.message : String(err)}`);
     } finally {

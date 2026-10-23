@@ -31,6 +31,7 @@ model User {
   jobs           Job[]
   coverLetters   CoverLetter[]
   applications   JobApplication[]
+  patchProposalBatches PatchProposalBatch[]
 }
 
 model Resume {
@@ -47,6 +48,7 @@ model Resume {
 
   variants    ResumeVariant[]
   history     MasterHistory[]
+  patchProposalBatches PatchProposalBatch[]
 
   @@index([userId])
 }
@@ -105,6 +107,7 @@ model Job {
   variants              ResumeVariant[]
   coverLetters          CoverLetter[]
   applications          JobApplication[]
+  patchProposalBatches PatchProposalBatch[]
   ingestedJob           IngestedJob?
   dossierId             String?
   dossier               CompanyDossier? @relation(fields: [dossierId], references: [id], onDelete: SetNull)
@@ -258,6 +261,28 @@ model PatchCitation {
   @@index([patchId])
   @@index([evidenceId])
   @@index([bulletId])
+}
+
+model PatchProposalBatch {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  masterResumeId  String
+  masterResume    Resume   @relation(fields: [masterResumeId], references: [id], onDelete: Cascade)
+  jobId           String
+  job             Job      @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  revisionToken   String
+  masterFingerprint String
+  jobFingerprint String
+  citationFingerprint String
+  proposals       Json
+  gaps            Json
+  status          String   @default("OPEN")
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([userId, status, expiresAt])
 }
 
 // Phase 5: Evidence-grounded tailored cover letter

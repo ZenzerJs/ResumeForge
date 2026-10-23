@@ -181,8 +181,9 @@ function matchesWhere(item: any, where?: any): boolean {
         continue;
       }
     }
-    if ((key === "variants" || key === "coverLetters") && item.rawDescription !== undefined) {
-      const table = key === "variants" ? activeStore.resumeVariant : activeStore.coverLetter;
+    if ((key === "variants" || key === "coverLetters" || key === "patchProposalBatches") && item.rawDescription !== undefined) {
+      const table = key === "variants" ? activeStore.resumeVariant
+        : key === "coverLetters" ? activeStore.coverLetter : activeStore.patchProposalBatch;
       const children = table?.filter((child: any) => child.jobId === item.id) || [];
       const relation = cond as any;
       if (relation?.none && children.some((child: any) => matchesWhere(child, relation.none))) return false;

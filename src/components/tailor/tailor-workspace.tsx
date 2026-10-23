@@ -213,6 +213,7 @@ export function TailorWorkspace() {
   const [patchVerified, setPatchVerified] = useState<PatchProposal[]>([]);
   const [patchRejected, setPatchRejected] = useState<RejectedPatch[]>([]);
   const [patchGaps, setPatchGaps] = useState<Gap[]>([]);
+  const [patchBatch, setPatchBatch] = useState<{ batchId: string; revisionToken: string; baseTypstSource: string; jobId: string } | null>(null);
   const [masterResumeId, setMasterResumeId] = useState<string | null>(null);
   const [masterTypstSource, setMasterTypstSource] = useState<string>("");
   const [activeVariantContent, setActiveVariantContent] = useState<string>("");
@@ -448,6 +449,7 @@ export function TailorWorkspace() {
     setPatchVerified([]);
     setPatchRejected([]);
     setPatchGaps([]);
+      setPatchBatch(null);
 
     try {
       const jobId = await ensureJobSaved();
@@ -476,6 +478,7 @@ export function TailorWorkspace() {
             roleTitle: roleTitle || undefined,
             company: company || undefined,
           },
+          jobId,
         }),
       });
 
@@ -492,6 +495,7 @@ export function TailorWorkspace() {
       setPatchVerified(json.data.verified || []);
       setPatchRejected(json.data.rejected || []);
       setPatchGaps(json.data.gaps || []);
+      setPatchBatch(json.data.batch || null);
       setMasterResumeId(json.data.masterResumeId || null);
       setPatchStage("done");
     } catch (err) {
@@ -967,9 +971,9 @@ export function TailorWorkspace() {
                   verified={patchVerified}
                   rejected={patchRejected}
                   gaps={patchGaps}
-                  masterResumeId={masterResumeId}
                   masterTypstSource={masterTypstSource || activeVariantContent}
                   jobId={savedJobId}
+                  batch={patchBatch}
                   onApplySuccess={(_variantId, mergedContent) => {
                     setActiveVariantContent(mergedContent);
                     setSaveStatus("Tailored variant applied — ATS will re-score against updated content.");
@@ -1081,9 +1085,9 @@ export function TailorWorkspace() {
                       verified={patchVerified}
                       rejected={patchRejected}
                       gaps={patchGaps}
-                      masterResumeId={masterResumeId}
                       masterTypstSource={masterTypstSource || activeVariantContent}
                       jobId={savedJobId}
+                      batch={patchBatch}
                       onApplySuccess={(_variantId, mergedContent) => {
                         setActiveVariantContent(mergedContent);
                         setSaveStatus("Tailored variant applied — ATS will re-score against updated content.");

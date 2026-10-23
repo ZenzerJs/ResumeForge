@@ -29,6 +29,9 @@ import { GuardrailFeedback } from "@/components/ui/guardrail-feedback";
 import { GuardrailResult } from "@/lib/guardrail/types";
 import { checkGuardrail } from "@/lib/guardrail/check";
 import { assertCanExport } from "@/lib/guardrail/policy";
+import { assertCanApplyPatches, markDocumentAsPatched } from "@/lib/guardrail/policy";
+import { applyPatchProposals } from "@/lib/ai/patch-application";
+import type { PatchProposal } from "@/lib/ai/patch-schema";
 import { evaluateAtsScore } from "@/lib/ats-evaluator/evaluator";
 import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
 import { generateAtsDocx } from "@/lib/export/docx";
@@ -66,6 +69,43 @@ interface ApplySheetProps {
 }
 
 type ApplyStep = "load" | "tailor" | "guardrail" | "score" | "export";
+type PatchReviewDecision = "pending" | "accepted" | "rejected";
+
+export function selectAcceptedPatchProposals(
+  proposals: PatchProposal[],
+  decisions: Record<string, PatchReviewDecision>
+): PatchProposal[] {
+  return proposals.filter((proposal) => decisions[proposal.id] === "accepted");
+}
+
+export function ApplySheetPatchCard({
+  patch,
+  decision,
+  onAccept,
+  onReject,
+}: {
+  patch: PatchProposal;
+  decision: PatchReviewDecision;
+  onAccept: () => void;
+  onReject: () => void;
+}) {
+  return (
+    <article data-testid={`apply-sheet-patch-${patch.id}`} className="rounded-lg border border-slate-700 bg-slate-900 p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-slate-200">{patch.operation.replace(/_/g, " ")} · {patch.targetSection}</span>
+        <div className="flex gap-2">
+          <Button type="button" size="sm" variant={decision === "accepted" ? "default" : "outline"} onClick={onAccept} data-testid={`apply-sheet-accept-${patch.id}`}>Accept</Button>
+          <Button type="button" size="sm" variant={decision === "rejected" ? "destructive" : "outline"} onClick={onReject} data-testid={`apply-sheet-reject-${patch.id}`}>Reject</Button>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-[11px] font-mono whitespace-pre-wrap">
+        <div className="rounded bg-red-950/30 p-2 text-slate-300"><span className="mb-1 block text-[9px] uppercase text-slate-500">Before</span>{patch.before || "(empty)"}</div>
+        <div className="rounded bg-emerald-950/30 p-2 text-emerald-200"><span className="mb-1 block text-[9px] uppercase text-slate-500">After</span>{patch.after || "(empty)"}</div>
+      </div>
+      <p className="text-[11px] text-slate-400">{patch.rationale}</p>
+    </article>
+  );
+}
 
 export function ApplySheet({
   open,
@@ -84,6 +124,11 @@ export function ApplySheet({
   const [exportError, setExportError] = useState<string | null>(null);
   const [variantError, setVariantError] = useState<string | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(job?.appliedVariantId ?? null);
+  const [patchBatch, setPatchBatch] = useState<{ batchId: string; revisionToken: string; baseTypstSource: string; jobId: string } | null>(null);
+  const [pendingPatches, setPendingPatches] = useState<PatchProposal[]>([]);
+  const [patchDecisions, setPatchDecisions] = useState<Record<string, PatchReviewDecision>>({});
+  const [acknowledgedSkills, setAcknowledgedSkills] = useState<string[]>([]);
+  const [skillsNeedingAck, setSkillsNeedingAck] = useState<string[]>([]);
 
   useEffect(() => {
     if (open && job) {
@@ -94,6 +139,11 @@ export function ApplySheet({
       setAtsScore(null);
       setExportError(null);
       setVariantError(null);
+      setPatchBatch(null);
+      setPendingPatches([]);
+      setPatchDecisions({});
+      setAcknowledgedSkills([]);
+      setSkillsNeedingAck([]);
       setSelectedVariantId(job.appliedVariantId ?? null);
 
       if (!masterTypst) {
@@ -166,6 +216,51 @@ export function ApplySheet({
       if (!workingTypst && typeof window !== "undefined") {
         workingTypst = localStorage.getItem("resumeforge_typst_source") || "";
       }
+      if (patchBatch) {
+        const acceptedPatches = selectAcceptedPatchProposals(pendingPatches, patchDecisions);
+        if (acceptedPatches.length === 0) throw new Error("Accept at least one patch before applying the tailored variant.");
+        if (workingTypst !== patchBatch.baseTypstSource) {
+          throw new Error("The resume changed after these patches were generated. Generate patches again to protect your edits.");
+        }
+        const reconstructed = applyPatchProposals(patchBatch.baseTypstSource, acceptedPatches);
+        const acceptedPatchIds = acceptedPatches.map((patch) => patch.id);
+        if (reconstructed.appliedIds.length !== acceptedPatchIds.length || acceptedPatchIds.some((id) => !reconstructed.appliedIds.includes(id))) {
+          throw new Error("The server proposal set changed. Generate patches again before applying.");
+        }
+        if (masterFacts) {
+          const unacknowledged = checkGuardrail(workingTypst, masterFacts, { patches: acceptedPatches }).violations
+            .filter((violation) => violation.kind === "skill" && typeof violation.actual === "string")
+            .map((violation) => violation.actual as string);
+          setSkillsNeedingAck(Array.from(new Set(unacknowledged)));
+          if (unacknowledged.some((skill) => !acknowledgedSkills.includes(skill))) {
+            throw new Error("Acknowledge each unverified skill below before applying these patches.");
+          }
+          assertCanApplyPatches(workingTypst, masterFacts, acceptedPatches, { acknowledgedSkills });
+        }
+        const preview = markDocumentAsPatched(reconstructed.typstSource);
+        const { compileTypstToSvg } = await import("@/lib/typst/compiler");
+        const compiled = await compileTypstToSvg(preview);
+        if (!compiled.success) throw new Error("The reconstructed resume does not compile. Review the generated patches.");
+        const applyRes = await fetch("/api/ai/apply-patches", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            batchId: patchBatch.batchId,
+            revisionToken: patchBatch.revisionToken,
+            acceptedPatchIds,
+            acknowledgedSkills,
+            variantTitle: `AI Tailored Variant — ${new Date().toLocaleDateString()}`,
+          }),
+        });
+        const applyJson = await applyRes.json();
+        if (!applyRes.ok || !applyJson.success) throw new Error(applyJson.error || "Failed to save tailored variant.");
+        workingTypst = applyJson.data.typstContent;
+        setTailoredTypst(workingTypst);
+        setAppliedPatchCount(acceptedPatchIds.length);
+        setPatchBatch(null);
+        setPendingPatches([]);
+        setPatchDecisions({});
+      }
 
       let reqs = job.requirements || {
         requiredSkills: [],
@@ -196,15 +291,17 @@ export function ApplySheet({
         } catch {}
       }
 
-      // Attempt BYOK AI patch generation if configured
-      const aiConfig = await resolveClientProviderConfig();
-      if (aiConfig && (reqs.requiredSkills.length > 0 || reqs.preferredSkills.length > 0)) {
-        try {
+      // Generate a saved proposal batch first. The next action applies the
+      // server-reconstructed preview after any required skill acknowledgement.
+      if (!patchBatch) {
+        const aiConfig = await resolveClientProviderConfig();
+        if (aiConfig && (reqs.requiredSkills.length > 0 || reqs.preferredSkills.length > 0)) {
           const patchRes = await fetch("/api/ai/generate-patches", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               providerConfig: aiConfig,
+              jobId: job.id,
               jobRequirements: {
                 requiredSkills: reqs.requiredSkills,
                 preferredSkills: reqs.preferredSkills,
@@ -216,20 +313,22 @@ export function ApplySheet({
           });
           const patchJson = await patchRes.json();
           if (patchRes.ok && patchJson.success && Array.isArray(patchJson.data?.verified)) {
-            let patched = workingTypst;
-            let count = 0;
-            for (const p of patchJson.data.verified) {
-              if (p.before && p.after && patched.includes(p.before)) {
-                patched = patched.replace(p.before, p.after);
-                count++;
-              }
+            const batch = patchJson.data.batch;
+            if (!batch) throw new Error("Save this job before applying a persistent tailored variant.");
+            if (workingTypst !== batch.baseTypstSource) throw new Error("The resume changed during generation. Generate patches again.");
+            setPatchBatch(batch);
+            setPendingPatches(patchJson.data.verified);
+            setPatchDecisions(Object.fromEntries(patchJson.data.verified.map((patch: PatchProposal) => [patch.id, "pending"])));
+            if (masterFacts) {
+              const unacknowledged = checkGuardrail(workingTypst, masterFacts, { patches: patchJson.data.verified }).violations
+                .filter((violation) => violation.kind === "skill" && typeof violation.actual === "string")
+                .map((violation) => violation.actual as string);
+              setSkillsNeedingAck(Array.from(new Set(unacknowledged)));
             }
-            workingTypst = patched;
-            setTailoredTypst(workingTypst);
-            setAppliedPatchCount(count);
+            setCurrentStep("tailor");
+            return;
           }
-        } catch {
-          // Proceed with deterministic audit if AI call fails
+          if (!patchRes.ok) throw new Error(patchJson.error || "AI patch generation failed.");
         }
       }
 
@@ -438,6 +537,31 @@ export function ApplySheet({
           </div>
 
           {/* Step 2 & 3: Tailoring & Guardrail Results */}
+          {patchBatch && pendingPatches.length > 0 && (
+            <div className="space-y-3" data-testid="apply-sheet-patch-review">
+              <h4 className="text-xs font-semibold text-slate-200">Review proposed changes</h4>
+              {pendingPatches.map((patch) => (
+                <ApplySheetPatchCard
+                  key={patch.id}
+                  patch={patch}
+                  decision={patchDecisions[patch.id] ?? "pending"}
+                  onAccept={() => setPatchDecisions((current) => ({ ...current, [patch.id]: "accepted" }))}
+                  onReject={() => setPatchDecisions((current) => ({ ...current, [patch.id]: "rejected" }))}
+                />
+              ))}
+            </div>
+          )}
+          {patchBatch && skillsNeedingAck.length > 0 && (
+            <div className="space-y-2 rounded-lg border border-amber-800/60 bg-amber-950/30 p-3 text-xs text-amber-200">
+              <p>Confirm any unverified skills you have real experience with before applying:</p>
+              {skillsNeedingAck.map((skill) => (
+                <label key={skill} className="flex items-center gap-2">
+                  <input type="checkbox" checked={acknowledgedSkills.includes(skill)} onChange={() => setAcknowledgedSkills((current) => current.includes(skill) ? current.filter((item) => item !== skill) : [...current, skill])} />
+                  I have real experience with {skill}
+                </label>
+              ))}
+            </div>
+          )}
           {guardrailResult && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -529,7 +653,7 @@ export function ApplySheet({
               className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs gap-2 shadow-lg shadow-amber-500/20"
             >
               {isProcessing ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-              Tailor &amp; Verify Guardrail
+              {patchBatch ? "Apply Verified Patches & Verify" : "Tailor & Verify Guardrail"}
             </Button>
           ) : (
             <div className="space-y-2 w-full">

@@ -52,32 +52,19 @@ describe("AI Model Tool Protocol & Executor", () => {
     expect(badResult.data.hasHardViolations).toBe(true);
   });
 
-  it("executes apply_patches tool with guardrail check", async () => {
-    const currentTypst = `*Google* -- *Software Engineer*\n- Handled database optimization.`;
-    const acceptedPatches = [
-      {
-        id: "patch-1",
-        before: "- Handled database optimization.",
-        after: "- Reduced latency by 45ms.",
-        evidenceIds: ["evid-100"],
-      },
-    ];
-
+  it("rejects legacy client-authored apply_patches payloads", async () => {
     const result = await executeServerTool(
       "apply_patches",
       {
-        currentTypst,
+        currentTypst: "forged",
         patchIds: ["patch-1"],
-        acceptedPatches,
-        masterFacts,
+        acceptedPatches: [{ id: "patch-1", before: "old", after: "forged" }],
       },
       "user-without-that-evidence"
     );
 
-    expect(result.success).toBe(true);
-    expect(result.data.appliedCount).toBe(0);
-    expect(result.data.updatedTypst).not.toContain("Reduced latency by 45ms.");
-    expect(result.data.rejected.length).toBeGreaterThan(0);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Tool failed");
   });
 
   it("executes inspect_layout_budget detecting page limits and overflow", async () => {

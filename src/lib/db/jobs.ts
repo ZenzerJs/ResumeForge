@@ -486,6 +486,7 @@ export async function cleanupStalePositions(
         userId: null,
         status: "SAVED",
         applications: { none: {} },
+        patchProposalBatches: { none: {} },
         variants: { none: {} },
         coverLetters: { none: {} },
       };

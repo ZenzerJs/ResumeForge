@@ -3,11 +3,9 @@ import { Prisma } from "@prisma/client";
 import { extractResumeFacts } from "@/lib/facts/extract";
 import { checkGuardrail } from "@/lib/guardrail/check";
 import {
-  assertCanApplyPatches,
   assertCanExport,
-  markDocumentAsPatched,
 } from "@/lib/guardrail/policy";
-import { verifyEvidenceCitations, type PatchProposal } from "@/lib/ai/patch-schema";
+import { applyProposalBatch } from "@/lib/ai/patch-batches";
 import { evaluateAtsScore } from "@/lib/ats-evaluator/evaluator";
 import { generateAtsDocx } from "@/lib/export/docx";
 import {
@@ -193,64 +191,11 @@ export async function executeServerTool(
       case "apply_patches": {
         const params = ApplyPatchesParamsSchema.parse(rawParams);
         const ownerId = requireOwner(userId);
-        let updatedTypst = params.currentTypst;
-
-        const master = await prisma.resume.findFirst({
-          where: { isMaster: true, userId: ownerId },
-        });
-        const evidence = await prisma.evidenceItem.findMany({
-          where: { status: "verified", userId: ownerId },
-          include: { bullets: true },
-        });
-        const masterFacts = extractResumeFacts(master?.typstSource || "", evidence as any);
-        const validEvidenceIds = new Set(evidence.map((item) => item.id));
-        const validBulletIds = new Set(evidence.flatMap((item) => item.bullets.map((bullet) => bullet.id)));
-
-        const proposals: PatchProposal[] = params.acceptedPatches.map((patch) => ({
-          id: patch.id,
-          operation: patch.operation ?? "MODIFY_BULLET",
-          targetSection: "experience",
-          before: patch.before,
-          after: patch.after,
-          evidenceIds: patch.evidenceIds ?? [],
-          rationale: patch.rationale ?? "",
-          confidence: 1,
-        }));
-
-        const verification = verifyEvidenceCitations(
-          { patches: proposals, gaps: [] },
-          validEvidenceIds,
-          validBulletIds
-        );
-        const allowedIds = new Set(verification.verified.map((patch) => patch.id));
-        if (verification.verified.length > 0) {
-          assertCanApplyPatches(params.currentTypst, masterFacts, verification.verified);
-        }
-
-        let appliedCount = 0;
-        for (const patch of params.acceptedPatches) {
-          if (!params.patchIds.includes(patch.id) || !allowedIds.has(patch.id)) continue;
-          if (patch.before && updatedTypst.includes(patch.before)) {
-            updatedTypst = updatedTypst.replace(patch.before, patch.after);
-            appliedCount += 1;
-          }
-        }
-
-        if (appliedCount > 0) {
-          updatedTypst = markDocumentAsPatched(updatedTypst);
-        }
-
+        const data = await applyProposalBatch({ userId: ownerId, ...params });
         return {
           tool: toolName,
           success: true,
-          data: {
-            updatedTypst,
-            appliedCount,
-            rejected: verification.rejected.map((item) => ({
-              id: item.patch.id,
-              reason: item.reason,
-            })),
-          },
+          data,
         };
       }
 

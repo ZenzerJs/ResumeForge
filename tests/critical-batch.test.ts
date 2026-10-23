@@ -101,7 +101,7 @@ describe("critical batch", () => {
 
   it("sends only verified evidence into patch generation", async () => {
     getEvidenceItems.mockResolvedValue([
-      { id: "ev-real", status: "verified", bullets: [{ id: "b1" }] },
+      { id: "ev-real", status: "verified", bullets: [{ id: "b1", verified: true }, { id: "b-draft", verified: false }] },
       { id: "ev-draft", status: "draft", bullets: [] },
     ]);
     generatePatchProposals.mockResolvedValue({ success: false, error: "stopped" });
@@ -119,6 +119,7 @@ describe("critical batch", () => {
     expect(res.status).toBe(502);
     const passed = generatePatchProposals.mock.calls[0][0].evidenceItems;
     expect(passed.map((item: { id: string }) => item.id)).toEqual(["ev-real"]);
+    expect(passed[0].bullets.map((bullet: { id: string }) => bullet.id)).toEqual(["b1"]);
   });
 
   it("skips personalized job scoring without a session and scopes evidence to the user", async () => {
@@ -175,45 +176,13 @@ describe("critical batch", () => {
       })
     );
 
-    resumeFindFirst.mockResolvedValue({ typstSource: "= Master" });
-    evidenceFindMany.mockResolvedValue([
-      {
-        id: "ev-real",
-        status: "verified",
-        title: "",
-        verifiedSummary: "",
-        bullets: [{ id: "b1", text: "", verified: true }],
-      },
-    ]);
     const rejected = await executeServerTool(
       "apply_patches",
-      {
-        currentTypst: "- old line",
-        patchIds: ["p1"],
-        acceptedPatches: [
-          { id: "p1", before: "- old line", after: "- new line", evidenceIds: ["ev-fake"] },
-        ],
-      },
+      { currentTypst: "- old line", patchIds: ["p1"], acceptedPatches: [{ id: "p1", before: "old", after: "new" }] },
       "user-a"
     );
-    expect(rejected.success).toBe(true);
-    expect(rejected.data.appliedCount).toBe(0);
-    expect(rejected.data.updatedTypst).toBe("- old line");
-
-    const applied = await executeServerTool(
-      "apply_patches",
-      {
-        currentTypst: "- old line",
-        patchIds: ["p1"],
-        acceptedPatches: [
-          { id: "p1", before: "- old line", after: "- new line", evidenceIds: ["ev-real"] },
-        ],
-      },
-      "user-a"
-    );
-    expect(applied.success).toBe(true);
-    expect(applied.data.appliedCount).toBe(1);
-    expect(applied.data.updatedTypst).toContain("- new line");
+    expect(rejected.success).toBe(false);
+    expect(rejected.error).toBe("Tool failed");
   });
 });
 

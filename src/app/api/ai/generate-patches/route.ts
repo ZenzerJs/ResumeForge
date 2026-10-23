@@ -7,6 +7,7 @@ import { getMasterResume } from "@/lib/db/resumes";
 import { getEvidenceItems } from "@/lib/db/evidence";
 import { sanitizeError } from "@/lib/ai/redact";
 import { requireUserId } from "@/lib/security/auth-request";
+import { captureProposalContext, createProposalBatch } from "@/lib/ai/patch-batches";
 
 const GeneratePatchesRequestSchema = z.object({
   providerConfig: ProviderConfigSchema,
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { providerConfig, jobRequirements, tailorFeedback } = parseResult.data;
+    const { providerConfig, jobRequirements, tailorFeedback, jobId } = parseResult.data;
 
     const masterResume = await getMasterResume(userId);
     if (!masterResume) {
@@ -60,8 +61,12 @@ export async function POST(request: Request) {
       );
     }
 
+    const context = jobId ? await captureProposalContext(userId, jobId, masterResume.id) : null;
+
     const allEvidence = await getEvidenceItems(undefined, userId);
-    const activeEvidence = allEvidence.filter((e) => e.status === "verified");
+    const activeEvidence = allEvidence
+      .filter((e) => e.status === "verified")
+      .map((e) => ({ ...e, bullets: e.bullets.filter((bullet) => bullet.verified) }));
 
     if (activeEvidence.length === 0) {
       return NextResponse.json(
@@ -82,7 +87,7 @@ export async function POST(request: Request) {
     // Generate patches via BYOK AI Gateway
     const result = await generatePatchProposals({
       providerConfig,
-      masterTypst: masterResume.typstSource,
+      masterTypst: context?.master.typstSource ?? masterResume.typstSource,
       jobRequirements,
       evidenceItems: activeEvidence,
       tailorFeedback,
@@ -125,19 +130,38 @@ export async function POST(request: Request) {
       validBulletIds
     );
 
+    const batchResult = context && verificationResult.verified.length > 0 ? await createProposalBatch({
+      userId,
+      masterResumeId: masterResume.id,
+      jobId: context.job.id,
+      proposals: verificationResult.verified,
+      gaps: verificationResult.gaps,
+      expectedMasterFingerprint: context.masterFingerprint,
+      expectedJobFingerprint: context.jobFingerprint,
+      expectedCitationFingerprint: context.evidenceFingerprint,
+    }) : undefined;
+
     return NextResponse.json({
       success: true,
       data: {
-        verified: verificationResult.verified,
+        verified: batchResult?.verified ?? verificationResult.verified,
         rejected: verificationResult.rejected,
-        gaps: verificationResult.gaps,
+        gaps: batchResult?.gaps ?? verificationResult.gaps,
         masterResumeId: masterResume.id,
+        ...(batchResult ? { batch: batchResult.batch } : {}),
       },
     });
   } catch (err) {
+    const raw = err instanceof Error ? err.message : "";
+    const known = [
+      "Freeze your master resume first.",
+      "Selected job is unavailable.",
+      "Source changed while proposals were generated. Generate again.",
+    ].includes(raw);
+    const changed = raw.startsWith("Source changed while proposals were generated.");
     return NextResponse.json(
-      { success: false, error: sanitizeError(`Internal server error: ${err instanceof Error ? err.message : String(err)}`) },
-      { status: 500 }
+      { success: false, error: known ? raw : "Patch generation failed. Verify selected job and try again." },
+      { status: changed ? 409 : known ? 422 : 500 }
     );
   }
 }
