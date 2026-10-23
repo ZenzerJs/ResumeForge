@@ -6,16 +6,16 @@ import { convertTextToTypst } from "@/lib/pdf/parser";
 import { buildPdfToTypstSystemPrompt, buildPdfToTypstUserPrompt } from "@/lib/ai/pdf-prompt";
 import { sanitizeTypstSource } from "@/lib/typst/sanitizer";
 
-const sampleExtractedText = `Jayden Saha
-Ontario, Canada | Jaydensaha@yahoo.com | LinkedIn | GitHub | Portfolio
+const sampleExtractedText = `Alex Rivera
+Ontario, Canada | alex.rivera@example.com | LinkedIn | GitHub | Portfolio
 
 Education
-Wilfrid Laurier University Waterloo, ON
+State University Waterloo, ON
 Bachelor of Science, Computer Science with Management Option Expected Apr. 2029
 - Relevant Coursework: Data Structures and Algorithms, Object-Oriented Programming, Database Management Systems (SQL), Linear Algebra, Calculus II
 
 Experience
-Trillium Health Partners Mississauga, ON
+Northwind Health Systems Mississauga, ON
 IT Operations May 2026 - Present
 - Maintained data-center asset, rack, and cabinet documentation using Sunbird dcTrack and monitored infrastructure health through Power IQ.
 - Supported software updates, server maintenance, and data backup workflows in a reliability-sensitive healthcare IT environment.
@@ -50,7 +50,7 @@ describe("Task 9.1 & 9.1b — AI-Powered PDF to Typst Conversion & Template Exem
         choices: [
           {
             message: {
-              content: "```typst\n#align(center)[*Jayden Saha*]\n#section(\"Education\")\n#entry(title: \"Wilfrid Laurier University\")\n```",
+              content: "```typst\n#align(center)[*Alex Rivera*]\n#section(\"Education\")\n#entry(title: \"State University\")\n```",
             },
           },
         ],
@@ -61,18 +61,18 @@ describe("Task 9.1 & 9.1b — AI-Powered PDF to Typst Conversion & Template Exem
     const result = await convertPdfTextToTypst({
       providerConfig: config,
       rawText: sampleExtractedText,
-      fileName: "Jayden_Saha_Resume",
+      fileName: "Alex_Rivera_Resume",
     });
 
     expect(result.success).toBe(true);
-    expect(result.typstSource).toContain("Jayden Saha");
+    expect(result.typstSource).toContain("Alex Rivera");
     expect(result.typstSource).not.toContain("```");
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it("3. Fallback path activates when no provider is configured", () => {
-    const fallbackTypst = convertTextToTypst(sampleExtractedText, "Jayden Saha Resume");
-    expect(fallbackTypst).toContain("= Jayden Saha");
+    const fallbackTypst = convertTextToTypst(sampleExtractedText, "Alex Rivera Resume");
+    expect(fallbackTypst).toContain("= Alex Rivera");
     expect(fallbackTypst).toContain("== Education");
     expect(fallbackTypst).toContain("== Experience");
   });
@@ -84,7 +84,7 @@ describe("Task 9.1 & 9.1b — AI-Powered PDF to Typst Conversion & Template Exem
     const result = await convertPdfTextToTypst({
       providerConfig: config,
       rawText: sampleExtractedText,
-      fileName: "Jayden_Saha_Resume",
+      fileName: "Alex_Rivera_Resume",
     });
 
     expect(result.success).toBe(false);
@@ -92,7 +92,7 @@ describe("Task 9.1 & 9.1b — AI-Powered PDF to Typst Conversion & Template Exem
   });
 
   it("5. Zero-content-drop metric assertion: verifies key section headers and >= 90% word preservation", () => {
-    const fallbackTypst = convertTextToTypst(sampleExtractedText, "Jayden Saha Resume");
+    const fallbackTypst = convertTextToTypst(sampleExtractedText, "Alex Rivera Resume");
 
     // Section headers preservation (canonical names)
     const requiredSections = ["Education", "Experience", "Projects", "Skills"];
@@ -110,7 +110,7 @@ describe("Task 9.1 & 9.1b — AI-Powered PDF to Typst Conversion & Template Exem
     expect(proj).toBeLessThan(skills);
 
     // Key terminology preservation
-    const keyTerms = ["Wilfrid Laurier", "Trillium Health", "FastAPI", "LangGraph", "Python", "TypeScript"];
+    const keyTerms = ["State University", "Northwind Health", "FastAPI", "LangGraph", "Python", "TypeScript"];
     for (const term of keyTerms) {
       expect(fallbackTypst).toContain(term);
     }
@@ -134,7 +134,7 @@ describe("Task 9.1 & 9.1b — AI-Powered PDF to Typst Conversion & Template Exem
   });
 
   it("7. AI conversion output verifies section headers and key term preservation against template exemplar response", async () => {
-    const mockedAiTypst = `#align(center)[*Jayden Saha*]\n\n#section("Education")\n#entry(title: "Wilfrid Laurier University", role: "Bachelor of Science")\n\n#section("Experience")\n#entry(title: "Trillium Health Partners", role: "IT Operations", details: [- Maintained data-center asset documentation])\n\n#section("Projects")\n#entry(title: "AI Stock Analyst Agent", role: "FastAPI, LangGraph")\n\n#section("Technical Skills")\n#entry(details: [- *Languages:* Python, TypeScript])`;
+    const mockedAiTypst = `#align(center)[*Alex Rivera*]\n\n#section("Education")\n#entry(title: "State University", role: "Bachelor of Science")\n\n#section("Experience")\n#entry(title: "Northwind Health Systems", role: "IT Operations", details: [- Maintained data-center asset documentation])\n\n#section("Projects")\n#entry(title: "AI Stock Analyst Agent", role: "FastAPI, LangGraph")\n\n#section("Technical Skills")\n#entry(details: [- *Languages:* Python, TypeScript])`;
 
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
       ok: true,
@@ -147,13 +147,13 @@ describe("Task 9.1 & 9.1b — AI-Powered PDF to Typst Conversion & Template Exem
     const result = await convertPdfTextToTypst({
       providerConfig: config,
       rawText: sampleExtractedText,
-      fileName: "Jayden_Saha_Resume",
+      fileName: "Alex_Rivera_Resume",
     });
 
     expect(result.success).toBe(true);
     expect(result.typstSource).toContain("Education");
     expect(result.typstSource).toContain("Experience");
-    expect(result.typstSource).toContain("Trillium Health");
+    expect(result.typstSource).toContain("Northwind Health");
     expect(result.typstSource).toContain("FastAPI");
   });
 
@@ -181,13 +181,13 @@ describe("Task 9.1 & 9.1b — AI-Powered PDF to Typst Conversion & Template Exem
     expect(prompt).toContain("DO NOT ALTER GLOBAL STYLE BLOCKS");
   });
 
-  it("10. sanitizeTypstSource cleans stray <yahoo.com> and <user@domain.com> angle brackets into plain text", () => {
-    const raw = '#link("mailto:jayden@yahoo.com")[<jayden@yahoo.com>] label <yahoo.com>';
+  it("10. sanitizeTypstSource cleans stray <example.com> and <user@domain.com> angle brackets into plain text", () => {
+    const raw = '#link("mailto:alex@example.com")[<alex@example.com>] label <example.com>';
     const cleaned = sanitizeTypstSource(raw);
-    expect(cleaned).not.toContain("<jayden@yahoo.com>");
-    expect(cleaned).not.toContain("<yahoo.com>");
-    expect(cleaned).toContain("jayden@yahoo.com");
-    expect(cleaned).toContain("yahoo.com");
+    expect(cleaned).not.toContain("<alex@example.com>");
+    expect(cleaned).not.toContain("<example.com>");
+    expect(cleaned).toContain("alex@example.com");
+    expect(cleaned).toContain("example.com");
   });
 
   it("11. sanitizeTypstSource normalizes arbitrary font declarations to Liberation Sans", () => {
@@ -209,28 +209,28 @@ describe("Task 9.1 & 9.1b — AI-Powered PDF to Typst Conversion & Template Exem
 #set text(font: "Some Random Font", size: 9pt)
 #label(<invalid_label>)
 #align(center)[
-  Jayden #link("mailto:jayden@yahoo.com")[<jayden@yahoo.com>] <yahoo.com>
+  Alex #link("mailto:alex@example.com")[<alex@example.com>] <example.com>
 ]`;
     const clean = sanitizeTypstSource(dirtyTypst);
 
     expect(clean).not.toContain("#label(<invalid_label>)");
-    expect(clean).not.toContain("<jayden@yahoo.com>");
-    expect(clean).not.toContain("<yahoo.com>");
+    expect(clean).not.toContain("<alex@example.com>");
+    expect(clean).not.toContain("<example.com>");
     expect(clean).not.toContain('font: "Some Random Font"');
     expect(clean).toContain('font: "Liberation Sans"');
-    expect(clean).toContain("jayden@yahoo.com");
+    expect(clean).toContain("alex@example.com");
   });
 
   it("14. buildPdfToTypstUserPrompt embeds VERIFIED PDF HYPERLINKS section when links array is provided", () => {
     const links = [
-      { url: "https://linkedin.com/in/jayden-saha", label: "LinkedIn" },
-      { url: "https://github.com/jayden-saha", label: "GitHub" },
+      { url: "https://linkedin.com/in/alex-rivera", label: "LinkedIn" },
+      { url: "https://github.com/alex-rivera", label: "GitHub" },
     ];
-    const userPrompt = buildPdfToTypstUserPrompt("Extracted text here", "Jayden_Resume.pdf", links);
+    const userPrompt = buildPdfToTypstUserPrompt("Extracted text here", "Alex_Resume.pdf", links);
 
     expect(userPrompt).toContain("VERIFIED PDF HYPERLINKS");
-    expect(userPrompt).toContain("https://linkedin.com/in/jayden-saha");
-    expect(userPrompt).toContain("https://github.com/jayden-saha");
+    expect(userPrompt).toContain("https://linkedin.com/in/alex-rivera");
+    expect(userPrompt).toContain("https://github.com/alex-rivera");
     expect(userPrompt).toContain("NEVER invent, guess, or infer URLs");
   });
 });

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { auditResume } from "../auditResume";
 
 describe("auditResume", () => {
-  it("Missing required skill -> emits urgent item", () => {
+  it("Missing required skill -> emits urgent item with truthful Evidence Bank guidance", () => {
     const report = auditResume({
       resumeText: "Experience and Education",
       requiredSkills: ["React"],
@@ -10,6 +10,25 @@ describe("auditResume", () => {
     const item = report.items.find(i => i.category === "missing_hard_requirement" && i.message.includes("React"));
     expect(item).toBeDefined();
     expect(item?.severity).toBe("urgent");
+    expect(item?.suggestedFix).toBe(
+      "Only add if you have real experience; log it in your Evidence Bank first, otherwise treat it as a gap."
+    );
+  });
+
+  it("Uses word-boundary skill matching so 'Go' does not match 'good' or 'MongoDB'", () => {
+    const report = auditResume({
+      resumeText: "Experience building good systems with MongoDB and Education",
+      requiredSkills: ["Go"],
+    });
+    const item = report.items.find(i => i.id === "missing-Go");
+    expect(item).toBeDefined();
+
+    const presentReport = auditResume({
+      resumeText: "Experience building microservices in Go and C++. Education.",
+      requiredSkills: ["Go", "C++"],
+    });
+    expect(presentReport.items.find(i => i.id === "missing-Go")).toBeUndefined();
+    expect(presentReport.items.find(i => i.id === "missing-C++")).toBeUndefined();
   });
 
   it("All required skills present -> no urgent missing_hard_requirement items", () => {

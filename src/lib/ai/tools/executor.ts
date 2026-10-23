@@ -1,7 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { extractResumeFacts } from "@/lib/facts/extract";
 import { checkGuardrail } from "@/lib/guardrail/check";
-import { assertCanApplyPatches, assertCanExport } from "@/lib/guardrail/policy";
+import {
+  assertCanApplyPatches,
+  assertCanExport,
+  markDocumentAsPatched,
+} from "@/lib/guardrail/policy";
 import { verifyEvidenceCitations, type PatchProposal } from "@/lib/ai/patch-schema";
 import { evaluateAtsScore } from "@/lib/ats-evaluator/evaluator";
 import { generateAtsDocx } from "@/lib/export/docx";
@@ -244,6 +248,10 @@ export async function executeServerTool(
           }
         }
 
+        if (appliedCount > 0) {
+          updatedTypst = markDocumentAsPatched(updatedTypst);
+        }
+
         return {
           tool: toolName,
           success: true,
@@ -345,7 +353,7 @@ export async function executeServerTool(
         const lines = params.typstSource.split("\n");
         const nonEmptyLines = lines.filter((l) => l.trim().length > 0);
         const totalChars = params.typstSource.length;
-        const bulletLines = lines.filter((l) => l.trim().startsWith("-") || l.trim().startsWith("•"));
+        const bulletLines = lines.filter((l) => l.trim().startsWith("-") || l.trim().startsWith("â€¢"));
 
         // Approximate Typst layout budget (standard 10pt letter page fits ~55 lines or ~3200 chars)
         const estimatedPages = Math.max(1, Math.ceil(nonEmptyLines.length / 55));

@@ -24,8 +24,25 @@ import { QualitativeCategoryFeedback, BulletFeedback } from "@/lib/ai/qualitativ
 import { TypstRepairProposal } from "@/lib/ai/repair-schema";
 import { ResumeFacts } from "@/lib/facts/types";
 import { checkGuardrail } from "@/lib/guardrail/check";
-import { assertCanApplyPatches } from "@/lib/guardrail/policy";
+import { assertCanApplyPatches, markDocumentAsPatched } from "@/lib/guardrail/policy";
 import { GuardrailResult } from "@/lib/guardrail/types";
+
+/**
+ * Pure helper that applies accepted sidebar patches and stamps the document
+ * with the persistent patch provenance marker so it survives across sessions.
+ */
+export function applyAcceptedSidebarPatches(
+  source: string,
+  acceptedPatches: Array<{ before?: string; after?: string }>
+): string {
+  let updatedSource = source;
+  for (const patch of acceptedPatches) {
+    if (patch.before && patch.after) {
+      updatedSource = updatedSource.replace(patch.before, patch.after);
+    }
+  }
+  return markDocumentAsPatched(updatedSource);
+}
 import { GuardrailFeedback } from "@/components/ui/guardrail-feedback";
 import { AiMarkdownRenderer } from "@/components/editor/ai-markdown-renderer";
 import { ChatPanel } from "@/components/editor/chat-panel";
@@ -114,6 +131,7 @@ export function AiSidebar({
   const [guardrailResult, setGuardrailResult] = useState<GuardrailResult | null>(null);
   const [acceptedIds, setAcceptedIds] = useState<Set<string>>(new Set());
   const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set());
+  const [acknowledgedSkills, setAcknowledgedSkills] = useState<Set<string>>(new Set());
   const [showGaps, setShowGaps] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
 
@@ -192,6 +210,7 @@ export function AiSidebar({
     setGuardrailResult(null);
     setAcceptedIds(new Set());
     setRejectedIds(new Set());
+    setAcknowledgedSkills(new Set());
     setHasApplied(false);
 
     try {
@@ -242,7 +261,13 @@ export function AiSidebar({
       const patchJson = await patchRes.json();
 
       if (!patchRes.ok || !patchJson.success) {
-        const errMsg = patchJson.error || "AI generation failed.";
+        const isProxyProvider = ["openai", "anthropic", "groq"].includes(
+          String(aiSettings.provider).toLowerCase()
+        );
+        const errMsg =
+          patchRes.status === 401 && isProxyProvider
+            ? "Sign in to use this provider, or switch to Gemini."
+            : patchJson.error || "AI generation failed.";
         setError(errMsg);
         setTailorStage("error");
         if (errMsg.toLowerCase().includes("api key") || errMsg.toLowerCase().includes("provider")) {
@@ -296,25 +321,45 @@ export function AiSidebar({
     });
   };
 
+  const unverifiedSkillsInAccepted = React.useMemo(() => {
+    if (!masterFacts || acceptedIds.size === 0) return [];
+    const acceptedList = suggestions.filter((s) => acceptedIds.has(s.id));
+    const gResult = checkGuardrail(source, masterFacts, { patches: acceptedList });
+    return Array.from(
+      new Set(
+        gResult.violations
+          .filter((v) => v.kind === "skill" && typeof v.actual === "string")
+          .map((v) => v.actual as string)
+      )
+    );
+  }, [masterFacts, acceptedIds, suggestions, source]);
+
+  const toggleSkillAck = (skill: string) => {
+    setAcknowledgedSkills((prev) => {
+      const next = new Set(prev);
+      if (next.has(skill)) next.delete(skill);
+      else next.add(skill);
+      return next;
+    });
+  };
+
   const handleApplyAccepted = () => {
     // Phase 11.2: Enforce guardrail safety gate
     if (masterFacts) {
       const acceptedList = suggestions.filter((s) => acceptedIds.has(s.id));
       try {
-        assertCanApplyPatches(source, masterFacts, acceptedList);
+        assertCanApplyPatches(source, masterFacts, acceptedList, {
+          acknowledgedSkills: Array.from(acknowledgedSkills),
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Cannot apply patches: guardrail check failed.");
         return;
       }
     }
 
-    // Apply all accepted patches to the buffer by simple string replacement
-    let updatedSource = source;
-    for (const patch of suggestions) {
-      if (acceptedIds.has(patch.id) && patch.before && patch.after) {
-        updatedSource = updatedSource.replace(patch.before, patch.after);
-      }
-    }
+    // Apply all accepted patches to the buffer and stamp persistent patch marker
+    const acceptedList = suggestions.filter((s) => acceptedIds.has(s.id));
+    const updatedSource = applyAcceptedSidebarPatches(source, acceptedList);
     onApplyToBuffer(updatedSource);
     setHasApplied(true);
   };
@@ -404,7 +449,7 @@ export function AiSidebar({
 
   const handleApplyRepairFix = () => {
     if (!repairProposal || preValidationValid === false) return;
-    onApplyToBuffer(repairProposal.replacementSource);
+    onApplyToBuffer(markDocumentAsPatched(repairProposal.replacementSource));
     setRepairApplied(true);
   };
 
@@ -525,7 +570,7 @@ export function AiSidebar({
                   className="text-slate-400 hover:text-white text-xs font-mono"
                   data-testid="close-repair-mode-btn"
                 >
-                  ✕ Exit
+                  âœ• Exit
                 </button>
               )}
             </div>
@@ -726,7 +771,7 @@ export function AiSidebar({
               setError(null);
               setNoKeyError(false);
             }}
-            placeholder={"Paste the job posting here…\n\n(or navigate to a job in the Tracker and click Copy JD to auto-fill)"}
+            placeholder={"Paste the job posting hereâ€¦\n\n(or navigate to a job in the Tracker and click Copy JD to auto-fill)"}
             className="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs text-slate-200 placeholder-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 resize-none font-mono leading-relaxed"
           />
         </div>
@@ -745,7 +790,7 @@ export function AiSidebar({
                 href="/settings"
                 className="mt-2 block underline underline-offset-2 text-amber-400 hover:text-amber-300 text-xs font-medium"
               >
-                → Configure your API key in Settings
+                â†’ Configure your API key in Settings
               </Link>
             )}
           </div>
@@ -761,7 +806,7 @@ export function AiSidebar({
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Generating suggestions…
+              Generating suggestionsâ€¦
             </>
           ) : (
             <>
@@ -781,6 +826,38 @@ export function AiSidebar({
         {/* Suggestions list */}
         {suggestions.length > 0 && (
           <div className="space-y-3">
+            {unverifiedSkillsInAccepted.length > 0 && (
+              <div
+                data-testid="unverified-skills-ack-box"
+                className="p-3 rounded-lg bg-amber-950/40 border border-amber-800/60 space-y-2 text-xs text-amber-200"
+              >
+                <div className="flex items-center gap-1.5 font-semibold text-amber-300">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+                  <span>Acknowledge unverified skills</span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Only add if you have real experience; log it in your Evidence Bank first, or check below to confirm before applying:
+                </p>
+                <div className="space-y-1 pt-0.5">
+                  {unverifiedSkillsInAccepted.map((skill) => (
+                    <label
+                      key={skill}
+                      className="flex items-center gap-2 text-[11px] text-amber-200 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={acknowledgedSkills.has(skill)}
+                        onChange={() => toggleSkillAck(skill)}
+                        data-testid={`ack-skill-checkbox-${skill}`}
+                        className="rounded border-amber-600 bg-slate-900 text-amber-500 focus:ring-amber-500"
+                      />
+                      <span>I have real experience with <strong>{skill}</strong></span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <h3 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                 {suggestions.length} suggestion{suggestions.length !== 1 ? "s" : ""}
@@ -838,7 +915,7 @@ export function AiSidebar({
 
                   {s.before && (
                     <div className="text-[10px] bg-red-950/30 border border-red-900/40 rounded p-2 text-red-300 font-mono line-clamp-2">
-                      − {s.before}
+                      âˆ’ {s.before}
                     </div>
                   )}
                   {s.after && (
@@ -926,7 +1003,7 @@ export function AiSidebar({
               href="/tracker"
               className="text-[11px] text-amber-400/80 hover:text-amber-400 underline underline-offset-2 transition"
             >
-              Browse saved jobs in Tracker →
+              Browse saved jobs in Tracker â†’
             </Link>
           </div>
         )}

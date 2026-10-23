@@ -59,7 +59,7 @@ describe("Evidence Bank Search & Import Data Format Verification", () => {
 
   it("converts ExtractedPdfEvidence into structured Evidence Bank items", () => {
     const samplePdfExtracted = {
-      sourceDoc: "jayden_resume.pdf",
+      sourceDoc: "alex_resume.pdf",
       pages: [{ pageNumber: 1, text: "Sample text" }],
       sections: {
         experience: [
@@ -70,7 +70,7 @@ describe("Evidence Bank Search & Import Data Format Verification", () => {
           "Architected real-time multiplayer code editor with operational transformation.",
         ],
         skills: ["TypeScript", "Rust", "Next.js", "PostgreSQL"],
-        education: ["Wilfrid Laurier University, Honours Computer Science"],
+        education: ["State University, Honours Computer Science"],
         certifications: ["AWS Certified Solutions Architect"],
         uncategorized: [],
       },
@@ -83,7 +83,7 @@ describe("Evidence Bank Search & Import Data Format Verification", () => {
 
     const expItem = items.find((i) => i.type === "experience");
     expect(expItem).toBeDefined();
-    expect(expItem?.title).toContain("jayden_resume");
+    expect(expItem?.title).toContain("alex_resume");
     expect(expItem?.bullets).toHaveLength(2);
     expect(expItem?.bullets[0].text).toContain("streaming pipeline");
 
@@ -97,6 +97,6 @@ describe("Evidence Bank Search & Import Data Format Verification", () => {
 
     const eduItem = items.find((i) => i.type === "education");
     expect(eduItem).toBeDefined();
-    expect(eduItem?.organization).toContain("Wilfrid Laurier University");
+    expect(eduItem?.organization).toContain("State University");
   });
 });

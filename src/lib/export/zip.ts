@@ -10,6 +10,7 @@ export const ZIP_MANIFEST_SCHEMA_VERSION = 1;
 export interface ApplicationPackageZipOptions {
   typstSource: string;
   masterFacts?: ResumeFacts | null;
+  allowUnfrozenMasterSelfExport?: boolean;
   coverLetter?: string | null;
   job?: {
     company?: string | null;
@@ -288,7 +289,9 @@ export async function generateApplicationPackageZip(
   });
 
   // 2. Mechanical Guardrail Gate
-  assertCanExport(snapshot.typstSource, snapshot.masterFacts);
+  assertCanExport(snapshot.typstSource, snapshot.masterFacts, {
+    allowUnfrozenMasterSelfExport: options.allowUnfrozenMasterSelfExport,
+  });
 
   // 3. Generate PDF and DOCX concurrently
   const getPdfBytes = async (): Promise<Uint8Array> => {

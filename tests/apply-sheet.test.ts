@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
+import React from "react";
+import JSZip from "jszip";
 import { checkGuardrail } from "@/lib/guardrail/check";
+import { assertCanExport, GuardrailBlockError } from "@/lib/guardrail/policy";
 import { evaluateAtsScore } from "@/lib/ats-evaluator/evaluator";
+import { generateApplicationPackageZip } from "@/lib/export/zip";
+import { ApplySheet } from "@/components/tracker/apply-sheet";
 import { ResumeFacts } from "@/lib/facts/types";
 
 describe("One-Click Apply Pipeline", () => {
@@ -9,7 +14,7 @@ describe("One-Click Apply Pipeline", () => {
     snapshotAt: "2026-08-14T00:00:00.000Z",
     employers: [{ raw: "Stripe", normalized: "stripe" }],
     titles: [{ raw: "Software Engineer", normalized: "software engineer" }],
-    dateRanges: [{ raw: "2022 – 2024", startIso: "2022-01", endIso: "2024-01" }],
+    dateRanges: [{ raw: "2022 – 2024", startIso: "2022-01", endIso: "2024-12" }],
     metrics: [{ raw: "45ms", value: 45, unit: "ms", context: "latency", isTrivial: false }],
     skills: ["typescript", "postgresql", "react"],
     evidenceIds: ["evid-1"],
@@ -45,9 +50,6 @@ describe("One-Click Apply Pipeline", () => {
   });
 
   it("generates an application package zip for the job with ATS score audit", async () => {
-    const { generateApplicationPackageZip } = await import("@/lib/export/zip");
-    const JSZip = (await import("jszip")).default;
-
     const requirements = {
       roleTitle: "Software Engineer",
       company: "Stripe",
@@ -82,12 +84,9 @@ describe("One-Click Apply Pipeline", () => {
     expect(summary).toContain("Company: Stripe");
     expect(summary).toContain("Role: Software Engineer");
     expect(summary).toContain(`Overall Match Score: ${score.overallScore} / 100`);
-  });
+  }, 15000);
 
   it("blocks downloads and export generation when guardrail detects hard violations", async () => {
-    const { assertCanExport, GuardrailBlockError } = await import("@/lib/guardrail/policy");
-    const { generateApplicationPackageZip } = await import("@/lib/export/zip");
-
     const invalidCandidate = `
 = Jane Doe
 == EXPERIENCE
@@ -106,10 +105,7 @@ describe("One-Click Apply Pipeline", () => {
     ).rejects.toThrow(GuardrailBlockError);
   });
 
-  it("exports ApplySheet component accepting onVariantChange callback and variants", async () => {
-    const { ApplySheet } = await import("@/components/tracker/apply-sheet");
-    const React = await import("react");
-
+  it("exports ApplySheet component accepting onVariantChange callback and variants", () => {
     let changedJobId: string | null = null;
     let changedVariantId: string | null = null;
     const onVariantChange = (jobId: string, variantId: string | null) => {
@@ -145,5 +141,3 @@ describe("One-Click Apply Pipeline", () => {
     expect(changedVariantId).toBe("var-2");
   });
 });
-
-

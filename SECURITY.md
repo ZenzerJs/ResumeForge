@@ -2,53 +2,49 @@
 
 ## 1. Overview & Threat Model
 
-ResumeForge is a **BYOK** workspace. Guests can use the editor without an account. Saved resumes, evidence, and jobs require an email/password account and are scoped per user.
+ResumeForge is a self-hostable **BYOK** workspace backed by PostgreSQL. Guests can try the editor and local Typst WASM compilation without an account. Saved resumes, evidence, jobs, and server-proxied BYOK calls require an authenticated session and are scoped per user.
 
-Resumes contain PII. LLM API keys have monetary value. The hosted threat model assumes a public origin: unauthenticated persist APIs, SSRF, ephemeral disks, and missing rate limits are treated as blockers.
+Resumes contain PII. LLM API keys have monetary value. The hosted threat model assumes a public origin: unauthenticated persist APIs, open relays, SSRF, ephemeral disks, and missing rate limits are treated as blockers.
 
 ---
 
 ## 2. Hosted Access Control
 
-- **Optional accounts**: email + password (`scrypt`). HttpOnly `rf_session` is signed with `APP_ACCESS_SECRET` (cookie signing key, not a login password).
-- **Pages are public.** Guests can use the editor. Persist mutations require a session and return **401** `{ code: "GUEST_READ_ONLY" }`. List GETs return empty `{ guest: true }` data.
-- Mutation requests (POST/PUT/PATCH/DELETE) require a same-origin `Origin` or `Referer` matching the `Host` header (not the server bind address).
-- In-memory per-IP rate limits apply to `/api/ai/*`, bulk-import, PDF upload, and auth signup/login.
-- `JOB_SYNC_SECRET` is **required**. Sync without it returns 401. Browser session users may omit the Bearer header; cron jobs should send `Authorization: Bearer <secret>`.
+- **Accounts & Sessions**: Email + password (`scrypt`). HttpOnly `rf_session` is HMAC-SHA256 signed with `APP_ACCESS_SECRET` and verified against the user's `sessionVersion` in PostgreSQL.
+- **Guest Mode vs. Authenticated Endpoints**: Pages are public so guests can try the Typst editor and local preview. Persistence mutations and `/api/ai/byok-proxy` require an authenticated session and return **401** when unauthenticated.
+- **Origin Enforcement**: Mutation requests (`POST`/`PUT`/`PATCH`/`DELETE`) require a same-origin `Origin`/`Referer` matching the request host. `POST /api/ai/byok-proxy` strictly requires a same-origin `Origin` header (`403` when missing or cross-origin).
+- **Rate Limits**: In-memory per-IP rate limits apply to `/api/ai/*`, bulk-import, PDF upload, and auth signup/login.
+- **Job Sync Secret**: `JOB_SYNC_SECRET` is required for `/api/jobs/sync-pittcsc`; unauthenticated calls without it return `401`.
 
 ---
 
-## 3. Bring-Your-Own-Key (BYOK) Security Policy & Client Storage
+## 3. Bring-Your-Own-Key (BYOK) Security Policy & Relay Hardening
 
-### Key Storage Mechanisms & Trade-offs
+### Key Storage & Transmission
 
-1. **Browser Local Storage (`localStorage`)**:
-   - Settings persist API keys in `resumeforge_ai_settings`.
-   - On a public HTTPS origin this is XSS-sensitive. CSP (`script-src` limited to `'self'` plus WASM eval) is the primary mitigation. Keys are never echoed in API error payloads.
-2. **Environment Variables (`.env.local`)**:
-   - Server-side provider keys may be set via environment variables. Never commit them.
-3. **OS Keychain Integration (Future Enhancement)**:
-   - Native desktop packaging may store keys in the OS keychain.
-4. **NEVER in the application database**:
-   - API keys must not be written to Postgres. Verified by `tests/db-security.test.ts`.
-5. **NEVER Committed to Version Control**:
-   - `.env` and `.env.local` are gitignored.
-
-### Key Redaction Policy
-
-- API error payloads use `sanitizeError()` (`src/lib/ai/redact.ts`).
-- Patterns scrubbed: `sk-proj-*`, `sk-ant-*`, `AIzaSy*`, Bearer tokens, `key=` query params.
-- Gemini requests send `x-goog-api-key` headers rather than `?key=` query strings.
+1. **Browser Vault (`localStorage`)**:
+   - Keys configured in the browser are encrypted with Web Crypto `AES-GCM` (`src/lib/byok-vault.ts`).
+   - On a public HTTPS origin, `localStorage` remains sensitive to XSS; strict CSP (`script-src 'self'`, `connect-src 'self' blob:`) is enforced in `next.config.ts`.
+2. **Authenticated BYOK Relay (`/api/ai/byok-proxy`)**:
+   - Browser calls for OpenAI, Anthropic, and Groq pass through `/api/ai/byok-proxy` to satisfy browser CORS and CSP (`connect-src 'self'`).
+   - The relay requires an authenticated user session (`requireUserId`), a same-origin `Origin` header, `POST` only (no `OPTIONS` or `Access-Control-Allow-Origin: *`), `https:` only, and an explicit host + path prefix allowlist:
+     - `api.openai.com` (`/v1/chat/completions`, `/v1/models`, `/v1/responses`)
+     - `api.anthropic.com` (`/v1/messages`, `/v1/models`)
+     - `api.groq.com` (`/openai/v1/chat/completions`, `/openai/v1/models`)
+   - Enforces a 256 KB body size limit (`413`) and 30s upstream timeout (`504`).
+   - Forwards only `authorization`, `x-api-key`, `anthropic-version`, and `content-type` (strips `cookie`, `host`, and `x-forwarded-*`).
+   - The app does not store or log request bodies or keys (note that the hosting platform may log HTTP metadata).
+3. **Never in the Application Database**:
+   - API keys are never written to PostgreSQL (verified by `tests/db-security.test.ts`).
+4. **Key Redaction Policy**:
+   - API error payloads pass through `sanitizeError()` (`src/lib/ai/redact.ts`), scrubbing `sk-proj-*`, `sk-ant-*`, `AIzaSy*`, `gsk_*`, Bearer tokens, and `key=` query parameters.
 
 ---
 
-## 4. Network Isolation, SSRF, and Custom Endpoints
+## 4. Network Isolation & SSRF Firewall
 
-- Bulk-import source URLs must be HTTPS hosts on the allowlist (`raw.githubusercontent.com` plus `ALLOWED_IMPORT_HOSTS`).
-- Tier-2 apply-URL fetches and custom AI `baseUrl` calls use `safeFetch`: HTTPS-only (localhost HTTP allowed in non-production), blocked private/loopback/metadata hosts, `redirect: "manual"`.
-- Apply links rendered in the UI must pass `isSafeHref` (http/https only).
-- Cloud provider requests go to official APIs or the user-configured custom base URL after the SSRF checks above.
-- Zero telemetry: no analytics or remote logging SDKs.
+- Outbound fetches use `assertSafePublicUrl` / `safeFetch` (`src/lib/security/safe-fetch.ts`): HTTPS-only (localhost HTTP allowed only in non-production when explicitly enabled), blocked private/loopback/link-local/metadata IP ranges (`127.0.0.0/8`, `10.0.0.0/8`, `169.254.0.0/16`, `172.16.0.0/12`, `192.168.0.0/16`, `::1`, `fe80::`, `fc00::/7`), and manual redirect handling.
+- Production database fallback is fail-closed (`src/lib/prisma.ts`): if PostgreSQL is unreachable in `NODE_ENV=production`, the app throws `RESUMEFORGE_DB_UNAVAILABLE` rather than falling back to the in-memory mock store, and setting `RESUME_FORGE_ALLOW_MOCK_DB=1` in production throws at startup unless `RESUME_FORGE_E2E=1` is also set.
 
 ---
 
@@ -61,37 +57,13 @@ Resumes contain PII. LLM API keys have monetary value. The hosted threat model a
 
 ---
 
-## 6. Mechanical Guardrail & AI Evidence Grounding (Phase 11)
+## 6. Mechanical Guardrail & AI Evidence Grounding
 
-- **Deterministic Fact Snapshots**: When Master Resumes are saved or confirmed, an immutable `factSnapshot` (version: 1) extracts and freezes verified employers, titles, date ranges, metrics, and skills.
-- **Fail-Closed Patch Evaluation**: Proposed AI tailoring diffs are diffed mechanically against the frozen master fact snapshot.
-  - **HARD Violations** (`employer`, `title`, `date`, `metric`, hallucinated `evidenceIds`) hard-block patch application (`apply_patches`), Master overwrite, and document export (`assertCanExport`).
-  - **SOFT Violations** (`skill`) generate visual audit warnings in `GuardrailFeedback` while permitting export.
-  - **Automatic 1x Retry Loop**: If initial AI patch generation produces hallucinations, a retry attempt is dispatched with explicit violation feedback. If the second attempt still fails, the engine **fails closed** to the verified clean master baseline.
-- **Confirm-Before-Master Flow**: Master saves and uploads require explicit user fact confirmation to prevent poisoned baseline records.
-- **Client-Side WASM Typst Sandboxing**: Typst document compilation (`compileTypstToPdf`, `compileTypstToSvg`) runs client-side in browser WebAssembly without sending raw document content to third-party rendering APIs.
-
-- AI writes go to `ResumeVariant` records, never the protected master row.
-
----
-
-## 7. Job Ingestion Connectors & SSRF Firewall (Phase 12)
-
-- **Zero Scraping & Zero Automated Submissions**: ResumeForge does not use headless browsers (Puppeteer/Playwright) or DOM scrapers. All ingestion connects strictly to public REST APIs and syndication feeds. It never auto-submits applications.
-- **SSRF Network Hardening**: `safeFetch` enforces:
-  - HTTPS protocol only (disallowing `http://`, `file://`, etc.).
-  - Hostname allowlist: `boards-api.greenhouse.io`, `api.lever.co`, `api.ashbyhq.com`, `api.adzuna.com`, `jobicy.com`, `remotive.com`, `remoteok.com`.
-  - IP range check (`ipaddr.js`): Rejects all private (`10.0.0.0/8`, `192.168.0.0/16`, `172.16.0.0/12`), loopback (`127.0.0.0/8`), link-local (`169.254.0.0/16`), unique local, and carrier-grade NAT destinations.
-  - Manual redirects (`redirect: "manual"`) to prevent open redirect SSRF bypass.
-- **HTML Sanitization**: All ingested descriptions pass through `sanitize-html`, stripping scripts, iframes, and inline event handlers before database storage.
-- **Master Fact Snapshot Isolation**: Ingested jobs are external read-only listings. They never mutate or poison the master `ResumeFacts` snapshot.
-
----
-
-## 8. Upload Limits and Security Headers
-
-- PDF uploads: 10 MB max and `%PDF-` magic-byte check.
-- Large string fields are Zod-capped (job descriptions, Typst source, bulk markdown).
-- `next.config.ts` sets CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, and HSTS in production.
-- Typst text fonts are served from `/fonts/typst/` (self-hosted). WASM binaries stay on `/wasm/*`. CSP `connect-src` is `'self' blob:` only.
-
+- **Deterministic Fact Snapshots (`src/lib/facts/extract.ts`)**: Extracts verified employers, job titles, date ranges, rendered bullet metrics (with trailing subject nouns), and skills section items from both `#entry(title:, role:, location:, date:, details:)` and `#resume-entry(...)` formats, ignoring Typst layout constants.
+- **Fail-Closed Verification (`src/lib/guardrail/check.ts` & `policy.ts`)**:
+  - **Employers (`HARD`)**: Exact match after corporate suffix normalization (`normalizeEmployer`), plus verified Evidence Bank aliases. No substring matching.
+  - **Job Titles (`HARD`)**: Candidate title tokens must be a subset of master title tokens (blocking added seniority/scope tokens like `Senior`, `Staff`, `Principal`, `Lead`), and level markers (`Intern`, `Co-op`, `Junior`, `Associate`) present in the master title cannot be dropped.
+  - **Date Ranges (`HARD`)**: Candidate date ranges must be contained within the master date range at ISO month granularity (`startIso >= master.startIso` and `endIso <= master.endIso`), falling back to year-level containment only when the candidate omits explicit months (e.g. `2022 - 2023`). Shifting start months/years earlier or extending `Present` beyond a bounded master end date is hard-blocked.
+  - **Metrics (`HARD` / `SOFT`)**: Non-trivial metrics must match master value and unit. When both sides carry a trailing subject noun (after singularization, e.g., `10M requests` vs `10M users`), subject mismatches are hard-blocked (`HARD`); when only one side carries a trailing subject, a `SOFT` warning is emitted.
+  - **Skills (`SOFT` + Patch Gate)**: Unverified skills in a document emit a `SOFT` warning, and `assertCanApplyPatches` blocks AI patches that introduce unverified skills without explicit per-skill acknowledgement.
+  - **Fail-Closed Export (`assertCanExport`)**: Exporting a derived or AI-patched variant without a frozen Master Resume snapshot throws `GuardrailBlockError` (`"Freeze your master resume first..."`), while untailored starter/master self-export remains allowed for first-run guest evaluation.

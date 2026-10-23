@@ -26,6 +26,7 @@ interface PreviewPanelProps {
   isCompiling: boolean;
   onResetTemplate: () => void;
   masterFacts?: ResumeFacts | null;
+  allowUnfrozenMasterSelfExport?: boolean;
   extractedRequirements?: {
     requiredSkills: string[];
     preferredSkills: string[];
@@ -47,6 +48,7 @@ export function PreviewPanel({
   isCompiling,
   onResetTemplate,
   masterFacts,
+  allowUnfrozenMasterSelfExport,
   extractedRequirements,
   roleTitle,
   onTriggerRepair,
@@ -67,7 +69,7 @@ export function PreviewPanel({
       setExportError(null);
 
       // Phase 11.2 Mechanical Guardrail Gate
-      assertCanExport(source, masterFacts);
+      assertCanExport(source, masterFacts, { allowUnfrozenMasterSelfExport });
 
       const { compileTypstToPdf } = await import("@/lib/typst/compiler");
       const pdfBytes = await compileTypstToPdf(source);
@@ -93,7 +95,7 @@ export function PreviewPanel({
       setExportError(null);
 
       // Phase 11.2 Mechanical Guardrail Gate
-      assertCanExport(source, masterFacts);
+      assertCanExport(source, masterFacts, { allowUnfrozenMasterSelfExport });
 
       const { generateAtsDocx } = await import("@/lib/export/docx");
       const docxBytes = await generateAtsDocx(source, { facts: masterFacts || undefined });
@@ -191,6 +193,7 @@ export function PreviewPanel({
       const zipBytes = await generateApplicationPackageZip({
         typstSource: source,
         masterFacts: masterFacts || undefined,
+        allowUnfrozenMasterSelfExport,
         job: roleTitle
           ? {
               company: "Target Company",

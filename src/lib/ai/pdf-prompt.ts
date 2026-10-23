@@ -148,7 +148,7 @@ You MUST use the exact styling, helper functions, and structural pattern defined
    - Escape '@' as '\\@'
    - Escape '\\' as '\\\\'
 9. **ZERO LOSS OF INFORMATION**: Preserve all extracted dates, job titles, companies, degrees, details, technologies, metrics, numbers, and bullets. Never drop or summarize candidate data.
-10. **FORBIDDEN ANGLE-BRACKET LABELS**: NEVER wrap email addresses, URLs, or domains in angle brackets like \`<yahoo.com>\` or \`<user@domain.com>\`. Typst treats angle brackets as document label references, causing fatal compiler errors. Keep emails as plain text or \`#link("mailto:user@domain.com")[user\\\\@domain.com]\`.
+10. **FORBIDDEN ANGLE-BRACKET LABELS**: NEVER wrap email addresses, URLs, or domains in angle brackets like \`<example.com>\` or \`<user@domain.com>\`. Typst treats angle brackets as document label references, causing fatal compiler errors. Keep emails as plain text or \`#link("mailto:user@domain.com")[user\\\\@domain.com]\`.
 11. **FORBIDDEN LABELS & METADATA**: Do NOT output \`#label(...)\` commands or metadata tags.
 12. **APPROVED FONT STACK ONLY**: Do NOT introduce custom font set blocks or lowercased font overrides like \`font: "liberation sans"\`. Use \`font: "Liberation Sans"\` exactly as defined in the template.
 13. **OUTPUT FORMAT**: Output ONLY valid Typst markup source code. Do NOT wrap the output in markdown fences (such as \`\`\`typst). Do NOT include preamble or conversational text.`;

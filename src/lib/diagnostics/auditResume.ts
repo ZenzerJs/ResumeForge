@@ -1,5 +1,25 @@
 import { ResumeDiagnosticReport, ResumeDiagnosticItem } from "../schema/resumeFeedback";
 
+const UNVERIFIED_SKILL_SUGGESTED_FIX =
+  "Only add if you have real experience; log it in your Evidence Bank first, otherwise treat it as a gap.";
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Matches a skill token on non-word/token boundaries so short skills like "Go", "C", or "R"
+ * never match substrings inside words like "good", "company", or "experience", while still
+ * matching punctuation-bearing tokens like "C++", "C#", "Node.js", and "Next.js".
+ */
+export function hasSkillWordBoundary(haystack: string, skill: string): boolean {
+  const cleanSkill = skill.trim();
+  if (!cleanSkill) return false;
+  const escaped = escapeRegex(cleanSkill);
+  const pattern = new RegExp(`(?:^|[^a-zA-Z0-9_+#])${escaped}(?=$|[^a-zA-Z0-9_+#])`, "i");
+  return pattern.test(haystack);
+}
+
 export function auditResume(params: {
   resumeText: string;
   requiredSkills: string[];
@@ -11,14 +31,14 @@ export function auditResume(params: {
   const text = params.resumeText.toLowerCase();
 
   for (const skill of params.requiredSkills) {
-    if (!text.includes(skill.toLowerCase())) {
+    if (!hasSkillWordBoundary(params.resumeText, skill)) {
       items.push({
         id: `missing-${skill}`,
         severity: "urgent",
         category: "missing_hard_requirement",
         message: `Missing required skill: ${skill}`,
         targetLineOrBulletId: "global",
-        suggestedFix: `Add ${skill} to your resume`,
+        suggestedFix: UNVERIFIED_SKILL_SUGGESTED_FIX,
       });
     }
   }
@@ -63,7 +83,7 @@ export function auditResume(params: {
           suggestedFix: "Quantify your achievements (e.g., % improvement, # of users).",
         });
       }
-      
+
       const bulletText = bullet.text.toLowerCase();
       for (const verb of passiveVerbs) {
         if (bulletText.includes(verb)) {
@@ -83,14 +103,14 @@ export function auditResume(params: {
 
   if (params.preferredSkills) {
     for (const skill of params.preferredSkills) {
-      if (!text.includes(skill.toLowerCase())) {
+      if (!hasSkillWordBoundary(params.resumeText, skill)) {
         items.push({
           id: `missing-pref-${skill}`,
           severity: "non_urgent",
           category: "weak_quantification",
           message: `Consider adding preferred tooling: ${skill}`,
           targetLineOrBulletId: "global",
-          suggestedFix: `Add ${skill} to your resume if you have experience with it.`,
+          suggestedFix: UNVERIFIED_SKILL_SUGGESTED_FIX,
         });
       }
     }

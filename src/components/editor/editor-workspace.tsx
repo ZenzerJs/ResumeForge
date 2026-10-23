@@ -33,6 +33,11 @@ import {
   X,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  isDocumentPatched,
+  markDocumentAsPatched,
+  stripPatchedDocumentMarker,
+} from "@/lib/guardrail/policy";
 import { cn } from "@/lib/utils";
 import { AppShell } from "@/components/design-system/app-shell";
 import { EditorWorkspaceSkeleton } from "@/components/editor/editor-workspace-skeleton";
@@ -100,8 +105,9 @@ export function EditorWorkspace() {
   const [draftEvidenceFromMaster, setDraftEvidenceFromMaster] = useState<boolean>(true);
   const [evidenceExtractToast, setEvidenceExtractToast] = useState<string | null>(null);
   const [isExtractingEvidence, setIsExtractingEvidence] = useState<boolean>(false);
-  // Phase 11: Master Fact Snapshot state
+  // Phase 11: Master Fact Snapshot state (strictly from frozen Master Resume + verified Evidence Bank)
   const [masterFacts, setMasterFacts] = useState<ResumeFacts | null>(null);
+  const [hasAiPatchedBuffer, setHasAiPatchedBuffer] = useState<boolean>(false);
 
   // Task B1: Canonical Document Loading & Metadata State
   const [isLoadingDocument, setIsLoadingDocument] = useState<boolean>(true);
@@ -278,11 +284,39 @@ export function EditorWorkspace() {
    */
   const loadGeneration = useRef(0);
 
+  const loadFrozenMasterSnapshot = useCallback(async () => {
+    try {
+      const [resumesRes, evidRes] = await Promise.all([
+        fetch("/api/resumes").catch(() => null),
+        fetch("/api/evidence").catch(() => null),
+      ]);
+      const resumesJson = resumesRes && resumesRes.ok ? await resumesRes.json().catch(() => null) : null;
+      const evidJson = evidRes && evidRes.ok ? await evidRes.json().catch(() => null) : null;
+
+      const resumesList = Array.isArray(resumesJson?.data) ? resumesJson.data : [];
+      const frozenMaster = resumesList.find((r: { isMaster?: boolean; typstSource?: string }) => r.isMaster && r.typstSource);
+      const verifiedEvidence = Array.isArray(evidJson?.data) ? evidJson.data : [];
+
+      if (frozenMaster?.typstSource) {
+        setMasterFacts(extractResumeFacts(frozenMaster.typstSource, verifiedEvidence));
+      } else {
+        setMasterFacts(null);
+      }
+    } catch {
+      setMasterFacts(null);
+    }
+  }, []);
+
   const loadCanonicalDocument = useCallback(async () => {
     const generation = ++loadGeneration.current;
     const current = () => generation === loadGeneration.current;
     setIsLoadingDocument(true);
     setDocumentError(null);
+    const persistedAiPatched =
+      typeof window !== "undefined" &&
+      sessionStorage.getItem("resumeforge_ai_patched_buffer") === "true";
+    setHasAiPatchedBuffer(persistedAiPatched);
+    void loadFrozenMasterSnapshot();
 
     try {
       // Priority 1: variantId param
@@ -374,7 +408,7 @@ export function EditorWorkspace() {
     }
 
     setIsLoadingDocument(false);
-  }, [variantIdParam, resumeIdParam, loadStarterTemplate]);
+  }, [variantIdParam, resumeIdParam, loadStarterTemplate, loadFrozenMasterSnapshot]);
 
   useEffect(() => {
     if (isLoadingDocument) return;
@@ -500,13 +534,30 @@ export function EditorWorkspace() {
 
   const handleApplyRepair = useCallback(
     (newSource: string) => {
-      handleSourceChange(newSource);
-      runCompile(newSource);
+      const patchedSource = markDocumentAsPatched(newSource);
+      setHasAiPatchedBuffer(true);
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem("resumeforge_ai_patched_buffer", "true");
+        } catch {
+          // ignore
+        }
+      }
+      handleSourceChange(patchedSource);
+      runCompile(patchedSource);
     },
     [runCompile]
   );
 
   const handleResetTemplate = async () => {
+    setHasAiPatchedBuffer(false);
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.removeItem("resumeforge_ai_patched_buffer");
+      } catch {
+        // ignore
+      }
+    }
     const starter = await loadStarterTemplate();
     handleSourceChange(starter);
   };
@@ -574,6 +625,7 @@ export function EditorWorkspace() {
       return;
     }
     const shouldExtractEvidence = draftEvidenceFromMaster;
+    const cleanMasterSource = stripPatchedDocumentMarker(source);
     try {
       setIsSavingMaster(true);
       setSaveSuccess(false);
@@ -584,7 +636,7 @@ export function EditorWorkspace() {
         body: JSON.stringify({
           id: docMetadata.id,
           title: "Master Resume",
-          typstSource: source,
+          typstSource: cleanMasterSource,
           confirmOverwrite: true,
         }),
       });
@@ -593,7 +645,8 @@ export function EditorWorkspace() {
 
       if (res.ok && json.success) {
         setSaveSuccess(true);
-        setBaselineSource(source);
+        setSource(cleanMasterSource);
+        setBaselineSource(cleanMasterSource);
         if (json.snapshotId) {
           setLastSnapshotId(json.snapshotId);
         }
@@ -602,9 +655,12 @@ export function EditorWorkspace() {
           title: "Master Resume",
           id: json.data?.id,
         });
+        setHasAiPatchedBuffer(false);
+        void loadFrozenMasterSnapshot();
         if (typeof window !== "undefined") {
           localStorage.setItem("resumeforge_draft_migrated", "true");
           localStorage.removeItem("resumeforge_has_guest_draft");
+          sessionStorage.removeItem("resumeforge_ai_patched_buffer");
         }
         setShowSaveConfirm(false);
         scheduleUiTimer(() => setSaveSuccess(false), 3000);
@@ -1009,6 +1065,12 @@ export function EditorWorkspace() {
                   source={source}
                   isCompiling={isCompiling}
                   masterFacts={masterFacts}
+                  allowUnfrozenMasterSelfExport={
+                    docMetadata.type === "MASTER_RESUME" ||
+                    (docMetadata.type === "LOCAL_FALLBACK" &&
+                      !hasAiPatchedBuffer &&
+                      !isDocumentPatched(source))
+                  }
                   onResetTemplate={handleResetTemplate}
                   onTriggerRepair={handleTriggerRepair}
                 />
@@ -1077,6 +1139,12 @@ export function EditorWorkspace() {
                 source={source}
                 isCompiling={isCompiling}
                 masterFacts={masterFacts}
+                allowUnfrozenMasterSelfExport={
+                  docMetadata.type === "MASTER_RESUME" ||
+                  (docMetadata.type === "LOCAL_FALLBACK" &&
+                    !hasAiPatchedBuffer &&
+                    !isDocumentPatched(source))
+                }
                 onResetTemplate={handleResetTemplate}
                 onTriggerRepair={handleTriggerRepair}
               />

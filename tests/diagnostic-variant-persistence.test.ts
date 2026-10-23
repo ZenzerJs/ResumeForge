@@ -2,10 +2,85 @@ import { describe, it, expect } from "vitest";
 import {
   canPersistDiagnosticVariant,
   buildDiagnosticVariantTitle,
+  extractDiagnosticSkill,
+  resolveDiagnosticFixAction,
 } from "../src/components/tailor/tailor-diagnostic-panel";
 
 // Regression coverage for deterministic-fix variant persistence gating:
 // a fix must only be saveable when a real master resume and saved job exist.
+
+describe("extractDiagnosticSkill & resolveDiagnosticFixAction", () => {
+  it("strips prefixes and the Evidence Bank advisory suffix from diagnostic messages", () => {
+    expect(
+      extractDiagnosticSkill(
+        "Missing required skill: Kubernetes. Only add if you have real experience; log it in your Evidence Bank first, otherwise treat it as a gap."
+      )
+    ).toBe("Kubernetes");
+
+    expect(
+      extractDiagnosticSkill(
+        "Consider adding preferred tooling: Terraform (only add if you have real experience; log it in your Evidence Bank first, otherwise treat it as a gap)."
+      )
+    ).toBe("Terraform");
+  });
+
+  it("refuses to insert an unverified missing skill when no matching Evidence Bank item exists", () => {
+    const outcome = resolveDiagnosticFixAction(
+      {
+        id: "diag-missing-k8s",
+        severity: "urgent",
+        category: "missing_hard_requirement",
+        message:
+          "Missing required skill: Kubernetes. Only add if you have real experience; log it in your Evidence Bank first, otherwise treat it as a gap.",
+        suggestedFix:
+          "Only add Kubernetes if you have real experience; log it in your Evidence Bank first, otherwise treat it as a gap.",
+        targetLineOrBulletId: "bullet-1",
+      },
+      "- Built scalable APIs in TypeScript",
+      [
+        {
+          id: "evid-1",
+          verifiedSummary: "Built scalable APIs in TypeScript and PostgreSQL.",
+          tags: ["TypeScript", "PostgreSQL"],
+        },
+      ]
+    );
+
+    expect(outcome.applied).toBe(false);
+    if (!outcome.applied) {
+      expect(outcome.error).toContain("No verified evidence found");
+      expect(outcome.error).toContain("never invents experience");
+    }
+  });
+
+  it("refuses document-level missing-skill insertion even when verified evidence exists (requires explicit bullet anchor)", () => {
+    const outcome = resolveDiagnosticFixAction(
+      {
+        id: "diag-missing-go",
+        severity: "urgent",
+        category: "missing_hard_requirement",
+        message:
+          "Missing required skill: Go. Only add if you have real experience; log it in your Evidence Bank first, otherwise treat it as a gap.",
+        suggestedFix:
+          "Only add Go if you have real experience; log it in your Evidence Bank first, otherwise treat it as a gap.",
+        targetLineOrBulletId: "global",
+      },
+      "- Built scalable APIs in TypeScript",
+      [
+        {
+          id: "evid-go",
+          verifiedSummary: "Built gRPC microservices in Go.",
+          tags: ["Go", "gRPC"],
+        },
+      ]
+    );
+
+    expect(outcome.applied).toBe(false);
+    if (!outcome.applied) {
+      expect(outcome.error).toContain("document-level (no bullet anchor)");
+    }
+  });
+});
 
 describe("canPersistDiagnosticVariant", () => {
   it("refuses when no patch has been applied", () => {

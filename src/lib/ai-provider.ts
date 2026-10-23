@@ -307,6 +307,18 @@ export async function callByokModel<T = unknown>(
     });
 
     if (!res.ok) {
+      if (needsCorsProxy && res.status === 401) {
+        let proxyMessage = "Sign in to use this provider, or switch to Gemini.";
+        try {
+          const errJson = await res.json();
+          if (typeof errJson?.error?.message === "string" && errJson.error.message.trim().length > 0) {
+            proxyMessage = errJson.error.message;
+          }
+        } catch {
+          // Use default message when response body is not JSON
+        }
+        throw new Error(proxyMessage);
+      }
       const errText = await res.text().catch(() => "");
       throw new Error(`${provider} request failed (${res.status}): ${errText}`);
     }

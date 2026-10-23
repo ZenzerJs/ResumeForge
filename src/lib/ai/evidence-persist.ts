@@ -52,8 +52,8 @@ export async function persistDraftEvidenceFromExtract(
     const created = await createEvidenceItem({
       type: item.type,
       title: item.title,
-      organization: item.organization,
-      dates: item.dates,
+      organization: item.organization ?? undefined,
+      dates: item.dates ?? undefined,
       verifiedSummary: item.verifiedSummary,
       tags: item.tags || [],
       status: "draft",

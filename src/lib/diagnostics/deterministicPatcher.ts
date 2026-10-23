@@ -1,3 +1,5 @@
+import { markDocumentAsPatched } from "@/lib/guardrail/policy";
+
 export interface DeterministicPatchResult {
   applied: boolean;
   patchedTypstAst: string;
@@ -99,7 +101,11 @@ export function applyDeterministicPatch(
   }
 
   if (applied) {
-    return { applied, patchedTypstAst: newAst, citedEvidenceId: evidence.id };
+    return {
+      applied,
+      patchedTypstAst: markDocumentAsPatched(newAst),
+      citedEvidenceId: evidence.id,
+    };
   }
   
   return { applied: false, patchedTypstAst: typstAst, error: "Failed to apply patch." };
