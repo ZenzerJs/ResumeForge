@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { clientKey, rateLimit } from "@/lib/security/rate-limit";
 import { isMutationMethod, isPublicPath, originAllowed } from "@/lib/security/session";
+import { demoAllowsMutation, isDemoMode } from "@/lib/demo-mode";
 
 export const HEAVY_ENDPOINT_LIMITS: Record<string, { limit: number; windowMs: number }> = {
   "/api/jobs/bulk-import": { limit: 10, windowMs: 60_000 },
@@ -11,6 +12,17 @@ export const HEAVY_ENDPOINT_LIMITS: Record<string, { limit: number; windowMs: nu
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (
+    isDemoMode() &&
+    pathname.startsWith("/api/") &&
+    isMutationMethod(request.method) &&
+    !demoAllowsMutation(pathname)
+  ) {
+    return NextResponse.json(
+      { success: false, error: "This public demo keeps changes in your browser.", code: "GUEST_READ_ONLY" },
+      { status: 401 }
+    );
+  }
   if (isPublicPath(pathname)) {
     if (pathname.startsWith("/api/auth/") && isMutationMethod(request.method)) {
       if (!originAllowed(request)) {
@@ -39,6 +51,10 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith("/api/ai/")) {
     if (!rateLimit(clientKey(request, "ai"), 20, 60_000)) {
       return NextResponse.json({ success: false, error: "Too many AI requests" }, { status: 429 });
+    }
+  } else if (pathname.startsWith("/api/demo/")) {
+    if (!rateLimit(clientKey(request, "demo-ai"), 8, 60_000)) {
+      return NextResponse.json({ success: false, error: "Too many demo AI requests" }, { status: 429 });
     }
   } else if (heavyConfig) {
     if (!rateLimit(clientKey(request, `heavy:${pathname}`), heavyConfig.limit, heavyConfig.windowMs)) {

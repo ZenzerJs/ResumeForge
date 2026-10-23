@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { CoverLetterResponse } from "@/lib/ai/cover-letter-schema";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
+import { getDemoContextFromBrowser } from "@/lib/demo-client";
 
 interface CoverLetterPanelProps {
   jobId: string;
@@ -42,12 +43,21 @@ export function CoverLetterPanel({
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
 
   // Task 8.6: Load existing cover letter draft for jobId on mount
   React.useEffect(() => {
     if (!jobId) return;
     async function loadExistingDraft() {
       try {
+        const configRes = await fetch("/api/demo-config");
+        const config = await configRes.json();
+        setDemoMode(config.demoMode === true);
+        if (config.demoMode) {
+          const local = localStorage.getItem(`resumeforge_demo_cover_letter_${jobId}`);
+          if (local) setCoverLetter(JSON.parse(local) as CoverLetterResponse);
+          return;
+        }
         const res = await fetch(`/api/cover-letters?jobId=${jobId}`);
         const json = await res.json();
         if (res.ok && json.success && Array.isArray(json.data) && json.data.length > 0) {
@@ -81,8 +91,15 @@ export function CoverLetterPanel({
 
     try {
       const providerConfig = (await resolveClientProviderConfig()) || undefined;
+      const demoConfigRes = await fetch("/api/demo-config");
+      const demoConfig = await demoConfigRes.json();
+      const demoContext = demoConfig.demoMode ? getDemoContextFromBrowser() : undefined;
+      if (demoConfig.demoMode && !demoContext) {
+        setGenerateError("Add a local resume and verified evidence before generating a cover letter.");
+        return;
+      }
 
-      const res = await fetch("/api/ai/generate-cover-letter", {
+      const res = await fetch(demoConfig.demoMode ? "/api/demo/generate-cover-letter" : "/api/ai/generate-cover-letter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -94,6 +111,7 @@ export function CoverLetterPanel({
           extractedRequirements: extractedRequirements || undefined,
           activeRoleProfile,
           providerConfig,
+          ...(demoConfig.demoMode ? { masterTypst: demoContext?.masterTypst, evidenceItems: demoContext?.evidenceItems } : {}),
         }),
       });
 
@@ -105,6 +123,7 @@ export function CoverLetterPanel({
       }
 
       setCoverLetter(json.data);
+      if (demoConfig.demoMode) localStorage.setItem(`resumeforge_demo_cover_letter_${jobId}`, JSON.stringify(json.data));
     } catch (err) {
       setGenerateError(`Generation error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -297,22 +316,22 @@ export function CoverLetterPanel({
                 Download ({activeFormat === "markdown" ? ".md" : ".txt"})
               </button>
 
-              <button
-                type="button"
-                onClick={handleSaveToDatabase}
-                disabled={isSaving}
-                data-testid="save-cover-letter-btn"
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs rounded-md font-medium transition flex items-center gap-1.5"
-              >
-                {isSaving ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : saveSuccess ? (
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                ) : (
-                  <Save className="h-3.5 w-3.5" />
-                )}
-                {saveSuccess ? "Saved to Database!" : "Save Cover Letter"}
-              </button>
+              {demoMode ? (
+                <span className="px-3 py-1.5 text-xs text-slate-400" data-testid="cover-letter-local-only">
+                  Saved in this browser
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSaveToDatabase}
+                  disabled={isSaving}
+                  data-testid="save-cover-letter-btn"
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs rounded-md font-medium transition flex items-center gap-1.5"
+                >
+                  {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saveSuccess ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
+                  {saveSuccess ? "Saved to Database!" : "Save Cover Letter"}
+                </button>
+              )}
             </div>
           </div>
 

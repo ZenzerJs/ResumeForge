@@ -23,6 +23,7 @@ import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ExtractedPdfEvidence } from "@/lib/evidence/pdfExtractor";
 import { convertExtractedPdfToEvidenceItems, type CreateEvidencePayload } from "@/lib/evidence/evidence-transform";
+import { initializeDemoSamples } from "@/lib/demo-client";
 
 const BulkPdfDropzone = dynamic(
   () => import("@/components/evidence/bulk-pdf-dropzone").then((mod) => mod.BulkPdfDropzone),
@@ -98,67 +99,71 @@ export function LibraryWorkspace() {
   const fetchItems = useCallback(async () => {
     try {
       setIsLoading(true);
-      const url =
-        filterStatus === "all"
-          ? "/api/evidence"
-          : `/api/evidence?status=${filterStatus}`;
-      const res = await fetch(url);
-      const json = await res.json();
-      if (json.success) {
-        let loadedItems: EvidenceItem[] = json.data || [];
+      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      let loadedItems: EvidenceItem[] = [];
+      if (demoConfig.demoMode) {
+        initializeDemoSamples();
+        const stored = localStorage.getItem("resumeforge_guest_evidence");
+        const localItems: EvidenceItem[] = stored ? JSON.parse(stored) : [];
+        loadedItems = filterStatus === "all" ? localItems : localItems.filter((item) => item.status === filterStatus);
+      } else {
+        const url = filterStatus === "all" ? "/api/evidence" : `/api/evidence?status=${filterStatus}`;
+        const res = await fetch(url);
+        const json = await res.json();
+        if (!json.success) throw new Error("Failed to fetch evidence items.");
+        loadedItems = json.data || [];
         try {
           const stored = typeof window !== "undefined" ? localStorage.getItem("resumeforge_guest_evidence") : null;
           if (stored) {
             const guestItems: EvidenceItem[] = JSON.parse(stored);
             const existingIds = new Set(loadedItems.map((i) => i.id));
-            const nonDups = guestItems.filter((g) => !existingIds.has(g.id));
-            loadedItems = [...loadedItems, ...nonDups];
+            loadedItems = [...loadedItems, ...guestItems.filter((item) => !existingIds.has(item.id))];
           }
         } catch (e) {
           console.error("Failed to read guest evidence from localStorage:", e);
         }
+      }
 
-        // Annotate potential duplicate items for the Review Queue unless already dismissed
-        let reviewedSet = new Set<string>();
-        try {
-          const rawReviewed = typeof window !== "undefined" ? localStorage.getItem("rf_reviewed_duplicates") : null;
-          if (rawReviewed) {
-            reviewedSet = new Set(JSON.parse(rawReviewed));
-          }
-        } catch {}
-
-        const annotated = loadedItems.map((item, idx) => {
-          if (reviewedSet.has(item.id)) return item;
-          if (item.needsReview) return item;
-          const normTitle = item.title.trim().toLowerCase();
-          const earlierMatch = loadedItems.slice(0, idx).find((prev) => {
-            const prevTitle = prev.title.trim().toLowerCase();
-            return (
-              prevTitle === normTitle &&
-              (prev.organization || "").trim().toLowerCase() === (item.organization || "").trim().toLowerCase()
-            );
-          });
-          if (earlierMatch) {
-            return {
-              ...item,
-              needsReview: true,
-              duplicateTargetId: earlierMatch.id,
-              similarityScore: 0.88,
-              candidateBullet: item.bullets?.[0]?.text || item.verifiedSummary,
-              existingBullet: earlierMatch.bullets?.[0]?.text || earlierMatch.verifiedSummary,
-            };
-          }
-          return item;
-        });
-
-        setItems(annotated);
-        // Expand first item by default while preserving existing expanded items
-        if (annotated.length > 0) {
-          setExpandedIds((prev) => ({
-            ...prev,
-            [annotated[0].id]: true,
-          }));
+      // Annotate potential duplicate items for the Review Queue unless already dismissed
+      let reviewedSet = new Set<string>();
+      try {
+        const rawReviewed = typeof window !== "undefined" ? localStorage.getItem("rf_reviewed_duplicates") : null;
+        if (rawReviewed) {
+          reviewedSet = new Set(JSON.parse(rawReviewed));
         }
+      } catch {}
+
+      const annotated = loadedItems.map((item, idx) => {
+        if (reviewedSet.has(item.id)) return item;
+        if (item.needsReview) return item;
+        const normTitle = item.title.trim().toLowerCase();
+        const earlierMatch = loadedItems.slice(0, idx).find((prev) => {
+          const prevTitle = prev.title.trim().toLowerCase();
+          return (
+            prevTitle === normTitle &&
+            (prev.organization || "").trim().toLowerCase() === (item.organization || "").trim().toLowerCase()
+          );
+        });
+        if (earlierMatch) {
+          return {
+            ...item,
+            needsReview: true,
+            duplicateTargetId: earlierMatch.id,
+            similarityScore: 0.88,
+            candidateBullet: item.bullets?.[0]?.text || item.verifiedSummary,
+            existingBullet: earlierMatch.bullets?.[0]?.text || earlierMatch.verifiedSummary,
+          };
+        }
+        return item;
+      });
+
+      setItems(annotated);
+      // Expand first item by default while preserving existing expanded items
+      if (annotated.length > 0) {
+        setExpandedIds((prev) => ({
+          ...prev,
+          [annotated[0].id]: true,
+        }));
       }
     } catch (err) {
       console.error("Failed to fetch evidence items:", err);

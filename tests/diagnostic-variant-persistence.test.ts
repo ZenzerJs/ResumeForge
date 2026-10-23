@@ -80,6 +80,27 @@ describe("extractDiagnosticSkill & resolveDiagnosticFixAction", () => {
       expect(outcome.error).toContain("document-level (no bullet anchor)");
     }
   });
+
+  it("returns the verified evidence and bullet pair needed by the saved proposal API", () => {
+    const outcome = resolveDiagnosticFixAction(
+      {
+        id: "diag-k8s",
+        severity: "non_urgent",
+        category: "missing_hard_requirement",
+        message: "Missing required skill: Kubernetes",
+        suggestedFix: "Use verified Kubernetes evidence",
+        targetLineOrBulletId: "bullet-42",
+      },
+      "// RF_BULLET:bullet-42\n- Built services in TypeScript",
+      [{ id: "evid-k8s", verifiedSummary: "Built services with Kubernetes", tags: ["Kubernetes"] }]
+    );
+
+    expect(outcome.applied).toBe(true);
+    if (outcome.applied) {
+      expect(outcome.evidenceId).toBe("evid-k8s");
+      expect(outcome.targetBulletId).toBe("bullet-42");
+    }
+  });
 });
 
 describe("canPersistDiagnosticVariant", () => {

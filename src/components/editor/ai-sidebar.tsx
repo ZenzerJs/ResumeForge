@@ -25,6 +25,7 @@ import { TypstRepairProposal } from "@/lib/ai/repair-schema";
 import { ResumeFacts } from "@/lib/facts/types";
 import { checkGuardrail } from "@/lib/guardrail/check";
 import { assertCanApplyPatches, markDocumentAsPatched } from "@/lib/guardrail/policy";
+import { applyPatchProposals } from "@/lib/ai/patch-application";
 import { GuardrailResult } from "@/lib/guardrail/types";
 
 /**
@@ -48,6 +49,7 @@ import { AiMarkdownRenderer } from "@/components/editor/ai-markdown-renderer";
 import { ChatPanel } from "@/components/editor/chat-panel";
 import { AiProgress, type AiJobStage } from "@/components/ui/ai-progress";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
+import { getDemoContextFromBrowser } from "@/lib/demo-client";
 
 interface AiSidebarProps {
   /** Current Typst source in the editor buffer */
@@ -79,13 +81,14 @@ interface AiSidebarProps {
 
 interface PatchSuggestion {
   id: string;
-  operation: string;
+  operation: "MODIFY_BULLET" | "ADD_SKILL" | "REORDER_BULLETS" | "TWEAK_SUMMARY" | "REPORT_GAP";
   targetSection: string;
   before: string;
   after: string;
   rationale: string;
   confidence: number;
   evidenceIds: string[];
+  targetId?: string;
 }
 
 interface GapItem {
@@ -134,6 +137,9 @@ export function AiSidebar({
   const [acknowledgedSkills, setAcknowledgedSkills] = useState<Set<string>>(new Set());
   const [showGaps, setShowGaps] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
+  const [patchBatch, setPatchBatch] = useState<{ batchId: string; revisionToken: string; baseTypstSource: string; jobId: string } | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [demoBaseTypstSource, setDemoBaseTypstSource] = useState<string | null>(null);
 
   // Task 9.6: Seeded feedback context from Tailor review
   const [seededFeedback, setSeededFeedback] = useState<{
@@ -148,17 +154,25 @@ export function AiSidebar({
   // Read seeded feedback on initial mount or when jobId changes
   useEffect(() => {
     if (!urlJobId || typeof window === "undefined") return;
-    try {
-      const raw = sessionStorage.getItem(`resumeforge_tailor_feedback_${urlJobId}`);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.jobId === urlJobId) {
-          setSeededFeedback(parsed);
-        }
+    let cancelled = false;
+    (async () => {
+      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      if (cancelled) return;
+      if (demoConfig?.demoMode) {
+        setSeededFeedback(null);
+        return;
       }
-    } catch {
-      // sessionStorage unavailable or invalid
-    }
+      try {
+        const raw = sessionStorage.getItem(`resumeforge_tailor_feedback_${urlJobId}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.jobId === urlJobId) setSeededFeedback(parsed);
+        }
+      } catch {
+        // sessionStorage unavailable or invalid
+      }
+    })();
+    return () => { cancelled = true; };
   }, [urlJobId]);
 
   const handleDismissSeededFeedback = () => {
@@ -175,14 +189,24 @@ export function AiSidebar({
   useEffect(() => {
     if (!urlJobId) return;
     let cancelled = false;
-    fetch(`/api/jobs/${urlJobId}`)
-      .then((r) => r.json())
-      .then((json) => {
-        if (!cancelled && json.success && json.data?.rawDescription) {
-          setJdText(json.data.rawDescription);
-        }
-      })
-      .catch(() => {});
+    (async () => {
+      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      if (cancelled) return;
+      if (demoConfig?.demoMode) {
+        try {
+          const rawJobs = localStorage.getItem("resumeforge_guest_jobs");
+          const jobs = rawJobs ? JSON.parse(rawJobs) : [];
+          const localJob = Array.isArray(jobs) ? jobs.find((item) => item?.id === urlJobId) : null;
+          if (localJob?.rawDescription) setJdText(localJob.rawDescription);
+        } catch {}
+        return;
+      }
+      try {
+        const res = await fetch(`/api/jobs/${urlJobId}`);
+        const json = await res.json();
+        if (!cancelled && json.success && json.data?.rawDescription) setJdText(json.data.rawDescription);
+      } catch {}
+    })();
     return () => {
       cancelled = true;
     };
@@ -212,6 +236,9 @@ export function AiSidebar({
     setRejectedIds(new Set());
     setAcknowledgedSkills(new Set());
     setHasApplied(false);
+    setPatchBatch(null);
+    setIsDemoMode(false);
+    setDemoBaseTypstSource(null);
 
     try {
       // Step 1: Extract requirements from JD text
@@ -232,9 +259,31 @@ export function AiSidebar({
 
       const jobRequirements = extractJson.data;
 
+      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      const isDemo = demoConfig?.demoMode === true;
+      const demoContext = isDemo ? getDemoContextFromBrowser() : undefined;
+      if (isDemo && (!demoContext?.masterTypst || demoContext.masterTypst !== source || localStorage.getItem("resumeforge_typst_source") !== source)) {
+        throw new Error("The browser resume changed. Reload the demo draft before generating patches.");
+      }
+
+      // Persist pasted job descriptions for signed-in users so accepted
+      // proposals can be bound to a real server-side job.
+      let jobId = urlJobId;
+      if (!isDemo && !jobId) {
+        const saveRes = await fetch("/api/jobs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rawDescription: jdText, source: "pasted" }),
+        });
+        const saveJson = await saveRes.json();
+        if (saveRes.ok && saveJson.success && typeof saveJson.data?.id === "string") {
+          jobId = saveJson.data.id;
+        }
+      }
+
       // Step 2: Generate patches against master resume
       setTailorStage("writing");
-      const patchRes = await fetch("/api/ai/generate-patches", {
+      const patchRes = await fetch(isDemo ? "/api/demo/generate-patches" : "/api/ai/generate-patches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -249,6 +298,7 @@ export function AiSidebar({
             preferredSkills: jobRequirements.preferredSkills,
             domainTerms: jobRequirements.domainTerms,
           },
+          ...(isDemo ? (demoContext || {}) : (jobId ? { jobId } : {})),
           tailorFeedback: seededFeedback
             ? {
                 overviewCommentary: seededFeedback.overviewCommentary,
@@ -266,7 +316,7 @@ export function AiSidebar({
         );
         const errMsg =
           patchRes.status === 401 && isProxyProvider
-            ? "Sign in to use this provider, or switch to Gemini."
+            ? isDemo ? "Use your own provider API key in Settings to generate a demo response." : "Sign in to use this provider, or switch to Gemini."
             : patchJson.error || "AI generation failed.";
         setError(errMsg);
         setTailorStage("error");
@@ -279,6 +329,9 @@ export function AiSidebar({
       setTailorStage("verifying");
       const verifiedPatches = patchJson.data.verified || [];
       setSuggestions(verifiedPatches);
+      setPatchBatch(patchJson.data.batch || null);
+      setIsDemoMode(isDemo && patchJson.data.demo === true);
+      setDemoBaseTypstSource(isDemo ? source : null);
       setGaps(patchJson.data.gaps || []);
 
       // Step 3: Phase 11.2 Guardrail verification against frozen master facts
@@ -293,7 +346,7 @@ export function AiSidebar({
     } finally {
       setIsGenerating(false);
     }
-  }, [jdText, masterFacts, seededFeedback, source]);
+  }, [jdText, masterFacts, seededFeedback, source, urlJobId]);
 
   const handleAccept = (id: string) => {
     setAcceptedIds((prev) => {
@@ -343,7 +396,52 @@ export function AiSidebar({
     });
   };
 
-  const handleApplyAccepted = () => {
+  const handleApplyAccepted = async () => {
+    if (isDemoMode) {
+      if (!demoBaseTypstSource || source !== demoBaseTypstSource || localStorage.getItem("resumeforge_typst_source") !== demoBaseTypstSource) {
+        setError("The browser draft changed after these patches were generated. Generate patches again to protect your edits.");
+        return;
+      }
+      const acceptedList = suggestions.filter((suggestion) => acceptedIds.has(suggestion.id));
+      if (acceptedList.length === 0) {
+        setError("Accept at least one verified patch before applying the local draft.");
+        return;
+      }
+      setIsGenerating(true);
+      setError(null);
+      try {
+        const rawFacts = localStorage.getItem("resumeforge_demo_master_facts");
+        const facts = rawFacts ? JSON.parse(rawFacts) as ResumeFacts : null;
+        if (!facts) throw new Error("Freeze a local master resume before applying patches.");
+        const reconstructed = applyPatchProposals(demoBaseTypstSource, acceptedList);
+        const acceptedPatchIds = acceptedList.map((patch) => patch.id);
+        if (new Set(acceptedPatchIds).size !== acceptedPatchIds.length || reconstructed.appliedIds.length !== acceptedPatchIds.length || acceptedPatchIds.some((id) => !reconstructed.appliedIds.includes(id))) {
+          throw new Error("The local proposal set changed. Generate patches again before applying.");
+        }
+        assertCanApplyPatches(reconstructed.typstSource, facts, acceptedList, { acknowledgedSkills: Array.from(acknowledgedSkills) });
+        const localContent = markDocumentAsPatched(reconstructed.typstSource);
+        const { compileTypstToSvg } = await import("@/lib/typst/compiler");
+        const compiled = await compileTypstToSvg(localContent);
+        if (!compiled.success) throw new Error("The local resume does not compile. Review the accepted patches before applying.");
+        localStorage.setItem("resumeforge_typst_source", localContent);
+        onApplyToBuffer(localContent);
+        setHasApplied(true);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to apply local patches.");
+      } finally {
+        setIsGenerating(false);
+      }
+      return;
+    }
+
+    if (!patchBatch) {
+      setError("Save this job and generate patches again before applying a persistent variant.");
+      return;
+    }
+    if (source !== patchBatch.baseTypstSource) {
+      setError("The resume changed after these patches were generated. Generate patches again to protect your edits.");
+      return;
+    }
     // Phase 11.2: Enforce guardrail safety gate
     if (masterFacts) {
       const acceptedList = suggestions.filter((s) => acceptedIds.has(s.id));
@@ -357,11 +455,42 @@ export function AiSidebar({
       }
     }
 
-    // Apply all accepted patches to the buffer and stamp persistent patch marker
     const acceptedList = suggestions.filter((s) => acceptedIds.has(s.id));
-    const updatedSource = applyAcceptedSidebarPatches(source, acceptedList);
-    onApplyToBuffer(updatedSource);
-    setHasApplied(true);
+    if (acceptedList.length === 0) return;
+    setIsGenerating(true);
+    try {
+      const reconstructed = applyPatchProposals(patchBatch.baseTypstSource, acceptedList);
+      const acceptedPatchIds = acceptedList.map((patch) => patch.id);
+      if (reconstructed.appliedIds.length !== acceptedPatchIds.length || acceptedPatchIds.some((id) => !reconstructed.appliedIds.includes(id))) {
+        throw new Error("The server proposal set changed. Generate patches again before applying.");
+      }
+      if (masterFacts) {
+        assertCanApplyPatches(source, masterFacts, acceptedList, { acknowledgedSkills: Array.from(acknowledgedSkills) });
+      }
+      const preview = markDocumentAsPatched(reconstructed.typstSource);
+      const { compileTypstToSvg } = await import("@/lib/typst/compiler");
+      const compiled = await compileTypstToSvg(preview);
+      if (!compiled.success) throw new Error("The reconstructed resume does not compile. Review the accepted patches before applying.");
+      const res = await fetch("/api/ai/apply-patches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          batchId: patchBatch.batchId,
+          revisionToken: patchBatch.revisionToken,
+          acceptedPatchIds,
+          acknowledgedSkills: Array.from(acknowledgedSkills),
+          variantTitle: `AI Tailored Variant — ${new Date().toLocaleDateString()}`,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Failed to save tailored variant.");
+      onApplyToBuffer(json.data.typstContent);
+      setHasApplied(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to apply patches.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const pendingCount = suggestions.filter(
@@ -869,6 +998,7 @@ export function AiSidebar({
                 <button
                   type="button"
                   onClick={handleApplyAccepted}
+                  disabled={isGenerating || hasApplied}
                   className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition ${
                     hasApplied
                       ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"

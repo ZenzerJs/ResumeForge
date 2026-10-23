@@ -32,6 +32,7 @@ import { AtsSandboxSection } from "@/components/landing/ats-sandbox-section";
 import { CompetitiveMatrixSection } from "@/components/landing/competitive-matrix-section";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
 import type { DashboardStats } from "@/lib/db/stats";
+import { clearDemoSamplesForPersonalResume } from "@/lib/demo-client";
 
 interface HomeLandingProps {
   initialStats: DashboardStats;
@@ -110,7 +111,12 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
       });
 
       const json = await res.json();
-      if (res.ok && json.success && json.data?.id) {
+      if (res.ok && json.success && json.data?.typstSource && !json.data?.id) {
+        clearDemoSamplesForPersonalResume(json.data.typstSource);
+        localStorage.setItem("resumeforge_typst_source", json.data.typstSource);
+        localStorage.setItem("resumeforge_has_guest_draft", "true");
+        router.push("/editor");
+      } else if (res.ok && json.success && json.data?.id) {
         router.push(`/editor?resumeId=${json.data.id}`);
       } else {
         setNotification({

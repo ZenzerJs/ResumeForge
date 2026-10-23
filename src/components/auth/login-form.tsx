@@ -64,10 +64,20 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [signupEnabled, setSignupEnabled] = useState(true);
 
   const emailInputRef = useRef<HTMLInputElement>(null);
   const usernameInputRef = useRef<HTMLInputElement>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    void fetch("/api/demo-config").then((res) => res.json()).then((config) => {
+      if (config?.signupEnabled === false) {
+        setSignupEnabled(false);
+        setMode("signin");
+      }
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const urlMode =
@@ -325,7 +335,7 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
       </button>
 
       <div className="mt-4 pt-4 border-t border-slate-800/80 flex flex-col gap-3 text-center">
-        <button
+        {signupEnabled ? <button
           type="button"
           data-testid="login-mode-toggle-btn"
           className="text-xs md:text-sm text-slate-400 hover:text-amber-400 transition focus-visible:ring-2 focus-visible:ring-amber-500/60 rounded py-1 cursor-pointer"
@@ -337,7 +347,7 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
           {mode === "signup"
             ? "Already have an account? Sign in"
             : "Don't have an account? Create one"}
-        </button>
+        </button> : <p className="text-xs text-slate-400">Public signup is disabled in the demo. Self-host ResumeForge to create an account.</p>}
 
         <Link
           href="/"

@@ -8,12 +8,16 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 COPY prisma ./prisma/
+COPY scripts/copy-pdf-worker.ts ./scripts/
 RUN npm ci
 
 # 2. Build the Next.js application
 FROM base AS builder
 WORKDIR /app
+ARG NEXT_PUBLIC_APP_URL
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/public/workers ./public/workers
 COPY . .
 
 # Generate Prisma Client & compile Next.js standalone build
@@ -45,4 +49,4 @@ USER nextjs
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]

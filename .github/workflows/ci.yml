@@ -63,5 +63,8 @@ jobs:
       - name: Test
         run: npm run test
 
+      - name: PostgreSQL integration
+        run: npm run test:integration
+
       - name: Build
         run: npm run build

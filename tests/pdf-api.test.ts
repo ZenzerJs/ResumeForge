@@ -1,8 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { POST as uploadPdfHandler } from "@/app/api/resumes/upload-pdf/route";
 import { POST as clearMasterHandler } from "@/app/api/resumes/clear-master/route";
+import * as resumesDb from "@/lib/db/resumes";
 import { getMasterResume } from "@/lib/db/resumes";
 import { authedRequest, createTestUser } from "./helpers/auth";
+
+const originalDemoMode = process.env.DEMO_MODE;
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  if (originalDemoMode === undefined) delete process.env.DEMO_MODE;
+  else process.env.DEMO_MODE = originalDemoMode;
+});
 
 describe("PDF Upload & Master Resume Clearing API", () => {
   it("rejects request if no payload provided", async () => {
@@ -46,6 +55,54 @@ describe("PDF Upload & Master Resume Clearing API", () => {
     expect(json.data.title).toBe("Jane Resume");
     expect(json.data.isMaster).toBe(false);
     expect(json.data.typstSource).toContain("@pdf-conversion-draft");
+  });
+
+  it("converts a public demo upload to a browser-local draft without auth or database writes", async () => {
+    process.env.DEMO_MODE = "true";
+    const createResume = vi.spyOn(resumesDb, "createResume");
+    const request = new Request("http://localhost/api/resumes/upload-pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: "http://localhost", Cookie: "rf_session=existing-signed-cookie" },
+      body: JSON.stringify({ title: "Local Draft", rawText: "Jane Smith\nBackend Engineer\n- Built APIs with TypeScript." }),
+    });
+
+    const response = await uploadPdfHandler(request);
+    const json = await response.json();
+    expect(response.status).toBe(200);
+    expect(json).toMatchObject({ success: true, persistence: "browser-local", data: { title: "Local Draft", isMaster: false } });
+    expect(json.data.typstSource).toContain("@pdf-conversion-draft");
+    expect(json.data.id).toBeUndefined();
+    expect(createResume).not.toHaveBeenCalled();
+  });
+
+  it("rejects demo uploads without a same-origin browser header", async () => {
+    process.env.DEMO_MODE = "true";
+    const request = new Request("http://localhost/api/resumes/upload-pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: "https://attacker.example" },
+      body: JSON.stringify({ rawText: "resume text" }),
+    });
+    const response = await uploadPdfHandler(request);
+    expect(response.status).toBe(403);
+  });
+
+  it("bounds chunked demo request bodies before multipart parsing", async () => {
+    process.env.DEMO_MODE = "true";
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(10 * 1024 * 1024));
+        controller.enqueue(new Uint8Array(64 * 1024 + 1));
+        controller.close();
+      },
+    });
+    const request = new Request("http://localhost/api/resumes/upload-pdf", {
+      method: "POST",
+      headers: { Origin: "http://localhost", "Content-Type": "multipart/form-data; boundary=demo" },
+      body,
+      duplex: "half",
+    } as RequestInit);
+    const response = await uploadPdfHandler(request);
+    expect(response.status).toBe(413);
   });
 
   it("rejects oversized PDF uploads", async () => {

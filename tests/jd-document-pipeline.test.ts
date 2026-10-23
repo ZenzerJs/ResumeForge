@@ -168,6 +168,19 @@ describe("Job Description Document Pipeline (H4)", () => {
     expect(doc.contentHash).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it("preserves requirements and normalized provenance across LF and CRLF inputs", () => {
+    for (const kind of ["text", "html"] as const) {
+      const source = kind === "text"
+        ? "## Requirements\n- Experience building TypeScript services.\n"
+        : "<h2>Requirements</h2>\n<ul>\n<li>Experience building TypeScript services.\n</ul>";
+      const lf = parseJobDescriptionDocument({ [kind]: source });
+      const crlf = parseJobDescriptionDocument({ [kind]: source.replace(/\n/g, "\r\n") });
+      expect(lf.requirements).toHaveLength(1);
+      expect(crlf.requirements).toEqual(lf.requirements);
+      expect(crlf.normalizedMarkdown).toBe(lf.normalizedMarkdown);
+      expect(crlf.contentHash).toBe(lf.contentHash);
+    }
+  });
   it("creates user-added requirements with confidence: USER_ADDED", () => {
     const userReq = createUserRequirement(
       "Demonstrated experience with Kafka event streaming",

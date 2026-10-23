@@ -120,12 +120,8 @@ export function JobDetailPane({
 }: JobDetailPaneProps) {
   const [evidence, setEvidence] = useState<EvidenceItemWithBullets[]>([]);
   const [evidenceLoaded, setEvidenceLoaded] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
   const [detailJob, setDetailJob] = useState<JobItem>(() => {
-    if (job.rawDescription && !isPlaceholderDescription(job.rawDescription)) return job;
-    const cached = jobDetailCache.get(job.id);
-    if (cached?.rawDescription && !isPlaceholderDescription(cached.rawDescription)) {
-      return { ...job, ...cached };
-    }
     return job;
   });
   const [applySheetOpen, setApplySheetOpen] = useState(false);
@@ -134,20 +130,26 @@ export function JobDetailPane({
   useEffect(() => {
     if (job.rawDescription && !isPlaceholderDescription(job.rawDescription)) {
       setDetailJob(job);
-      jobDetailCache.set(job.id, job);
+      void fetch("/api/demo-config").then((res) => res.json()).then((config) => {
+        setDemoMode(config?.demoMode === true);
+        if (config?.demoMode !== true) jobDetailCache.set(job.id, job);
+      }).catch(() => {});
       return;
     }
-
-    const cached = jobDetailCache.get(job.id);
-    if (cached?.rawDescription && !isPlaceholderDescription(cached.rawDescription)) {
-      setDetailJob({ ...job, ...cached });
-      return;
-    }
-
     setDetailJob(job);
     let cancelled = false;
     (async () => {
       try {
+        const config = await fetch("/api/demo-config").then((res) => res.json()).catch(() => ({}));
+        if (cancelled) return;
+        const localDemo = config?.demoMode === true;
+        setDemoMode(localDemo);
+        if (localDemo) return;
+        const cached = jobDetailCache.get(job.id);
+        if (cached?.rawDescription && !isPlaceholderDescription(cached.rawDescription)) {
+          setDetailJob({ ...job, ...cached });
+          return;
+        }
         const res = await fetch(`/api/jobs/${job.id}`);
         const json = await res.json();
         if (!cancelled && res.ok && json.success && json.data) {
@@ -181,6 +183,16 @@ export function JobDetailPane({
     let cancelled = false;
     (async () => {
       try {
+        const config = await fetch("/api/demo-config").then((res) => res.json()).catch(() => ({}));
+        if (cancelled) return;
+        const localDemo = config?.demoMode === true;
+        setDemoMode(localDemo);
+        if (localDemo) {
+          const raw = localStorage.getItem("resumeforge_guest_evidence");
+          const parsed = raw ? JSON.parse(raw) : [];
+          if (!cancelled && Array.isArray(parsed)) setEvidence(parsed as EvidenceItemWithBullets[]);
+          return;
+        }
         const res = await fetch("/api/evidence");
         const json = await res.json();
         if (!cancelled && res.ok && json.success) {
@@ -203,6 +215,13 @@ export function JobDetailPane({
     let cancelled = false;
     (async () => {
       try {
+        const config = await fetch("/api/demo-config").then((res) => res.json()).catch(() => ({}));
+        if (cancelled) return;
+        if (config?.demoMode === true) {
+          const localSource = localStorage.getItem("resumeforge_typst_source");
+          if (localSource) setMasterTypst(localSource);
+          return;
+        }
         const res = await fetch("/api/resumes");
         const json = await res.json();
         if (!cancelled && res.ok && json.success && Array.isArray(json.data) && json.data.length > 0) {
@@ -261,6 +280,8 @@ export function JobDetailPane({
     if (!detailJob.id) return;
     (async () => {
       try {
+        const config = await fetch("/api/demo-config").then((res) => res.json()).catch(() => ({}));
+        if (cancelled || config?.demoMode === true) return;
         const res = await fetch(`/api/jobs/${detailJob.id}/interview-prep`);
         const json = await res.json();
         if (!cancelled && res.ok && json.success) {

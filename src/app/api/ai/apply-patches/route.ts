@@ -1,98 +1,31 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getMasterResume } from "@/lib/db/resumes";
-import { createVariant, assertNotProtectedResume } from "@/lib/db/variants";
-import { sanitizeError } from "@/lib/ai/redact";
 import { requireUserId } from "@/lib/security/auth-request";
-import { markDocumentAsPatched } from "@/lib/guardrail/policy";
+import { applyProposalBatch } from "@/lib/ai/patch-batches";
 
 const ApplyPatchesRequestSchema = z.object({
-  masterResumeId: z.string(),
-  jobId: z.string(),
-  variantTitle: z.string().min(1),
-  /** The merged Typst content with all accepted patches applied (computed client-side) */
-  mergedTypstContent: z.string().min(1),
-});
+  batchId: z.string().uuid(),
+  revisionToken: z.string().length(64),
+  acceptedPatchIds: z.array(z.string().uuid()).min(1).max(100),
+  acknowledgedSkills: z.array(z.string().max(80)).max(100).default([]),
+  variantTitle: z.string().trim().min(1).max(160),
+}).strict();
 
-/**
- * POST /api/ai/apply-patches
- *
- * Creates a ResumeVariant from accepted patch proposals.
- *
- * Amendment 2: Client must validate Typst compilation BEFORE calling this route.
- *   This route persists the variant only if the client confirms compilation succeeded.
- *
- * Amendment 3: Hard guard — refuses to write to any Resume with isProtected=true.
- *   Only creates ResumeVariant records.
- */
 export async function POST(request: Request) {
   try {
     const userId = await requireUserId(request);
     if (userId instanceof NextResponse) return userId;
-
-    const body = await request.json();
-    const parseResult = ApplyPatchesRequestSchema.safeParse(body);
-
-    if (!parseResult.success) {
-      return NextResponse.json(
-        { success: false, error: `Validation error: ${parseResult.error.message}` },
-        { status: 400 }
-      );
-    }
-
-    const { masterResumeId, jobId, variantTitle, mergedTypstContent } = parseResult.data;
-
-    // Amendment 3: Hard guard — verify master resume is protected and exists
-    const masterResume = await getMasterResume(userId);
-    if (!masterResume || masterResume.id !== masterResumeId) {
-      return NextResponse.json(
-        { success: false, error: "Master resume not found or ID mismatch." },
-        { status: 404 }
-      );
-    }
-
-    // Amendment 3: Explicitly assert we are NOT writing to a protected resume
-    // This guards against any attempt to use a Resume ID as a variant target
-    try {
-      await assertNotProtectedResume(masterResumeId);
-      // If we get here, it means the ID does NOT belong to a protected resume.
-      // But we expect the master resume IS protected. This is the correct path:
-      // we are writing to a NEW ResumeVariant, not to the Resume itself.
-    } catch {
-      // Expected: masterResumeId IS protected. This confirms we're reading it, not writing to it.
-      // The variant will be created as a separate ResumeVariant record.
-    }
-
-    // Create the variant (never writes to Resume table — only ResumeVariant)
-    const variant = await createVariant({
-      masterResumeId,
-      jobId,
-      variantTitle,
-      typstContent: markDocumentAsPatched(mergedTypstContent),
-      userId,
-    });
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        variantId: variant.id,
-        variantTitle: variant.variantTitle,
-        status: variant.status,
-      },
-    });
-  } catch (err) {
-    // Amendment 3: Catch security assertion errors
-    const errorMessage = sanitizeError(err);
-    if (errorMessage.includes("SECURITY")) {
-      return NextResponse.json(
-        { success: false, error: errorMessage },
-        { status: 403 }
-      );
-    }
-
-    return NextResponse.json(
-      { success: false, error: sanitizeError(`Internal server error: ${errorMessage}`) },
-      { status: 500 }
-    );
+    const parsed = ApplyPatchesRequestSchema.safeParse(await request.json());
+    if (!parsed.success) return NextResponse.json({ success: false, error: "Invalid patch batch request." }, { status: 400 });
+    const data = await applyProposalBatch({ userId, ...parsed.data });
+    return NextResponse.json({ success: true, data });
+  } catch (error) {
+    const rawMessage = error instanceof Error ? error.message : "";
+    const retryable = typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "P2034";
+    const known = /^(Select unique patch proposals to apply\.|Proposal batch is unavailable or already applied\.|Proposal revision is stale\.|Master resume or job changed\. Generate proposals again\.|Cited evidence changed\. Generate proposals again\.|Unknown proposal ID\.|Patch citation is unavailable or unverified\.|Every patch needs verified evidence\.|Gap items cannot be accepted as patches\.|Freeze your master resume first\.|Selected job is unavailable\.|No evidence-backed proposals to save\.)$/.test(rawMessage);
+    const isGuardrail = error instanceof Error && error.name === "GuardrailBlockError";
+    const message = retryable ? "Proposal batch changed concurrently. Reload proposals and retry." : known || isGuardrail ? rawMessage : "Patch batch could not be applied.";
+    const conflict = retryable || /changed|stale|already applied|unavailable|Unknown proposal|anchor|makes no change/i.test(message);
+    return NextResponse.json({ success: false, error: message }, { status: conflict ? 409 : 422 });
   }
 }

@@ -4,6 +4,7 @@ import { ProviderConfigSchema } from "@/lib/ai/types";
 import { repairTypstSource } from "@/lib/ai/gateway";
 import { sanitizeError } from "@/lib/ai/redact";
 import { requireUserId } from "@/lib/security/auth-request";
+import { isDemoMode } from "@/lib/demo-mode";
 
 export async function POST(request: Request) {
   try {
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
     }
 
     let providerConfigToUse = providerConfig;
-    if (!providerConfigToUse || !providerConfigToUse.apiKey) {
+    if ((!providerConfigToUse || !providerConfigToUse.apiKey) && !isDemoMode()) {
       const auth = await requireUserId(request);
       if (auth instanceof Response) return auth;
 
@@ -69,6 +70,9 @@ export async function POST(request: Request) {
           apiKey: process.env.OPENAI_API_KEY || "",
         };
       }
+    }
+    if (isDemoMode() && (!providerConfigToUse || !providerConfigToUse.apiKey)) {
+      return NextResponse.json({ success: false, error: "Provide your own AI provider key in Settings to use AI in the demo." }, { status: 400 });
     }
 
     const configParse = ProviderConfigSchema.safeParse(providerConfigToUse);
