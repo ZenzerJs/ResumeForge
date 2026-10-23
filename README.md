@@ -14,11 +14,13 @@
 [![Tests](https://img.shields.io/badge/tests-Vitest_%2B_Playwright-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-*Deterministic guardrail hard-blocks fabricated employers, titles, dates, and metrics. Every resume bullet is a reviewable, evidence-backed patch.*
+*Zero hallucination. Zero data leaks. Every resume bullet is a reviewable, evidence-backed patch.*
 
 <!-- TODO: Replace this screenshot with an animated demo GIF (docs/demo.gif)
      showing the full workflow: paste JD → generate patches → accept → preview PDF. -->
 <img src="docs/screenshot.png" alt="ResumeForge landing page — evidence-grounded resume workspace with live Typst preview" width="800" />
+
+> Built after a season of silent rejections as a first-year. This tool carried my own search into a Google technical interview as a second-year.
 
 </div>
 
@@ -129,8 +131,8 @@ Typst compilation (`typst.ts` WASM) runs client-side in the browser. Browser BYO
 | Layer | Technology |
 |---|---|
 | Framework | Next.js 15 (App Router) + React 19 + TypeScript |
-| Styling | Tailwind CSS + shadcn/ui — custom **"Forge Terminal"** dark design system |
-| Database | PostgreSQL via Prisma ORM |
+| Styling | Tailwind CSS + shadcn/ui — custom **"Forge Terminal"** dark design system (obsidian background, amber/emerald accents, glassmorphic panels) |
+| Database | PostgreSQL 16 via Prisma ORM (`docker compose`) |
 | Document Engine | Typst (`typst.ts` WASM browser compiler) |
 | Code Editor | CodeMirror 6 |
 | AI Integration | BYOK gateway — OpenAI, Anthropic, Gemini, Groq — AES-GCM browser vault & error redaction |
@@ -163,7 +165,8 @@ npm install
 ```bash
 cp .env.example .env
 ```
-Fill in required values (`DATABASE_URL` pointing to PostgreSQL, `APP_ACCESS_SECRET`, etc.).
+
+`DATABASE_URL` must be a Postgres URL. `APP_ACCESS_SECRET` signs the session cookie. Provider keys in this file are optional server fallbacks. The browser BYOK vault does not read them.
 </details>
 
 <details>
