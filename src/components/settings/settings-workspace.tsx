@@ -497,7 +497,7 @@ export function SettingsWorkspace() {
 
               <div className="flex items-center gap-2 text-xs text-slate-400">
                 <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                <span>Keys are encrypted client-side and never written to SQLite or server logs</span>
+                <span>Keys are encrypted client-side and never written to database or server logs</span>
               </div>
             </div>
 
