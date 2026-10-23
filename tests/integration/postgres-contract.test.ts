@@ -5,16 +5,33 @@ import { cleanupStalePositions } from "@/lib/db/jobs";
 import { POST as cleanupPOST } from "@/app/api/jobs/cleanup/route";
 import { NextRequest } from "next/server";
 import { createTestUser } from "../helpers/auth";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { createPatchCitations, readPatchCitations } from "@/lib/ai/patch-citations";
+import { DELETE as evidenceDELETE } from "@/app/api/evidence/[id]/route";
 
 describe("real PostgreSQL contracts", () => {
   const userIds: string[] = [];
   const jobIds: string[] = [];
+  const patchIds: string[] = [];
 
   beforeAll(async () => {
     const expectedSchema = new URL(process.env.DATABASE_URL!).searchParams.get("schema");
     const [{ schema }] = await prisma.$queryRaw<Array<{ schema: string }>>`SELECT current_schema() AS schema`;
     expect(expectedSchema).toMatch(/^rf_it_[0-9]+_[a-f0-9]{32}$/);
     expect(schema).toBe(expectedSchema);
+
+    // db push cannot express the migration's CHECK constraint. Replace only
+    // the generated table in the runner-verified disposable schema, then run
+    // the authored SQL statements there to exercise the actual PostgreSQL contract.
+    await prisma.$executeRawUnsafe('DROP TABLE "PatchCitation"');
+    const migration = readFileSync(
+      path.resolve(process.cwd(), "prisma/migrations/20261023000000_patch_citations/migration.sql"),
+      "utf8"
+    );
+    for (const statement of migration.split(";").map((part) => part.trim()).filter(Boolean)) {
+      await prisma.$executeRawUnsafe(statement);
+    }
   });
 
   async function createUser(email: string) {
@@ -25,7 +42,153 @@ describe("real PostgreSQL contracts", () => {
     return user;
   }
 
+  it("persists and reads owner-bound citations, legacy IDs, and PostgreSQL restrictions", async () => {
+    const suffix = crypto.randomUUID();
+    const { user: owner, cookie } = await createTestUser(`citations-${suffix}@test.invalid`);
+    userIds.push(owner.id);
+    const other = await createUser(`citations-other-${suffix}@test.invalid`);
+    const job = await prisma.job.create({ data: { rawDescription: "Citation integration job" } });
+    jobIds.push(job.id);
+    const master = await prisma.resume.create({
+      data: { userId: owner.id, title: "Citation master", typstSource: "resume", isMaster: true },
+    });
+    const variant = await prisma.resumeVariant.create({
+      data: { masterResumeId: master.id, jobId: job.id, variantTitle: "Citation variant", typstContent: "resume" },
+    });
+    const otherMaster = await prisma.resume.create({
+      data: { userId: other.id, title: "Other master", typstSource: "resume", isMaster: true },
+    });
+    const otherVariant = await prisma.resumeVariant.create({
+      data: { masterResumeId: otherMaster.id, jobId: job.id, variantTitle: "Other variant", typstContent: "resume" },
+    });
+    const evidence = await prisma.evidenceItem.create({
+      data: {
+        userId: owner.id,
+        type: "project",
+        title: "Verified project",
+        verifiedSummary: "Built a verified project.",
+        bullets: { create: [{ text: "First verified bullet" }, { text: "Second verified bullet" }] },
+      },
+      include: { bullets: true },
+    });
+    const otherEvidence = await prisma.evidenceItem.create({
+      data: {
+        userId: other.id,
+        type: "project",
+        title: "Other user's project",
+        verifiedSummary: "Private evidence.",
+        bullets: { create: [{ text: "Private bullet" }] },
+      },
+      include: { bullets: true },
+    });
+    const citationPatch = await prisma.patch.create({
+      data: {
+        variantId: variant.id,
+        operation: "MODIFY_BULLET",
+        targetSection: "experience",
+        beforeContent: "Before",
+        afterContent: "After",
+        rationale: "Verified evidence",
+      },
+    });
+    const legacyPatch = await prisma.patch.create({
+      data: {
+        variantId: variant.id,
+        operation: "MODIFY_BULLET",
+        targetSection: "experience",
+        beforeContent: "Before",
+        afterContent: "After",
+        evidenceCitations: JSON.stringify([evidence.id, evidence.bullets[1].id, otherEvidence.id, "missing-id"]),
+        rationale: "Legacy citation fixture",
+      },
+    });
+    const foreignPatch = await prisma.patch.create({
+      data: {
+        variantId: otherVariant.id,
+        operation: "MODIFY_BULLET",
+        targetSection: "experience",
+        beforeContent: "Before",
+        afterContent: "After",
+        rationale: "Foreign patch fixture",
+      },
+    });
+    patchIds.push(citationPatch.id, legacyPatch.id, foreignPatch.id);
+
+    await prisma.$transaction((tx) => createPatchCitations(tx, {
+      patchId: citationPatch.id,
+      ownerId: owner.id,
+      citations: [
+        { evidenceId: evidence.id },
+        { bulletId: evidence.bullets[0].id },
+        { evidenceId: evidence.id, bulletId: evidence.bullets[1].id },
+      ],
+    }));
+    const storedCitations = await readPatchCitations(citationPatch.id, owner.id);
+    expect(storedCitations).not.toBeNull();
+    expect(storedCitations!.citations).toHaveLength(3);
+    expect(storedCitations!.citations).toEqual(expect.arrayContaining([
+        { evidenceId: evidence.id },
+        { bulletId: evidence.bullets[0].id },
+        { evidenceId: evidence.id, bulletId: evidence.bullets[1].id },
+    ]));
+    expect(storedCitations!.unresolvedLegacyReferences).toEqual([]);
+    expect(await readPatchCitations(legacyPatch.id, owner.id)).toEqual({
+      citations: [
+        { evidenceId: evidence.id },
+        { bulletId: evidence.bullets[1].id },
+      ],
+      unresolvedLegacyReferences: [otherEvidence.id, "missing-id"],
+    });
+    expect(await readPatchCitations(legacyPatch.id, other.id)).toBeNull();
+
+    await expect(prisma.$transaction((tx) => createPatchCitations(tx, {
+      patchId: citationPatch.id,
+      ownerId: owner.id,
+      citations: [{ evidenceId: otherEvidence.id }],
+    }))).rejects.toThrow();
+    await expect(prisma.$transaction((tx) => createPatchCitations(tx, {
+      patchId: citationPatch.id,
+      ownerId: owner.id,
+      citations: [{ evidenceId: evidence.id, bulletId: otherEvidence.bullets[0].id }],
+    }))).rejects.toThrow();
+    await expect(prisma.$transaction((tx) => createPatchCitations(tx, {
+      patchId: foreignPatch.id,
+      ownerId: owner.id,
+      citations: [{ evidenceId: evidence.id }],
+    }))).rejects.toThrow();
+
+    await expect(prisma.$executeRaw`
+      INSERT INTO "PatchCitation" ("id", "patchId", "createdAt")
+      VALUES (${crypto.randomUUID()}, ${citationPatch.id}, CURRENT_TIMESTAMP)
+    `).rejects.toThrow();
+    await expect(prisma.evidenceItem.delete({ where: { id: evidence.id } })).rejects.toThrow();
+    await expect(prisma.bullet.delete({ where: { id: evidence.bullets[0].id } })).rejects.toThrow();
+    const purge = await evidenceDELETE(
+      new Request(`http://localhost/api/evidence/${evidence.id}?mode=purge`, {
+        method: "DELETE",
+        headers: { Cookie: cookie },
+      }),
+      { params: Promise.resolve({ id: evidence.id }) }
+    );
+    expect(purge.status).toBe(409);
+    const purgeBody = await purge.json();
+    expect(purgeBody.code).toBe("EVIDENCE_CITATION_RESTRICTED");
+    expect(purgeBody.error).toContain("Archive it instead.");
+    const archive = await evidenceDELETE(
+      new Request(`http://localhost/api/evidence/${evidence.id}`, {
+        method: "DELETE",
+        headers: { Cookie: cookie },
+      }),
+      { params: Promise.resolve({ id: evidence.id }) }
+    );
+    expect(archive.status).toBe(200);
+    expect(await prisma.evidenceItem.findUnique({ where: { id: evidence.id } })).toMatchObject({
+      status: "archived",
+    });
+  });
+
   afterAll(async () => {
+    await prisma.patchCitation.deleteMany({ where: { patchId: { in: patchIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.job.deleteMany({ where: { id: { in: jobIds } } });
   });

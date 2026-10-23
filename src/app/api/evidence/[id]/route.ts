@@ -135,6 +135,21 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, message: "Evidence item processed" });
   } catch (err) {
+    if (
+      err &&
+      typeof err === "object" &&
+      "code" in err &&
+      err.code === "P2003"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "This evidence is cited by a saved patch and cannot be permanently deleted. Archive it instead.",
+          code: "EVIDENCE_CITATION_RESTRICTED",
+        },
+        { status: 409 }
+      );
+    }
     return NextResponse.json(
       { success: false, error: "Failed to delete evidence item", message: sanitizeError(err) },
       { status: 500 }

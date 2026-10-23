@@ -66,6 +66,7 @@ model EvidenceItem {
   updatedAt       DateTime @updatedAt
 
   bullets         Bullet[]
+  patchCitations  PatchCitation[] @relation("PatchCitationEvidence")
 
   @@index([userId])
 }
@@ -81,6 +82,7 @@ model Bullet {
   orderIndex   Int          @default(0)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
+  patchCitations PatchCitation[] @relation("PatchCitationBullet")
 }
 
 model Job {
@@ -238,6 +240,24 @@ model Patch {
   confidence        Float         @default(0)
   status            String        @default("PENDING") // PENDING | ACCEPTED | REJECTED | REJECTED_CITATION
   createdAt         DateTime      @default(now())
+  citations         PatchCitation[]
+}
+
+// Additive normalized citation storage. Legacy evidenceCitations remains readable.
+model PatchCitation {
+  id         String        @id @default(cuid())
+  patchId    String
+  patch      Patch         @relation(fields: [patchId], references: [id], onDelete: Cascade)
+  evidenceId String?
+  evidence   EvidenceItem? @relation("PatchCitationEvidence", fields: [evidenceId], references: [id], onDelete: Restrict)
+  bulletId   String?
+  bullet     Bullet?       @relation("PatchCitationBullet", fields: [bulletId], references: [id], onDelete: Restrict)
+  createdAt  DateTime      @default(now())
+
+  // Enforced in SQL because Prisma schema syntax does not express CHECK.
+  @@index([patchId])
+  @@index([evidenceId])
+  @@index([bulletId])
 }
 
 // Phase 5: Evidence-grounded tailored cover letter
