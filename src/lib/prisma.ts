@@ -119,14 +119,14 @@ export const prisma: PrismaClient = new Proxy({} as any, {
     };
 
     if (prop === "$transaction") {
-      return async (arg: any) => {
+      return async (arg: any, options?: any) => {
         const client = await getActiveClient();
         try {
-          return await client.$transaction(arg);
+          return await client.$transaction(arg, options);
         } catch (err: any) {
           if (fallbackToMockOnError(err)) {
             await switchToMock();
-            return await mockClient.$transaction(arg);
+            return await mockClient.$transaction(arg, options);
           }
           throw err;
         }

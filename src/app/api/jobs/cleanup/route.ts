@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { cleanupStalePositions } from "@/lib/db/jobs";
-import { requireUserId } from "@/lib/security/auth-request";
 import { redactError } from "@/lib/ai/redact";
 
 export const dynamic = "force-dynamic";
@@ -23,19 +22,17 @@ export async function POST(req: NextRequest) {
     );
 
     if (!isJobSyncAuthorized) {
-      const auth = await requireUserId(req);
-      if (auth instanceof Response) return auth;
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
     let maxAgeDays = 30;
-    let preserveActiveApplications = true;
     try {
       const body = await req.json();
       if (typeof body?.maxAgeDays === "number" && Number.isFinite(body.maxAgeDays) && body.maxAgeDays >= 1) {
         maxAgeDays = Math.floor(body.maxAgeDays);
-      }
-      if (typeof body?.preserveActiveApplications === "boolean") {
-        preserveActiveApplications = body.preserveActiveApplications;
       }
     } catch {
       // Optional JSON body
@@ -43,7 +40,6 @@ export async function POST(req: NextRequest) {
 
     const result = await cleanupStalePositions({
       maxAgeDays,
-      preserveActiveApplications,
     });
 
     return NextResponse.json({

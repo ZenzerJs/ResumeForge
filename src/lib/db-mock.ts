@@ -181,6 +181,15 @@ function matchesWhere(item: any, where?: any): boolean {
         continue;
       }
     }
+    if ((key === "variants" || key === "coverLetters") && item.rawDescription !== undefined) {
+      const table = key === "variants" ? activeStore.resumeVariant : activeStore.coverLetter;
+      const children = table?.filter((child: any) => child.jobId === item.id) || [];
+      const relation = cond as any;
+      if (relation?.none && children.some((child: any) => matchesWhere(child, relation.none))) return false;
+      if (relation?.some && !children.some((child: any) => matchesWhere(child, relation.some))) return false;
+      if (relation?.every && !children.every((child: any) => matchesWhere(child, relation.every))) return false;
+      continue;
+    }
     if (!matchCondition(item[key], cond)) return false;
   }
   return true;

@@ -426,11 +426,6 @@ export interface CleanupStalePositionsOptions {
   maxAgeDays?: number;
   /** Reference time for age comparison. Defaults to new Date(). */
   now?: Date;
-  /**
-   * When true (default), preserves tracked Job rows that have active user applications
-   * (APPLIED, INTERVIEWING, OFFER), tailored resume variants, or cover letters.
-   */
-  preserveActiveApplications?: boolean;
 }
 
 export interface CleanupStalePositionsResult {
@@ -442,8 +437,6 @@ export interface CleanupStalePositionsResult {
   maxAgeDays: number;
 }
 
-const ACTIVE_APPLICATION_STATUSES = new Set(["APPLIED", "INTERVIEWING", "OFFER"]);
-
 /**
  * Purges positions older than `maxAgeDays` (default: 30 days / 1 month) across
  * `IngestedJob`, `DiscoveredJob`, and untracked/unapplied `Job` records.
@@ -453,30 +446,17 @@ export async function cleanupStalePositions(
 ): Promise<CleanupStalePositionsResult> {
   const maxAgeDays = Math.max(1, options.maxAgeDays ?? 30);
   const now = options.now ?? new Date();
-  const preserveActive = options.preserveActiveApplications ?? true;
   const cutoffMs = now.getTime() - maxAgeDays * 24 * 60 * 60 * 1000;
   const cutoffDate = new Date(cutoffMs);
 
   // 1. Clean stale Job rows first so any linked IngestedJob rows can also be cleaned
   const candidateJobs = await prisma.job.findMany({
-    include: {
-      variants: { select: { id: true } },
-      coverLetters: { select: { id: true } },
-      applications: { select: { id: true, status: true } },
-    },
+    where: { userId: null, status: "SAVED" },
+    select: { id: true, notes: true, createdAt: true },
   });
 
   const staleJobIds: string[] = [];
   for (const job of candidateJobs) {
-    if (preserveActive) {
-      if (ACTIVE_APPLICATION_STATUSES.has(job.status)) continue;
-      if (job.variants && job.variants.length > 0) continue;
-      if (job.coverLetters && job.coverLetters.length > 0) continue;
-      if (job.applications?.some((app) => ACTIVE_APPLICATION_STATUSES.has(app.status))) {
-        continue;
-      }
-    }
-
     const rawPosted = extractPostingDateFromNotes(job.notes)?.trim() || null;
     const cleanedPosted = rawPosted && !/^apply$/i.test(rawPosted) ? rawPosted : null;
     const ageDays = resolvePostedAgeDays(cleanedPosted, now, job.createdAt);
@@ -492,28 +472,47 @@ export async function cleanupStalePositions(
 
   let deletedJobs = 0;
   if (staleJobIds.length > 0) {
-    await prisma.ingestedJob.updateMany({
-      where: { trackedJobId: { in: staleJobIds } },
-      data: { trackedJobId: null },
-    });
-    await prisma.jobApplication.deleteMany({
-      where: { jobId: { in: staleJobIds } },
-    });
-    await prisma.coverLetter.deleteMany({
-      where: { jobId: { in: staleJobIds } },
-    });
-    await prisma.resumeVariant.deleteMany({
-      where: { jobId: { in: staleJobIds } },
-    });
-    const delJobsRes = await prisma.job.deleteMany({
-      where: { id: { in: staleJobIds } },
-    });
-    deletedJobs = delJobsRes.count;
+    deletedJobs = await prisma.$transaction(async (tx) => {
+      // FK inserts acquire KEY SHARE on Job. Lock parents first, then use a
+      // fresh READ COMMITTED snapshot to see references committed while waiting.
+      // This also prevents new references between the check and deletion.
+      await tx.$queryRaw(Prisma.sql`
+        SELECT "id" FROM "Job"
+        WHERE "id" IN (${Prisma.join(staleJobIds)})
+        ORDER BY "id" FOR UPDATE
+      `);
+      const removableWhere: Prisma.JobWhereInput = {
+        id: { in: staleJobIds },
+        userId: null,
+        status: "SAVED",
+        applications: { none: {} },
+        variants: { none: {} },
+        coverLetters: { none: {} },
+      };
+      const removableJobs = await tx.job.findMany({
+        where: removableWhere,
+        select: { id: true },
+      });
+      const removableIds = removableJobs.map((job) => job.id);
+      if (removableIds.length === 0) return 0;
+
+      await tx.ingestedJob.updateMany({
+        where: { trackedJobId: { in: removableIds } },
+        data: { trackedJobId: null },
+      });
+      const delJobsRes = await tx.job.deleteMany({
+        where: {
+          ...removableWhere,
+          id: { in: removableIds },
+        },
+      });
+      return delJobsRes.count;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
   }
 
   // 2. Clean stale IngestedJob rows (unlinked to active tracked jobs)
   const candidateIngested = await prisma.ingestedJob.findMany({
-    where: preserveActive ? { trackedJobId: null } : {},
+    where: { trackedJobId: null },
     select: { id: true, postedAt: true, createdAt: true },
   });
 
@@ -529,7 +528,7 @@ export async function cleanupStalePositions(
   let deletedIngestedJobs = 0;
   if (staleIngestedIds.length > 0) {
     const delIngestedRes = await prisma.ingestedJob.deleteMany({
-      where: { id: { in: staleIngestedIds } },
+      where: { id: { in: staleIngestedIds }, trackedJobId: null },
     });
     deletedIngestedJobs = delIngestedRes.count;
   }
