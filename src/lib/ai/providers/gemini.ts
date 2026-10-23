@@ -318,7 +318,8 @@ export async function convertGeminiPdfTextToTypst(
           system_instruction: { parts: [{ text: systemPrompt }] },
           contents: [{ parts: [{ text: userPrompt }] }],
           generationConfig: {
-            temperature: 0.2,
+            temperature: 0.1,
+            thinkingConfig: { thinkingBudget: 1024 },
           },
         }),
         signal: AbortSignal.timeout(30000),

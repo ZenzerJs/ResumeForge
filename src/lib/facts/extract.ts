@@ -383,8 +383,17 @@ function extractFactsFromTypst(
   // Track character ranges consumed by `#entry(...)` so we don't double-parse their lines
   const consumedRanges: Array<{ start: number; end: number }> = [];
 
-  // 3. Parse `#entry(title:, role:, location:, date:, details: [...])`
-  const entryCalls = findBalancedCalls(source, "entry");
+  // 3. Parse `#entry(...)`, `#resume-entry(...)` (with subtitle/role), `#project-entry(...)`, and `#skill-line(...)`
+  const entryCalls = [
+    ...findBalancedCalls(source, "entry"),
+    ...findBalancedCalls(source, "project-entry"),
+  ];
+  // Include `#resume-entry(...)` calls only when they carry `subtitle:` or `role:` (otherwise let legacy #resume-entry + bold-pair handler process them)
+  for (const rc of findBalancedCalls(source, "resume-entry")) {
+    if (extractNamedStringArg(rc.body, "subtitle") || extractNamedStringArg(rc.body, "role")) {
+      entryCalls.push(rc);
+    }
+  }
   const eduKeywords = /\b(university|college|institute|school|academy|bachelor|master|b\.?s\.?|m\.?s\.?|ph\.?d)\b/i;
 
   for (const call of entryCalls) {
@@ -392,7 +401,10 @@ function extractFactsFromTypst(
     const sectionKind = getSectionAt(call.start);
 
     const titleArg = extractNamedStringArg(call.body, "title");
-    const roleArg = extractNamedStringArg(call.body, "role");
+    const roleArg =
+      extractNamedStringArg(call.body, "role") ??
+      extractNamedStringArg(call.body, "subtitle") ??
+      extractNamedStringArg(call.body, "stack");
     const locationArg = extractNamedStringArg(call.body, "location");
     const dateArg = extractNamedStringArg(call.body, "date");
     const detailsBlock = extractDetailsBracketBlock(call.body);
@@ -460,6 +472,14 @@ function extractFactsFromTypst(
           }
         }
       }
+    }
+  }
+
+  for (const skCall of findBalancedCalls(source, "skill-line")) {
+    consumedRanges.push({ start: skCall.start, end: skCall.end });
+    const itemsArg = extractNamedStringArg(skCall.body, "items");
+    if (itemsArg) {
+      extractSkillsFromBulletLine(`- ${itemsArg}`, skillsSet, true);
     }
   }
 

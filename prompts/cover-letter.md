@@ -19,6 +19,8 @@ Write a tailored cover letter **only** from Evidence Bank + master resume contex
    - `fullMarkdown` ≥ 100 characters
 6. `fullMarkdown` must be the **complete letter** (salutation, blank-line paragraphs, closing, signature).
 7. Prefer verified evidence; treat drafts as unverified if used.
+8. **Natural human voice (no system meta-language):** Never mention "my Evidence Bank", "verified experience", "master resume", or "evidence citations" inside the cover letter text. Write naturally as the candidate speaking directly to the hiring team.
+9. **Synchronized markdown:** `fullMarkdown` must contain the exact same text as `salutation` + `openingParagraph` + `bodyParagraphs` + `closingParagraph` + signature, separated by `\n\n`. Do not summarize or truncate inside `fullMarkdown`.
 
 ---
 
@@ -28,13 +30,13 @@ Write a tailored cover letter **only** from Evidence Bank + master resume contex
 {
   "title": "Cover Letter — Acme Corp Senior Backend Engineer",
   "salutation": "Dear Hiring Team at Acme Corp,",
-  "openingParagraph": "I am writing to apply for the Senior Backend Engineer role at Acme Corp. My verified backend work building APIs and data systems aligns closely with your reliability and scale priorities.",
+  "openingParagraph": "I am writing to apply for the Senior Backend Engineer role at Acme Corp. My background building production APIs and high-throughput data systems aligns closely with your reliability and scale priorities.",
   "bodyParagraphs": [
-    "In my recent platform role, I designed service APIs and improved database performance using approaches documented in my Evidence Bank, including measurable latency reductions on production queries.",
-    "I also partnered with infrastructure teammates on containerized deployments, focusing on maintainable services rather than unsupported claims outside my verified experience."
+    "At Acme Platform, I architected TypeScript REST APIs and optimized PostgreSQL indexing, cutting p95 query latency by 40% across 1,000+ daily active users.",
+    "I also partnered with infrastructure engineers on containerized microservice deployments, improving release predictability and observability across core services."
   ],
-  "closingParagraph": "Thank you for considering my application. I would welcome the opportunity to discuss how my verified experience can support Acme Corp's backend roadmap.",
-  "fullMarkdown": "# Cover Letter — Acme Corp Senior Backend Engineer\n\nDear Hiring Team at Acme Corp,\n\nI am writing to apply for the Senior Backend Engineer role at Acme Corp. My verified backend work building APIs and data systems aligns closely with your reliability and scale priorities.\n\nIn my recent platform role, I designed service APIs and improved database performance using approaches documented in my Evidence Bank, including measurable latency reductions on production queries.\n\nI also partnered with infrastructure teammates on containerized deployments, focusing on maintainable services rather than unsupported claims outside my verified experience.\n\nThank you for considering my application. I would welcome the opportunity to discuss how my verified experience can support Acme Corp's backend roadmap.\n\nSincerely,\nJane Candidate",
+  "closingParagraph": "Thank you for considering my application. I would welcome the opportunity to discuss how my backend engineering background can support Acme Corp's roadmap.",
+  "fullMarkdown": "# Cover Letter — Acme Corp Senior Backend Engineer\n\nDear Hiring Team at Acme Corp,\n\nI am writing to apply for the Senior Backend Engineer role at Acme Corp. My background building production APIs and high-throughput data systems aligns closely with your reliability and scale priorities.\n\nAt Acme Platform, I architected TypeScript REST APIs and optimized PostgreSQL indexing, cutting p95 query latency by 40% across 1,000+ daily active users.\n\nI also partnered with infrastructure engineers on containerized microservice deployments, improving release predictability and observability across core services.\n\nThank you for considering my application. I would welcome the opportunity to discuss how my backend engineering background can support Acme Corp's roadmap.\n\nSincerely,\nJane Candidate",
   "evidenceCitations": ["exp-1", "bullet-101"],
   "gapsAddressed": ["No verified Kubernetes production ownership in Evidence Bank."]
 }

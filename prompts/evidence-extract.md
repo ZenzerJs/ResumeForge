@@ -16,6 +16,8 @@ Composed via master guardrails. Used after Save as Master (opt-in) to draft Evid
 4. Prefer experience/project entries with bullets; skills as tags and/or `type: "skill"`.
 5. Skip contact / hobbies → `skippedSections`.
 6. JSON only.
+7. **Clean plain text extraction:** Strip Typst markup when populating JSON fields (`*text*` → `text`, `_text_` → `text`, `#emph[text]` → `text`; unescape `\@`, `\#`, `\$`, `--` → `–`; strip `#link("...")[...]` in `title`).
+8. **Role affinity vocabulary:** Populate `roleAffinity` using standardized tags (`"backend"`, `"fullstack"`, `"frontend"`, `"ai-ml"`, `"devops"`, `"data"`, `"mobile"`).
 
 ## Output JSON Schema
 

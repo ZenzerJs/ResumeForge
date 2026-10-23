@@ -14,8 +14,12 @@ Analyze master Typst vs extracted job requirements and propose evidence-backed e
 
 1. One-page resume constraint — do not add overflow content.
 2. Typst compatibility — `before` / `after` must be valid Typst markup.
-3. Every patch must cite valid `evidenceIds` from the Evidence Bank.
-4. Unmatched requirements → `gaps` entries (never invent experience).
+3. Exact substring match (`before`) — `before` must be a character-for-character verbatim substring copied directly from the Master Resume Typst source (including exact `*bold*` markers, punctuation, and escaping).
+4. Character budget (1-page protection) — for `MODIFY_BULLET` and `TWEAK_SUMMARY`, `after` length must not exceed `before` length by more than +15%.
+5. Typst syntax in `after` — preserve Typst inline emphasis (`*bold*`, `_italic_`) and escape special characters (`\@`, `\$`, `\#`). Never output Markdown `**bold**`.
+6. No duplicate keywords — before proposing an `ADD_SKILL` patch, verify the skill (or direct alias) is not already in the Skills section.
+7. Every patch must cite valid `evidenceIds` from the Evidence Bank.
+8. Unmatched requirements → `gaps` entries (never invent experience).
 
 Optional carried tailor qualitative feedback may be injected when the user opts in.
 

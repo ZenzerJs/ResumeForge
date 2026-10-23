@@ -19,6 +19,11 @@ Your task is to extract structured Evidence Bank draft items from a candidate's 
 5. **SKIP**: Contact headers, pure hobbies without career signal, and decorative layout-only content → list names in \`skippedSections\`.
 6. **JSON ONLY**: Return a single JSON object matching the schema below. No markdown fences.
 7. **NOT A COVER LETTER**: This task extracts Evidence Bank drafts. Do NOT write a cover letter. Do NOT return \`salutation\`, \`openingParagraph\`, \`bodyParagraphs\`, \`fullMarkdown\`, or \`evidenceCitations\`. Return ONLY \`items\` and \`skippedSections\`.
+8. **CLEAN PLAIN TEXT EXTRACTION**: Strip Typst markup when populating JSON fields:
+   - Remove bold/italic wrappers (\`*text*\` → \`text\`, \`_text_\` → \`text\`, \`#emph[text]\` → \`text\`).
+   - Unescape Typst characters (\`\\@\` → \`@\`, \`\\#\` → \`#\`, \`\\$\` → \`$\`, \`--\` → \`–\`).
+   - Do not include \`#link("...")[...]\` syntax in \`title\`; extract only the clean project/company name.
+9. **ROLE AFFINITY VOCABULARY**: Populate \`roleAffinity\` using standardized tags (e.g., \`"backend"\`, \`"fullstack"\`, \`"frontend"\`, \`"ai-ml"\`, \`"devops"\`, \`"data"\`, \`"mobile"\`).
 
 ## OUTPUT JSON SCHEMA
 
