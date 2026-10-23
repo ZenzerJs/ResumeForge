@@ -18,10 +18,12 @@ This task adds **commentary only**. The deterministic ATS score is already compu
 4. `verdict` must be **exactly** one of:
    - `"STRONG_EVIDENCE"` | `"WEAK_EVIDENCE"` | `"KEYWORD_STUFFING"` | `"VAGUE_CLAIM"`
 5. `jdContextAdjustment` is an integer from **-10 to +10**.
-6. If `jdContextAdjustment` is **0**, set `"adjustmentReasoning": []`.
-7. If `jdContextAdjustment` is **non-zero**, every point needs a reasoning row and **sum(points) === jdContextAdjustment**.
+6. **Order of operations for adjustments:** Always populate `adjustmentReasoning` items FIRST, then compute `jdContextAdjustment` as the exact arithmetic sum of `adjustmentReasoning[].points`.
+7. If `jdContextAdjustment` is **0**, set `"adjustmentReasoning": []`.
 8. `jdSignal` must be a **specific** JD quote/paraphrase (≥5 chars). Never `"important"`, `"good fit"`, `"n/a"`.
-9. Do **not** rewrite bullets or emit Typst — advice only.
+9. **Exact bullet quote:** In `bulletFeedbacks[]`, `bulletText` must copy the candidate's bullet text (stripped of Typst syntax) accurately—never invent a hypothetical bullet to critique.
+10. **Required 4 categories:** `categoryFeedbacks` MUST contain all 4 categories in that exact order.
+11. Do **not** rewrite bullets or emit Typst — advice only.
 
 **When unsure about JD adjustment: use `jdContextAdjustment: 0` and `adjustmentReasoning: []`.** That always validates.
 
@@ -66,8 +68,8 @@ This task adds **commentary only**. The deterministic ATS score is already compu
       "improvementAdvice": "If Evidence Bank has traffic volume, add it to show scale."
     }
   ],
-  "jdContextAdjustment": 0,
   "adjustmentReasoning": [],
+  "jdContextAdjustment": 0,
   "detectedAntiPatterns": [],
   "nextStepsAdvice": [
     "Add verified container orchestration evidence before claiming Kubernetes depth.",

@@ -23,6 +23,7 @@ import {
   usernameInitial,
   type SessionUser,
 } from "@/components/auth/session-user";
+import { getActiveConfig } from "@/lib/byok-vault";
 
 const NAV_LINKS = [
   { href: "/editor", label: "Editor", icon: Edit },
@@ -80,9 +81,56 @@ function GuestAuthLinks({ className }: { className?: string }) {
   );
 }
 
-function NavUtilities() {
+function NavUtilities({ pathname }: { pathname: string }) {
+  const [aiStatus, setAiStatus] = useState<{ provider: string; hasKey: boolean } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getActiveConfig()
+      .then((cfg) => {
+        if (!cancelled) {
+          setAiStatus({ provider: cfg.provider, hasKey: cfg.hasKey });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
+
   return (
-    <div className="hidden md:flex items-center gap-1">
+    <div className="hidden md:flex items-center gap-1.5">
+      {aiStatus && (
+        <Link
+          href="/settings"
+          data-testid="nav-ai-status-pill"
+          title={
+            aiStatus.hasKey
+              ? `AI Connected (${aiStatus.provider.toUpperCase()}) — Click to manage in Settings`
+              : "No AI API key configured — Click to connect in Settings"
+          }
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-amber-500/60",
+            aiStatus.hasKey
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+              : "border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+          )}
+        >
+          <span
+            className={cn(
+              "h-1.5 w-1.5 rounded-full",
+              aiStatus.hasKey ? "bg-emerald-400" : "bg-amber-400 animate-pulse"
+            )}
+            aria-hidden
+          />
+          <span className="hidden xl:inline">
+            {aiStatus.hasKey ? `AI · ${aiStatus.provider.toUpperCase()}` : "Connect AI Key"}
+          </span>
+          <span className="xl:hidden">
+            {aiStatus.hasKey ? aiStatus.provider.toUpperCase() : "AI Key"}
+          </span>
+        </Link>
+      )}
       <button
         type="button"
         aria-label="Notifications"
@@ -189,14 +237,14 @@ export function TopNav({ actions, badge }: TopNavProps) {
                 title={label}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 transition-colors hover:bg-slate-800/40 focus-visible:ring-2 focus-visible:ring-amber-500/60 xl:px-3",
+                  "flex items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 transition-colors border border-transparent hover:bg-slate-800/40 focus-visible:ring-2 focus-visible:ring-amber-500/60 lg:px-3",
                   isActive
-                    ? "text-white bg-slate-800/60"
+                    ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
                     : "text-slate-400 hover:text-white"
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                <span className="sr-only xl:not-sr-only">{label}</span>
+                <span className="sr-only lg:not-sr-only">{label}</span>
               </Link>
             );
           })}
@@ -215,7 +263,7 @@ export function TopNav({ actions, badge }: TopNavProps) {
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
         {actions}
-        <NavUtilities />
+        <NavUtilities pathname={pathname} />
         {user ? (
           <>
             <Link
@@ -249,8 +297,8 @@ export function TopNav({ actions, badge }: TopNavProps) {
                   key={href}
                   href={href}
                   className={cn(
-                    "flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-amber-500/60",
-                    isActive ? "bg-slate-800/60 text-white" : "text-slate-300 hover:bg-slate-800/40"
+                    "flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm border border-transparent focus-visible:ring-2 focus-visible:ring-amber-500/60",
+                    isActive ? "bg-amber-500/10 text-amber-400 border-amber-500/30" : "text-slate-300 hover:bg-slate-800/40"
                   )}
                 >
                   <Icon className="h-4 w-4" aria-hidden />

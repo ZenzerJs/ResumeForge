@@ -86,18 +86,33 @@ export function AppShell({
         if (isAuthUser) {
           const hasGuestDraft = localStorage.getItem("resumeforge_has_guest_draft") === "true";
           const stored = localStorage.getItem("resumeforge_typst_source");
-          if (
+          const storedEvidenceRaw = localStorage.getItem("resumeforge_guest_evidence");
+          let hasGuestEvidence = false;
+          try {
+            const parsedEvidence = storedEvidenceRaw ? JSON.parse(storedEvidenceRaw) : [];
+            hasGuestEvidence = Array.isArray(parsedEvidence) && parsedEvidence.length > 0;
+          } catch {
+            hasGuestEvidence = false;
+          }
+
+          const hasCustomResumeDraft =
             hasGuestDraft &&
-            stored &&
-            stored.trim().length > 30 &&
-            !stored.includes("// Starter Typst Resume")
-          ) {
+            Boolean(stored) &&
+            stored!.trim().length > 30 &&
+            !stored!.includes("// Starter Typst Resume");
+
+          if (hasCustomResumeDraft || hasGuestEvidence) {
             try {
               const res = await fetch("/api/resumes");
               const resJson = await res.json();
-              if (resJson.success && Array.isArray(resJson.data)) {
+              if (
+                hasCustomResumeDraft &&
+                !hasGuestEvidence &&
+                resJson.success &&
+                Array.isArray(resJson.data)
+              ) {
                 const alreadyExists = resJson.data.some(
-                  (r: { typstSource: string }) => r.typstSource?.trim() === stored.trim()
+                  (r: { typstSource: string }) => r.typstSource?.trim() === stored!.trim()
                 );
                 if (alreadyExists) {
                   localStorage.removeItem("resumeforge_has_guest_draft");
@@ -108,7 +123,11 @@ export function AppShell({
             } catch {
               // ignore
             }
-            setGuestDraft(stored);
+            setGuestDraft(
+              stored && stored.trim().length > 0
+                ? stored
+                : `// Imported Guest Workspace\n= Resume Draft\n`
+            );
             setShowMigrationModal(true);
           }
         } else if (json?.guest) {
@@ -130,7 +149,7 @@ export function AppShell({
   return (
     <div
       className={cn(
-        "relative flex flex-col bg-rf-bg text-rf-body",
+        "relative flex flex-col bg-rf-bg bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(255,140,0,0.06),transparent)] text-rf-body",
         lockViewport ? "h-dvh max-h-dvh overflow-hidden" : "min-h-screen overflow-x-hidden"
       )}
       data-testid={`app-shell-${variant}`}

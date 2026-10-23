@@ -3,12 +3,16 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { generateDossier } from "@/lib/company-dossier";
 import { requireUserId } from "@/lib/security/auth-request";
+import { ProviderConfigSchema } from "@/lib/ai/types";
 
 const DOSSIER_REGEN_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 const GenerateDossierBodySchema = z.object({
   companyName: z.string().trim().min(1).max(120).optional(),
   jobTitle: z.string().trim().min(1).max(160).optional(),
+  referenceNotes: z.string().optional(),
+  processNotes: z.string().optional(),
+  providerConfig: ProviderConfigSchema.optional(),
 });
 
 export async function POST(
@@ -46,7 +50,7 @@ export async function POST(
     where: { companySlug: slug },
   });
 
-  if (existing && Date.now() - existing.lastUpdated.getTime() < DOSSIER_REGEN_COOLDOWN_MS) {
+  if (existing && Date.now() - new Date(existing.lastUpdated).getTime() < DOSSIER_REGEN_COOLDOWN_MS) {
     return NextResponse.json({ found: true, dossier: existing, stale: false, cooldown: true });
   }
 
@@ -54,16 +58,25 @@ export async function POST(
     const dossier = await generateDossier({
       companyName: parsed.data.companyName || existing?.displayName || slug,
       jobTitle: parsed.data.jobTitle,
-      referenceNotes: existing?.referenceNotes ?? undefined,
-      processNotes: existing?.processNotes ?? undefined,
+      referenceNotes: parsed.data.referenceNotes ?? existing?.referenceNotes ?? undefined,
+      processNotes: parsed.data.processNotes ?? existing?.processNotes ?? undefined,
+      providerConfig: parsed.data.providerConfig,
     });
+
+    const isLlm = Boolean(dossier.llmUsed);
+    const effectiveReferenceNotes = parsed.data.referenceNotes ?? existing?.referenceNotes ?? undefined;
+    const effectiveProcessNotes = parsed.data.processNotes ?? existing?.processNotes ?? undefined;
+    const hasNotes = Boolean(effectiveReferenceNotes || effectiveProcessNotes);
+    const source = isLlm ? (hasNotes ? "seed+llm" : "llm") : "seed";
 
     const data = {
       displayName: dossier.companyName,
       interviewStyle: dossier.interviewStyle as any,
       cultureMetrics: dossier.engineeringCulture as any,
       recentSignals: dossier.recentSignals,
-      source: existing?.referenceNotes || existing?.processNotes ? "seed+llm" : "llm",
+      ...(parsed.data.referenceNotes !== undefined ? { referenceNotes: parsed.data.referenceNotes } : {}),
+      ...(parsed.data.processNotes !== undefined ? { processNotes: parsed.data.processNotes } : {}),
+      source,
       lastUpdated: new Date(),
     };
 

@@ -18,6 +18,8 @@ interviewing a candidate for {{jobTitle}}.
   the top skill keyword in the job description — clearly labeled as a generic fallback.
 - Probe claims, don't flatter them. If a bullet cites a metric (latency %,
   QPS, scale, users), ask how it was measured and what breaks at 10x scale.
+- **Cite the Exact Bullet:** Before each Resume Deep-Dive question, quote the exact tailored bullet you are targeting in a `>` blockquote so the candidate knows which claim is on trial.
+- **Include Expected Engineering Trade-offs:** Under each Resume Deep-Dive question, include a collapsible or bulleted *"What a strong answer covers"* checklist (e.g., idempotency keys, connection pooling under concurrency, hash collision / sandbox escape vectors) grounded in the candidate's actual tech stack.
 
 ### OUTPUT (markdown, exactly these three sections)
 1. **Round 1 OA Simulator** — one problem from section 3, restated with

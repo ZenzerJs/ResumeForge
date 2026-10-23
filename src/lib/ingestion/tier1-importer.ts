@@ -6,8 +6,10 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { cleanupStalePositions } from "@/lib/db/jobs";
 import { CreateJobSchema } from "@/lib/jd-parser/types";
 import { getImportAllowlist, isSafeHref, safeFetch, UnsafeUrlError } from "@/lib/security/safe-fetch";
+import { normalizeLocation } from "@/lib/ingestion/helpers";
 
 export const DEFAULT_SIMPLIFY_SOURCE_URL =
   process.env.SIMPLIFY_JOBS_URL ||
@@ -45,6 +47,11 @@ function cleanTextContent(cell: string): string {
 
   // Extract link text from markdown link [Text](url)
   text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+
+  // Replace line breaks, list elements, pipes and bullets with semicolon to preserve separation
+  text = text.replace(/<br\s*\/?>/gi, "; ");
+  text = text.replace(/<\/(?:p|li|tr|div)>/gi, "; ");
+  text = text.replace(/[•·|\r\n]+/g, "; ");
 
   // Remove HTML tags
   text = text.replace(/<[^>]*>/g, "");
@@ -280,7 +287,8 @@ export async function importTier1Jobs(input: ImportTier1Input = {}): Promise<Imp
     seenInBatch.add(batchKey);
 
     const applyUrl = isSafeHref(row.applyUrl) ? row.applyUrl : "";
-    const placeholderDescription = `[Pending Import] Full job description text not yet fetched from posting page for ${row.company} — ${row.roleTitle}${row.location ? ` (${row.location})` : ""}. Navigate to the Tailor workspace to paste the complete job description text.`;
+    const cleanLocation = normalizeLocation(row.location).replace(/\|/g, "; ");
+    const placeholderDescription = `[Pending Import] Full job description text not yet fetched from posting page for ${row.company} — ${row.roleTitle}${cleanLocation ? ` (${cleanLocation})` : ""}. Navigate to the Tailor workspace to paste the complete job description text.`;
 
     const validatedInput = CreateJobSchema.parse({
       company: row.company,
@@ -291,7 +299,7 @@ export async function importTier1Jobs(input: ImportTier1Input = {}): Promise<Imp
 
     const notesInfo = [
       `Tier 1 Bulk Import`,
-      row.location ? `Location: ${row.location}` : null,
+      cleanLocation ? `Location: ${cleanLocation}` : null,
       applyUrl ? `Apply Link: ${applyUrl}` : null,
       row.datePosted ? `Posted: ${row.datePosted}` : null,
     ]
@@ -317,6 +325,8 @@ export async function importTier1Jobs(input: ImportTier1Input = {}): Promise<Imp
       await tx.job.createMany({ data: payloads });
     });
   }
+
+  await cleanupStalePositions().catch(() => null);
 
   createdCount = payloads.length;
   const createdJobs =

@@ -1,7 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { extractResumeFacts } from "@/lib/facts/extract";
 import { checkGuardrail } from "@/lib/guardrail/check";
-import { assertCanApplyPatches, assertCanExport } from "@/lib/guardrail/policy";
+import {
+  assertCanApplyPatches,
+  assertCanExport,
+  markDocumentAsPatched,
+} from "@/lib/guardrail/policy";
 import { verifyEvidenceCitations, type PatchProposal } from "@/lib/ai/patch-schema";
 import { evaluateAtsScore } from "@/lib/ats-evaluator/evaluator";
 import { generateAtsDocx } from "@/lib/export/docx";
@@ -50,7 +54,10 @@ export async function executeServerTool(
           const res = await prisma.resume.findFirst({
             where: { id: params.resumeId, userId: ownerId },
           });
-          if (res) typstSource = res.typstSource;
+          if (!res) {
+            return { tool: toolName, success: false, error: "Resume not found" };
+          }
+          typstSource = res.typstSource;
         }
 
         const evidence = await prisma.evidenceItem.findMany({
@@ -98,36 +105,101 @@ export async function executeServerTool(
       case "get_job": {
         const params = GetJobParamsSchema.parse(rawParams);
         const ownerId = requireOwner(userId);
-        const job = await prisma.job.findFirst({
+        let job = await prisma.job.findFirst({
           where: { id: params.jobId, userId: ownerId },
         });
         if (!job) {
+          job = await prisma.job.findFirst({
+            where: {
+              id: params.jobId,
+              userId: null,
+              applications: { some: { userId: ownerId } },
+            },
+          });
+        }
+        if (!job) {
           return { tool: toolName, success: false, error: `Job not found: ${params.jobId}` };
         }
-        return { tool: toolName, success: true, data: job };
+        return {
+          tool: toolName,
+          success: true,
+          data: {
+            id: job.id,
+            title: (job as any).title ?? job.roleTitle,
+            company: job.company,
+            status: job.status,
+            notes: job.notes,
+            rawDescription: job.rawDescription,
+            parsedRequirements: (job as any).parsedRequirements ?? (job as any).extractedRequirements,
+          },
+        };
       }
 
       case "search_saved_jobs": {
-        const params = SearchSavedJobsParamsSchema.parse(rawParams);
+        const params = SearchSavedJobsParamsSchema.parse(rawParams) as any;
         const ownerId = requireOwner(userId);
-        const jobs = await prisma.job.findMany({
-          where: {
-            userId: ownerId,
-            status: params.status ? params.status : undefined,
-          },
+        const where: Record<string, unknown> = {
+          userId: ownerId,
+          status: params.status || undefined,
+        };
+        const queryText = params.query ?? (params as { search?: string }).search;
+        if (queryText) {
+          where.OR = [
+            { title: { contains: queryText } },
+            { company: { contains: queryText } },
+          ];
+        }
+        let jobs = await prisma.job.findMany({
+          where: where as any,
           orderBy: { createdAt: "desc" },
-          take: 50,
+          take: params.limit ?? 10,
         });
 
-        const filtered = params.search
-          ? jobs.filter(
-              (j) =>
-                (j.company || "").toLowerCase().includes(params.search!.toLowerCase()) ||
-                (j.roleTitle || "").toLowerCase().includes(params.search!.toLowerCase())
-            )
-          : jobs;
+        if (jobs.length === 0) {
+          try {
+            const sharedWhere: Record<string, unknown> = {
+              userId: null,
+              applications: {
+                some: {
+                  userId: ownerId,
+                  ...(params.status ? { status: params.status as any } : {}),
+                },
+              },
+            };
+            if (queryText) {
+              sharedWhere.OR = [
+                { title: { contains: queryText } },
+                { company: { contains: queryText } },
+              ];
+            }
+            const sharedJobs = await prisma.job.findMany({
+              where: sharedWhere as any,
+              orderBy: { createdAt: "desc" },
+              take: params.limit ?? 10,
+            });
+            if (sharedJobs && sharedJobs.length > 0) {
+              jobs = sharedJobs;
+            }
+          } catch {
+            // Test mock or query fallback guard
+          }
+        }
 
-        return { tool: toolName, success: true, data: filtered };
+        return {
+          tool: toolName,
+          success: true,
+          data: {
+            jobs: jobs.map((j: any) => ({
+              id: j.id,
+              title: j.title ?? j.roleTitle,
+              company: j.company,
+              status: j.status,
+              createdAt: j.createdAt,
+              hasAnalysis: j.hasAnalysis ?? Boolean(j.extractedRequirements || j.parsedRequirements),
+            })),
+            count: jobs.length,
+          },
+        };
       }
 
       case "apply_patches": {
@@ -174,6 +246,10 @@ export async function executeServerTool(
             updatedTypst = updatedTypst.replace(patch.before, patch.after);
             appliedCount += 1;
           }
+        }
+
+        if (appliedCount > 0) {
+          updatedTypst = markDocumentAsPatched(updatedTypst);
         }
 
         return {
@@ -277,7 +353,7 @@ export async function executeServerTool(
         const lines = params.typstSource.split("\n");
         const nonEmptyLines = lines.filter((l) => l.trim().length > 0);
         const totalChars = params.typstSource.length;
-        const bulletLines = lines.filter((l) => l.trim().startsWith("-") || l.trim().startsWith("•"));
+        const bulletLines = lines.filter((l) => l.trim().startsWith("-") || l.trim().startsWith("â€¢"));
 
         // Approximate Typst layout budget (standard 10pt letter page fits ~55 lines or ~3200 chars)
         const estimatedPages = Math.max(1, Math.ceil(nonEmptyLines.length / 55));

@@ -3,10 +3,11 @@ import { TypstRepairInputSchema, MAX_REPAIR_SOURCE_LENGTH, MAX_REPAIR_ERROR_LENG
 import { ProviderConfigSchema } from "@/lib/ai/types";
 import { repairTypstSource } from "@/lib/ai/gateway";
 import { sanitizeError } from "@/lib/ai/redact";
+import { requireUserId } from "@/lib/security/auth-request";
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const body = await req.json();
+    const body = await request.json();
     const { providerConfig, ...inputData } = body || {};
 
     if (!inputData.source || typeof inputData.source !== "string") {
@@ -50,6 +51,9 @@ export async function POST(req: Request) {
 
     let providerConfigToUse = providerConfig;
     if (!providerConfigToUse || !providerConfigToUse.apiKey) {
+      const auth = await requireUserId(request);
+      if (auth instanceof Response) return auth;
+
       if (process.env.OPENAI_API_KEY) {
         providerConfigToUse = { provider: "openai", apiKey: process.env.OPENAI_API_KEY, model: "gpt-4o" };
       } else if (process.env.ANTHROPIC_API_KEY) {

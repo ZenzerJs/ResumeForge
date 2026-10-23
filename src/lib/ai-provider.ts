@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { getActiveConfig, getKey, ByokProvider } from "./byok-vault";
+import { getActiveConfig, getKey, resolveClientProviderConfig, ByokProvider } from "./byok-vault";
 
 export interface ByokMessage {
   role: "system" | "user" | "assistant";
@@ -29,7 +29,7 @@ export interface CallByokModelResult<T = unknown> {
 }
 
 const DEFAULT_MODELS: Record<string, string> = {
-  gemini: "gemini-3.8-flash",
+  gemini: "gemini-2.5-flash",
   openai: "gpt-4o",
   anthropic: "claude-3-5-sonnet-20241022",
   groq: "llama-3.3-70b-versatile",
@@ -102,7 +102,7 @@ async function streamOpenAiResponse(
 
 /**
  * Universal execution helper for BYOK models.
- * Handles Gemini (default gemini-3.8-flash via @google/genai),
+ * Handles Gemini (default gemini-2.5-flash via @google/genai),
  * OpenAI-compatible endpoints (Groq, OpenAI), and local Ollama.
  * Routes through byok-proxy when CORS bypass is required.
  */
@@ -111,13 +111,35 @@ export async function callByokModel<T = unknown>(
 ): Promise<CallByokModelResult<T>> {
   const startTime = Date.now();
 
-  // 1. Resolve active provider, model, and API key
+  // 1. Resolve active provider, model, baseUrl, and API key via unified client config
+  const resolvedClient = await resolveClientProviderConfig();
   const activeConfig = await getActiveConfig();
-  const provider = (options.provider || activeConfig.provider || "gemini").toLowerCase();
-  const model = options.model || (provider === activeConfig.provider ? activeConfig.model : null) || DEFAULT_MODELS[provider] || "gemini-3.8-flash";
-  const apiKey = options.apiKey || (await getKey(provider)) || "";
+  const provider = (
+    options.provider ||
+    resolvedClient?.provider ||
+    activeConfig.provider ||
+    "gemini"
+  ).toLowerCase();
+  const rawModel =
+    options.model ||
+    (provider === resolvedClient?.provider ? resolvedClient?.model : null) ||
+    (provider === activeConfig.provider ? activeConfig.model : null) ||
+    DEFAULT_MODELS[provider] ||
+    "gemini-2.5-flash";
+  const model =
+    provider === "gemini" && rawModel === "gemini-3.8-flash"
+      ? "gemini-2.5-flash"
+      : rawModel;
+  const apiKey =
+    options.apiKey ||
+    (provider === resolvedClient?.provider ? resolvedClient?.apiKey : null) ||
+    (await getKey(provider)) ||
+    "";
+  const resolvedBaseUrl =
+    options.baseUrl ||
+    (provider === resolvedClient?.provider ? resolvedClient?.baseUrl : undefined);
 
-  if (!apiKey && provider !== "ollama") {
+  if (!apiKey && provider !== "ollama" && provider !== "custom") {
     throw new Error(`API key for provider '${provider}' is missing. Please configure it in Settings.`);
   }
 
@@ -134,6 +156,7 @@ export async function callByokModel<T = unknown>(
 
   // 3. Dispatch to provider handler
   if (provider === "gemini") {
+    const geminiModel = model === "gemini-3.8-flash" ? "gemini-2.5-flash" : model;
     const ai = new GoogleGenAI({ apiKey });
     const contents = messages
       .filter((m) => m.role !== "system")
@@ -157,7 +180,7 @@ export async function callByokModel<T = unknown>(
 
     if (options.onToken) {
       const stream = await ai.models.generateContentStream({
-        model,
+        model: geminiModel,
         contents,
         config,
       });
@@ -171,7 +194,7 @@ export async function callByokModel<T = unknown>(
       }
     } else {
       const response = await ai.models.generateContent({
-        model,
+        model: geminiModel,
         contents,
         config,
       });
@@ -179,7 +202,7 @@ export async function callByokModel<T = unknown>(
     }
   } else if (provider === "ollama") {
     // Local Ollama running directly on host (http://localhost:11434)
-    const base = options.baseUrl || "http://localhost:11434";
+    const base = resolvedBaseUrl || "http://localhost:11434";
     const endpoint = `${base.replace(/\/+$/, "")}/v1/chat/completions`;
 
     const body: Record<string, unknown> = {
@@ -228,7 +251,7 @@ export async function callByokModel<T = unknown>(
     } else if (provider === "anthropic") {
       targetUrl = "https://api.anthropic.com/v1/messages";
     } else {
-      targetUrl = `${(options.baseUrl || "http://localhost:8000").replace(/\/+$/, "")}/v1/chat/completions`;
+      targetUrl = `${(resolvedBaseUrl || "http://localhost:8000").replace(/\/+$/, "")}/v1/chat/completions`;
     }
 
     // Build payload
@@ -284,6 +307,18 @@ export async function callByokModel<T = unknown>(
     });
 
     if (!res.ok) {
+      if (needsCorsProxy && res.status === 401) {
+        let proxyMessage = "Sign in to use this provider, or switch to Gemini.";
+        try {
+          const errJson = await res.json();
+          if (typeof errJson?.error?.message === "string" && errJson.error.message.trim().length > 0) {
+            proxyMessage = errJson.error.message;
+          }
+        } catch {
+          // Use default message when response body is not JSON
+        }
+        throw new Error(proxyMessage);
+      }
       const errText = await res.text().catch(() => "");
       throw new Error(`${provider} request failed (${res.status}): ${errText}`);
     }

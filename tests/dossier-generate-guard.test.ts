@@ -36,13 +36,15 @@ describe("dossier generate guard", () => {
     vi.clearAllMocks();
   });
 
-  it("drops client providerConfig and validates the name", async () => {
+  it("accepts client providerConfig and validates the name", async () => {
     findUnique.mockResolvedValue(null);
     generateDossier.mockResolvedValue({
       companyName: "Acme",
       interviewStyle: {},
       engineeringCulture: {},
       recentSignals: "none",
+      llmUsed: true,
+      source: "llm",
     });
     upsert.mockImplementation(async ({ create }: { create: { displayName: string } }) => ({
       companySlug: "acme",
@@ -60,7 +62,35 @@ describe("dossier generate guard", () => {
       jobTitle: "Engineer",
       referenceNotes: undefined,
       processNotes: undefined,
+      providerConfig: { provider: "custom", baseUrl: "https://evil.example", apiKey: "stolen" },
     });
+  });
+
+  it("labels fallback as 'seed' source when offline or LLM not used", async () => {
+    findUnique.mockResolvedValue(null);
+    generateDossier.mockResolvedValue({
+      companyName: "Acme",
+      interviewStyle: {},
+      engineeringCulture: {},
+      recentSignals: "none",
+      llmUsed: false,
+      source: "offline",
+    });
+    let capturedSource: string | undefined;
+    upsert.mockImplementation(async ({ create }: { create: { source: string; displayName: string } }) => {
+      capturedSource = create.source;
+      return {
+        companySlug: "acme",
+        ...create,
+      };
+    });
+
+    const res = await post({
+      companyName: "Acme",
+      jobTitle: "Engineer",
+    });
+    expect(res.status).toBe(200);
+    expect(capturedSource).toBe("seed");
   });
 
   it("rejects an oversized company name", async () => {
@@ -85,5 +115,35 @@ describe("dossier generate guard", () => {
     expect(body.dossier.displayName).toBe("Acme");
     expect(generateDossier).not.toHaveBeenCalled();
     expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it("persists caller-provided notes and labels source as 'seed+llm' on successful generation", async () => {
+    findUnique.mockResolvedValue(null);
+    generateDossier.mockResolvedValue({
+      companyName: "Acme",
+      interviewStyle: {},
+      engineeringCulture: {},
+      recentSignals: "none",
+      llmUsed: true,
+      source: "llm",
+    });
+    let capturedCreate: any;
+    upsert.mockImplementation(async ({ create }: { create: any }) => {
+      capturedCreate = create;
+      return {
+        companySlug: "acme",
+        ...create,
+      };
+    });
+
+    const res = await post({
+      companyName: "Acme",
+      referenceNotes: "Engineering blog: remote-first async culture",
+      processNotes: "Pair programming session on PR",
+    });
+    expect(res.status).toBe(200);
+    expect(capturedCreate.source).toBe("seed+llm");
+    expect(capturedCreate.referenceNotes).toBe("Engineering blog: remote-first async culture");
+    expect(capturedCreate.processNotes).toBe("Pair programming session on PR");
   });
 });

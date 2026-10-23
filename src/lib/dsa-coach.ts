@@ -1,6 +1,6 @@
 import type { DsaProblem, DsaLanguage } from './dsa-problems';
 import type { DsaExecutionSummary } from './dsa-runner';
-import { getActiveConfig } from './byok-vault';
+import { getActiveConfig, resolveClientProviderConfig } from './byok-vault';
 import { callByokModel } from './ai-provider';
 
 export type DsaInterviewStage =
@@ -359,8 +359,9 @@ export async function auditDsaSubmission(params: {
   let mode: 'byok' | 'heuristic' = 'heuristic';
 
   try {
+    const clientConfig = await resolveClientProviderConfig();
     const config = await getActiveConfig();
-    if (config.hasKey) {
+    if (clientConfig || config.hasKey) {
       const systemPrompt = `You are a Staff-Engineer Socratic DSA Interviewer and Complexity Auditor.
 Evaluate the candidate's code for "${problem.title}".
 Return a JSON object with:
@@ -612,8 +613,9 @@ export async function askSocraticCoach(params: {
   let mode: 'byok' | 'heuristic' = 'heuristic';
 
   try {
+    const clientConfig = await resolveClientProviderConfig();
     const config = await getActiveConfig();
-    if (config.hasKey) {
+    if (clientConfig || config.hasKey) {
       const systemPrompt = `You are a Staff Software Engineer Socratic DSA Interviewer.
 Problem: ${problem.title} (${problem.difficulty})
 Pattern: ${problem.pattern}

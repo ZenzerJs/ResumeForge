@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { extractJsonObject } from "./ai/json-response";
 import { ProviderConfig } from "./ai/types";
+import { sendChatCompletion, resolveServerProviderConfig } from "@/lib/ai/gateway";
 
 export const dossierSchema = z.object({
   companyName: z.string(),
@@ -26,6 +27,7 @@ export const dossierSchema = z.object({
 });
 
 export type CompanyIntelligenceDossier = z.infer<typeof dossierSchema>;
+export type CompanyDossierOutput = CompanyIntelligenceDossier;
 
 export interface GenerateDossierInput {
   companyName: string;
@@ -34,6 +36,7 @@ export interface GenerateDossierInput {
   processNotes?: string;
   providerConfig?: ProviderConfig;
 }
+export type DossierGenerationInput = GenerateDossierInput;
 
 export function buildCompanyDossierPrompt(input: GenerateDossierInput): {
   systemPrompt: string;
@@ -140,72 +143,115 @@ export function generateOfflineDossier(input: GenerateDossierInput): CompanyInte
   };
 }
 
-/**
- * Synthesize company intelligence dossier with BYOK LLM or deterministic fallback.
- * Validates strictly with Zod schema.
- */
-export async function generateDossier(input: GenerateDossierInput): Promise<CompanyIntelligenceDossier> {
-  const { providerConfig } = input;
+async function callDossierLlm(providerConfig: ProviderConfig, promptText: string): Promise<string> {
+  const messages = [
+    { role: "system" as const, content: "Return ONLY valid JSON matching the schema." },
+    { role: "user" as const, content: promptText },
+  ];
 
-  if (!providerConfig || !providerConfig.apiKey) {
-    // If no BYOK key is configured, return high quality deterministic fallback
-    return generateOfflineDossier(input);
+  if (providerConfig.provider === "openai") {
+    const { chatOpenAI } = await import("./ai/providers/openai");
+    const res = await chatOpenAI(providerConfig, messages, []);
+    return res.content;
+  }
+  if (providerConfig.provider === "anthropic") {
+    const { chatAnthropic } = await import("./ai/providers/anthropic");
+    const res = await chatAnthropic(providerConfig, messages, []);
+    return res.content;
+  }
+  if (providerConfig.provider === "gemini") {
+    const { chatGemini } = await import("./ai/providers/gemini");
+    const res = await chatGemini(providerConfig, messages, []);
+    return res.content;
+  }
+
+  const res = await sendChatCompletion(
+    providerConfig,
+    [{ role: "user", content: promptText }],
+    "Return ONLY valid JSON matching the schema." as any
+  );
+  return res.content;
+}
+
+function detectServerProviderConfig(): ProviderConfig | undefined {
+  if (process.env.OPENAI_API_KEY?.trim()) {
+    return { provider: "openai", apiKey: process.env.OPENAI_API_KEY.trim() };
+  }
+  if (process.env.ANTHROPIC_API_KEY?.trim()) {
+    return { provider: "anthropic", apiKey: process.env.ANTHROPIC_API_KEY.trim() };
+  }
+  if (process.env.GEMINI_API_KEY?.trim()) {
+    return { provider: "gemini", apiKey: process.env.GEMINI_API_KEY.trim() };
+  }
+  if (process.env.GROQ_API_KEY?.trim()) {
+    return { provider: "groq", apiKey: process.env.GROQ_API_KEY.trim() };
+  }
+  return undefined;
+}
+
+/**
+ * Synthesize company intelligence dossier with source tagging.
+ */
+export async function generateDossierWithSource(
+  input: GenerateDossierInput
+): Promise<{ dossier: CompanyIntelligenceDossier; source: "llm" | "seed" }> {
+  const rawConfig = input.providerConfig || detectServerProviderConfig();
+  const resolvedConfig = rawConfig ? resolveServerProviderConfig(rawConfig) : undefined;
+
+  if (
+    !resolvedConfig ||
+    (!resolvedConfig.apiKey && resolvedConfig.provider !== "custom" && resolvedConfig.provider !== "ollama")
+  ) {
+    return {
+      dossier: generateOfflineDossier(input),
+      source: "seed",
+    };
   }
 
   // Attempt live LLM completion
   const { systemPrompt, userPrompt } = buildCompanyDossierPrompt(input);
-  const messages = [
-    { role: "system" as const, content: systemPrompt },
-    { role: "user" as const, content: userPrompt },
-  ];
+  const promptText = `${systemPrompt}\n\n${userPrompt}`;
 
   try {
-    const { chatOpenAI } = await import("./ai/providers/openai");
-    const { chatAnthropic } = await import("./ai/providers/anthropic");
-    const { chatGemini } = await import("./ai/providers/gemini");
-    const { chatCustom } = await import("./ai/providers/custom");
-
-    let rawText = "";
-    if (providerConfig.provider === "openai") {
-      const res = await chatOpenAI(providerConfig, messages, []);
-      rawText = res.content;
-    } else if (providerConfig.provider === "anthropic") {
-      const res = await chatAnthropic(providerConfig, messages, []);
-      rawText = res.content;
-    } else if (providerConfig.provider === "gemini") {
-      const res = await chatGemini(providerConfig, messages, []);
-      rawText = res.content;
-    } else {
-      const res = await chatCustom(providerConfig, messages, []);
-      rawText = res.content;
-    }
+    let rawText = await callDossierLlm(resolvedConfig, promptText);
 
     const parsedJson = extractJsonObject(rawText);
     const validated = dossierSchema.safeParse(parsedJson);
 
     if (validated.success) {
-      return validated.data;
+      return { dossier: validated.data, source: "llm" };
     }
 
     // 1-time retry with Zod errors appended
-    const retryUserPrompt = `${userPrompt}\n\nYour previous JSON output failed validation with the following errors:\n${validated.error.message}\nPlease return valid JSON fixing these issues.`;
-    const retryMessages = [
-      { role: "system" as const, content: systemPrompt },
-      { role: "user" as const, content: retryUserPrompt },
-    ];
+    const retryPrompt = `${promptText}\n\nYour previous JSON output failed validation with the following errors:\n${validated.error.message}\nPlease return valid JSON fixing these issues.`;
+    rawText = await callDossierLlm(resolvedConfig, retryPrompt);
 
-    let retryRawText = "";
-    if (providerConfig.provider === "openai") {
-      const res = await chatOpenAI(providerConfig, retryMessages, []);
-      retryRawText = res.content;
-    } else {
-      retryRawText = rawText; // Fallback
-    }
-
-    const retryJson = extractJsonObject(retryRawText);
-    return dossierSchema.parse(retryJson);
+    const retryJson = extractJsonObject(rawText);
+    const retryValidated = dossierSchema.parse(retryJson);
+    return { dossier: retryValidated, source: "llm" };
   } catch {
     // If live call fails, fallback gracefully to structured offline dossier
-    return generateOfflineDossier(input);
+    return {
+      dossier: generateOfflineDossier(input),
+      source: "seed",
+    };
   }
+}
+
+export type GenerateDossierOutput = CompanyIntelligenceDossier & {
+  llmUsed: boolean;
+  source: "llm" | "seed";
+};
+
+/**
+ * Synthesize company intelligence dossier with BYOK LLM or deterministic fallback.
+ * Validates strictly with Zod schema.
+ */
+export async function generateDossier(input: GenerateDossierInput): Promise<GenerateDossierOutput> {
+  const result = await generateDossierWithSource(input);
+  return {
+    ...result.dossier,
+    llmUsed: result.source === "llm",
+    source: result.source,
+  };
 }

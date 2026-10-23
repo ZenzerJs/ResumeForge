@@ -111,12 +111,16 @@ export async function DELETE(
     if (userId instanceof NextResponse) return userId;
 
     const { id } = await params;
-    const deleted = await deleteJob(id);
-    if (!deleted) {
-      return NextResponse.json(
-        { success: false, error: "Job posting not found" },
-        { status: 404 }
-      );
+    try {
+      await deleteJob(id, userId);
+    } catch (err: any) {
+      if (err?.message === "Job not found") {
+        return NextResponse.json(
+          { success: false, error: "Job posting not found" },
+          { status: 404 }
+        );
+      }
+      throw err;
     }
 
     return NextResponse.json({ success: true, message: "Job posting deleted" });

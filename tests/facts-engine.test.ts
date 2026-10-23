@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import fs from "fs";
+import path from "path";
 import {
   normalizeString,
   normalizeEmployer,
@@ -46,9 +48,9 @@ describe("Facts Engine: Normalization & Extraction", () => {
       expect(range.isCurrent).toBe(false);
     });
 
-    it("detects ongoing/current positions", () => {
-      const range = parseDateRange("May 2023 - Present");
-      expect(range.startIso).toBe("2023-05");
+    it("detects ongoing/current positions and normalizes en-dash", () => {
+      const range = parseDateRange("Jun 2024 – Present");
+      expect(range.startIso).toBe("2024-06");
       expect(range.endIso).toBeUndefined();
       expect(range.isCurrent).toBe(true);
     });
@@ -61,7 +63,7 @@ describe("Facts Engine: Normalization & Extraction", () => {
   });
 
   describe("Metric Extraction & Trivial Number Filtering", () => {
-    it("extracts non-trivial metrics with units and values", () => {
+    it("extracts non-trivial metrics with units, values, and trailing subjects", () => {
       const text = "Reduced latency by 45ms and scaled system to 500k QPS generating $1.2M in savings.";
       const metrics = extractMetricsFromText(text);
 
@@ -158,6 +160,46 @@ describe("Facts Engine: Normalization & Extraction", () => {
       expect(facts.employers.some((e) => e.normalized.includes("old corp"))).toBe(false);
       expect(facts.evidenceIds).not.toContain("evid-unverified");
       expect(facts.evidenceIds).not.toContain("evid-archived");
+    });
+
+    it("Golden Test: extracts clean employers, titles, dateRanges, metrics, and skills from every template in public/templates", () => {
+      const templatesDir = path.join(process.cwd(), "public", "templates");
+      const templateFiles = fs.readdirSync(templatesDir).filter((f) => f.endsWith(".typ"));
+      expect(templateFiles.length).toBeGreaterThan(0);
+
+      for (const file of templateFiles) {
+        const source = fs.readFileSync(path.join(templatesDir, file), "utf-8");
+        const facts = extractResumeFacts(source);
+
+        // No skill should ever contain layout/heading words like "section" or unstripped category prefixes
+        for (const skill of facts.skills) {
+          expect(skill).not.toContain("section");
+          expect(skill).not.toContain("frameworks libraries");
+          expect(skill).not.toContain("tools infrastructure");
+        }
+
+        // Layout constants (margins, font sizes, hex colors, leading) must never be extracted as metrics
+        const forbiddenLayoutValues = new Set([1.25, 1.1, 111827, 0.48, 1155, 475569, 9, 18, 0.35, 0.15, 0.4]);
+        for (const m of facts.metrics) {
+          expect(forbiddenLayoutValues.has(m.value)).toBe(false);
+        }
+
+        if (file === "starter-resume.typ") {
+          const rawEmployers = facts.employers.map((e) => e.raw);
+          expect(rawEmployers).toContain("TechCorp Systems");
+          expect(rawEmployers).not.toContain("University of California, Berkeley");
+          expect(rawEmployers).not.toContain("ResumeForge — Local-First AI Resume Workspace");
+
+          const rawTitles = facts.titles.map((t) => t.raw);
+          expect(rawTitles).toContain("Software Engineer Intern");
+
+          expect(facts.dateRanges.length).toBeGreaterThanOrEqual(1);
+          expect(facts.dateRanges.some((d) => d.isCurrent === true)).toBe(true);
+          expect(facts.skills).toContain("typescript");
+          expect(facts.skills).toContain("react");
+          expect(facts.skills).toContain("postgresql");
+        }
+      }
     });
   });
 });

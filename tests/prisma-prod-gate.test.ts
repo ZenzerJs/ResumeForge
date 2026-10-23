@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createPrismaMockClient } from "../src/lib/db-mock";
+import { assertValidMockDbEnv } from "../src/lib/prisma";
 
 // Vitest sets NODE_ENV readonly via process.env typing; cast through record.
 const env = process.env as Record<string, string | undefined>;
@@ -23,7 +24,6 @@ describe("prisma prod fail-closed gate", () => {
     try {
       setNodeEnv("test");
       delete env.RESUME_FORGE_ALLOW_MOCK_DB;
-      // Import after env set: module caches prod gate decision lazily per call.
       const { prisma } = await import("../src/lib/prisma");
       await expect(prisma.systemInfo.count()).resolves.toBeTypeOf("number");
     } finally {
@@ -40,10 +40,6 @@ describe("prisma prod fail-closed gate", () => {
       setNodeEnv("production");
       delete env.RESUME_FORGE_ALLOW_MOCK_DB;
       const { prisma } = await import("../src/lib/prisma");
-      // probePostgresPort will fail to connect in CI without Postgres; if a
-      // local Postgres IS reachable the real client path is used and the
-      // query succeeds — both are acceptable; the mock refusal only fires
-      // when dbAvailable === false.
       const dbReachable = await (async () => {
         try {
           await prisma.systemInfo.count();
@@ -58,6 +54,27 @@ describe("prisma prod fail-closed gate", () => {
       restoreNodeEnv(prevNodeEnv);
       if (prevFlag === undefined) delete env.RESUME_FORGE_ALLOW_MOCK_DB;
       else env.RESUME_FORGE_ALLOW_MOCK_DB = prevFlag;
+    }
+  });
+
+  it("throws when RESUME_FORGE_ALLOW_MOCK_DB=1 is set in production without RESUME_FORGE_E2E=1", () => {
+    const prevNodeEnv = env.NODE_ENV;
+    const prevFlag = env.RESUME_FORGE_ALLOW_MOCK_DB;
+    const prevE2e = env.RESUME_FORGE_E2E;
+    try {
+      setNodeEnv("production");
+      env.RESUME_FORGE_ALLOW_MOCK_DB = "1";
+      delete env.RESUME_FORGE_E2E;
+      expect(() => assertValidMockDbEnv()).toThrow(/RESUMEFORGE_INVALID_PROD_MOCK_FLAG/);
+
+      env.RESUME_FORGE_E2E = "1";
+      expect(() => assertValidMockDbEnv()).not.toThrow();
+    } finally {
+      restoreNodeEnv(prevNodeEnv);
+      if (prevFlag === undefined) delete env.RESUME_FORGE_ALLOW_MOCK_DB;
+      else env.RESUME_FORGE_ALLOW_MOCK_DB = prevFlag;
+      if (prevE2e === undefined) delete env.RESUME_FORGE_E2E;
+      else env.RESUME_FORGE_E2E = prevE2e;
     }
   });
 

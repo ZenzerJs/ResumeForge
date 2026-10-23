@@ -15,6 +15,26 @@ import {
   Edit3,
 } from "lucide-react";
 import type { PatchProposal, Gap, RejectedPatch } from "@/lib/ai/patch-schema";
+import { extractResumeFacts } from "@/lib/facts/extract";
+import { checkGuardrail } from "@/lib/guardrail/check";
+import { assertCanApplyPatches, markDocumentAsPatched } from "@/lib/guardrail/policy";
+
+/**
+ * Pure helper that merges accepted patches into Typst source and stamps the document
+ * with the persistent patch provenance marker so it travels with the document across sessions.
+ */
+export function mergeAndMarkAcceptedPatches(
+  baseTypstSource: string,
+  acceptedPatches: Array<{ before?: string; after?: string }>
+): string {
+  let mergedContent = baseTypstSource;
+  for (const patch of acceptedPatches) {
+    if (patch.before && patch.after && mergedContent.includes(patch.before)) {
+      mergedContent = mergedContent.replace(patch.before, patch.after);
+    }
+  }
+  return markDocumentAsPatched(mergedContent);
+}
 
 interface PatchDiffReviewProps {
   verified: PatchProposal[];
@@ -71,10 +91,37 @@ export function PatchDiffReview({
   const [applyError, setApplyError] = useState<string | null>(null);
   const [applySuccess, setApplySuccess] = useState<string | null>(null);
   const [createdVariantId, setCreatedVariantId] = useState<string | null>(null);
+  const [acknowledgedSkills, setAcknowledgedSkills] = useState<Set<string>>(new Set());
 
   const acceptedPatches = verified.filter((p) => decisions[p.id] === "accepted");
   const rejectedByUser = verified.filter((p) => decisions[p.id] === "rejected");
   const pendingPatches = verified.filter((p) => decisions[p.id] === "pending");
+
+  const masterFacts = React.useMemo(
+    () => (masterTypstSource ? extractResumeFacts(masterTypstSource) : null),
+    [masterTypstSource]
+  );
+
+  const unverifiedSkillsForAccepted = React.useMemo(() => {
+    if (!masterFacts || acceptedPatches.length === 0) return [];
+    const gResult = checkGuardrail(masterTypstSource, masterFacts, { patches: acceptedPatches });
+    return Array.from(
+      new Set(
+        gResult.violations
+          .filter((v) => v.kind === "skill" && typeof v.actual === "string")
+          .map((v) => v.actual as string)
+      )
+    );
+  }, [masterTypstSource, masterFacts, acceptedPatches]);
+
+  const toggleSkillAck = (skill: string) => {
+    setAcknowledgedSkills((prev) => {
+      const next = new Set(prev);
+      if (next.has(skill)) next.delete(skill);
+      else next.add(skill);
+      return next;
+    });
+  };
 
   const handleDecision = (patchId: string, decision: PatchDecision) => {
     setDecisions((prev) => ({ ...prev, [patchId]: decision }));
@@ -113,13 +160,15 @@ export function PatchDiffReview({
     setApplySuccess(null);
 
     try {
-      // Step 1: Compute merged Typst content
-      let mergedContent = masterTypstSource;
-      for (const patch of acceptedPatches) {
-        if (patch.before && patch.after && mergedContent.includes(patch.before)) {
-          mergedContent = mergedContent.replace(patch.before, patch.after);
-        }
+      // Step 0: Guardrail verification (including per-skill acknowledgment for unverified skills)
+      if (masterFacts) {
+        assertCanApplyPatches(masterTypstSource, masterFacts, acceptedPatches, {
+          acknowledgedSkills: Array.from(acknowledgedSkills),
+        });
       }
+
+      // Step 1: Compute merged Typst content with persistent patch marker
+      const mergedContent = mergeAndMarkAcceptedPatches(masterTypstSource, acceptedPatches);
 
       // Step 2: Amendment 2 — Typst compile validation
       // Import compiler dynamically (browser-only WASM)
@@ -399,6 +448,38 @@ export function PatchDiffReview({
       {/* Apply Accepted Patches Button */}
       {verified.length > 0 && (
         <div className="space-y-3">
+          {unverifiedSkillsForAccepted.length > 0 && (
+            <div
+              data-testid="unverified-skills-ack-box"
+              className="p-3.5 bg-amber-950/40 border border-amber-800/60 rounded-lg space-y-2 text-xs text-amber-200"
+            >
+              <div className="flex items-center gap-2 font-semibold text-amber-300">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
+                <span>Acknowledge unverified skills before applying</span>
+              </div>
+              <p className="text-[11px] text-slate-300">
+                Only add skills if you have real experience; log them in your Evidence Bank first, or check below to confirm you have real experience with each skill:
+              </p>
+              <div className="space-y-1.5 pt-1">
+                {unverifiedSkillsForAccepted.map((skill) => (
+                  <label
+                    key={skill}
+                    className="flex items-center gap-2 text-xs text-amber-200 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={acknowledgedSkills.has(skill)}
+                      onChange={() => toggleSkillAck(skill)}
+                      data-testid={`ack-skill-checkbox-${skill}`}
+                      className="rounded border-amber-600 bg-slate-900 text-amber-500 focus:ring-amber-500"
+                    />
+                    <span>I have real experience with <strong>{skill}</strong></span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           {applyError && (
             <div
               className="p-3 bg-red-950/50 border border-red-800/50 rounded-lg flex items-center gap-2 text-xs text-red-300"

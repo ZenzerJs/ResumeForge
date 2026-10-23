@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { ResumeDiagnosticReport, ResumeDiagnosticItem } from "@/lib/schema/resumeFeedback";
 import { applyDeterministicPatch } from "@/lib/diagnostics/deterministicPatcher";
 import { validateMetricGrounding } from "@/lib/diagnostics/deterministicPatcher";
+import { hasSkillWordBoundary } from "@/lib/diagnostics/auditResume";
 import { BadgeCheck, TriangleAlert, Save } from "lucide-react";
 
 interface RankedMatchLite {
@@ -47,6 +48,97 @@ export function buildDiagnosticVariantTitle(now: Date = new Date()): string {
 }
 
 /**
+ * Extracts the canonical skill/requirement name from a diagnostic message,
+ * stripping both the diagnostic prefix and the Evidence Bank advisory suffix.
+ */
+export function extractDiagnosticSkill(message: string): string {
+  return message
+    .replace(/^Missing required skill:\s*/i, "")
+    .replace(/^Consider adding preferred tooling:\s*/i, "")
+    .replace(/\.\s*Only add if you have real experience.*$/i, "")
+    .replace(/\s*\(only add if you have real experience.*\)\.?$/i, "")
+    .trim();
+}
+
+export type DiagnosticFixActionResult =
+  | { applied: true; patchedTypstAst: string; evidenceId: string }
+  | { applied: false; error: string };
+
+/**
+ * Pure deterministic fix resolver — exported for unit testing.
+ * Refuses to insert any unverified skill or fabricate content when no matching
+ * Evidence Bank item or specific bullet anchor exists.
+ */
+export function resolveDiagnosticFixAction(
+  item: ResumeDiagnosticItem,
+  typstAst: string,
+  evidence: RankedMatchLite[]
+): DiagnosticFixActionResult {
+  if (typstAst.trim().length === 0) {
+    return {
+      applied: false,
+      error: "No resume content loaded — cannot apply a deterministic fix.",
+    };
+  }
+
+  const diagnosticSkill = extractDiagnosticSkill(item.message);
+  const evidenceMatch = evidence.find((e) => {
+    const haystack = [e.verifiedSummary, ...(e.tags || [])].join(" ");
+    return diagnosticSkill.length > 0 && hasSkillWordBoundary(haystack, diagnosticSkill);
+  });
+
+  if (!evidenceMatch) {
+    return {
+      applied: false,
+      error: `No verified evidence found for "${item.message}". Add matching evidence in the Library first — this tool never invents experience.`,
+    };
+  }
+
+  const targetBulletId =
+    item.targetLineOrBulletId && item.targetLineOrBulletId !== "global"
+      ? item.targetLineOrBulletId
+      : null;
+  if (!targetBulletId) {
+    return {
+      applied: false,
+      error: "This diagnostic is document-level (no bullet anchor). Edit the resume directly in the editor.",
+    };
+  }
+
+  const grounding = validateMetricGrounding(
+    evidenceMatch.verifiedSummary,
+    evidenceMatch.verifiedSummary
+  );
+  if (!grounding.valid) {
+    return {
+      applied: false,
+      error: `Evidence metric not grounded: ${grounding.reason}`,
+    };
+  }
+
+  const result = applyDeterministicPatch(typstAst, evidenceMatch.id, targetBulletId, [
+    {
+      id: evidenceMatch.id,
+      content: evidenceMatch.verifiedSummary,
+      extractedTechnologies: e_tags(evidenceMatch),
+    },
+  ]);
+
+  if (!result.applied) {
+    return {
+      applied: false,
+      error: result.error || "Patch could not be applied — anchor not found.",
+    };
+  }
+
+  return {
+    applied: true,
+    patchedTypstAst: result.patchedTypstAst,
+    evidenceId: evidenceMatch.id,
+  };
+}
+
+/**
  * Renders the deterministic resume diagnostics and applies real, evidence-grounded
  * patches against the caller's Typst source. Never fabricates evidence content:
  * a fix only applies when the diagnostic maps to a real Evidence Bank item.
@@ -70,58 +162,17 @@ export const TailorDiagnosticPanel = ({
   const handleApplyFix = (item: ResumeDiagnosticItem) => {
     setPatchError(null);
 
-    if (typstAst.trim().length === 0) {
-      setPatchError("No resume content loaded — cannot apply a deterministic fix.");
-      return;
-    }
-
-    // Ground the fix in real evidence: match the diagnostic back to an Evidence
-    // Bank item via the diagnostic's referenced skill / requirement text.
-    const diagnosticSkill = item.message.replace(/^Missing required skill: /, "").trim();
-    const evidenceMatch = evidence.find((e) => {
-      const haystack = [e.verifiedSummary, ...(e.tags || [])].join(" ").toLowerCase();
-      return diagnosticSkill.length > 0 && haystack.includes(diagnosticSkill.toLowerCase());
-    });
-
-    if (!evidenceMatch) {
-      setPatchError(
-        `No verified evidence found for "${item.message}". Add matching evidence in the Library first — this tool never invents experience.`
-      );
-      return;
-    }
-
-    // Only patch when the diagnostic targets a specific bullet we can anchor to.
-    const targetBulletId =
-      item.targetLineOrBulletId && item.targetLineOrBulletId !== "global"
-        ? item.targetLineOrBulletId
-        : null;
-    if (!targetBulletId) {
-      setPatchError(
-        "This diagnostic is document-level (no bullet anchor). Edit the resume directly in the editor."
-      );
-      return;
-    }
-
-    // Guardrail: proposed content metrics must be grounded in the cited evidence.
-    const grounding = validateMetricGrounding(evidenceMatch.verifiedSummary, evidenceMatch.verifiedSummary);
-    if (!grounding.valid) {
-      setPatchError(`Evidence metric not grounded: ${grounding.reason}`);
-      return;
-    }
-
     try {
-      const result = applyDeterministicPatch(typstAst, evidenceMatch.id, targetBulletId, [
-        { id: evidenceMatch.id, content: evidenceMatch.verifiedSummary, extractedTechnologies: e_tags(evidenceMatch) },
-      ]);
-      if (!result.applied) {
-        setPatchError(result.error || "Patch could not be applied — anchor not found.");
+      const outcome = resolveDiagnosticFixAction(item, typstAst, evidence);
+      if (!outcome.applied) {
+        setPatchError(outcome.error);
         return;
       }
-      setPatchResult(result.patchedTypstAst);
+      setPatchResult(outcome.patchedTypstAst);
       setAppliedIds((prev) => [...prev, item.id]);
       setPersistedVariantId(null);
       setPersistError(null);
-      onPatchApplied?.(result.patchedTypstAst);
+      onPatchApplied?.(outcome.patchedTypstAst);
     } catch (err) {
       console.error(err);
       setPatchError("Unexpected error while applying the deterministic fix.");

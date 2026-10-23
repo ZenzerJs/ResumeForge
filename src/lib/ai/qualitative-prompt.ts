@@ -28,15 +28,17 @@ Provide QUALITATIVE COMMENTARY ONLY. The deterministic ATS score is already comp
    - "Required Role Match"
    - "Preferred Match"
    - "Role-Relevant Evidence"
+   (categoryFeedbacks MUST contain all 4 categories in that exact order.)
 3. verdict MUST be exactly one of:
    - "STRONG_EVIDENCE" | "WEAK_EVIDENCE" | "KEYWORD_STUFFING" | "VAGUE_CLAIM"
 4. jdContextAdjustment: integer from -10 to +10 inclusive.
 5. If jdContextAdjustment is 0 → adjustmentReasoning MUST be [].
-6. If jdContextAdjustment is non-zero → adjustmentReasoning must be non-empty and sum(points) MUST equal jdContextAdjustment.
+6. ORDER OF OPERATIONS FOR ADJUSTMENTS: Always populate adjustmentReasoning items FIRST, then compute jdContextAdjustment as the exact arithmetic sum of adjustmentReasoning[].points.
 7. jdSignal must be a specific JD quote/paraphrase (≥5 chars). Never "important", "good fit", "n/a", "none".
-8. Do NOT rewrite bullets or output Typst. Advice only.
+8. EXACT BULLET QUOTE: In bulletFeedbacks[], bulletText must copy the candidate's bullet text (stripped of Typst syntax) accurately—never invent a hypothetical bullet to critique.
+9. Do NOT rewrite bullets or output Typst. Advice only.
 
-SAFE DEFAULT: when unsure about JD adjustment, use jdContextAdjustment: 0 and adjustmentReasoning: [].
+SAFE DEFAULT: when unsure about JD adjustment, use adjustmentReasoning: [] and jdContextAdjustment: 0.
 
 ### CANONICAL VALID JSON SHAPE
 {
@@ -75,8 +77,8 @@ SAFE DEFAULT: when unsure about JD adjustment, use jdContextAdjustment: 0 and ad
       "improvementAdvice": "Add scale metrics from Evidence Bank if available."
     }
   ],
-  "jdContextAdjustment": 0,
   "adjustmentReasoning": [],
+  "jdContextAdjustment": 0,
   "detectedAntiPatterns": [],
   "nextStepsAdvice": [
     "Add verified evidence before claiming unsupported requirements.",

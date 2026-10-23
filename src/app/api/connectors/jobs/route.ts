@@ -69,7 +69,11 @@ export async function GET(req: NextRequest) {
       andConditions.push({ workplaceType: workplace as WorkplaceType });
     }
 
+    const VALID_SOURCES = ["GREENHOUSE", "LEVER", "ASHBY", "USAJOBS", "MANUAL", "PITTCSC", "SIMPLIFY"] as const;
     if (source && source !== "ALL") {
+      if (!VALID_SOURCES.includes(source as any)) {
+        return NextResponse.json({ error: "Invalid source parameter" }, { status: 400 });
+      }
       andConditions.push({ source: source as any });
     }
 
@@ -120,6 +124,7 @@ export async function GET(req: NextRequest) {
     // Fetch candidate records to calculate scoring and geo-filtering
     const rawJobs = await prisma.ingestedJob.findMany({
       where,
+      take: 500,
       orderBy: [{ postedAt: "desc" }, { createdAt: "desc" }],
       include: {
         trackedJob: {
@@ -209,8 +214,8 @@ export async function GET(req: NextRequest) {
       scoredJobs.sort((a, b) => b.scoreBreakdown.atsScore - a.scoreBreakdown.atsScore);
     } else if (sort === "newest") {
       scoredJobs.sort((a, b) => {
-        const timeA = (a.postedAt || a.createdAt).getTime();
-        const timeB = (b.postedAt || b.createdAt).getTime();
+        const timeA = new Date(a.postedAt || a.createdAt).getTime();
+        const timeB = new Date(b.postedAt || b.createdAt).getTime();
         return timeB - timeA;
       });
     } else if (sort === "salary") {

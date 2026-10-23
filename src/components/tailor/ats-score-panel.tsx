@@ -21,6 +21,7 @@ import {
 } from "@/lib/ats-evaluator/types";
 import { QualitativeReviewPanel } from "./qualitative-review-panel";
 import { AtsQualitativeReviewResult } from "@/lib/ai/qualitative-schema";
+import { resolveClientProviderConfig } from "@/lib/byok-vault";
 
 interface AtsScorePanelProps {
   typstContent: string;
@@ -134,15 +135,9 @@ export function AtsScorePanel({
   const handleFetchQualitativeReview = async () => {
     if (!result) return;
 
-    let aiSettings;
-    try {
-      const stored = localStorage.getItem("resumeforge_ai_settings");
-      aiSettings = stored ? JSON.parse(stored) : null;
-    } catch {
-      aiSettings = null;
-    }
+    const aiSettings = await resolveClientProviderConfig();
 
-    if (!aiSettings?.provider || !aiSettings?.apiKey) {
+    if (!aiSettings) {
       setQualitativeError("No AI provider configured. Please configure your API key in Settings.");
       return;
     }

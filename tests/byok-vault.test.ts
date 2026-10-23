@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { saveKey, getKey, removeKey, getActiveConfig } from "@/lib/byok-vault";
 import { callByokModel } from "@/lib/ai-provider";
-import { POST as proxyPost } from "@/app/api/ai/byok-proxy/route";
 
 describe("BYOK Vault & Router (WS6)", () => {
   const store: Record<string, string> = {};
@@ -72,7 +71,7 @@ describe("BYOK Vault & Router (WS6)", () => {
       // Default when empty
       const defaultConfig = await getActiveConfig();
       expect(defaultConfig.provider).toBe("gemini");
-      expect(defaultConfig.model).toBe("gemini-3.8-flash");
+      expect(defaultConfig.model).toBe("gemini-2.5-flash");
       expect(defaultConfig.hasKey).toBe(false);
 
       // Save a key for gemini
@@ -164,56 +163,27 @@ describe("BYOK Vault & Router (WS6)", () => {
       expect(result.text).toBe("Hello world");
       fetchSpy.mockRestore();
     });
-  });
 
-  describe("BYOK Edge Proxy Route", () => {
-    it("returns 400 when x-byok-target-url header is missing", async () => {
-      const req = new Request("http://localhost/api/ai/byok-proxy", {
-        method: "POST",
-        body: JSON.stringify({ test: true }),
-      });
-
-      const res = await proxyPost(req);
-      expect(res.status).toBe(400);
-      const json = await res.json();
-      expect(json.error).toContain("Missing x-byok-target-url");
-    });
-
-    it("forwards upstream request and streams payload directly", async () => {
-      const fakeTarget = "https://api.groq.com/openai/v1/chat/completions";
-      const upstreamBody = JSON.stringify({ choices: [{ message: { content: "Proxy response" } }] });
-
+    it("surfaces 'Sign in to use this provider, or switch to Gemini.' when guest calls OpenAI/Anthropic/Groq and receives 401 from proxy", async () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response(upstreamBody, {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        })
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "AUTH_REQUIRED",
+              message: "Sign in to use this provider, or switch to Gemini.",
+            },
+          }),
+          { status: 401, headers: { "content-type": "application/json" } }
+        )
       );
 
-      const req = new Request("http://localhost/api/ai/byok-proxy", {
-        method: "POST",
-        headers: {
-          "x-byok-target-url": fakeTarget,
-          "x-byok-auth": "Bearer gsk-secret-key",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ model: "llama-3.3-70b-versatile" }),
-      });
-
-      const res = await proxyPost(req);
-      expect(res.status).toBe(200);
-
-      // Verify upstream fetch received auth and target
-      expect(fetchSpy).toHaveBeenCalledWith(
-        fakeTarget,
-        expect.objectContaining({
-          method: "POST",
-          headers: expect.any(Headers),
+      await expect(
+        callByokModel({
+          provider: "openai",
+          apiKey: "sk-guest-key",
+          prompt: "Test prompt",
         })
-      );
-
-      const responseText = await res.text();
-      expect(responseText).toBe(upstreamBody);
+      ).rejects.toThrow("Sign in to use this provider, or switch to Gemini.");
 
       fetchSpy.mockRestore();
     });

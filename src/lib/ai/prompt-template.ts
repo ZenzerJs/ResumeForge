@@ -26,6 +26,10 @@ You MUST address the specific points raised in this qualitative feedback while g
 
 1. **ONE-PAGE CONSTRAINT**: The resume must remain within a single page. Do not add content that would cause overflow.
 2. **TYPST COMPATIBILITY**: The \`before\` and \`after\` fields must contain valid Typst markup that compiles without errors.
+3. **EXACT SUBSTRING MATCH (\`before\`)**: The \`before\` field MUST be a character-for-character verbatim substring copied directly from the Master Resume Typst source (including exact \`*bold*\` markers, punctuation, and escaping). If \`before\` does not match exactly, the patch will fail to apply.
+4. **CHARACTER BUDGET (1-PAGE PROTECTION)**: For \`MODIFY_BULLET\` and \`TWEAK_SUMMARY\`, the character length of \`after\` MUST NOT exceed the character length of \`before\` by more than +15% (and ideally stay within ±10 chars) so line wraps do not push the resume onto a second page.
+5. **TYPST SYNTAX IN \`after\`**: Preserve Typst inline emphasis (\`*bold*\`, \`_italic_\`) and escape special characters (\`\\@\`, \`\\$\`, \`\\#\`). Never output Markdown \`**bold**\` (double asterisks) inside Typst fields.
+6. **NO DUPLICATE KEYWORDS**: Before proposing an \`ADD_SKILL\` patch, verify the skill (or its direct alias, e.g., \`Postgres\` vs \`PostgreSQL\`) is not already present in the Master Resume Skills section.
 
 ## OUTPUT FORMAT — STRICT JSON SCHEMA
 

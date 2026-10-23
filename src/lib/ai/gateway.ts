@@ -16,6 +16,29 @@ import { buildJdFormatSystemPrompt, buildJdFormatUserPrompt, JdFormatPromptInput
 import { sanitizeTypstSource } from "../typst/sanitizer";
 
 /**
+ * Resolves server-side defaults and environment variables for AI providers.
+ */
+export function resolveServerProviderConfig(config: ProviderConfig): ProviderConfig {
+  if (config.provider === "groq") {
+    return {
+      ...config,
+      apiKey: config.apiKey?.trim() || process.env.GROQ_API_KEY?.trim() || undefined,
+      baseUrl: config.baseUrl || "https://api.groq.com/openai/v1",
+      model: config.model || "llama-3.3-70b-versatile",
+    };
+  }
+  if (config.provider === "ollama") {
+    return {
+      ...config,
+      baseUrl: config.baseUrl || process.env.OLLAMA_BASE_URL || "http://localhost:11434/v1",
+      model: config.model || "llama3.2",
+      apiKey: config.apiKey || "ollama",
+    };
+  }
+  return config;
+}
+
+/**
  * Unified AI Provider Gateway Connectivity Interface
  *
  * Dispatches test connection requests to the selected provider adapter.
@@ -31,41 +54,31 @@ export async function testProviderConnection(rawConfig: ProviderConfig): Promise
     };
   }
 
-  const config = parseResult.data;
+  const resolved = resolveServerProviderConfig(parseResult.data);
 
   try {
-    switch (config.provider) {
+    switch (resolved.provider) {
       case "openai":
-        return await testOpenAIConnection(config);
+        return await testOpenAIConnection(resolved);
       case "anthropic":
-        return await testAnthropicConnection(config);
+        return await testAnthropicConnection(resolved);
       case "gemini":
-        return await testGeminiConnection(config);
+        return await testGeminiConnection(resolved);
       case "groq":
-        return await testCustomConnection({
-          ...config,
-          baseUrl: config.baseUrl || "https://api.groq.com/openai",
-          model: config.model || "llama-3.3-70b-versatile",
-        });
       case "ollama":
-        return await testCustomConnection({
-          ...config,
-          baseUrl: config.baseUrl || "http://localhost:11434",
-          model: config.model || "llama3",
-        });
       case "custom":
-        return await testCustomConnection(config);
+        return await testCustomConnection(resolved);
       default:
         return {
           success: false,
-          provider: config.provider,
-          message: `Unsupported AI provider: ${config.provider}`,
+          provider: resolved.provider,
+          message: `Unsupported AI provider: ${resolved.provider}`,
         };
     }
   } catch (err) {
     return {
       success: false,
-      provider: config.provider,
+      provider: resolved.provider,
       message: sanitizeError(`Unhandled gateway exception: ${err instanceof Error ? err.message : String(err)}`),
     };
   }
@@ -86,24 +99,26 @@ export async function generatePatchProposals(input: GeneratePatchesInput): Promi
     };
   }
 
-  const config = parseResult.data;
+  const resolvedConfig = resolveServerProviderConfig(parseResult.data);
   const systemPrompt = buildPatchSystemPrompt(input.tailorFeedback);
   const userPrompt = buildPatchUserPrompt(input);
 
   try {
-    switch (config.provider) {
+    switch (resolvedConfig.provider) {
       case "openai":
-        return await generateOpenAIPatches(config, systemPrompt, userPrompt);
+        return await generateOpenAIPatches(resolvedConfig, systemPrompt, userPrompt);
       case "anthropic":
-        return await generateAnthropicPatches(config, systemPrompt, userPrompt);
+        return await generateAnthropicPatches(resolvedConfig, systemPrompt, userPrompt);
       case "gemini":
-        return await generateGeminiPatches(config, systemPrompt, userPrompt);
+        return await generateGeminiPatches(resolvedConfig, systemPrompt, userPrompt);
+      case "groq":
+      case "ollama":
       case "custom":
-        return await generateCustomPatches(config, systemPrompt, userPrompt);
+        return await generateCustomPatches(resolvedConfig, systemPrompt, userPrompt);
       default:
         return {
           success: false,
-          error: `Unsupported AI provider for patch generation: ${config.provider}`,
+          error: `Unsupported AI provider for patch generation: ${resolvedConfig.provider}`,
         };
     }
   } catch (err) {
@@ -126,24 +141,26 @@ export async function generateQualitativeReview(input: QualitativeReviewPromptIn
     };
   }
 
-  const config = parseResult.data;
+  const resolvedConfig = resolveServerProviderConfig(parseResult.data);
   const systemPrompt = buildQualitativeReviewSystemPrompt();
   const userPrompt = buildQualitativeReviewUserPrompt(input);
 
   try {
-    switch (config.provider) {
+    switch (resolvedConfig.provider) {
       case "openai":
-        return await generateOpenAIQualitativeReview(config, systemPrompt, userPrompt);
+        return await generateOpenAIQualitativeReview(resolvedConfig, systemPrompt, userPrompt);
       case "anthropic":
-        return await generateAnthropicQualitativeReview(config, systemPrompt, userPrompt);
+        return await generateAnthropicQualitativeReview(resolvedConfig, systemPrompt, userPrompt);
       case "gemini":
-        return await generateGeminiQualitativeReview(config, systemPrompt, userPrompt);
+        return await generateGeminiQualitativeReview(resolvedConfig, systemPrompt, userPrompt);
+      case "groq":
+      case "ollama":
       case "custom":
-        return await generateCustomQualitativeReview(config, systemPrompt, userPrompt);
+        return await generateCustomQualitativeReview(resolvedConfig, systemPrompt, userPrompt);
       default:
         return {
           success: false,
-          error: `Unsupported AI provider for qualitative review: ${config.provider}`,
+          error: `Unsupported AI provider for qualitative review: ${resolvedConfig.provider}`,
         };
     }
   } catch (err) {
@@ -171,24 +188,26 @@ export async function generateCoverLetter(
     };
   }
 
-  const config = parseResult.data;
+  const resolvedConfig = resolveServerProviderConfig(parseResult.data);
   const systemPrompt = buildCoverLetterSystemPrompt();
   const userPrompt = buildCoverLetterUserPrompt(input, evidenceItems, masterTypstSource);
 
   try {
-    switch (config.provider) {
+    switch (resolvedConfig.provider) {
       case "openai":
-        return await generateOpenAICoverLetter(config, systemPrompt, userPrompt);
+        return await generateOpenAICoverLetter(resolvedConfig, systemPrompt, userPrompt);
       case "anthropic":
-        return await generateAnthropicCoverLetter(config, systemPrompt, userPrompt);
+        return await generateAnthropicCoverLetter(resolvedConfig, systemPrompt, userPrompt);
       case "gemini":
-        return await generateGeminiCoverLetter(config, systemPrompt, userPrompt);
+        return await generateGeminiCoverLetter(resolvedConfig, systemPrompt, userPrompt);
+      case "groq":
+      case "ollama":
       case "custom":
-        return await generateCustomCoverLetter(config, systemPrompt, userPrompt);
+        return await generateCustomCoverLetter(resolvedConfig, systemPrompt, userPrompt);
       default:
         return {
           success: false,
-          error: `Unsupported AI provider for cover letter generation: ${config.provider}`,
+          error: `Unsupported AI provider for cover letter generation: ${resolvedConfig.provider}`,
         };
     }
   } catch (err) {
@@ -211,29 +230,31 @@ export async function convertPdfTextToTypst(input: ConvertPdfInput): Promise<Con
     };
   }
 
-  const config = parseResult.data;
+  const resolvedConfig = resolveServerProviderConfig(parseResult.data);
   const systemPrompt = buildPdfToTypstSystemPrompt();
   const userPrompt = buildPdfToTypstUserPrompt(input.rawText, input.fileName, input.links);
 
   try {
     let result: ConvertPdfResult;
-    switch (config.provider) {
+    switch (resolvedConfig.provider) {
       case "openai":
-        result = await convertOpenAIPdfTextToTypst(config, systemPrompt, userPrompt);
+        result = await convertOpenAIPdfTextToTypst(resolvedConfig, systemPrompt, userPrompt);
         break;
       case "anthropic":
-        result = await convertAnthropicPdfTextToTypst(config, systemPrompt, userPrompt);
+        result = await convertAnthropicPdfTextToTypst(resolvedConfig, systemPrompt, userPrompt);
         break;
       case "gemini":
-        result = await convertGeminiPdfTextToTypst(config, systemPrompt, userPrompt);
+        result = await convertGeminiPdfTextToTypst(resolvedConfig, systemPrompt, userPrompt);
         break;
+      case "groq":
+      case "ollama":
       case "custom":
-        result = await convertCustomPdfTextToTypst(config, systemPrompt, userPrompt);
+        result = await convertCustomPdfTextToTypst(resolvedConfig, systemPrompt, userPrompt);
         break;
       default:
         return {
           success: false,
-          error: `Unsupported AI provider for PDF conversion: ${config.provider}`,
+          error: `Unsupported AI provider for PDF conversion: ${resolvedConfig.provider}`,
         };
     }
 
@@ -272,22 +293,24 @@ export async function repairTypstSource(
     };
   }
 
-  const config = parseResult.data;
+  const resolvedConfig = resolveServerProviderConfig(parseResult.data);
 
   try {
-    switch (config.provider) {
+    switch (resolvedConfig.provider) {
       case "openai":
-        return await repairTypstWithOpenAI(config, inputValidate.data);
+        return await repairTypstWithOpenAI(resolvedConfig, inputValidate.data);
       case "anthropic":
-        return await repairTypstWithAnthropic(config, inputValidate.data);
+        return await repairTypstWithAnthropic(resolvedConfig, inputValidate.data);
       case "gemini":
-        return await repairTypstWithGemini(config, inputValidate.data);
+        return await repairTypstWithGemini(resolvedConfig, inputValidate.data);
+      case "groq":
+      case "ollama":
       case "custom":
-        return await repairTypstWithCustom(config, inputValidate.data);
+        return await repairTypstWithCustom(resolvedConfig, inputValidate.data);
       default:
         return {
           success: false,
-          error: `Unsupported AI provider for Typst repair: ${config.provider}`,
+          error: `Unsupported AI provider for Typst repair: ${resolvedConfig.provider}`,
         };
     }
   } catch (err) {
@@ -314,24 +337,26 @@ export async function extractEvidenceFromMaster(
     };
   }
 
-  const config = parseResult.data;
+  const resolvedConfig = resolveServerProviderConfig(parseResult.data);
   const systemPrompt = buildEvidenceExtractSystemPrompt();
   const userPrompt = buildEvidenceExtractUserPrompt(typstSource);
 
   try {
-    switch (config.provider) {
+    switch (resolvedConfig.provider) {
       case "openai":
-        return await generateOpenAIPatches(config, systemPrompt, userPrompt);
+        return await generateOpenAIPatches(resolvedConfig, systemPrompt, userPrompt);
       case "anthropic":
-        return await generateAnthropicPatches(config, systemPrompt, userPrompt);
+        return await generateAnthropicPatches(resolvedConfig, systemPrompt, userPrompt);
       case "gemini":
-        return await generateGeminiPatches(config, systemPrompt, userPrompt);
+        return await generateGeminiPatches(resolvedConfig, systemPrompt, userPrompt);
+      case "groq":
+      case "ollama":
       case "custom":
-        return await generateCustomPatches(config, systemPrompt, userPrompt);
+        return await generateCustomPatches(resolvedConfig, systemPrompt, userPrompt);
       default:
         return {
           success: false,
-          error: `Unsupported AI provider for evidence extract: ${config.provider}`,
+          error: `Unsupported AI provider for evidence extract: ${resolvedConfig.provider}`,
         };
     }
   } catch (err) {
@@ -351,27 +376,36 @@ export async function extractEvidenceFromMaster(
 export async function sendChatCompletion(
   rawConfig: ProviderConfig,
   messages: Array<{ role: string; content: string }>,
-  tools: unknown[] = []
+  tools: unknown = []
 ): Promise<ChatCompletionResult> {
   const parseResult = ProviderConfigSchema.safeParse(rawConfig);
   if (!parseResult.success) {
     throw new Error(sanitizeError(`Invalid provider configuration: ${parseResult.error.message}`));
   }
 
-  const config = parseResult.data;
+  const resolvedConfig = resolveServerProviderConfig(parseResult.data);
+  let effectiveMessages = messages;
+  let effectiveTools: any[] = [];
+  if (typeof tools === "string") {
+    effectiveMessages = [{ role: "system", content: tools }, ...messages];
+  } else if (Array.isArray(tools)) {
+    effectiveTools = tools;
+  }
 
   try {
-    switch (config.provider) {
+    switch (resolvedConfig.provider) {
       case "openai":
-        return await chatOpenAI(config, messages, tools);
+        return await chatOpenAI(resolvedConfig, effectiveMessages, effectiveTools);
       case "anthropic":
-        return await chatAnthropic(config, messages, tools);
+        return await chatAnthropic(resolvedConfig, effectiveMessages, effectiveTools);
       case "gemini":
-        return await chatGemini(config, messages, tools);
+        return await chatGemini(resolvedConfig, effectiveMessages, effectiveTools);
+      case "groq":
+      case "ollama":
       case "custom":
-        return await chatCustom(config, messages, tools);
+        return await chatCustom(resolvedConfig, effectiveMessages, effectiveTools);
       default:
-        throw new Error(`Unsupported AI provider for chat: ${config.provider}`);
+        throw new Error(`Unsupported AI provider for chat: ${resolvedConfig.provider}`);
     }
   } catch (err) {
     throw new Error(
@@ -401,29 +435,31 @@ export async function formatJobDescriptionWithAi(
     };
   }
 
-  const config = parseResult.data;
+  const resolvedConfig = resolveServerProviderConfig(parseResult.data);
   const systemPrompt = buildJdFormatSystemPrompt();
   const userPrompt = buildJdFormatUserPrompt(input);
 
   try {
     let rawResult: GeneratePatchesResult;
-    switch (config.provider) {
+    switch (resolvedConfig.provider) {
       case "openai":
-        rawResult = await generateOpenAIPatches(config, systemPrompt, userPrompt);
+        rawResult = await generateOpenAIPatches(resolvedConfig, systemPrompt, userPrompt);
         break;
       case "anthropic":
-        rawResult = await generateAnthropicPatches(config, systemPrompt, userPrompt);
+        rawResult = await generateAnthropicPatches(resolvedConfig, systemPrompt, userPrompt);
         break;
       case "gemini":
-        rawResult = await generateGeminiPatches(config, systemPrompt, userPrompt);
+        rawResult = await generateGeminiPatches(resolvedConfig, systemPrompt, userPrompt);
         break;
+      case "groq":
+      case "ollama":
       case "custom":
-        rawResult = await generateCustomPatches(config, systemPrompt, userPrompt);
+        rawResult = await generateCustomPatches(resolvedConfig, systemPrompt, userPrompt);
         break;
       default:
         return {
           success: false,
-          error: `Unsupported AI provider: ${config.provider}`,
+          error: `Unsupported AI provider: ${resolvedConfig.provider}`,
         };
     }
 

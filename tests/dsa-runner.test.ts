@@ -129,7 +129,9 @@ describe('WS9 DSA Engine & Problem Catalog', () => {
 
     it('deepEqual utility validates primitives, nested objects, and arrays', () => {
       expect(deepEqual([0, 1], [0, 1])).toBe(true);
-      expect(deepEqual([1, 2], [2, 1])).toBe(true); // Permuted primitive array equality
+      expect(deepEqual([1, 2], [2, 1])).toBe(false);
+      expect(deepEqual([[1, 2], [3, 4]], [[3, 4], [2, 1]])).toBe(true);
+      expect(deepEqual([], {})).toBe(false);
       expect(deepEqual({ a: 1, b: [2, 3] }, { a: 1, b: [2, 3] })).toBe(true);
       expect(deepEqual(NaN, NaN)).toBe(true);
       expect(deepEqual([0, 1], [0, 2])).toBe(false);
@@ -141,8 +143,12 @@ describe('WS9 DSA Engine & Problem Catalog', () => {
         interface Result {
           indices: number[];
         }
-        function twoSum(nums: number[], target: number): number[] {
+        export function twoSum(nums: number[], target: number): number[] {
           const map: Map<number, number> = new Map<number, number>();
+          const obj = { a: 1, b: 2 };
+          if (left < right || nums[left] > target) {
+            return [0, 1];
+          }
           return [0, 1] as number[];
         }
       `;
@@ -151,6 +157,8 @@ describe('WS9 DSA Engine & Problem Catalog', () => {
       expect(sanitized).not.toContain(': number[]');
       expect(sanitized).not.toContain('as number[]');
       expect(sanitized).toContain('function twoSum(nums, target)');
+      expect(sanitized).toContain('{ a: 1, b: 2 }');
+      expect(sanitized).toContain('if (left < right || nums[left] > target)');
     });
 
     it('returns Accepted for a valid JavaScript solution', async () => {

@@ -1,6 +1,7 @@
 export interface FactEmployer {
   raw: string;
   normalized: string;
+  aliases?: string[];
   location?: string;
   startDate?: string;
   endDate?: string;
@@ -20,6 +21,7 @@ export interface FactDateRange {
   startIso?: string;
   endIso?: string;
   isCurrent?: boolean;
+  employerNormalized?: string;
 }
 
 export interface FactMetric {
@@ -27,6 +29,7 @@ export interface FactMetric {
   value: number;
   unit: string;
   context: string;
+  subject?: string;
   isTrivial: boolean;
 }
 

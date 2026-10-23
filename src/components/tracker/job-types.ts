@@ -20,6 +20,7 @@ export interface JobItem {
   roleTitle?: string | null;
   rawDescription?: string;
   isPlaceholder?: boolean;
+  extractFailure?: string | null;
   source: string;
   extractedRequirements: {
     requiredSkills: string[];

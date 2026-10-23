@@ -21,10 +21,10 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
 
   const linkClass = (active: boolean) =>
     cn(
-      "flex h-full shrink-0 items-center whitespace-nowrap border-b-2 px-3 text-xs font-medium transition-colors",
+      "flex shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
       active
-        ? "border-amber-500 text-white"
-        : "border-transparent text-slate-400 hover:text-slate-200",
+        ? "bg-amber-500/15 border border-amber-500/40 text-amber-300"
+        : "border border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-slate-200",
     );
 
   return (

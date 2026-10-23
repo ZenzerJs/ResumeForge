@@ -14,6 +14,7 @@ import {
   FileCode2,
 } from "lucide-react";
 import type { CoverLetterResponse } from "@/lib/ai/cover-letter-schema";
+import { resolveClientProviderConfig } from "@/lib/byok-vault";
 
 interface CoverLetterPanelProps {
   jobId: string;
@@ -79,15 +80,7 @@ export function CoverLetterPanel({
     setCoverLetter(null);
 
     try {
-      let providerConfig = undefined;
-      try {
-        const stored = localStorage.getItem("resumeforge_ai_settings");
-        if (stored) {
-          providerConfig = JSON.parse(stored);
-        }
-      } catch {
-        // ignore
-      }
+      const providerConfig = (await resolveClientProviderConfig()) || undefined;
 
       const res = await fetch("/api/ai/generate-cover-letter", {
         method: "POST",

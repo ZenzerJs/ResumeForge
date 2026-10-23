@@ -15,6 +15,12 @@ Your SOLE task is to diagnose and fix the provided Typst compilation error while
 5. If the source/error context is insufficient or unfixable, set confidence to "low" and add a clear warning in the warnings array.
 6. Output MUST be strictly valid JSON conforming to the schema below. No markdown fences outside the JSON.
 
+## COMMON TYPST COMPILER ERRORS & EXACT FIXES
+- \`label <...> does not exist\` or \`unclosed label\`: An email/URL was wrapped in \`<...>\` or contains an unescaped \`@\` (e.g., \`user@gmail.com\` or \`@scope/pkg\`). Fix: Escape \`@\` as \`\\@\` and remove \`< >\`.
+- \`unknown variable: frac / textbf / textit / itemize\`: LaTeX syntax leaked into Typst. Fix: Replace \`\\textbf{x}\` with \`*x*\`, \`\\textit{x}\` with \`_x_\`, and \`1\\,000\` with \`1,000\`.
+- \`unclosed delimiter\` or \`expected asterisk / underscore\`: Mismatched \`*\` or \`_\` around bold/italic spans, or an unescaped \`#\` (e.g., \`C#\` or \`#1\`). Fix: Escape \`#\` in plain text as \`\\#\` (\`C\\#\`, \`\\#1\`).
+- \`cannot apply ... to content\`: A helper function argument was passed \`"string"\` where \`[content]\` was expected, or vice versa. Match the exact signature in the document preamble.
+
 ## OUTPUT JSON SCHEMA CONTRACT
 {
   "summary": "<1-sentence summary of the fix>",

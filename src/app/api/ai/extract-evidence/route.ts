@@ -3,7 +3,7 @@ import {
   EvidenceExtractResponseSchema,
   ExtractEvidenceRequestSchema,
 } from "@/lib/ai/evidence-extract-schema";
-import { extractEvidenceFromMaster } from "@/lib/ai/gateway";
+import { extractEvidenceFromMaster, resolveServerProviderConfig } from "@/lib/ai/gateway";
 import { persistDraftEvidenceFromExtract } from "@/lib/ai/evidence-persist";
 import { sanitizeError } from "@/lib/ai/redact";
 import { requireUserId } from "@/lib/security/auth-request";
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     const { typstSource, providerConfig } = parseResult.data;
 
-    if (!providerConfig?.provider || (!providerConfig.apiKey && providerConfig.provider !== "custom")) {
+    if (!providerConfig?.provider) {
       return NextResponse.json(
         {
           success: false,
@@ -39,7 +39,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const gatewayResult = await extractEvidenceFromMaster(providerConfig, typstSource);
+    const resolvedConfig = resolveServerProviderConfig(providerConfig);
+    if (!resolvedConfig.apiKey && resolvedConfig.provider !== "custom" && resolvedConfig.provider !== "ollama") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "No AI provider configured. Please configure your API key in Settings.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const gatewayResult = await extractEvidenceFromMaster(resolvedConfig, typstSource);
 
     if (!gatewayResult.success || !gatewayResult.rawJson) {
       return NextResponse.json(

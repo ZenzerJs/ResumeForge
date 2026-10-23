@@ -6,14 +6,17 @@
  */
 
 // Common API key patterns
-const API_KEY_PATTERNS = [
+export const SECRET_PATTERNS = [
   /sk-proj-[A-Za-z0-9_-]+/g,
   /sk-ant-[A-Za-z0-9_-]+/g,
   /sk-[A-Za-z0-9_-]{20,}/g,
   /AIzaSy[A-Za-z0-9_-]{33}/g,
   /Bearer\s+[A-Za-z0-9._~+/-]+=*/gi,
   /key=[A-Za-z0-9_-]{20,}/gi,
+  /gsk_[A-Za-z0-9_-]{20,}/g,
 ];
+
+export const API_KEY_PATTERNS = SECRET_PATTERNS;
 
 /**
  * Redacts any key-shaped string from a given input string.
@@ -64,3 +67,5 @@ export function sanitizeError(error: unknown): string {
 
   return redactKeys(message);
 }
+
+export const redactError = sanitizeError;

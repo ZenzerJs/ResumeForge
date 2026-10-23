@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { clientKey, rateLimit } from "@/lib/security/rate-limit";
 import { isMutationMethod, isPublicPath, originAllowed } from "@/lib/security/session";
 
+export const HEAVY_ENDPOINT_LIMITS: Record<string, { limit: number; windowMs: number }> = {
+  "/api/jobs/bulk-import": { limit: 10, windowMs: 60_000 },
+  "/api/resumes/upload-pdf": { limit: 10, windowMs: 60_000 },
+  "/api/jobs/extract": { limit: 15, windowMs: 60_000 },
+  "/api/connectors/sync": { limit: 5, windowMs: 60_000 },
+};
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (isPublicPath(pathname)) {
@@ -28,16 +35,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Invalid request origin" }, { status: 403 });
   }
 
+  const heavyConfig = HEAVY_ENDPOINT_LIMITS[pathname];
   if (pathname.startsWith("/api/ai/")) {
     if (!rateLimit(clientKey(request, "ai"), 20, 60_000)) {
       return NextResponse.json({ success: false, error: "Too many AI requests" }, { status: 429 });
     }
-  } else if (
-    pathname === "/api/jobs/bulk-import" ||
-    pathname === "/api/resumes/upload-pdf" ||
-    pathname === "/api/connectors/sync" ||
-    (pathname.startsWith("/api/companies/") && pathname.endsWith("/dossier/generate"))
-  ) {
+  } else if (heavyConfig) {
+    if (!rateLimit(clientKey(request, `heavy:${pathname}`), heavyConfig.limit, heavyConfig.windowMs)) {
+      return NextResponse.json({ success: false, error: "Too many requests" }, { status: 429 });
+    }
+  } else if (pathname.startsWith("/api/companies/") && pathname.endsWith("/dossier/generate")) {
     if (!rateLimit(clientKey(request, "heavy"), 10, 60_000)) {
       return NextResponse.json({ success: false, error: "Too many requests" }, { status: 429 });
     }

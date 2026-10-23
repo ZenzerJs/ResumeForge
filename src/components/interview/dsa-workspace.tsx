@@ -11,6 +11,13 @@ import {
 import { listSandboxProblems } from "@/lib/sandbox-problems";
 import { executeDsaCode, type DsaExecutionSummary } from "@/lib/dsa-runner";
 import {
+  askSocraticCoach,
+  auditDsaSubmission,
+  type DsaChatMessage,
+  type DsaInterviewStage,
+  type DsaScorecard,
+} from "@/lib/dsa-coach";
+import {
   Play,
   RotateCcw,
   Sparkles,
@@ -23,6 +30,9 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  Bot,
+  Send,
+  Award,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -59,6 +69,12 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
   const [executionSummary, setExecutionSummary] = useState<DsaExecutionSummary | null>(null);
   const [activeTestCaseIndex, setActiveTestCaseIndex] = useState<number>(0);
   const [isRunning, setIsRunning] = useState<boolean>(false);
+  const [coachStage, setCoachStage] = useState<DsaInterviewStage>("CLARIFICATION");
+  const [coachMessages, setCoachMessages] = useState<DsaChatMessage[]>([]);
+  const [coachInput, setCoachInput] = useState<string>("");
+  const [isAskingCoach, setIsAskingCoach] = useState<boolean>(false);
+  const [scorecard, setScorecard] = useState<DsaScorecard | null>(null);
+  const [isAuditing, setIsAuditing] = useState<boolean>(false);
   const [, startTransition] = useTransition();
   const gutterRef = useRef<HTMLDivElement>(null);
 
@@ -72,6 +88,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
         setRevealedHints({});
         setExecutionSummary(null);
         setActiveTestCaseIndex(0);
+        setCoachStage("CLARIFICATION");
+        setCoachMessages([]);
+        setScorecard(null);
       }
     }
     if (queryJd && !jdInput) {
@@ -89,17 +108,22 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
     setRevealedHints({});
     setExecutionSummary(null);
     setActiveTestCaseIndex(0);
+    setCoachStage("CLARIFICATION");
+    setCoachMessages([]);
+    setScorecard(null);
   };
 
   const handleLanguageChange = (lang: DsaLanguage) => {
     setSelectedLanguage(lang);
     setCode(selectedProblem.starterCode[lang]);
     setExecutionSummary(null);
+    setScorecard(null);
   };
 
   const handleReset = () => {
     setCode(selectedProblem.starterCode[selectedLanguage]);
     setExecutionSummary(null);
+    setScorecard(null);
   };
 
   const handleRecommend = () => {
@@ -113,6 +137,62 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
       ...prev,
       [index]: !prev[index],
     }));
+  };
+
+  const handleAskCoach = async () => {
+    const trimmed = coachInput.trim();
+    if (!trimmed || isAskingCoach) return;
+    setIsAskingCoach(true);
+    const userMsg: DsaChatMessage = {
+      role: "user",
+      content: trimmed,
+      stage: coachStage,
+      timestamp: new Date().toISOString(),
+    };
+    const nextHistory = [...coachMessages, userMsg];
+    setCoachMessages(nextHistory);
+    setCoachInput("");
+
+    try {
+      const turn = await askSocraticCoach({
+        problem: selectedProblem,
+        stage: coachStage,
+        language: selectedLanguage,
+        code,
+        execution: executionSummary || undefined,
+        messages: nextHistory,
+        userMessage: trimmed,
+      });
+      const assistantMsg: DsaChatMessage = {
+        role: "assistant",
+        content: turn.reply,
+        stage: turn.suggestedNextStage,
+        timestamp: new Date().toISOString(),
+      };
+      setCoachMessages((prev) => [...prev, assistantMsg]);
+      setCoachStage(turn.suggestedNextStage);
+    } finally {
+      setIsAskingCoach(false);
+    }
+  };
+
+  const handleAuditScorecard = async () => {
+    if (!executionSummary || isAuditing) return;
+    setIsAuditing(true);
+    try {
+      const hintsUsed = Object.values(revealedHints).filter(Boolean).length;
+      const result = await auditDsaSubmission({
+        problem: selectedProblem,
+        language: selectedLanguage,
+        code,
+        execution: executionSummary,
+        hintsUsed,
+      });
+      setScorecard(result);
+      setCoachStage("SCORECARD");
+    } finally {
+      setIsAuditing(false);
+    }
   };
 
   const handleRun = async () => {
@@ -418,6 +498,134 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               })}
             </div>
           </div>
+
+          {/* Socratic AI Coach & Complexity Auditor */}
+          <div
+            data-testid="dsa-socratic-coach-panel"
+            className="space-y-3 border-t border-slate-800 pt-5"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <Bot className="h-4 w-4 text-amber-400" aria-hidden />
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+                  Socratic Interview Coach
+                </h2>
+              </div>
+              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-amber-300">
+                Stage: {coachStage}
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-400">
+              Discuss constraints, walk through your Big-O approach, or request a Socratic nudge without spoiling the code.
+            </p>
+
+            {coachMessages.length > 0 && (
+              <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-slate-800 bg-rf-bg p-2.5 text-xs">
+                {coachMessages.map((msg, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "rounded-md p-2 leading-relaxed",
+                      msg.role === "user"
+                        ? "ml-4 bg-slate-800/80 text-slate-200"
+                        : "mr-2 border border-amber-500/20 bg-amber-500/5 text-slate-200"
+                    )}
+                  >
+                    <span className="mb-0.5 block font-mono text-[10px] uppercase text-slate-400">
+                      {msg.role === "user" ? "You" : "Socratic Coach"}
+                    </span>
+                    {msg.content}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                data-testid="dsa-coach-input"
+                value={coachInput}
+                onChange={(e) => setCoachInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleAskCoach();
+                  }
+                }}
+                placeholder="Explain your approach or ask a clarifying question…"
+                className="h-8 flex-1 rounded-md border border-slate-700 bg-rf-bg px-2.5 text-xs text-slate-100 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+              />
+              <button
+                type="button"
+                data-testid="dsa-coach-send-btn"
+                disabled={isAskingCoach || !coachInput.trim()}
+                onClick={() => void handleAskCoach()}
+                className="inline-flex h-8 items-center gap-1 rounded-md bg-slate-800 px-3 text-xs font-semibold text-amber-300 transition-colors hover:bg-slate-700 disabled:opacity-50"
+              >
+                {isAskingCoach ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                ) : (
+                  <Send className="h-3.5 w-3.5" aria-hidden />
+                )}
+                <span>Ask</span>
+              </button>
+            </div>
+
+            {executionSummary && (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  data-testid="dsa-audit-scorecard-btn"
+                  disabled={isAuditing}
+                  onClick={() => void handleAuditScorecard()}
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-300 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
+                >
+                  {isAuditing ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                  ) : (
+                    <Award className="h-3.5 w-3.5" aria-hidden />
+                  )}
+                  <span>Audit Complexity &amp; Generate Scorecard</span>
+                </button>
+              </div>
+            )}
+
+            {scorecard && (
+              <div
+                data-testid="dsa-scorecard-panel"
+                className="space-y-2.5 rounded-lg border border-emerald-500/30 bg-emerald-950/15 p-3 text-xs"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-white">
+                    Interview Readiness Grade:{" "}
+                    <span className="font-mono text-sm text-amber-400">{scorecard.grade}</span>{" "}
+                    ({scorecard.overallScore}/100)
+                  </span>
+                  <span className="font-mono text-[10px] uppercase text-slate-400">
+                    {scorecard.mode === "byok" ? "AI Audited" : "Heuristic Audit"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
+                  <div className="rounded border border-slate-800 bg-rf-bg p-2">
+                    <span className="block text-[10px] text-slate-400">Time Complexity</span>
+                    <span className={scorecard.complexityAudit.isTimeOptimal ? "text-emerald-400" : "text-amber-300"}>
+                      {scorecard.complexityAudit.detectedTimeComplexity} (target {scorecard.complexityAudit.optimalTimeComplexity})
+                    </span>
+                  </div>
+                  <div className="rounded border border-slate-800 bg-rf-bg p-2">
+                    <span className="block text-[10px] text-slate-400">Space Complexity</span>
+                    <span className={scorecard.complexityAudit.isSpaceOptimal ? "text-emerald-400" : "text-amber-300"}>
+                      {scorecard.complexityAudit.detectedSpaceComplexity} (target {scorecard.complexityAudit.optimalSpaceComplexity})
+                    </span>
+                  </div>
+                </div>
+                <p className="text-[11px] leading-relaxed text-slate-300">
+                  {scorecard.complexityAudit.actionableFeedback}
+                </p>
+              </div>
+            )}
+          </div>
         </section>
 
         {/* Editor + console */}
@@ -484,7 +692,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               <div
                 ref={gutterRef}
                 aria-hidden
-                className="select-none overflow-hidden border-r border-slate-800/70 py-4 pl-3 pr-3 text-right font-mono text-[13px] leading-relaxed text-slate-600"
+                className="select-none overflow-hidden border-r border-slate-800 bg-slate-950/40 py-4 pl-3 pr-3 text-right font-mono text-[13px] leading-relaxed text-slate-500"
               >
                 {Array.from({ length: lineCount }, (_, i) => (
                   <div key={i}>{i + 1}</div>
@@ -588,10 +796,10 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                     onClick={() => setActiveTestCaseIndex(idx)}
                     aria-pressed={isActive}
                     className={cn(
-                      "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60",
+                      "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60",
                       isActive
-                        ? "border-slate-500 bg-slate-700 text-white"
-                        : "border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200"
+                        ? "border-amber-500/40 bg-amber-500/15 text-amber-300"
+                        : "border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:text-slate-200"
                     )}
                   >
                     <span>Case {idx + 1}</span>

@@ -19,10 +19,22 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/design-system/app-shell";
+import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BulkPdfDropzone } from "@/components/evidence/bulk-pdf-dropzone";
-import { ExtractedPdfEvidence } from "@/lib/evidence/pdfExtractor";
+import type { ExtractedPdfEvidence } from "@/lib/evidence/pdfExtractor";
 import { convertExtractedPdfToEvidenceItems, type CreateEvidencePayload } from "@/lib/evidence/evidence-transform";
+
+const BulkPdfDropzone = dynamic(
+  () => import("@/components/evidence/bulk-pdf-dropzone").then((mod) => mod.BulkPdfDropzone),
+  {
+    loading: () => (
+      <div className="h-32 rounded-xl border border-dashed border-slate-800 bg-slate-900/40 p-4 animate-pulse flex items-center justify-center text-xs text-slate-500 font-mono">
+        Loading PDF dropzone...
+      </div>
+    ),
+    ssr: false,
+  }
+);
 
 export interface Bullet {
   id?: string;
@@ -46,6 +58,7 @@ export interface EvidenceItem {
   updatedAt?: string;
   bullets: Bullet[];
   needsReview?: boolean;
+  duplicateTargetId?: string;
   similarityScore?: number;
   candidateBullet?: string;
   existingBullet?: string;
@@ -104,12 +117,46 @@ export function LibraryWorkspace() {
         } catch (e) {
           console.error("Failed to read guest evidence from localStorage:", e);
         }
-        setItems(loadedItems);
+
+        // Annotate potential duplicate items for the Review Queue unless already dismissed
+        let reviewedSet = new Set<string>();
+        try {
+          const rawReviewed = typeof window !== "undefined" ? localStorage.getItem("rf_reviewed_duplicates") : null;
+          if (rawReviewed) {
+            reviewedSet = new Set(JSON.parse(rawReviewed));
+          }
+        } catch {}
+
+        const annotated = loadedItems.map((item, idx) => {
+          if (reviewedSet.has(item.id)) return item;
+          if (item.needsReview) return item;
+          const normTitle = item.title.trim().toLowerCase();
+          const earlierMatch = loadedItems.slice(0, idx).find((prev) => {
+            const prevTitle = prev.title.trim().toLowerCase();
+            return (
+              prevTitle === normTitle &&
+              (prev.organization || "").trim().toLowerCase() === (item.organization || "").trim().toLowerCase()
+            );
+          });
+          if (earlierMatch) {
+            return {
+              ...item,
+              needsReview: true,
+              duplicateTargetId: earlierMatch.id,
+              similarityScore: 0.88,
+              candidateBullet: item.bullets?.[0]?.text || item.verifiedSummary,
+              existingBullet: earlierMatch.bullets?.[0]?.text || earlierMatch.verifiedSummary,
+            };
+          }
+          return item;
+        });
+
+        setItems(annotated);
         // Expand first item by default while preserving existing expanded items
-        if (loadedItems.length > 0) {
+        if (annotated.length > 0) {
           setExpandedIds((prev) => ({
             ...prev,
-            [loadedItems[0].id]: true,
+            [annotated[0].id]: true,
           }));
         }
       }
@@ -617,7 +664,7 @@ export function LibraryWorkspace() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search evidence by title, org, summary, or tags…"
-              className="w-full h-11 pl-9 pr-4 rounded bg-white text-slate-900 text-xs font-mono placeholder:text-slate-500 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00]"
+              className="w-full h-11 pl-9 pr-4 rounded bg-slate-900/90 border border-slate-700/80 text-slate-100 placeholder:text-slate-500 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00] text-xs font-mono"
             />
           </div>
 
@@ -783,41 +830,207 @@ export function LibraryWorkspace() {
         )}
         </>
         ) : (
-          <div className="grid gap-4">
-            {items.filter(item => item.needsReview).length === 0 ? (
-              <div className="text-center p-8 text-slate-400">No items need review.</div>
+          <div className="grid gap-4" data-testid="duplicate-review-queue">
+            {items.filter((item) => item.needsReview).length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-800 bg-[#121929]/50 text-center p-10 text-slate-400 text-xs font-mono">
+                No duplicate or overlapping evidence items need review.
+              </div>
             ) : (
-              items.filter(item => item.needsReview).map(item => (
-                <div key={item.id} className="rounded-xl border border-slate-800 bg-[#121929]/90 p-5">
-                  <h3 className="text-lg font-bold text-white mb-2">Review Potential Duplicate</h3>
-                  <div className="flex gap-4 mb-4">
-                    <div className="flex-1 p-4 rounded bg-slate-900 border border-slate-700">
-                      <div className="text-xs text-slate-400 mb-1 font-mono uppercase">Candidate Bullet</div>
-                      <p className="text-sm text-slate-200">{item.candidateBullet || 'N/A'}</p>
+              items
+                .filter((item) => item.needsReview)
+                .map((item) => (
+                  <div
+                    key={item.id}
+                    data-testid={`duplicate-review-card-${item.id}`}
+                    className="rounded-xl border border-slate-800 bg-[#121929]/90 p-5"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-base font-bold text-white">
+                        Review Potential Duplicate · {item.title}
+                      </h3>
+                      <span className="text-xs font-mono text-slate-400">
+                        {item.organization || "Personal"}
+                      </span>
                     </div>
-                    <div className="flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="text-[#ff8c00] font-bold text-lg">{(item.similarityScore || 0.75) * 100}%</div>
-                        <div className="text-[10px] text-slate-500 uppercase">Similarity</div>
+                    <div className="flex flex-col md:flex-row gap-4 mb-4">
+                      <div className="flex-1 p-4 rounded-lg bg-[#0b1326] border border-slate-800">
+                        <div className="text-[11px] text-amber-300 mb-1 font-mono uppercase">
+                          Candidate Bullet
+                        </div>
+                        <p className="text-xs text-slate-200 leading-relaxed">
+                          {item.candidateBullet || item.verifiedSummary || "N/A"}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-center px-2">
+                        <div className="text-center">
+                          <div className="text-[#ff8c00] font-bold text-lg font-mono">
+                            {Math.round((item.similarityScore || 0.75) * 100)}%
+                          </div>
+                          <div className="text-[10px] text-slate-500 uppercase font-mono">
+                            Similarity
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex-1 p-4 rounded-lg bg-[#0b1326] border border-slate-800">
+                        <div className="text-[11px] text-emerald-300 mb-1 font-mono uppercase">
+                          Existing Bullet
+                        </div>
+                        <p className="text-xs text-slate-200 leading-relaxed">
+                          {item.existingBullet || "N/A"}
+                        </p>
                       </div>
                     </div>
-                    <div className="flex-1 p-4 rounded bg-slate-900 border border-slate-700">
-                      <div className="text-xs text-slate-400 mb-1 font-mono uppercase">Existing Bullet</div>
-                      <p className="text-sm text-slate-200">{item.existingBullet || 'N/A'}</p>
+                    <div className="flex gap-2 justify-end">
+                      <Button
+                        type="button"
+                        data-testid={`keep-both-btn-${item.id}`}
+                        onClick={async () => {
+                          try {
+                            const raw = localStorage.getItem("rf_reviewed_duplicates");
+                            const list: string[] = raw ? JSON.parse(raw) : [];
+                            localStorage.setItem(
+                              "rf_reviewed_duplicates",
+                              JSON.stringify(Array.from(new Set([...list, item.id])))
+                            );
+                          } catch {}
+                          if (!item.id.startsWith("guest-")) {
+                            if (item.status !== "verified") {
+                              await fetch(`/api/evidence/${item.id}`, {
+                                method: "PUT",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ status: "verified" }),
+                              }).catch(() => {});
+                            }
+                          } else {
+                            try {
+                              const rawGuest = localStorage.getItem("resumeforge_guest_evidence");
+                              const list: EvidenceItem[] = rawGuest ? JSON.parse(rawGuest) : [];
+                              localStorage.setItem(
+                                "resumeforge_guest_evidence",
+                                JSON.stringify(
+                                  list.map((g) =>
+                                    g.id === item.id ? { ...g, status: "verified", needsReview: false } : g
+                                  )
+                                )
+                              );
+                            } catch {}
+                          }
+                          setItems((prev) =>
+                            prev.map((i) =>
+                              i.id === item.id ? { ...i, needsReview: false, status: "verified" } : i
+                            )
+                          );
+                          setNotification({
+                            type: "success",
+                            message: `Kept both "${item.title}" entries as distinct verified items.`,
+                          });
+                        }}
+                        variant="outline"
+                        className="border-slate-700 text-slate-300 text-xs"
+                      >
+                        Keep Both
+                      </Button>
+                      <Button
+                        type="button"
+                        data-testid={`merge-duplicate-btn-${item.id}`}
+                        onClick={async () => {
+                          const target = items.find((i) => i.id === item.duplicateTargetId);
+                          if (!target) {
+                            setNotification({
+                              type: "error",
+                              message: "Could not locate primary target item for merge.",
+                            });
+                            return;
+                          }
+                          const mergedTags = Array.from(
+                            new Set([...(target.tags || []), ...(item.tags || [])])
+                          );
+                          const existingTexts = new Set(
+                            (target.bullets || []).map((b) => b.text.trim().toLowerCase())
+                          );
+                          const mergedBullets = [
+                            ...(target.bullets || []).map((b) => ({
+                              text: b.text,
+                              verified: true,
+                            })),
+                            ...(item.bullets || [])
+                              .filter((b) => !existingTexts.has(b.text.trim().toLowerCase()))
+                              .map((b) => ({ text: b.text, verified: true })),
+                          ];
+
+                          if (!target.id.startsWith("guest-")) {
+                            const updateRes = await fetch(`/api/evidence/${target.id}`, {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                tags: mergedTags,
+                                bullets: mergedBullets,
+                                status: "verified",
+                              }),
+                            }).catch(() => null);
+                            if (!updateRes || !updateRes.ok) {
+                              setNotification({
+                                type: "error",
+                                message: `Failed to merge into "${target.title}". Duplicate was preserved.`,
+                              });
+                              return;
+                            }
+                          } else {
+                            try {
+                              const rawGuest = localStorage.getItem("resumeforge_guest_evidence");
+                              const list: EvidenceItem[] = rawGuest ? JSON.parse(rawGuest) : [];
+                              const updatedGuestList = list.map((g) =>
+                                g.id === target.id
+                                  ? {
+                                      ...g,
+                                      tags: mergedTags,
+                                      status: "verified" as const,
+                                      bullets: mergedBullets.map((b, idx) => ({
+                                        id: `b-${idx}-${Date.now()}`,
+                                        evidenceItemId: target.id,
+                                        text: b.text,
+                                        technologies: [],
+                                        roleAffinity: [],
+                                        verified: true,
+                                        orderIndex: idx,
+                                      })),
+                                    }
+                                  : g
+                              );
+                              localStorage.setItem(
+                                "resumeforge_guest_evidence",
+                                JSON.stringify(updatedGuestList)
+                              );
+                            } catch {}
+                          }
+
+                          if (!item.id.startsWith("guest-")) {
+                            await fetch(`/api/evidence/${item.id}`, {
+                              method: "DELETE",
+                            }).catch(() => {});
+                          } else {
+                            try {
+                              const rawGuest = localStorage.getItem("resumeforge_guest_evidence");
+                              const list: EvidenceItem[] = rawGuest ? JSON.parse(rawGuest) : [];
+                              localStorage.setItem(
+                                "resumeforge_guest_evidence",
+                                JSON.stringify(list.filter((g) => g.id !== item.id))
+                              );
+                            } catch {}
+                          }
+                          await fetchItems();
+                          setNotification({
+                            type: "success",
+                            message: `Merged "${item.title}" bullets into primary Evidence Bank record.`,
+                          });
+                        }}
+                        className="bg-[#ff8c00] text-black font-bold text-xs hover:bg-amber-400"
+                      >
+                        Merge
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex gap-2 justify-end">
-                    <Button onClick={() => {
-                      const newItems = items.map(i => i.id === item.id ? { ...i, needsReview: false } : i);
-                      setItems(newItems);
-                    }} variant="outline" className="border-slate-700 text-slate-300">Keep Both</Button>
-                    <Button onClick={() => {
-                      const newItems = items.map(i => i.id === item.id ? { ...i, needsReview: false } : i);
-                      setItems(newItems);
-                    }} className="bg-[#ff8c00] text-black font-bold">Merge</Button>
-                  </div>
-                </div>
-              ))
+                ))
             )}
           </div>
         )}

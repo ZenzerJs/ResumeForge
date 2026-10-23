@@ -35,6 +35,7 @@ import { generateAtsDocx } from "@/lib/export/docx";
 import { generateApplicationPackageZip, sanitizeZipFilename } from "@/lib/export/zip";
 import { compileTypstToPdf } from "@/lib/typst/compiler";
 import { ResumeFacts } from "@/lib/facts/types";
+import { resolveClientProviderConfig } from "@/lib/byok-vault";
 
 export interface TrackerJobItem {
   id: string;
@@ -47,6 +48,7 @@ export interface TrackerJobItem {
   source?: string;
   location?: string | null;
   salarySnippet?: string | null;
+  rawDescription?: string | null;
   requirements?: {
     requiredSkills: string[];
     preferredSkills: string[];
@@ -78,6 +80,7 @@ export function ApplySheet({
   const [guardrailResult, setGuardrailResult] = useState<GuardrailResult | null>(null);
   const [atsScore, setAtsScore] = useState<AtsEvaluationResult | null>(null);
   const [tailoredTypst, setTailoredTypst] = useState<string>(masterTypst);
+  const [appliedPatchCount, setAppliedPatchCount] = useState<number>(0);
   const [exportError, setExportError] = useState<string | null>(null);
   const [variantError, setVariantError] = useState<string | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(job?.appliedVariantId ?? null);
@@ -86,11 +89,38 @@ export function ApplySheet({
     if (open && job) {
       setCurrentStep("load");
       setTailoredTypst(masterTypst);
+      setAppliedPatchCount(0);
       setGuardrailResult(null);
       setAtsScore(null);
       setExportError(null);
       setVariantError(null);
       setSelectedVariantId(job.appliedVariantId ?? null);
+
+      if (!masterTypst) {
+        let cancelled = false;
+        (async () => {
+          try {
+            const res = await fetch("/api/resumes");
+            const json = await res.json();
+            if (!cancelled && res.ok && json.success && Array.isArray(json.data) && json.data.length > 0) {
+              const master = json.data.find((r: { isMaster?: boolean }) => r.isMaster) || json.data[0];
+              if (master?.typstSource) {
+                setTailoredTypst(master.typstSource);
+                return;
+              }
+            }
+          } catch {}
+          if (typeof window !== "undefined") {
+            const localSource = localStorage.getItem("resumeforge_typst_source");
+            if (!cancelled && localSource) {
+              setTailoredTypst(localSource);
+            }
+          }
+        })();
+        return () => {
+          cancelled = true;
+        };
+      }
     }
   }, [open, job, masterTypst]);
 
@@ -129,12 +159,79 @@ export function ApplySheet({
   const handleStartTailoring = async () => {
     setIsProcessing(true);
     setCurrentStep("tailor");
+    setExportError(null);
 
     try {
-      // Simulate/Trigger tailoring flow
-      await new Promise((r) => setTimeout(r, 400));
+      let workingTypst = tailoredTypst || masterTypst;
+      if (!workingTypst && typeof window !== "undefined") {
+        workingTypst = localStorage.getItem("resumeforge_typst_source") || "";
+      }
 
-      const workingTypst = tailoredTypst || masterTypst;
+      let reqs = job.requirements || {
+        requiredSkills: [],
+        preferredSkills: [],
+        domainTerms: [],
+      };
+
+      if (
+        reqs.requiredSkills.length === 0 &&
+        reqs.preferredSkills.length === 0 &&
+        job.rawDescription &&
+        job.rawDescription.trim().length > 20
+      ) {
+        try {
+          const extRes = await fetch("/api/jobs/extract", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rawDescription: job.rawDescription }),
+          });
+          const extJson = await extRes.json();
+          if (extRes.ok && extJson.success && extJson.data) {
+            reqs = {
+              requiredSkills: extJson.data.requiredSkills || [],
+              preferredSkills: extJson.data.preferredSkills || [],
+              domainTerms: extJson.data.domainTerms || [],
+            };
+          }
+        } catch {}
+      }
+
+      // Attempt BYOK AI patch generation if configured
+      const aiConfig = await resolveClientProviderConfig();
+      if (aiConfig && (reqs.requiredSkills.length > 0 || reqs.preferredSkills.length > 0)) {
+        try {
+          const patchRes = await fetch("/api/ai/generate-patches", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              providerConfig: aiConfig,
+              jobRequirements: {
+                requiredSkills: reqs.requiredSkills,
+                preferredSkills: reqs.preferredSkills,
+                domainTerms: reqs.domainTerms,
+                roleTitle: job.roleTitle || undefined,
+                company: job.company || undefined,
+              },
+            }),
+          });
+          const patchJson = await patchRes.json();
+          if (patchRes.ok && patchJson.success && Array.isArray(patchJson.data?.verified)) {
+            let patched = workingTypst;
+            let count = 0;
+            for (const p of patchJson.data.verified) {
+              if (p.before && p.after && patched.includes(p.before)) {
+                patched = patched.replace(p.before, p.after);
+                count++;
+              }
+            }
+            workingTypst = patched;
+            setTailoredTypst(workingTypst);
+            setAppliedPatchCount(count);
+          }
+        } catch {
+          // Proceed with deterministic audit if AI call fails
+        }
+      }
 
       // 1. Guardrail check
       let gResult: GuardrailResult;
@@ -153,11 +250,6 @@ export function ApplySheet({
       setCurrentStep("guardrail");
 
       // 2. Score evaluation
-      const reqs = job.requirements || {
-        requiredSkills: [],
-        preferredSkills: [],
-        domainTerms: [],
-      };
       const score = evaluateAtsScore(workingTypst, reqs, "Full-stack");
       setAtsScore(score);
     } catch (err) {
@@ -348,7 +440,14 @@ export function ApplySheet({
           {/* Step 2 & 3: Tailoring & Guardrail Results */}
           {guardrailResult && (
             <div className="space-y-2">
-              <h4 className="text-xs font-semibold text-slate-300">Guardrail Audit</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-semibold text-slate-300">Guardrail Audit</h4>
+                {appliedPatchCount > 0 && (
+                  <Badge variant="outline" className="border-emerald-500/40 text-emerald-300 bg-emerald-950/30 text-[10px]">
+                    {appliedPatchCount} AI Patch{appliedPatchCount === 1 ? "" : "es"} Applied
+                  </Badge>
+                )}
+              </div>
               <GuardrailFeedback result={guardrailResult} />
             </div>
           )}

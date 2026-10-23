@@ -4,6 +4,7 @@ import { getMasterResume } from "@/lib/db/resumes";
 import { createVariant, assertNotProtectedResume } from "@/lib/db/variants";
 import { sanitizeError } from "@/lib/ai/redact";
 import { requireUserId } from "@/lib/security/auth-request";
+import { markDocumentAsPatched } from "@/lib/guardrail/policy";
 
 const ApplyPatchesRequestSchema = z.object({
   masterResumeId: z.string(),
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
       masterResumeId,
       jobId,
       variantTitle,
-      typstContent: mergedTypstContent,
+      typstContent: markDocumentAsPatched(mergedTypstContent),
       userId,
     });
 

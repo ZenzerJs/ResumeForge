@@ -130,7 +130,7 @@ describe("PDF Evidence Extractor & Transform", () => {
 
   describe("Career Evidence Bank segmentation (EXP-*, PRJ-*, skills matrix)", () => {
     const evidenceBankData: ExtractedPdfEvidence = {
-      sourceDoc: "Jayden_Saha_Evidence_Bank.pdf",
+      sourceDoc: "Alex_Rivera_Evidence_Bank.pdf",
       pages: [{ pageNumber: 1, text: "Sample career evidence bank" }],
       sections: {
         experience: [
@@ -159,7 +159,7 @@ describe("PDF Evidence Extractor & Transform", () => {
           "DevOps & Cloud: Docker, Kubernetes, AWS, CI/CD",
         ],
         education: [
-          "Wilfrid Laurier University",
+          "State University",
           "Honours Bachelor of Science in Computer Science",
           "2020 – 2024",
         ],
@@ -237,7 +237,7 @@ describe("PDF Evidence Extractor & Transform", () => {
 
       const eduItem = items.find((i) => i.type === "education");
       expect(eduItem).toBeDefined();
-      expect(eduItem?.organization).toContain("Wilfrid Laurier University");
+      expect(eduItem?.organization).toContain("State University");
       expect(eduItem?.title).toContain("Computer Science");
 
       const certItem = items.find((i) => i.type === "award");
@@ -338,7 +338,7 @@ describe("PDF Evidence Extractor & Transform", () => {
             "Architected real-time multiplayer code editor with operational transformation.",
           ],
           skills: ["TypeScript", "Rust", "Next.js", "PostgreSQL"],
-          education: ["Wilfrid Laurier University, Honours Computer Science"],
+          education: ["State University, Honours Computer Science"],
           certifications: ["AWS Certified Solutions Architect"],
           uncategorized: [],
         },
@@ -364,7 +364,7 @@ describe("PDF Evidence Extractor & Transform", () => {
 
       const eduItem = items.find((i) => i.type === "education");
       expect(eduItem).toBeDefined();
-      expect(eduItem?.organization).toContain("Wilfrid Laurier University");
+      expect(eduItem?.organization).toContain("State University");
     });
   });
 
@@ -533,7 +533,7 @@ describe("PDF Evidence Extractor & Transform", () => {
         pages: [{ pageNumber: 1, text: "Sample" }],
         sections: {
           experience: [
-            "EXP-01 — Trillium Health Partners — Clinical License Operations Portal",
+            "EXP-01 — Northwind Health Systems — Clinical License Operations Portal",
             "Where/when: Mississauga, Ontario | May 2026 ‒ Present [VERIFIED]",
             'Official title: IT Operations. Resume-facing: "IT Operations (Software Development)".',
             "• Deployed production clinical license portal in Next.js.",
@@ -552,7 +552,7 @@ describe("PDF Evidence Extractor & Transform", () => {
       const expItems = items.filter((i) => i.type === "experience");
       expect(expItems).toHaveLength(1);
       expect(expItems[0].title).toBe("IT Operations (Software Development)");
-      expect(expItems[0].organization).toBe("Trillium Health Partners");
+      expect(expItems[0].organization).toBe("Northwind Health Systems");
       expect(expItems[0].dates).toBe("Mississauga, Ontario | May 2026 ‒ Present");
     });
 
@@ -678,13 +678,13 @@ describe("PDF Evidence Extractor & Transform", () => {
           education: [],
           certifications: [],
           uncategorized: [
-            "name: Jayden Saha",
-            "education: BSc Computer Science, Management Option — Wilfrid Laurier",
+            "name: Alex Rivera",
+            "education: BSc Computer Science, Management Option — State",
             "University",
             "graduation: Expected April 2029 # target internships",
             "skills + education. Drop weakest itemsfirst per Section 5.",
             '"Career Education College" → Council; "Scholars Spark" naming consistent; neutral',
-            'bio now "CS @ Wilfrid Laurier University · Building reliable full-stack apps"',
+            'bio now "CS @ State University · Building reliable full-stack apps"',
           ],
         },
         extractedTechnologies: [],
@@ -697,10 +697,10 @@ describe("PDF Evidence Extractor & Transform", () => {
 
       const edu = eduItems[0];
       expect(edu.title).toBe("BSc Computer Science, Management Option");
-      expect(edu.organization).toBe("Wilfrid Laurier University");
+      expect(edu.organization).toBe("State University");
       expect(edu.dates).toBe("Expected April 2029");
       expect(edu.bullets[0].text).toBe(
-        "BSc Computer Science, Management Option — Wilfrid Laurier University (Expected April 2029)"
+        "BSc Computer Science, Management Option — State University (Expected April 2029)"
       );
     });
 

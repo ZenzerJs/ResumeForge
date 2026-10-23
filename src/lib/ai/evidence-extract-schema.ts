@@ -10,8 +10,8 @@ export const EvidenceExtractBulletSchema = z.object({
 export const EvidenceExtractItemSchema = z.object({
   type: z.enum(["experience", "project", "skill", "education", "award", "metric"]),
   title: z.string().min(1),
-  organization: z.string().optional(),
-  dates: z.string().optional(),
+  organization: z.string().nullable().optional(),
+  dates: z.string().nullable().optional(),
   verifiedSummary: z.string().min(1),
   tags: z.array(z.string()).default([]),
   bullets: z.array(EvidenceExtractBulletSchema).default([]),

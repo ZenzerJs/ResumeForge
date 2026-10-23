@@ -21,6 +21,14 @@ function geminiHeaders(apiKey: string): HeadersInit {
   };
 }
 
+function resolveGeminiModel(model: string | undefined, fallback = "gemini-2.5-flash"): string {
+  const trimmed = model?.trim();
+  if (!trimmed || trimmed === "gemini-3.8-flash") {
+    return fallback;
+  }
+  return trimmed;
+}
+
 export async function testGeminiConnection(config: ProviderConfig): Promise<TestConnectionResult> {
   const { apiKey, baseUrl } = resolveProviderCredentials({
     configApiKey: config.apiKey,
@@ -105,7 +113,7 @@ export async function generateGeminiPatches(
     defaultBaseUrl: "https://generativelanguage.googleapis.com",
     officialHosts: ["generativelanguage.googleapis.com"],
   });
-  const model = config.model?.trim() || "gemini-2.5-flash";
+  const model = resolveGeminiModel(config.model, "gemini-2.5-flash");
 
   if (!apiKey) {
     return { success: false, error: "Gemini API key is missing." };
@@ -168,7 +176,7 @@ export async function generateGeminiQualitativeReview(
     defaultBaseUrl: "https://generativelanguage.googleapis.com",
     officialHosts: ["generativelanguage.googleapis.com"],
   });
-  const model = config.model?.trim() || "gemini-2.5-flash";
+  const model = resolveGeminiModel(config.model, "gemini-2.5-flash");
 
   if (!apiKey) {
     return { success: false, error: "Gemini API key is missing." };
@@ -231,7 +239,7 @@ export async function generateGeminiCoverLetter(
     defaultBaseUrl: "https://generativelanguage.googleapis.com",
     officialHosts: ["generativelanguage.googleapis.com"],
   });
-  const model = config.model?.trim() || "gemini-2.5-flash";
+  const model = resolveGeminiModel(config.model, "gemini-2.5-flash");
 
   if (!apiKey) {
     return { success: false, error: "Gemini API key is missing." };
@@ -294,7 +302,7 @@ export async function convertGeminiPdfTextToTypst(
     defaultBaseUrl: "https://generativelanguage.googleapis.com",
     officialHosts: ["generativelanguage.googleapis.com"],
   });
-  const model = config.model?.trim() || "gemini-2.5-flash";
+  const model = resolveGeminiModel(config.model, "gemini-2.5-flash");
 
   if (!apiKey) {
     return { success: false, error: "Gemini API key is missing." };
@@ -310,7 +318,8 @@ export async function convertGeminiPdfTextToTypst(
           system_instruction: { parts: [{ text: systemPrompt }] },
           contents: [{ parts: [{ text: userPrompt }] }],
           generationConfig: {
-            temperature: 0.2,
+            temperature: 0.1,
+            thinkingConfig: { thinkingBudget: 1024 },
           },
         }),
         signal: AbortSignal.timeout(30000),
@@ -354,7 +363,7 @@ export async function repairTypstWithGemini(
     defaultBaseUrl: "https://generativelanguage.googleapis.com",
     officialHosts: ["generativelanguage.googleapis.com"],
   });
-  const model = config.model?.trim() || "gemini-1.5-pro";
+  const model = resolveGeminiModel(config.model, "gemini-1.5-pro");
 
   if (!apiKey) {
     return { success: false, error: "Gemini API key is missing. Please configure your key in Settings." };
@@ -435,7 +444,7 @@ export async function chatGemini(
     defaultBaseUrl: "https://generativelanguage.googleapis.com",
     officialHosts: ["generativelanguage.googleapis.com"],
   });
-  const model = config.model?.trim() || "gemini-2.0-flash";
+  const model = resolveGeminiModel(config.model, "gemini-2.5-flash");
 
   if (!apiKey) {
     throw new Error("Gemini API key is missing.");

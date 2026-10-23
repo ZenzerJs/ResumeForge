@@ -49,6 +49,42 @@ export function GuestMigrationModal({
     return "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
   });
 
+  const [guestEvidenceItems] = useState<
+    Array<{
+      title: string;
+      organization?: string;
+      category?: string;
+      tags?: string[];
+      bullets?: string[];
+    }>
+  >(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = localStorage.getItem("resumeforge_guest_evidence");
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .filter((item: any) => item && typeof item.title === "string" && item.title.trim().length > 0)
+        .slice(0, 50)
+        .map((item: any) => ({
+          title: item.title.trim(),
+          organization: typeof item.organization === "string" ? item.organization : undefined,
+          category: typeof item.type === "string" ? item.type.toUpperCase() : "PROJECT",
+          tags: Array.isArray(item.tags) ? item.tags.filter((t: any) => typeof t === "string") : [],
+          bullets: Array.isArray(item.bullets)
+            ? item.bullets
+                .map((b: any) => (typeof b === "string" ? b : typeof b?.text === "string" ? b.text : ""))
+                .filter((t: string) => t.trim().length > 0)
+            : typeof item.verifiedSummary === "string" && item.verifiedSummary.trim()
+            ? [item.verifiedSummary.trim()]
+            : [],
+        }));
+    } catch {
+      return [];
+    }
+  });
+
   if (!isOpen) return null;
 
   const handleMigrate = async () => {
@@ -83,6 +119,7 @@ export function GuestMigrationModal({
           typstSource: draftSource,
           conflictStrategy: strategy,
           confirmReplaceMaster: strategy === "REPLACE_MASTER" ? confirmReplaceMaster : undefined,
+          evidenceItems: guestEvidenceItems.length > 0 ? guestEvidenceItems : undefined,
           migrationId,
         }),
       });
@@ -93,6 +130,7 @@ export function GuestMigrationModal({
         if (typeof window !== "undefined") {
           localStorage.removeItem("resumeforge_typst_source");
           localStorage.removeItem("resumeforge_has_guest_draft");
+          localStorage.removeItem("resumeforge_guest_evidence");
           localStorage.removeItem("resumeforge_migration_id");
           localStorage.removeItem(lockKey);
           localStorage.setItem("resumeforge_draft_migrated", "true");
@@ -142,9 +180,19 @@ export function GuestMigrationModal({
         <div className="space-y-3.5 py-2 text-xs">
           {/* Draft Preview */}
           <div className="space-y-1">
-            <div className="flex items-center gap-2 text-slate-300 font-semibold">
-              <FileText className="size-3.5 text-blue-400" />
-              <span>Draft Preview ({draftSource.split("\n").length} lines)</span>
+            <div className="flex items-center justify-between gap-2 text-slate-300 font-semibold">
+              <div className="flex items-center gap-2">
+                <FileText className="size-3.5 text-blue-400" />
+                <span>Draft Preview ({draftSource.split("\n").length} lines)</span>
+              </div>
+              {guestEvidenceItems.length > 0 && (
+                <span
+                  data-testid="guest-evidence-migration-badge"
+                  className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 font-mono text-[10px] text-emerald-300"
+                >
+                  +{guestEvidenceItems.length} Evidence Item{guestEvidenceItems.length === 1 ? "" : "s"}
+                </span>
+              )}
             </div>
             <div className="max-h-28 overflow-y-auto rounded-md border border-slate-800 bg-slate-950/80 p-2.5 font-mono text-[11px] text-slate-300 whitespace-pre-wrap leading-relaxed">
               {draftSource.slice(0, 400)}

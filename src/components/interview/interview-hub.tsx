@@ -7,13 +7,34 @@ import { CompanyBadge, getCompanyLogo } from "./company-logos";
 
 export interface InterviewHubProps {
   onSolveInRunner?: (slug: string) => void;
+  targetCompany?: string;
 }
 
-export function InterviewHub({ onSolveInRunner }: InterviewHubProps = {}) {
+export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubProps = {}) {
   const [track, setTrack] = useState<InterviewTrack | "all">("all");
   const [difficulty, setDifficulty] = useState<"Easy" | "Medium" | "Hard" | "all">("all");
   const [company, setCompany] = useState<string | "all">("all");
   const [selectedQuestion, setSelectedQuestion] = useState<InterviewQuestion | null>(null);
+
+  useEffect(() => {
+    if (!targetCompany) {
+      setCompany("all");
+      return;
+    }
+    const norm = targetCompany.trim().toLowerCase();
+    const matched = COMPANY_LOGOS.find(
+      (c) =>
+        c.slug.toLowerCase() === norm ||
+        c.name.toLowerCase() === norm ||
+        norm.includes(c.slug.toLowerCase()) ||
+        norm.includes(c.name.toLowerCase())
+    );
+    if (matched) {
+      setCompany(matched.slug);
+    } else {
+      setCompany("all");
+    }
+  }, [targetCompany]);
 
   useEffect(() => {
     if (!selectedQuestion) return;
@@ -43,7 +64,7 @@ export function InterviewHub({ onSolveInRunner }: InterviewHubProps = {}) {
   return (
     <div className="w-full space-y-6">
       {/* Filter Controls */}
-      <div className="space-y-3 p-4 bg-muted/30 border border-border rounded-xl">
+      <div className="space-y-3 p-4 bg-slate-900/60 border border-slate-800/80 rounded-xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Track Filters */}
           <div className="flex flex-wrap gap-1.5">
@@ -56,10 +77,10 @@ export function InterviewHub({ onSolveInRunner }: InterviewHubProps = {}) {
               <button
                 key={t.id}
                 onClick={() => setTrack(t.id as any)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
                   track === t.id
-                    ? "bg-slate-700 text-white"
-                    : "bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-100 border border-slate-700"
+                    ? "bg-amber-500/15 border-amber-500/40 text-amber-300"
+                    : "border-slate-800 bg-slate-900/80 hover:bg-slate-800/80 text-slate-400 hover:text-slate-100"
                 }`}
               >
                 {t.label}
@@ -73,10 +94,10 @@ export function InterviewHub({ onSolveInRunner }: InterviewHubProps = {}) {
               <button
                 key={d}
                 onClick={() => setDifficulty(d as any)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors border ${
                   difficulty === d
-                    ? "bg-foreground text-background font-semibold"
-                    : "bg-background/80 hover:bg-background text-muted-foreground hover:text-foreground border border-border/80"
+                    ? "bg-amber-500/15 border-amber-500/40 text-amber-300"
+                    : "border-slate-800 bg-slate-900/80 hover:bg-slate-800/80 text-slate-400 hover:text-slate-100"
                 }`}
               >
                 {d === "all" ? "All Levels" : d}
@@ -86,17 +107,17 @@ export function InterviewHub({ onSolveInRunner }: InterviewHubProps = {}) {
         </div>
 
         {/* Company Filter Pills */}
-        <div className="pt-2 border-t border-border/60">
+        <div className="pt-2 border-t border-slate-800/80">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            <span className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/80 flex-shrink-0">
+            <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400 flex-shrink-0">
               Company:
             </span>
             <button
               onClick={() => setCompany("all")}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex-shrink-0 ${
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex-shrink-0 border ${
                 company === "all"
-                  ? "bg-slate-700 text-slate-100 border border-slate-600 font-semibold"
-                  : "bg-slate-900 text-slate-400 hover:text-slate-100 border border-slate-700"
+                  ? "bg-amber-500/15 text-amber-300 border-amber-500/40 font-semibold"
+                  : "bg-slate-900/80 text-slate-400 hover:text-slate-100 border-slate-800 hover:bg-slate-800/80"
               }`}
             >
               All Companies
@@ -109,8 +130,8 @@ export function InterviewHub({ onSolveInRunner }: InterviewHubProps = {}) {
                   onClick={() => setCompany(isSelected ? "all" : c.slug)}
                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex-shrink-0 border ${
                     isSelected
-                      ? "bg-slate-700 text-slate-100 border-slate-600 font-semibold"
-                      : "bg-slate-900 text-slate-400 hover:text-slate-100 border-slate-700 hover:bg-slate-800"
+                      ? "bg-amber-500/15 text-amber-300 border-amber-500/40 font-semibold"
+                      : "bg-slate-900/80 text-slate-400 hover:text-slate-100 border-slate-800 hover:bg-slate-800/80"
                   }`}
                 >
                   {getCompanyLogo(c.slug, "w-3.5 h-3.5 flex-shrink-0 grayscale")}

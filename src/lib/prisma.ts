@@ -2,6 +2,29 @@ import { PrismaClient } from "@prisma/client";
 import { createPrismaMockClient } from "./db-mock";
 import net from "net";
 
+export function assertValidMockDbEnv(): void {
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.RESUME_FORGE_ALLOW_MOCK_DB === "1" &&
+    process.env.RESUME_FORGE_E2E !== "1"
+  ) {
+    throw new Error(
+      "RESUMEFORGE_INVALID_PROD_MOCK_FLAG: RESUME_FORGE_ALLOW_MOCK_DB=1 is forbidden when NODE_ENV=production unless RESUME_FORGE_E2E=1 is also explicitly set for CI E2E runs."
+    );
+  }
+}
+
+assertValidMockDbEnv();
+
+function isMockFallbackAllowed(): boolean {
+  assertValidMockDbEnv();
+  if (process.env.NODE_ENV !== "production") return true;
+  return (
+    process.env.RESUME_FORGE_ALLOW_MOCK_DB === "1" &&
+    process.env.RESUME_FORGE_E2E === "1"
+  );
+}
+
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
@@ -40,7 +63,17 @@ function probePostgresPort(urlStr?: string): Promise<boolean> {
 }
 
 async function getActiveClient(): Promise<any> {
-  if (dbAvailable === null) {
+  assertValidMockDbEnv();
+
+  if (process.env.VITEST && process.env.NODE_ENV !== "production") {
+    dbAvailable = false;
+    if (!mockClient) {
+      mockClient = createPrismaMockClient();
+    }
+    return mockClient;
+  }
+
+  if (dbAvailable === null || !probePromise) {
     if (!probePromise) {
       probePromise = probePostgresPort();
     }
@@ -58,10 +91,7 @@ async function getActiveClient(): Promise<any> {
 
   // Fail-closed in production: never masquerade in-memory mock writes as
   // durable persistence. Guests/dev/E2E keep the offline mock fallback.
-  const allowMockFallback =
-    process.env.NODE_ENV !== "production" ||
-    process.env.RESUME_FORGE_ALLOW_MOCK_DB === "1";
-  if (!allowMockFallback) {
+  if (!isMockFallbackAllowed()) {
     throw new Error(
       "RESUMEFORGE_DB_UNAVAILABLE: PostgreSQL is not reachable. Refusing to fall back to the in-memory mock store in production because writes would be lost on restart. Start PostgreSQL or set DATABASE_URL to a reachable instance."
     );
@@ -76,14 +106,11 @@ async function getActiveClient(): Promise<any> {
 export const prisma: PrismaClient = new Proxy({} as any, {
   get(_target, prop: string) {
     const fallbackToMockOnError = (err: any): boolean =>
-      dbAvailable && (err?.message?.includes("Can't reach database") || err?.code === "P1001");
+      Boolean(dbAvailable && (err?.message?.includes("Can't reach database") || err?.code === "P1001"));
 
     const switchToMock = async () => {
       dbAvailable = false;
-      const allowMockFallback =
-        process.env.NODE_ENV !== "production" ||
-        process.env.RESUME_FORGE_ALLOW_MOCK_DB === "1";
-      if (!allowMockFallback) {
+      if (!isMockFallbackAllowed()) {
         throw new Error(
           "RESUMEFORGE_DB_UNAVAILABLE: PostgreSQL connection lost mid-session. Refusing to fall back to the in-memory mock store in production because writes would be lost on restart."
         );

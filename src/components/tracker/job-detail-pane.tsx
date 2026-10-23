@@ -47,6 +47,28 @@ const ApplyPrepSheetModal = dynamic(
   { ssr: false },
 );
 import { ShieldCheck, ClipboardList } from "lucide-react";
+import { extractResumeFacts } from "@/lib/facts/extract";
+
+function parseCandidateInfoFromTypst(typst: string) {
+  if (!typst) return undefined;
+  const nameMatch =
+    typst.match(/#let\s+name\s*=\s*"([^"]+)"/) ||
+    typst.match(/^=\s+([^\n]+)/m) ||
+    typst.match(/name:\s*"([^"]+)"/);
+  const emailMatch = typst.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  const phoneMatch = typst.match(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}/);
+  const linkedinMatch = typst.match(/https?:\/\/(?:www\.)?linkedin\.com\/in\/[^\s")\]]+/i);
+  const githubMatch = typst.match(/https?:\/\/(?:www\.)?github\.com\/[^\s")\]]+/i);
+
+  return {
+    name: nameMatch?.[1]?.trim() || "Candidate",
+    email: emailMatch?.[0] || "candidate@resumeforge.dev",
+    phone: phoneMatch?.[0] || "+1 (555) 019-2834",
+    linkedin: linkedinMatch?.[0] || "https://linkedin.com/in/candidate",
+    github: githubMatch?.[0] || "https://github.com/candidate",
+    portfolio: "https://resumeforge.dev",
+  };
+}
 
 const STATUS_LABELS: Record<JobStatus, string> = {
   SAVED: "Saved",
@@ -74,7 +96,10 @@ interface JobDetailPaneProps {
   onNotesChange: (jobId: string, value: string) => void;
   onSaveNotes: (jobId: string) => void;
   onFetchFullText: (jobId: string) => void;
+  onJobLoaded?: (job: JobItem) => void;
 }
+
+const jobDetailCache = new Map<string, JobItem>();
 
 export function JobDetailPane({
   job,
@@ -91,23 +116,45 @@ export function JobDetailPane({
   onNotesChange,
   onSaveNotes,
   onFetchFullText,
+  onJobLoaded,
 }: JobDetailPaneProps) {
   const [evidence, setEvidence] = useState<EvidenceItemWithBullets[]>([]);
   const [evidenceLoaded, setEvidenceLoaded] = useState(false);
-  const [detailJob, setDetailJob] = useState<JobItem>(job);
+  const [detailJob, setDetailJob] = useState<JobItem>(() => {
+    if (job.rawDescription && !isPlaceholderDescription(job.rawDescription)) return job;
+    const cached = jobDetailCache.get(job.id);
+    if (cached?.rawDescription && !isPlaceholderDescription(cached.rawDescription)) {
+      return { ...job, ...cached };
+    }
+    return job;
+  });
   const [applySheetOpen, setApplySheetOpen] = useState(false);
   const [prepSheetOpen, setPrepSheetOpen] = useState(false);
 
   useEffect(() => {
+    if (job.rawDescription && !isPlaceholderDescription(job.rawDescription)) {
+      setDetailJob(job);
+      jobDetailCache.set(job.id, job);
+      return;
+    }
+
+    const cached = jobDetailCache.get(job.id);
+    if (cached?.rawDescription && !isPlaceholderDescription(cached.rawDescription)) {
+      setDetailJob({ ...job, ...cached });
+      return;
+    }
+
     setDetailJob(job);
-    if (job.rawDescription) return;
     let cancelled = false;
     (async () => {
       try {
         const res = await fetch(`/api/jobs/${job.id}`);
         const json = await res.json();
-        if (!cancelled && res.ok && json.success) {
-          setDetailJob({ ...job, ...json.data });
+        if (!cancelled && res.ok && json.success && json.data) {
+          const merged: JobItem = { ...job, ...json.data };
+          jobDetailCache.set(job.id, merged);
+          setDetailJob(merged);
+          onJobLoaded?.(merged);
         }
       } catch {
         // keep slim list row
@@ -116,7 +163,7 @@ export function JobDetailPane({
     return () => {
       cancelled = true;
     };
-  }, [job]);
+  }, [job, onJobLoaded]);
 
   const location = extractLocationFromNotes(detailJob.notes);
   const applyUrl = extractApplyUrlFromNotes(detailJob.notes);
@@ -149,6 +196,62 @@ export function JobDetailPane({
       cancelled = true;
     };
   }, []);
+
+  const [masterTypst, setMasterTypst] = useState<string>("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/resumes");
+        const json = await res.json();
+        if (!cancelled && res.ok && json.success && Array.isArray(json.data) && json.data.length > 0) {
+          const master = json.data.find((r: { isMaster?: boolean }) => r.isMaster) || json.data[0];
+          if (master?.typstSource) {
+            setMasterTypst(master.typstSource);
+            return;
+          }
+        }
+      } catch {}
+      if (typeof window !== "undefined") {
+        const localSource = localStorage.getItem("resumeforge_typst_source");
+        if (!cancelled && localSource) {
+          setMasterTypst(localSource);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const masterFacts = useMemo(() => {
+    if (!masterTypst) return null;
+    try {
+      return extractResumeFacts(masterTypst, evidence as any);
+    } catch {
+      return null;
+    }
+  }, [masterTypst, evidence]);
+
+  const candidateInfo = useMemo(() => parseCandidateInfoFromTypst(masterTypst), [masterTypst]);
+
+  const parsedRequirements = useMemo(() => {
+    const raw = detailJob.extractedRequirements;
+    if (!raw) return null;
+    if (typeof raw === "string") {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+    return raw as {
+      requiredSkills: string[];
+      preferredSkills: string[];
+      domainTerms: string[];
+    };
+  }, [detailJob.extractedRequirements]);
 
   const [oaProblems, setOaProblems] = useState<Array<{ id: string; title: string; category?: string; sourceUrl?: string; difficulty?: string }>>([]);
   const [oaMatched, setOaMatched] = useState(false);
@@ -526,6 +629,15 @@ export function JobDetailPane({
     </div>
   );
 
+  const applySheetJob = {
+    ...(detailJob as any),
+    jobUrl: applyUrl,
+    location,
+    salarySnippet: salary,
+    rawDescription: detailJob.rawDescription,
+    requirements: parsedRequirements,
+  };
+
   if (isSheet) {
     return (
       <>
@@ -537,7 +649,14 @@ export function JobDetailPane({
         >
           {content}
         </div>
-        <ApplySheet open={applySheetOpen} onOpenChange={setApplySheetOpen} job={detailJob as any} onVariantChange={onVariantChange} />
+        <ApplySheet
+          open={applySheetOpen}
+          onOpenChange={setApplySheetOpen}
+          job={applySheetJob}
+          masterTypst={masterTypst}
+          masterFacts={masterFacts}
+          onVariantChange={onVariantChange}
+        />
         <ApplyPrepSheetModal
           isOpen={prepSheetOpen}
           onClose={() => setPrepSheetOpen(false)}
@@ -549,9 +668,12 @@ export function JobDetailPane({
             location: location,
             notes: detailJob.notes,
             rawDescription: detailJob.rawDescription,
+            requirements: parsedRequirements,
           }}
           coverLetter={null}
           matchedHighlights={evidence.flatMap((e) => e.bullets.map((b) => b.text)).slice(0, 5)}
+          evidenceItems={evidence}
+          candidateInfo={candidateInfo}
         />
       </>
     );
@@ -562,7 +684,14 @@ export function JobDetailPane({
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background/50 relative" data-testid="job-detail-pane">
         {content}
       </div>
-      <ApplySheet open={applySheetOpen} onOpenChange={setApplySheetOpen} job={detailJob as any} onVariantChange={onVariantChange} />
+      <ApplySheet
+        open={applySheetOpen}
+        onOpenChange={setApplySheetOpen}
+        job={applySheetJob}
+        masterTypst={masterTypst}
+        masterFacts={masterFacts}
+        onVariantChange={onVariantChange}
+      />
       <ApplyPrepSheetModal
         isOpen={prepSheetOpen}
         onClose={() => setPrepSheetOpen(false)}
@@ -574,9 +703,12 @@ export function JobDetailPane({
           location: location,
           notes: detailJob.notes,
           rawDescription: detailJob.rawDescription,
+          requirements: parsedRequirements,
         }}
         coverLetter={null}
         matchedHighlights={evidence.flatMap((e) => e.bullets.map((b) => b.text)).slice(0, 5)}
+        evidenceItems={evidence}
+        candidateInfo={candidateInfo}
       />
     </>
   );

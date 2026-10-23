@@ -19,6 +19,13 @@ Diagnose and fix Typst compile errors while preserving content, structure, and s
 5. Low confidence + warnings when context is insufficient.
 6. JSON only.
 
+## Common Typst Compiler Errors & Exact Fixes
+
+- `label <...> does not exist` or `unclosed label`: Email/URL wrapped in `<...>` or contains unescaped `@`. Fix: Escape `@` as `\@` and remove `< >`.
+- `unknown variable: frac / textbf / textit / itemize`: LaTeX syntax leaked into Typst. Fix: Replace `\textbf{x}` with `*x*`, `\textit{x}` with `_x_`, and `1\,000` with `1,000`.
+- `unclosed delimiter` or `expected asterisk / underscore`: Mismatched `*` or `_`, or unescaped `#` (e.g., `C#`, `#1`). Fix: Escape `#` in plain text as `\#`.
+- `cannot apply ... to content`: Helper function argument passed `"string"` where `[content]` expected, or vice versa. Match exact signature in preamble.
+
 ## Output JSON Schema
 
 ```json
