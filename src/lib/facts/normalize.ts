@@ -239,8 +239,8 @@ function parseDatePart(part: string, bound: "start" | "end"): string | undefined
   if (!part) return undefined;
   const p = part.trim().toLowerCase();
 
-  // Pattern: "May 2023" or "May, 2023"
-  const wordYearMatch = p.match(/([a-z]+)[,\s]+(\d{4})/i);
+  // Pattern: "May 2023", "Sept. 2023", or "May, 2023"
+  const wordYearMatch = p.match(/([a-z]+)\.?\s*,?\s*(\d{4})/i);
   if (wordYearMatch) {
     const monthName = wordYearMatch[1];
     const year = wordYearMatch[2];

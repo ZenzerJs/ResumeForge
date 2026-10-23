@@ -160,6 +160,72 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedPdfResult> {
   }
 }
 
+const SECTION_HEADER_WHITELIST = new Set([
+  "experience",
+  "work experience",
+  "professional experience",
+  "employment",
+  "work history",
+  "education",
+  "academic",
+  "academics",
+  "projects",
+  "personal projects",
+  "selected projects",
+  "side projects",
+  "technical projects",
+  "skills",
+  "technical skills",
+  "technologies",
+  "tech stack",
+  "tools & technologies",
+  "skills & technologies",
+  "summary",
+  "professional summary",
+  "executive summary",
+  "profile",
+  "certifications",
+  "awards",
+  "honors & awards",
+  "leadership",
+  "volunteer",
+  "volunteering",
+  "publications",
+]);
+
+const BULLET_LINE_REGEX = /^[-–—•*▪|]\s+/;
+
+const TRAILING_DATE_REGEX =
+  /\s+((?:Expected\s+|Graduated\s+)?(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{4}|\d{1,2}\/\d{4}|\d{4})(?:\s*(?:[-–—‒]|to)\s*(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{4}|\d{1,2}\/\d{4}|\d{4}|Present|Current|Now))?)$/i;
+
+const TRAILING_LOCATION_REGEX =
+  /\s+((?:Remote|Hybrid|(?:(?:San|Los|New|St\.?|Saint|Fort|Mount|North|South|East|West|Port|Grand|Salt\s+Lake)\s+)?[A-Z][a-zA-Z.'-]+(?:\s+(?:Falls|Park|Beach|City|Springs|Hills|Valley|Bay|View|Heights|Harbor|Creek))?,\s*(?:[A-Z]{2}|Canada|Ontario|USA|UK))(?:\s*\((?:Remote|Hybrid|On-site)\))?)$/;
+
+function mergeWrappedSectionLines(rawLines: string[]): string[] {
+  const out: string[] = [];
+  for (const line of rawLines) {
+    if (BULLET_LINE_REGEX.test(line)) {
+      out.push(line);
+      continue;
+    }
+    if (out.length > 0 && BULLET_LINE_REGEX.test(out[out.length - 1])) {
+      const prev = out[out.length - 1];
+      const prevComplete = /[.!?]\s*$/.test(prev);
+      const startsLowerOrPunct = /^[a-z0-9(,]/.test(line);
+      const hasTrailingDate = TRAILING_DATE_REGEX.test(line);
+      const hasTrailingLoc = TRAILING_LOCATION_REGEX.test(line);
+      const isSkillCategory = /^[A-Za-z0-9\s&/+_-]{2,30}:\s+\S/.test(line);
+
+      if (!hasTrailingDate && !hasTrailingLoc && !isSkillCategory && (startsLowerOrPunct || !prevComplete)) {
+        out[out.length - 1] = `${prev} ${line}`;
+        continue;
+      }
+    }
+    out.push(line);
+  }
+  return out;
+}
+
 /**
  * Converts extracted PDF text and link metadata into Typst markup with
  * canonical section order: Experience → Education → Projects → Skills → other.
@@ -169,12 +235,14 @@ export function convertTextToTypst(
   fileName?: string,
   links: ExtractedPdfLink[] = []
 ): string {
-  const cleanText = rawText
+  // 4. Rejoin hyphenated line wraps ("idempo-\ntent" -> "idempotent")
+  const dehyphenated = rawText
     .replace(/\r\n/g, "\n")
+    .replace(/([a-zA-Z])-\n\s*([a-z])/g, "$1$2")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  const lines = cleanText.split("\n").map((l) => l.trim()).filter(Boolean);
+  const lines = dehyphenated.split("\n").map((l) => l.trim()).filter(Boolean);
   const titleLine = lines[0] || fileName || "Imported Resume";
   const restLines = lines.slice(1);
 
@@ -185,11 +253,20 @@ export function convertTextToTypst(
       .replace(/\$/g, "\\$")
       .replace(/@/g, "\\@");
 
-  const isSectionHeader = (line: string) =>
-    line.length < 40 &&
-    !line.endsWith(".") &&
-    !line.endsWith(",") &&
-    (line === line.toUpperCase() || /^[A-Z][a-zA-Z\s&/]{2,35}$/.test(line));
+  const escapeTypstStr = (text: string) =>
+    sanitizeForTypst(text).replace(/"/g, '\\"');
+
+  // 2. Whitelist known section names or ALL-CAPS lines so entry headers like "Career Education Council Remote" are never promoted
+  const isSectionHeader = (line: string) => {
+    if (line.length >= 40 || line.endsWith(".") || line.endsWith(",") || BULLET_LINE_REGEX.test(line)) {
+      return false;
+    }
+    const normalizedKey = line.toLowerCase().replace(/\s+/g, " ").trim();
+    if (SECTION_HEADER_WHITELIST.has(normalizedKey)) {
+      return true;
+    }
+    return /[A-Z]{2,}/.test(line) && line === line.toUpperCase() && !/\d{4}/.test(line);
+  };
 
   type SectionBucket = { title: string; lines: string[] };
   const preamble: string[] = [];
@@ -209,24 +286,138 @@ export function convertTextToTypst(
     }
   }
 
+  // 3. Drop raw contact line from preamble when renderedLinks is emitted
+  const isContactLine = (line: string) =>
+    /@|linkedin|github|portfolio|https?:\/\/|\(\d{3}\)|\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b/i.test(line) ||
+    (line.includes("|") && /\b(canada|usa|ontario|ca|ny|tx|wa|remote)\b/i.test(line));
+
+  const filteredPreamble =
+    links.length > 0 ? preamble.filter((l) => !isContactLine(l)) : preamble;
+
   sections.sort((a, b) => {
     const diff = canonicalSectionRank(a.title) - canonicalSectionRank(b.title);
     return diff;
   });
 
+  // 1. Support "-", "–", "—" in formatBodyLine
   const formatBodyLine = (line: string) => {
-    if (/^[-•*▪|]\s*/.test(line)) {
-      const bulletText = line.replace(/^[-•*▪|]\s*/, "");
+    if (BULLET_LINE_REGEX.test(line)) {
+      const bulletText = line.replace(BULLET_LINE_REGEX, "");
       return `- ${sanitizeForTypst(bulletText)}`;
     }
     return sanitizeForTypst(line);
   };
 
+  // 5. Emit `#entry(title:, role:, location:, date:, details:)` in Experience/Projects/Education
+  const formatStructuredSection = (sec: SectionBucket): string[] => {
+    const mergedLines = mergeWrappedSectionLines(sec.lines);
+    const kind = sec.title.toLowerCase();
+    if (kind !== "experience" && kind !== "education" && kind !== "projects") {
+      return mergedLines.map(formatBodyLine);
+    }
+
+    type EntryDraft = {
+      headerLines: string[];
+      bullets: string[];
+    };
+
+    const entries: EntryDraft[] = [];
+    let currentEntry: EntryDraft | null = null;
+
+    for (const line of mergedLines) {
+      if (BULLET_LINE_REGEX.test(line)) {
+        if (!currentEntry) {
+          currentEntry = { headerLines: [], bullets: [] };
+          entries.push(currentEntry);
+        }
+        currentEntry.bullets.push(line.replace(BULLET_LINE_REGEX, ""));
+      } else {
+        if (!currentEntry || currentEntry.bullets.length > 0) {
+          currentEntry = { headerLines: [line], bullets: [] };
+          entries.push(currentEntry);
+        } else {
+          currentEntry.headerLines.push(line);
+        }
+      }
+    }
+
+    // If no structured headers with dates/roles were detected, fall back to plain formatted lines
+    const hasStructuredEntry = entries.some(
+      (e) =>
+        e.headerLines.length > 0 &&
+        (e.bullets.length > 0 || e.headerLines.some((h) => TRAILING_DATE_REGEX.test(h)))
+    );
+    if (!hasStructuredEntry) {
+      return mergedLines.map(formatBodyLine);
+    }
+
+    const out: string[] = [];
+    for (const entry of entries) {
+      if (entry.headerLines.length === 0) {
+        for (const b of entry.bullets) {
+          out.push(`- ${sanitizeForTypst(b)}`);
+        }
+        continue;
+      }
+
+      let title = "";
+      let role = "";
+      let location = "";
+      let date = "";
+
+      const remainingHeaders: string[] = [];
+      for (const hLine of entry.headerLines) {
+        let work = hLine.trim();
+        const dateMatch = work.match(TRAILING_DATE_REGEX);
+        if (dateMatch && !date) {
+          date = dateMatch[1].trim();
+          work = work.slice(0, dateMatch.index).trim();
+        }
+        const locMatch = work.match(TRAILING_LOCATION_REGEX);
+        if (locMatch && !location) {
+          location = locMatch[1].trim();
+          work = work.slice(0, locMatch.index).trim();
+        }
+        work = work.replace(/[|—–-]\s*$/, "").trim();
+        if (work) remainingHeaders.push(work);
+      }
+
+      if (remainingHeaders.length >= 2) {
+        title = remainingHeaders[0];
+        role = remainingHeaders.slice(1).join(" — ");
+      } else if (remainingHeaders.length === 1) {
+        const single = remainingHeaders[0];
+        const atParts = single.split(/\s+at\s+/i);
+        if (atParts.length === 2) {
+          role = atParts[0].trim();
+          title = atParts[1].trim();
+        } else {
+          const dashParts = single.split(/\s+(?:—|–|\|)\s+/);
+          if (dashParts.length >= 2) {
+            title = dashParts[0].trim();
+            role = dashParts.slice(1).join(" | ").trim();
+          } else {
+            title = single;
+          }
+        }
+      }
+
+      const bulletLines = entry.bullets.map((b) => `    - ${sanitizeForTypst(b)}`).join("\n");
+      const detailsPart = bulletLines ? `\n  details: [\n${bulletLines}\n  ]` : "";
+
+      out.push(
+        `#entry(\n  title: "${escapeTypstStr(title)}",\n  role: "${escapeTypstStr(role)}",\n  location: "${escapeTypstStr(location)}",\n  date: "${escapeTypstStr(date)}",${detailsPart}\n)`
+      );
+    }
+
+    return out;
+  };
+
   const bodyContent = [
-    ...preamble.map(formatBodyLine),
+    ...filteredPreamble.map(formatBodyLine),
     ...sections.flatMap((sec) => [
       `\n== ${sanitizeForTypst(sec.title)}\n`,
-      ...sec.lines.map(formatBodyLine),
+      ...formatStructuredSection(sec),
     ]),
   ].join("\n");
 
@@ -239,7 +430,27 @@ export function convertTextToTypst(
         "\n"
       : "";
 
-  return `= ${sanitizeForTypst(titleLine)}
+  return `#let entry(
+  title: "",
+  role: "",
+  location: "",
+  date: "",
+  details: [],
+) = {
+  block(width: 100%, breakable: false, below: 0.45em, above: 0.55em)[
+    #grid(
+      columns: (1fr, auto),
+      row-gutter: 0.28em,
+      align: (left, right),
+      [*#title*], [#location],
+      [#emph(role)], [#emph(date)],
+    )
+    #v(-0.35em)
+    #details
+  ]
+}
+
+= ${sanitizeForTypst(titleLine)}
 ${renderedLinks}
 #v(4pt)
 #line(length: 100%, stroke: 0.5pt + rgb("#CBD5E1"))
