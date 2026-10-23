@@ -546,7 +546,9 @@ export function PatchDiffReview({
                 <div>
                   <span className="font-semibold block text-white">{applySuccess}</span>
                   <span className="text-[11px] text-slate-300">
-                    Your tailored variant is saved to the database. Edit and compile it live in the editor.
+                    {localOnly
+                      ? "Your tailored draft is saved in this browser. Open the editor to continue editing."
+                      : "Your tailored variant is saved to the database. Edit and compile it live in the editor."}
                   </span>
                 </div>
               </div>

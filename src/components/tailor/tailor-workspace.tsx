@@ -1042,7 +1042,10 @@ export function TailorWorkspace() {
                   onApplySuccess={(_variantId, mergedContent) => {
                     setActiveVariantContent(mergedContent);
                     setSaveStatus("Tailored variant applied — ATS will re-score against updated content.");
-                    if (masterResumeId === "demo-local") localStorage.setItem("resumeforge_typst_source", mergedContent);
+                    if (masterResumeId === "demo-local") {
+                      setMasterTypstSource(mergedContent);
+                      localStorage.setItem("resumeforge_typst_source", mergedContent);
+                    }
                   }}
                 />
               ) : (
@@ -1161,7 +1164,10 @@ export function TailorWorkspace() {
                       onApplySuccess={(_variantId, mergedContent) => {
                         setActiveVariantContent(mergedContent);
                         setSaveStatus("Tailored variant applied — ATS will re-score against updated content.");
-                        if (masterResumeId === "demo-local") localStorage.setItem("resumeforge_typst_source", mergedContent);
+                        if (masterResumeId === "demo-local") {
+                          setMasterTypstSource(mergedContent);
+                          localStorage.setItem("resumeforge_typst_source", mergedContent);
+                        }
                       }}
                     />
                   )}

@@ -1,6 +1,6 @@
 export const DEMO_RESUME_SOURCE = `// Synthetic sample. This is not a real person's resume or experience.
 = Jordan Example
-#link("mailto:sample@example.invalid")[sample@example.invalid] | #link("https://example.invalid")[example.invalid]
+#link("mailto:sample@example.invalid")[sample\\@example.invalid] | #link("https://example.invalid")[example.invalid]
 
 == Summary
 Fictional resume content used to demonstrate the editor and Typst preview.
