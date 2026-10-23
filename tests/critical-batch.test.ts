@@ -164,7 +164,14 @@ describe("critical batch", () => {
     await executeServerTool("search_saved_jobs", {}, "user-a");
     expect(jobFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { userId: "user-a", status: undefined },
+        where: {
+          AND: expect.arrayContaining([{
+            OR: [
+              { userId: "user-a" },
+              { userId: null, applications: { some: { userId: "user-a" } } },
+            ],
+          }]),
+        },
       })
     );
 

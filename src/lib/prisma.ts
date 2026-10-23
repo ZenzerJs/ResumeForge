@@ -18,6 +18,7 @@ assertValidMockDbEnv();
 
 function isMockFallbackAllowed(): boolean {
   assertValidMockDbEnv();
+  if (process.env.VITEST_POSTGRES_INTEGRATION === "1") return false;
   if (process.env.NODE_ENV !== "production") return true;
   return (
     process.env.RESUME_FORGE_ALLOW_MOCK_DB === "1" &&
@@ -65,7 +66,11 @@ function probePostgresPort(urlStr?: string): Promise<boolean> {
 async function getActiveClient(): Promise<any> {
   assertValidMockDbEnv();
 
-  if (process.env.VITEST && process.env.NODE_ENV !== "production") {
+  if (
+    process.env.VITEST &&
+    process.env.VITEST_POSTGRES_INTEGRATION !== "1" &&
+    process.env.NODE_ENV !== "production"
+  ) {
     dbAvailable = false;
     if (!mockClient) {
       mockClient = createPrismaMockClient();
@@ -136,6 +141,12 @@ export const prisma: PrismaClient = new Proxy({} as any, {
       return async () => {
         const client = await getActiveClient();
         return await client[prop]();
+      };
+    }
+    if (prop === "$queryRaw" || prop === "$queryRawUnsafe" || prop === "$executeRaw" || prop === "$executeRawUnsafe") {
+      return async (...args: any[]) => {
+        const client = await getActiveClient();
+        return await client[prop](...args);
       };
     }
 

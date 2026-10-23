@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { extractResumeFacts } from "@/lib/facts/extract";
 import { checkGuardrail } from "@/lib/guardrail/check";
 import {
@@ -136,66 +137,53 @@ export async function executeServerTool(
       }
 
       case "search_saved_jobs": {
-        const params = SearchSavedJobsParamsSchema.parse(rawParams) as any;
+        const params = SearchSavedJobsParamsSchema.parse(rawParams);
         const ownerId = requireOwner(userId);
-        const where: Record<string, unknown> = {
-          userId: ownerId,
-          status: params.status || undefined,
-        };
-        const queryText = params.query ?? (params as { search?: string }).search;
+        const queryText = params.search?.trim();
+        const filters: Prisma.JobWhereInput[] = [{
+          OR: [
+            { userId: ownerId },
+            { userId: null, applications: { some: { userId: ownerId } } },
+          ],
+        }];
         if (queryText) {
-          where.OR = [
-            { title: { contains: queryText } },
-            { company: { contains: queryText } },
-          ];
+          filters.push({ OR: [
+            { roleTitle: { contains: queryText, mode: "insensitive" } },
+            { company: { contains: queryText, mode: "insensitive" } },
+          ] });
         }
-        let jobs = await prisma.job.findMany({
-          where: where as any,
-          orderBy: { createdAt: "desc" },
-          take: params.limit ?? 10,
-        });
-
-        if (jobs.length === 0) {
-          try {
-            const sharedWhere: Record<string, unknown> = {
-              userId: null,
-              applications: {
-                some: {
-                  userId: ownerId,
-                  ...(params.status ? { status: params.status as any } : {}),
-                },
+        if (params.status) {
+          filters.push({
+            OR: [
+              { applications: { some: { userId: ownerId, status: params.status } } },
+              {
+                AND: [
+                  { userId: ownerId },
+                  { applications: { none: { userId: ownerId } } },
+                  { status: params.status },
+                ],
               },
-            };
-            if (queryText) {
-              sharedWhere.OR = [
-                { title: { contains: queryText } },
-                { company: { contains: queryText } },
-              ];
-            }
-            const sharedJobs = await prisma.job.findMany({
-              where: sharedWhere as any,
-              orderBy: { createdAt: "desc" },
-              take: params.limit ?? 10,
-            });
-            if (sharedJobs && sharedJobs.length > 0) {
-              jobs = sharedJobs;
-            }
-          } catch {
-            // Test mock or query fallback guard
-          }
+            ],
+          });
         }
+        const jobs = await prisma.job.findMany({
+          where: { AND: filters },
+          include: { applications: { where: { userId: ownerId }, select: { status: true } } },
+          orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+          take: 10,
+        });
 
         return {
           tool: toolName,
           success: true,
           data: {
-            jobs: jobs.map((j: any) => ({
+            jobs: jobs.map((j) => ({
               id: j.id,
-              title: j.title ?? j.roleTitle,
+              title: j.roleTitle,
               company: j.company,
-              status: j.status,
+              status: j.applications[0]?.status ?? j.status,
               createdAt: j.createdAt,
-              hasAnalysis: j.hasAnalysis ?? Boolean(j.extractedRequirements || j.parsedRequirements),
+              hasAnalysis: Boolean(j.extractedRequirements),
             })),
             count: jobs.length,
           },

@@ -9,6 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:integration": "node --env-file-if-exists=.env --experimental-strip-types scripts/run-postgres-integration.ts",
     "check:env": "tsx scripts/check-env-parity.ts",
     "generate:fixtures": "tsx scripts/generate-sample-resume-pdf.ts",
     "test:e2e": "playwright test",
