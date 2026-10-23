@@ -18,6 +18,8 @@ import { JobRequirements } from "@/lib/jd-parser/types";
 import { RoleProfile, ROLE_PROFILES, AtsEvaluationResult } from "@/lib/ats-evaluator/types";
 import { auditResume } from "@/lib/diagnostics/auditResume";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
+import { getDemoContextFromBrowser, initializeDemoSamples } from "@/lib/demo-client";
+import { DEMO_JOB } from "@/lib/demo-samples";
 import dynamic from "next/dynamic";
 import { PatchDiffReview } from "./patch-diff-review";
 import { AtsScorePanel } from "./ats-score-panel";
@@ -62,6 +64,7 @@ import {
 import { Plus, Columns3 } from "lucide-react";
 import { TechDiffPillList } from "@/components/tracker/tech-diff-pill-list";
 import { tokenizeHighlightedJd } from "@/lib/jd/highlight-keywords";
+import type { ResumeFacts } from "@/lib/facts/types";
 
 interface RankedMatch {
   id: string;
@@ -214,8 +217,11 @@ export function TailorWorkspace() {
   const [patchRejected, setPatchRejected] = useState<RejectedPatch[]>([]);
   const [patchGaps, setPatchGaps] = useState<Gap[]>([]);
   const [patchBatch, setPatchBatch] = useState<{ batchId: string; revisionToken: string; baseTypstSource: string; jobId: string } | null>(null);
+  const [patchReviewGeneration, setPatchReviewGeneration] = useState(0);
+  const [demoPatchBaseSource, setDemoPatchBaseSource] = useState<string | null>(null);
   const [masterResumeId, setMasterResumeId] = useState<string | null>(null);
   const [masterTypstSource, setMasterTypstSource] = useState<string>("");
+  const [masterFactsSnapshot, setMasterFactsSnapshot] = useState<ResumeFacts | null>(null);
   const [activeVariantContent, setActiveVariantContent] = useState<string>("");
   const [patchError, setPatchError] = useState<string | null>(null);
   const [savedJobId, setSavedJobId] = useState<string | null>(null);
@@ -244,6 +250,36 @@ export function TailorWorkspace() {
   useEffect(() => {
     async function loadMasterOrStarterResume() {
       try {
+        const config = await (await fetch("/api/demo-config")).json();
+        if (config?.demoMode) {
+          initializeDemoSamples();
+          setCompany(DEMO_JOB.company);
+          setRoleTitle(DEMO_JOB.roleTitle);
+          setRawDescription(DEMO_JOB.rawDescription);
+          setExtractedRequirements({
+            requiredSkills: ["TypeScript", "PostgreSQL"],
+            preferredSkills: ["AWS"],
+            domainTerms: ["product analytics"],
+            roleTitle: DEMO_JOB.roleTitle,
+            company: DEMO_JOB.company,
+          });
+        }
+        if (config?.demoMode) {
+          let localSource = localStorage.getItem("resumeforge_typst_source");
+          if (!localSource) {
+            const starterResponse = await fetch("/templates/starter-resume.typ").catch(() => null);
+            localSource = starterResponse?.ok ? await starterResponse.text() : `// Local demo draft\n= Resume\n\n== Skills\nTypeScript, PostgreSQL\n`;
+            localStorage.setItem("resumeforge_typst_source", localSource);
+            localStorage.setItem("resumeforge_has_guest_draft", "true");
+          }
+          setMasterTypstSource(localSource);
+          setActiveVariantContent(localSource);
+          const frozen = localStorage.getItem("resumeforge_demo_master_facts");
+          setMasterFactsSnapshot(frozen ? JSON.parse(frozen) as ResumeFacts : null);
+          return;
+        }
+      } catch {}
+      try {
         const res = await fetch("/api/resumes");
         const json = await res.json();
         if (res.ok && json.success && json.data.length > 0) {
@@ -251,6 +287,7 @@ export function TailorWorkspace() {
           setMasterResumeId(master.id);
           setMasterTypstSource(master.typstSource);
           setActiveVariantContent(master.typstSource);
+          setMasterFactsSnapshot(master.factSnapshot ?? null);
           return;
         }
       } catch {}
@@ -314,10 +351,24 @@ export function TailorWorkspace() {
 
   useEffect(() => {
     if (!jobIdParam) return;
-    savedJobIdRef.current = jobIdParam;
-    setSavedJobId(jobIdParam);
     async function loadJobById() {
       try {
+        const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+        if (demoConfig?.demoMode) {
+          const rawJobs = localStorage.getItem("resumeforge_guest_jobs");
+          const jobs = rawJobs ? JSON.parse(rawJobs) : [];
+          const localJob = Array.isArray(jobs) ? jobs.find((item) => item?.id === jobIdParam) : null;
+          setSavedJobId(null);
+          savedJobIdRef.current = null;
+          if (localJob) {
+            if (localJob.company) setCompany(localJob.company);
+            if (localJob.roleTitle) setRoleTitle(localJob.roleTitle);
+            if (localJob.rawDescription) setRawDescription(convertHtmlToCleanMarkdown(localJob.rawDescription));
+          }
+          return;
+        }
+        savedJobIdRef.current = jobIdParam;
+        setSavedJobId(jobIdParam);
         const res = await fetch(`/api/jobs/${jobIdParam}`);
         const json = await res.json();
         if (res.ok && json.success && json.data) {
@@ -449,19 +500,29 @@ export function TailorWorkspace() {
     setPatchVerified([]);
     setPatchRejected([]);
     setPatchGaps([]);
-      setPatchBatch(null);
+    setPatchBatch(null);
+    setDemoPatchBaseSource(null);
+    setPatchReviewGeneration((generation) => generation + 1);
 
     try {
-      const jobId = await ensureJobSaved();
-      if (!jobId) {
-        setPatchError("Failed to save job posting before patch generation.");
-        setPatchStage("error");
-        setIsGeneratingPatches(false);
-        return;
+      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      const isDemo = demoConfig?.demoMode === true;
+      let jobId: string | null = null;
+      let demoContext: ReturnType<typeof getDemoContextFromBrowser>;
+      if (isDemo) {
+        demoContext = getDemoContextFromBrowser();
+        const currentSource = masterTypstSource || activeVariantContent;
+        if (!demoContext?.masterTypst || demoContext.masterTypst !== currentSource) {
+          throw new Error("The local resume changed. Reload the demo workspace before generating patches.");
+        }
+        setDemoPatchBaseSource(currentSource);
+      } else {
+        jobId = await ensureJobSaved();
+        if (!jobId) throw new Error("Failed to save job posting before patch generation.");
       }
 
       setPatchStage("writing");
-      const res = await fetch("/api/ai/generate-patches", {
+      const res = await fetch(isDemo ? "/api/demo/generate-patches" : "/api/ai/generate-patches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -478,7 +539,7 @@ export function TailorWorkspace() {
             roleTitle: roleTitle || undefined,
             company: company || undefined,
           },
-          jobId,
+          ...(isDemo ? (demoContext || {}) : { jobId }),
         }),
       });
 
@@ -496,7 +557,7 @@ export function TailorWorkspace() {
       setPatchRejected(json.data.rejected || []);
       setPatchGaps(json.data.gaps || []);
       setPatchBatch(json.data.batch || null);
-      setMasterResumeId(json.data.masterResumeId || null);
+      setMasterResumeId(json.data.masterResumeId || (json.data.demo ? "demo-local" : null));
       setPatchStage("done");
     } catch (err) {
       setPatchError(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -612,7 +673,7 @@ export function TailorWorkspace() {
   };
 
   // Ensure a job record exists so CoverLetterPanel can generate,
-  // and keep company / role / description / requirements synced in SQLite.
+  // and keep company / role / description / requirements synced in PostgreSQL.
   useEffect(() => {
     if (!userEditedRef.current) return;
     if (!rawDescription.trim()) return;
@@ -966,17 +1027,22 @@ export function TailorWorkspace() {
 
               {(patchVerified.length > 0 || patchRejected.length > 0 || patchGaps.length > 0) &&
               masterResumeId &&
-              savedJobId ? (
+              (savedJobId || masterResumeId === "demo-local") ? (
                 <PatchDiffReview
+                  key={`${patchReviewGeneration}-${patchBatch?.batchId || "local"}`}
                   verified={patchVerified}
                   rejected={patchRejected}
                   gaps={patchGaps}
                   masterTypstSource={masterTypstSource || activeVariantContent}
-                  jobId={savedJobId}
+                  jobId={savedJobId || "demo-local-job"}
                   batch={patchBatch}
+                  localOnly={masterResumeId === "demo-local"}
+                  localBaseTypstSource={demoPatchBaseSource}
+                  masterFactsSnapshot={masterFactsSnapshot}
                   onApplySuccess={(_variantId, mergedContent) => {
                     setActiveVariantContent(mergedContent);
                     setSaveStatus("Tailored variant applied — ATS will re-score against updated content.");
+                    if (masterResumeId === "demo-local") localStorage.setItem("resumeforge_typst_source", mergedContent);
                   }}
                 />
               ) : (
@@ -1080,17 +1146,22 @@ export function TailorWorkspace() {
 
                 {(patchVerified.length > 0 || patchRejected.length > 0 || patchGaps.length > 0) &&
                   masterResumeId &&
-                  savedJobId && (
+                  (savedJobId || masterResumeId === "demo-local") && (
                     <PatchDiffReview
+                      key={`${patchReviewGeneration}-${patchBatch?.batchId || "local"}`}
                       verified={patchVerified}
                       rejected={patchRejected}
                       gaps={patchGaps}
                       masterTypstSource={masterTypstSource || activeVariantContent}
-                      jobId={savedJobId}
+                      jobId={savedJobId || "demo-local-job"}
                       batch={patchBatch}
+                      localOnly={masterResumeId === "demo-local"}
+                      localBaseTypstSource={demoPatchBaseSource}
+                      masterFactsSnapshot={masterFactsSnapshot}
                       onApplySuccess={(_variantId, mergedContent) => {
                         setActiveVariantContent(mergedContent);
                         setSaveStatus("Tailored variant applied — ATS will re-score against updated content.");
+                        if (masterResumeId === "demo-local") localStorage.setItem("resumeforge_typst_source", mergedContent);
                       }}
                     />
                   )}

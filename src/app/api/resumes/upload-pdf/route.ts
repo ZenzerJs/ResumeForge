@@ -7,8 +7,43 @@ import { sanitizeTypstSource } from "@/lib/typst/sanitizer";
 import { ensureTypstLinks } from "@/lib/typst/ensure-links";
 import { redactError, sanitizeError } from "@/lib/ai/redact";
 import { requireUserId } from "@/lib/security/auth-request";
+import { isDemoMode } from "@/lib/demo-mode";
+import { originAllowed } from "@/lib/security/session";
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
+const MAX_DEMO_REQUEST_BYTES = MAX_PDF_BYTES + 64 * 1024;
+
+async function readBodyWithinLimit(request: Request, maxBytes: number): Promise<Request | null> {
+  if (!request.body) return new Request(request.url, { method: request.method, headers: request.headers });
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const headers = new Headers(request.headers);
+  headers.delete("content-length");
+  headers.set("content-length", String(totalBytes));
+  return new Request(request.url, { method: request.method, headers, body });
+}
 
 function isPdfMagic(buffer: Buffer): boolean {
   return buffer.subarray(0, 5).toString("utf8") === "%PDF-";
@@ -16,10 +51,31 @@ function isPdfMagic(buffer: Buffer): boolean {
 
 export async function POST(request: Request) {
   try {
-    const userId = await requireUserId(request);
-    if (userId instanceof NextResponse) return userId;
+    const demoMode = isDemoMode();
+    let uploadRequest = request;
+    let userId: string | null = null;
+    if (demoMode) {
+      const hasOrigin = Boolean(request.headers.get("origin") || request.headers.get("referer"));
+      if (!hasOrigin || !originAllowed(request)) {
+        return NextResponse.json({ success: false, error: "Invalid request origin" }, { status: 403 });
+      }
+      const contentLengthHeader = request.headers.get("content-length");
+      const contentLength = contentLengthHeader ? Number(contentLengthHeader) : Number.NaN;
+      if (Number.isFinite(contentLength) && contentLength > MAX_DEMO_REQUEST_BYTES) {
+        return NextResponse.json({ success: false, error: "Upload exceeds the 10 MB request limit" }, { status: 413 });
+      }
+      const boundedRequest = await readBodyWithinLimit(request, MAX_DEMO_REQUEST_BYTES);
+      if (!boundedRequest) {
+        return NextResponse.json({ success: false, error: "Upload exceeds the 10 MB request limit" }, { status: 413 });
+      }
+      uploadRequest = boundedRequest;
+    } else {
+      const authenticatedUserId = await requireUserId(request);
+      if (authenticatedUserId instanceof NextResponse) return authenticatedUserId;
+      userId = authenticatedUserId;
+    }
 
-    const contentType = request.headers.get("content-type") || "";
+    const contentType = uploadRequest.headers.get("content-type") || "";
 
     let buffer: Buffer | null = null;
     let fileName = "Uploaded Resume";
@@ -27,7 +83,7 @@ export async function POST(request: Request) {
     let providerConfig: ProviderConfig | null = null;
 
     if (contentType.includes("multipart/form-data")) {
-      const formData = await request.formData();
+      const formData = await uploadRequest.formData();
       const file = formData.get("file") as File | null;
 
       if (!file) {
@@ -61,7 +117,7 @@ export async function POST(request: Request) {
         }
       }
     } else {
-      const body = await request.json();
+      const body = await uploadRequest.json();
       if (!body.pdfBase64 && !body.rawText) {
         return NextResponse.json(
           { success: false, error: "Provide either multipart file, pdfBase64, or rawText" },
@@ -98,7 +154,7 @@ export async function POST(request: Request) {
 
     // Check header fallback for providerConfig if not in body/formData
     if (!providerConfig) {
-      const headerConfigStr = request.headers.get("x-ai-provider-config");
+      const headerConfigStr = uploadRequest.headers.get("x-ai-provider-config");
       if (headerConfigStr) {
         try {
           const parsed = JSON.parse(headerConfigStr);
@@ -147,7 +203,7 @@ export async function POST(request: Request) {
     }
 
     // Fallback to server-side environment variables if client did not supply providerConfig
-    if (!providerConfig || (!providerConfig.apiKey && providerConfig.provider !== "custom")) {
+    if (!isDemoMode() && (!providerConfig || (!providerConfig.apiKey && providerConfig.provider !== "custom"))) {
       if (process.env.OPENAI_API_KEY?.trim()) {
         providerConfig = { provider: "openai" };
       } else if (process.env.ANTHROPIC_API_KEY?.trim()) {
@@ -198,12 +254,18 @@ export async function POST(request: Request) {
     const typstSource = `// @pdf-conversion-draft: Review and edit before saving as Master Resume\n// @conversion-path: ${conversionPath}\n// PDF source: "${fileName}" — converted ${new Date().toISOString().slice(0, 10)}\n\n${sanitized}`;
 
     // Always create as non-master draft (isMaster: false)
-    const newResume = await createResume({
-      title,
-      typstSource,
-      isMaster: false,
-      userId,
-    });
+    if (demoMode) {
+      return NextResponse.json({
+        success: true,
+        data: { title, typstSource, isMaster: false },
+        conversionPath,
+        pageCount,
+        extractedLength: extractedText.length,
+        persistence: "browser-local",
+      });
+    }
+
+    const newResume = await createResume({ title, typstSource, isMaster: false, userId: userId! });
 
     return NextResponse.json(
       {

@@ -1,21 +1,42 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: resumeforge-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: resumeforge
-      POSTGRES_PASSWORD: resumeforge
-      POSTGRES_DB: resumeforge
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - resumeforge_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U resumeforge -d resumeforge"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  app:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?Set NEXT_PUBLIC_APP_URL in .env}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in .env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      APP_ACCESS_SECRET: ${APP_ACCESS_SECRET:?Set APP_ACCESS_SECRET in .env}
+      APP_ACCESS_PASSWORD: ${APP_ACCESS_PASSWORD:-}
+      JOB_SYNC_SECRET: ${JOB_SYNC_SECRET:?Set JOB_SYNC_SECRET in .env}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?Set NEXT_PUBLIC_APP_URL in .env}
+      DEMO_MODE: ${DEMO_MODE:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-3000}:3000"
 
 volumes:
   resumeforge_pgdata:

@@ -59,6 +59,7 @@ export function SettingsWorkspace() {
   } | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
   const [usernameDraft, setUsernameDraft] = useState("");
   const [usernameStatus, setUsernameStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isSavingUsername, setIsSavingUsername] = useState(false);
@@ -69,6 +70,9 @@ export function SettingsWorkspace() {
     let cancelled = false;
     async function loadSettings() {
       try {
+        const demoConfig = await fetch("/api/demo-config").then((res) => res.json()).catch(() => ({}));
+        const isDemo = demoConfig.demoMode === true;
+        if (!cancelled) setDemoMode(isDemo);
         const config = await getActiveConfig();
         let activeProvider = (config.provider as ProviderType) || "gemini";
         let activeModel = config.model || DEFAULT_MODELS[activeProvider] || DEFAULT_MODELS.gemini;
@@ -80,6 +84,12 @@ export function SettingsWorkspace() {
           if (parsed.provider) activeProvider = parsed.provider;
           if (parsed.model) activeModel = parsed.model;
           if (parsed.baseUrl) activeBaseUrl = parsed.baseUrl;
+        }
+
+        if (isDemo && (activeProvider === "ollama" || activeProvider === "custom")) {
+          activeProvider = "gemini";
+          activeModel = DEFAULT_MODELS.gemini;
+          activeBaseUrl = "";
         }
 
         if (activeProvider === "gemini" && activeModel === "gemini-3.8-flash") {
@@ -342,12 +352,10 @@ export function SettingsWorkspace() {
                   <LogIn className="h-4 w-4" aria-hidden />
                   Sign In
                 </Link>
-                <Link
+                {!demoMode && <Link
                   href="/login?mode=signup"
                   className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#ff8c00] px-4 text-sm font-semibold text-black hover:bg-[#ffa024] focus-visible:ring-2 focus-visible:ring-amber-500/60"
-                >
-                  Sign Up
-                </Link>
+                >Sign Up</Link>}
               </div>
             )}
           </Surface>
@@ -365,12 +373,13 @@ export function SettingsWorkspace() {
                 className="w-full rounded-md border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
               >
                 <option value="gemini">Google Gemini (Direct API)</option>
-                <option value="openai">OpenAI (Direct API)</option>
-                <option value="anthropic">Anthropic (Direct API)</option>
-                <option value="groq">Groq (High-Speed Cloud Inference)</option>
-                <option value="ollama">Ollama (Local Inference)</option>
-                <option value="custom">Custom OpenAI-compatible endpoint (Local / self-hosted endpoint)</option>
+                <option value="openai">OpenAI (BYOK)</option>
+                <option value="anthropic">Anthropic (BYOK)</option>
+                <option value="groq">Groq (BYOK)</option>
+                {!demoMode && <option value="ollama">Ollama (Local Inference)</option>}
+                {!demoMode && <option value="custom">Custom OpenAI-compatible endpoint (Local / self-hosted endpoint)</option>}
               </select>
+              {demoMode && <p className="mt-2 text-xs text-slate-400">Demo BYOK supports Gemini, OpenAI, Anthropic, and Groq. Custom and local Ollama endpoints are disabled.</p>}
             </div>
 
             {/* API Key Input (Hidden for Ollama) */}

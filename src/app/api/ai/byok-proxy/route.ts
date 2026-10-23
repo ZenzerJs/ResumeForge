@@ -1,6 +1,8 @@
 import { requireUserId } from "@/lib/security/auth-request";
 import { assertSafePublicUrl, UnsafeUrlError } from "@/lib/security/safe-fetch";
 import { originAllowed } from "@/lib/security/session";
+import { isDemoMode } from "@/lib/demo-mode";
+import { clientKey, rateLimit } from "@/lib/security/rate-limit";
 
 const ALLOWED_PROVIDER_PATHS: Record<string, readonly string[]> = {
   "api.openai.com": ["/v1/chat/completions", "/v1/models", "/v1/responses"],
@@ -44,8 +46,8 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // 2. Require authenticated user session
-  const userIdOrRes = await requireUserId(req);
-  if (userIdOrRes instanceof Response) {
+  const userIdOrRes = isDemoMode() ? null : await requireUserId(req);
+  if (!isDemoMode() && userIdOrRes instanceof Response) {
     return new Response(
       JSON.stringify({
         error: {
@@ -55,6 +57,12 @@ export async function POST(req: Request): Promise<Response> {
       }),
       { status: 401, headers: { "content-type": "application/json" } }
     );
+  }
+  if (isDemoMode() && !rateLimit(clientKey(req, "demo-byok"), 8, 60_000)) {
+    return new Response(JSON.stringify({ error: { code: "RATE_LIMITED", message: "Too many BYOK requests" } }), {
+      status: 429,
+      headers: { "content-type": "application/json" },
+    });
   }
 
   // 3. Validate target URL header

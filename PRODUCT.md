@@ -25,7 +25,7 @@ These ten rules govern all design and development decisions across ResumeForge:
 4. **Traceable Citations**: Every resume claim must be traceable to a verified evidence item.
 5. **No ATS Gaming**: No hidden text, white text, keyword stuffing, or cheat codes anywhere in generated output.
 6. **Zero Plaintext Secrets**: API keys must never be committed to git, logged, or stored in plaintext in the database.
-7. **Local-First & BYOK**: V1 is local-first, single-user, and Bring-Your-Own-Key (BYOK). No cloud sync, no auth, no analytics, no telemetry.
+7. **Local-First & BYOK**: Browser guest work stays local; self-hosted accounts persist to PostgreSQL. AI uses visitor/user BYOK or an operator-configured provider in private self-hosted installs. The public demo requires visitor BYOK and does not persist visitor work.
 8. **Intership-Focused 100-Point ATS Rubric**: Base resume quality + job-specific match + role profile equal exactly 100 base points before optional bonus points. Every category weight must have a clear rationale.
 9. **One-Page Constraint**: One-page target is the default; multi-page layouts require explicit user override.
 10. **Scope Discipline**: Implementers must not build beyond the task assigned to them. No feature may be added "while I was in there."
@@ -72,12 +72,16 @@ The ResumeForge workspace consists of eight core modules:
 
 ---
 
-## 4. Out of Scope for V1
+## 4. Current Deployment Modes
+
+- **Public demo**: synthetic sample content is labeled; visitor drafts remain in browser storage; signup and database writes are disabled; AI requires visitor BYOK.
+- **Self-hosted**: PostgreSQL is the only application database and accounts are optional. Signed-in users can persist private resumes, evidence, variants, and application data.
+
+## 5. Out of Scope for V1
 
 The following features are explicitly deferred to post-V1 phases:
 
-- Multi-user authentication & user accounts
-- Cloud database sync & remote storage
+- Cloud database sync between independent installations
 - Background automated scheduled scrapers or auto-polling (on-demand manual refresh only per ADR-010)
 - Automated job application submitting bots
 - Analytics, telemetry, or user tracking

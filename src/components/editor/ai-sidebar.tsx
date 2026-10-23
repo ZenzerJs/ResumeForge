@@ -49,6 +49,7 @@ import { AiMarkdownRenderer } from "@/components/editor/ai-markdown-renderer";
 import { ChatPanel } from "@/components/editor/chat-panel";
 import { AiProgress, type AiJobStage } from "@/components/ui/ai-progress";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
+import { getDemoContextFromBrowser } from "@/lib/demo-client";
 
 interface AiSidebarProps {
   /** Current Typst source in the editor buffer */
@@ -137,6 +138,8 @@ export function AiSidebar({
   const [showGaps, setShowGaps] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
   const [patchBatch, setPatchBatch] = useState<{ batchId: string; revisionToken: string; baseTypstSource: string; jobId: string } | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [demoBaseTypstSource, setDemoBaseTypstSource] = useState<string | null>(null);
 
   // Task 9.6: Seeded feedback context from Tailor review
   const [seededFeedback, setSeededFeedback] = useState<{
@@ -151,17 +154,25 @@ export function AiSidebar({
   // Read seeded feedback on initial mount or when jobId changes
   useEffect(() => {
     if (!urlJobId || typeof window === "undefined") return;
-    try {
-      const raw = sessionStorage.getItem(`resumeforge_tailor_feedback_${urlJobId}`);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.jobId === urlJobId) {
-          setSeededFeedback(parsed);
-        }
+    let cancelled = false;
+    (async () => {
+      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      if (cancelled) return;
+      if (demoConfig?.demoMode) {
+        setSeededFeedback(null);
+        return;
       }
-    } catch {
-      // sessionStorage unavailable or invalid
-    }
+      try {
+        const raw = sessionStorage.getItem(`resumeforge_tailor_feedback_${urlJobId}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.jobId === urlJobId) setSeededFeedback(parsed);
+        }
+      } catch {
+        // sessionStorage unavailable or invalid
+      }
+    })();
+    return () => { cancelled = true; };
   }, [urlJobId]);
 
   const handleDismissSeededFeedback = () => {
@@ -178,14 +189,24 @@ export function AiSidebar({
   useEffect(() => {
     if (!urlJobId) return;
     let cancelled = false;
-    fetch(`/api/jobs/${urlJobId}`)
-      .then((r) => r.json())
-      .then((json) => {
-        if (!cancelled && json.success && json.data?.rawDescription) {
-          setJdText(json.data.rawDescription);
-        }
-      })
-      .catch(() => {});
+    (async () => {
+      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      if (cancelled) return;
+      if (demoConfig?.demoMode) {
+        try {
+          const rawJobs = localStorage.getItem("resumeforge_guest_jobs");
+          const jobs = rawJobs ? JSON.parse(rawJobs) : [];
+          const localJob = Array.isArray(jobs) ? jobs.find((item) => item?.id === urlJobId) : null;
+          if (localJob?.rawDescription) setJdText(localJob.rawDescription);
+        } catch {}
+        return;
+      }
+      try {
+        const res = await fetch(`/api/jobs/${urlJobId}`);
+        const json = await res.json();
+        if (!cancelled && json.success && json.data?.rawDescription) setJdText(json.data.rawDescription);
+      } catch {}
+    })();
     return () => {
       cancelled = true;
     };
@@ -216,6 +237,8 @@ export function AiSidebar({
     setAcknowledgedSkills(new Set());
     setHasApplied(false);
     setPatchBatch(null);
+    setIsDemoMode(false);
+    setDemoBaseTypstSource(null);
 
     try {
       // Step 1: Extract requirements from JD text
@@ -236,10 +259,17 @@ export function AiSidebar({
 
       const jobRequirements = extractJson.data;
 
-      // Persist pasted job descriptions for authenticated users so citations and
-      // accepted proposals can be bound to a real server-side job.
+      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      const isDemo = demoConfig?.demoMode === true;
+      const demoContext = isDemo ? getDemoContextFromBrowser() : undefined;
+      if (isDemo && (!demoContext?.masterTypst || demoContext.masterTypst !== source || localStorage.getItem("resumeforge_typst_source") !== source)) {
+        throw new Error("The browser resume changed. Reload the demo draft before generating patches.");
+      }
+
+      // Persist pasted job descriptions for signed-in users so accepted
+      // proposals can be bound to a real server-side job.
       let jobId = urlJobId;
-      if (!jobId) {
+      if (!isDemo && !jobId) {
         const saveRes = await fetch("/api/jobs", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -253,7 +283,7 @@ export function AiSidebar({
 
       // Step 2: Generate patches against master resume
       setTailorStage("writing");
-      const patchRes = await fetch("/api/ai/generate-patches", {
+      const patchRes = await fetch(isDemo ? "/api/demo/generate-patches" : "/api/ai/generate-patches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -268,7 +298,7 @@ export function AiSidebar({
             preferredSkills: jobRequirements.preferredSkills,
             domainTerms: jobRequirements.domainTerms,
           },
-          ...(jobId ? { jobId } : {}),
+          ...(isDemo ? (demoContext || {}) : (jobId ? { jobId } : {})),
           tailorFeedback: seededFeedback
             ? {
                 overviewCommentary: seededFeedback.overviewCommentary,
@@ -286,7 +316,7 @@ export function AiSidebar({
         );
         const errMsg =
           patchRes.status === 401 && isProxyProvider
-            ? "Sign in to use this provider, or switch to Gemini."
+            ? isDemo ? "Use your own provider API key in Settings to generate a demo response." : "Sign in to use this provider, or switch to Gemini."
             : patchJson.error || "AI generation failed.";
         setError(errMsg);
         setTailorStage("error");
@@ -300,6 +330,8 @@ export function AiSidebar({
       const verifiedPatches = patchJson.data.verified || [];
       setSuggestions(verifiedPatches);
       setPatchBatch(patchJson.data.batch || null);
+      setIsDemoMode(isDemo && patchJson.data.demo === true);
+      setDemoBaseTypstSource(isDemo ? source : null);
       setGaps(patchJson.data.gaps || []);
 
       // Step 3: Phase 11.2 Guardrail verification against frozen master facts
@@ -365,6 +397,43 @@ export function AiSidebar({
   };
 
   const handleApplyAccepted = async () => {
+    if (isDemoMode) {
+      if (!demoBaseTypstSource || source !== demoBaseTypstSource || localStorage.getItem("resumeforge_typst_source") !== demoBaseTypstSource) {
+        setError("The browser draft changed after these patches were generated. Generate patches again to protect your edits.");
+        return;
+      }
+      const acceptedList = suggestions.filter((suggestion) => acceptedIds.has(suggestion.id));
+      if (acceptedList.length === 0) {
+        setError("Accept at least one verified patch before applying the local draft.");
+        return;
+      }
+      setIsGenerating(true);
+      setError(null);
+      try {
+        const rawFacts = localStorage.getItem("resumeforge_demo_master_facts");
+        const facts = rawFacts ? JSON.parse(rawFacts) as ResumeFacts : null;
+        if (!facts) throw new Error("Freeze a local master resume before applying patches.");
+        const reconstructed = applyPatchProposals(demoBaseTypstSource, acceptedList);
+        const acceptedPatchIds = acceptedList.map((patch) => patch.id);
+        if (new Set(acceptedPatchIds).size !== acceptedPatchIds.length || reconstructed.appliedIds.length !== acceptedPatchIds.length || acceptedPatchIds.some((id) => !reconstructed.appliedIds.includes(id))) {
+          throw new Error("The local proposal set changed. Generate patches again before applying.");
+        }
+        assertCanApplyPatches(reconstructed.typstSource, facts, acceptedList, { acknowledgedSkills: Array.from(acknowledgedSkills) });
+        const localContent = markDocumentAsPatched(reconstructed.typstSource);
+        const { compileTypstToSvg } = await import("@/lib/typst/compiler");
+        const compiled = await compileTypstToSvg(localContent);
+        if (!compiled.success) throw new Error("The local resume does not compile. Review the accepted patches before applying.");
+        localStorage.setItem("resumeforge_typst_source", localContent);
+        onApplyToBuffer(localContent);
+        setHasApplied(true);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to apply local patches.");
+      } finally {
+        setIsGenerating(false);
+      }
+      return;
+    }
+
     if (!patchBatch) {
       setError("Save this job and generate patches again before applying a persistent variant.");
       return;

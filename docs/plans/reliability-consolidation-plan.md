@@ -1,6 +1,6 @@
 # ResumeForge reliability and public demo plan
 
-Status: Step 1 implemented on `codex/cleanup-containment`; later steps remain planned.
+Status: Steps 1–4 implemented on `codex/bounded-public-demo`; step 5 demo-browser verification is pending. Unit, environment, PostgreSQL, Docker PDF smoke, and persistent-browser checks pass on the latest source.
 Date: 2026-10-23 (America/New_York).
 Reviewed baseline: `89439b1c10fa70b451d9cf96ebe31363107cc861`, committed at 06:08:09 Eastern.
 
@@ -12,11 +12,11 @@ Keep the existing editor, evidence library, tailoring, exports, tracker, discove
 
 ADR-014 approved optional accounts and a shared job catalog. Existing accounts are intentional; the conflicting single-user/no-auth language in PRODUCT.md is stale. Historical decisions should retain their history, with their superseding decisions clearly identified.
 
-Proposed public demo policy, still to be confirmed: synthetic sample records; visitor drafts remain in the browser; live AI requires visitor BYOK; no operator-funded public AI fallback; maintenance/import controls stay operator-only. Decide whether public signup and persistent visitor saves are needed before implementing demo restrictions. Do not share one writable demo account among visitors.
+Approved public demo policy: synthetic sample records; visitor drafts remain in the browser; live AI requires visitor BYOK; no operator-funded public AI fallback; public signup is disabled; maintenance/import controls stay operator-only. Self-hosted deployments keep account signup and full PostgreSQL persistence when `DEMO_MODE=false`. Do not share one writable demo account among visitors.
 
 ## 1. Contain destructive maintenance
 
-Completed 2026-10-23: maintenance-only endpoint, unconditional protection of application history and private artifacts, parent-row locking before eligibility checks, and preservation of protected feed links. Lint, typecheck, 652 tests across 111 files, and production build passed. A separate real-PostgreSQL test confirmed cleanup waits for an in-flight application save and preserves its committed records. The temporary test schema was removed. Permanent database integration coverage remains step 2.
+Completed 2026-10-23 in `83c90f8`: maintenance-only endpoint, unconditional protection of application history and private artifacts, parent-row locking before eligibility checks, and preservation of protected feed links. At that phase, lint, typecheck, 652 tests across 111 files, production build, and a real-PostgreSQL cleanup-race test passed. The temporary test schema was removed. Permanent database integration coverage was added in step 2.
 
 First implementation concern: global cleanup authorization and preservation of user work.
 
@@ -32,6 +32,8 @@ Primary existing files: `src/app/api/jobs/cleanup/route.ts`, `src/lib/db/jobs.ts
 
 ## 2. Verify the actual PostgreSQL contract
 
+Completed 2026-10-23 in `6a568f0`: added a disposable PostgreSQL integration suite and CI wiring, fixed saved-job search to query `roleTitle`, and verified per-user shared-catalog isolation and critical write behavior. The phase passed 652 unit tests, four real PostgreSQL integration checks, lint, typecheck, build, and environment parity checks.
+
 Second concern: database integration tests and the confirmed AI search field mismatch.
 
 - Keep fast mock-based unit tests, but add an explicitly separate integration suite using a disposable PostgreSQL test database. Never reset the developer's application database.
@@ -46,7 +48,9 @@ Primary existing files: `src/lib/prisma.ts`, `src/lib/ai/tools/executor.ts`, `vi
 
 ## 3. Restore durable patch provenance
 
-Two dependent implementation concerns, in separate branches/PRs.
+Step 3a completed 2026-10-23 in `ae4c539`: added durable `PatchCitation` storage and validation while retaining legacy citation JSON. Step 3b completed 2026-10-23 in `6dd93db`: generation stores server-bound proposals; apply accepts proposal IDs and acknowledgements, revalidates them, reconstructs against the bound source revision, and writes variants and citations atomically. The latest 3b checks passed 662 unit tests, lint, typecheck, build, environment parity (28 names), and six real PostgreSQL checks. Both subphases passed their acceptance checks without deleting legacy citation data.
+
+Two dependent implementation concerns, landed as separate commits.
 
 ### 3a. Add citation storage without removing legacy data
 
@@ -73,9 +77,11 @@ Primary existing files: `prisma/schema.prisma`, `src/lib/ai/patch-schema.ts`, `s
 
 ## 4. Prepare a bounded public demo and self-hosting path
 
-- Agree on visitor signup/save policy; document which features are live, local-only, or sample-backed.
+Implemented 2026-10-23 in `9ce6079` and integrated with steps 3b and parser fix `ebe5ec5`; the latest production Docker image built successfully and its stateless PDF-import smoke test confirmed no database writes. Full synthetic lifecycle and backup/restore validation passed on the prior image; no database schema changed in the PDF-route refinement. Persistent browser checks passed; demo browser verification remains in step 5. The approved visitor policy remains unchanged: synthetic samples, visitor drafts in browser storage, visitor-provided BYOK, no public signup, and no operator-funded AI fallback. Demo mode blocks persistent application writes even for signed-in visitors and reads visitor resume/evidence/job data from browser storage. Self-hosted mode retains signup and PostgreSQL persistence when `DEMO_MODE=false`.
+
+- Implement the approved visitor signup/save policy; document which features are live, local-only, or sample-backed.
 - Reconcile PRODUCT.md and active architecture documentation with PostgreSQL and the approved account/catalog model. Do not remove historical ADR context.
-- Verify Docker installation, migration, asset packaging, restart persistence, and backup/restore on synthetic data. The current Compose file starts PostgreSQL only; the complete app startup path needs verification.
+- Verify Docker installation, migration, asset packaging, restart persistence, and backup/restore on synthetic data. The complete app-plus-PostgreSQL Compose path is implemented and has passed combined synthetic lifecycle and custom-format backup/restore validation.
 - Verify that public AI cannot use operator fallback credentials, provider networking works under the production CSP, and public users cannot trigger unrestricted imports or maintenance.
 - Keep expensive job refreshes on-demand and operator-controlled. Bound imported records and upload/request sizes based on measured use, without deleting user history to control costs.
 - Compare current hosting offerings only after measuring production memory, build requirements, database/storage use, and WASM asset sizes. Check sleep/cold-start behavior, execution limits, egress, database expiry, and current pricing. A zero-dollar deployment is a target, not an established fact.
@@ -83,6 +89,8 @@ Primary existing files: `prisma/schema.prisma`, `src/lib/ai/patch-schema.ts`, `s
 Acceptance: a new user can follow the self-hosting instructions successfully; the public demo shows its limitations honestly; projected demo resource use fits the chosen provider's verified limits; personal data and shared records cannot be mutated through demo bypasses.
 
 ## 5. Prove the release journey
+
+In progress. The combined PostgreSQL integration run passed all six checks. The latest Docker image is 2,219,207,990 bytes; its PDF-upload smoke returned a browser-local Typst draft while `User` and `Resume` row counts stayed at zero. The full 10-migration lifecycle, Secure signup cookie, restart persistence, and separate-database restore passed on the prior image; no schema changed in the PDF-route update. Persistent Playwright passed 2/2 journeys, covering accepted/rejected patch review, compile/apply, citation reload, exports, tracker isolation, and authenticated PDF import. Demo Playwright remains in progress. Earlier per-phase checks are recorded in the walkthrough and are not substitutes for the final demo browser result.
 
 Use synthetic resume/evidence fixtures and real PostgreSQL for persistence verification:
 
@@ -107,6 +115,6 @@ Playwright execution must be delegated to GPT-6 Luna. The primary agent reviews 
 - Record actual verification results and the required walkthrough after each major phase. Preserve unrelated existing screenshots and untracked browser specs.
 - No auth cutover, billing, subscriptions, scheduled scraping, collaboration, new job sources, broad UI rewrite, or speculative scale infrastructure in this pass.
 - Retain the signed Better Auth design for its eventual task; keep APP_ACCESS_SECRET until that cutover. Keep the signed empty-requirements scoring behavior; RF-SCORE-NULL remains deferred.
-- The four required checks passed on the reviewed source baseline: lint, typecheck, 649 tests in 111 files, and production build. Those are baseline results, not verification of the planned changes. This planning task does not run Playwright or claim the implementation is complete.
+- Keep the implementation history above and in the walkthrough. The current combined source has passed lint, typecheck, 674 tests across 115 files, `check:env` (32 declared names), six PostgreSQL integration checks, latest Docker build/PDF smoke, and both persistent Playwright journeys. Demo Playwright remains pending; do not claim step 5 complete until that journey is recorded.
 
-Next actionable task: step 2, the real PostgreSQL integration suite and AI saved-job search correction.
+Next actionable task: finish step 5 release verification with the combined source, then update the walkthrough with exact final results.

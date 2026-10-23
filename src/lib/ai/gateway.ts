@@ -14,6 +14,7 @@ import { buildEvidenceExtractSystemPrompt, buildEvidenceExtractUserPrompt } from
 import { FormattedJd, FormattedJdSchema } from "./jd-format-schema";
 import { buildJdFormatSystemPrompt, buildJdFormatUserPrompt, JdFormatPromptInput } from "./jd-format-prompt";
 import { sanitizeTypstSource } from "../typst/sanitizer";
+import { isDemoMode } from "../demo-mode";
 
 /**
  * Resolves server-side defaults and environment variables for AI providers.
@@ -22,7 +23,7 @@ export function resolveServerProviderConfig(config: ProviderConfig): ProviderCon
   if (config.provider === "groq") {
     return {
       ...config,
-      apiKey: config.apiKey?.trim() || process.env.GROQ_API_KEY?.trim() || undefined,
+      apiKey: config.apiKey?.trim() || (!isDemoMode() ? process.env.GROQ_API_KEY?.trim() : undefined) || undefined,
       baseUrl: config.baseUrl || "https://api.groq.com/openai/v1",
       model: config.model || "llama-3.3-70b-versatile",
     };
@@ -30,7 +31,7 @@ export function resolveServerProviderConfig(config: ProviderConfig): ProviderCon
   if (config.provider === "ollama") {
     return {
       ...config,
-      baseUrl: config.baseUrl || process.env.OLLAMA_BASE_URL || "http://localhost:11434/v1",
+      baseUrl: config.baseUrl || (!isDemoMode() ? process.env.OLLAMA_BASE_URL : undefined) || "http://localhost:11434/v1",
       model: config.model || "llama3.2",
       apiKey: config.apiKey || "ollama",
     };

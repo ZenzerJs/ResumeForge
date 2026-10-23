@@ -39,6 +39,8 @@ import { generateApplicationPackageZip, sanitizeZipFilename } from "@/lib/export
 import { compileTypstToPdf } from "@/lib/typst/compiler";
 import { ResumeFacts } from "@/lib/facts/types";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
+import { getDemoContextFromBrowser } from "@/lib/demo-client";
+import type { Gap } from "@/lib/ai/patch-schema";
 
 export interface TrackerJobItem {
   id: string;
@@ -125,7 +127,11 @@ export function ApplySheet({
   const [variantError, setVariantError] = useState<string | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(job?.appliedVariantId ?? null);
   const [patchBatch, setPatchBatch] = useState<{ batchId: string; revisionToken: string; baseTypstSource: string; jobId: string } | null>(null);
+  const [demoLocalPatches, setDemoLocalPatches] = useState(false);
+  const [demoPatchBaseSource, setDemoPatchBaseSource] = useState<string | null>(null);
   const [pendingPatches, setPendingPatches] = useState<PatchProposal[]>([]);
+  const [patchGaps, setPatchGaps] = useState<Gap[]>([]);
+  const [tailoringNotice, setTailoringNotice] = useState<string | null>(null);
   const [patchDecisions, setPatchDecisions] = useState<Record<string, PatchReviewDecision>>({});
   const [acknowledgedSkills, setAcknowledgedSkills] = useState<string[]>([]);
   const [skillsNeedingAck, setSkillsNeedingAck] = useState<string[]>([]);
@@ -140,7 +146,11 @@ export function ApplySheet({
       setExportError(null);
       setVariantError(null);
       setPatchBatch(null);
+      setDemoLocalPatches(false);
+      setDemoPatchBaseSource(null);
       setPendingPatches([]);
+      setPatchGaps([]);
+      setTailoringNotice(null);
       setPatchDecisions({});
       setAcknowledgedSkills([]);
       setSkillsNeedingAck([]);
@@ -215,6 +225,43 @@ export function ApplySheet({
       let workingTypst = tailoredTypst || masterTypst;
       if (!workingTypst && typeof window !== "undefined") {
         workingTypst = localStorage.getItem("resumeforge_typst_source") || "";
+      }
+      if (demoLocalPatches) {
+        const baseSource = demoPatchBaseSource;
+        if (!baseSource || workingTypst !== baseSource || localStorage.getItem("resumeforge_typst_source") !== baseSource) {
+          throw new Error("The browser draft changed after these patches were generated. Generate patches again to protect your edits.");
+        }
+        const acceptedPatches = selectAcceptedPatchProposals(pendingPatches, patchDecisions);
+        if (acceptedPatches.length === 0) throw new Error("Accept at least one patch before applying the local variant.");
+        const reconstructed = applyPatchProposals(baseSource, acceptedPatches);
+        const acceptedIds = acceptedPatches.map((patch) => patch.id);
+        if (new Set(acceptedIds).size !== acceptedIds.length || reconstructed.appliedIds.length !== acceptedIds.length || acceptedIds.some((id) => !reconstructed.appliedIds.includes(id))) {
+          throw new Error("The local proposal set changed. Generate patches again before applying.");
+        }
+        const rawFacts = localStorage.getItem("resumeforge_demo_master_facts");
+        const facts = rawFacts ? JSON.parse(rawFacts) as ResumeFacts : null;
+        if (!facts) throw new Error("Freeze a local master resume before applying patches.");
+        const unacknowledged = checkGuardrail(baseSource, facts, { patches: acceptedPatches }).violations
+          .filter((violation) => violation.kind === "skill" && typeof violation.actual === "string")
+          .map((violation) => violation.actual as string);
+        setSkillsNeedingAck(Array.from(new Set(unacknowledged)));
+        if (unacknowledged.some((skill) => !acknowledgedSkills.includes(skill))) {
+          throw new Error("Acknowledge each unverified skill below before applying these patches.");
+        }
+        assertCanApplyPatches(baseSource, facts, acceptedPatches, { acknowledgedSkills });
+        assertCanApplyPatches(reconstructed.typstSource, facts, acceptedPatches, { acknowledgedSkills });
+        const localContent = markDocumentAsPatched(reconstructed.typstSource);
+        const { compileTypstToSvg } = await import("@/lib/typst/compiler");
+        const compiled = await compileTypstToSvg(localContent);
+        if (!compiled.success) throw new Error("The local resume does not compile. Review the generated patches.");
+        localStorage.setItem("resumeforge_typst_source", localContent);
+        workingTypst = localContent;
+        setTailoredTypst(localContent);
+        setAppliedPatchCount(acceptedIds.length);
+        setDemoLocalPatches(false);
+        setDemoPatchBaseSource(null);
+        setPendingPatches([]);
+        setPatchDecisions({});
       }
       if (patchBatch) {
         const acceptedPatches = selectAcceptedPatchProposals(pendingPatches, patchDecisions);
@@ -291,17 +338,27 @@ export function ApplySheet({
         } catch {}
       }
 
-      // Generate a saved proposal batch first. The next action applies the
-      // server-reconstructed preview after any required skill acknowledgement.
-      if (!patchBatch) {
+      // Generate a saved proposal batch for signed-in use, or a stateless BYOK
+      // proposal set for the browser-local public demo.
+      if (!patchBatch && !demoLocalPatches && (reqs.requiredSkills.length > 0 || reqs.preferredSkills.length > 0)) {
+        const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+        const isDemo = demoConfig?.demoMode === true;
         const aiConfig = await resolveClientProviderConfig();
-        if (aiConfig && (reqs.requiredSkills.length > 0 || reqs.preferredSkills.length > 0)) {
-          const patchRes = await fetch("/api/ai/generate-patches", {
+        if (!aiConfig) {
+          setTailoringNotice(isDemo
+            ? "Add your own provider API key in Settings to generate demo patches. Your key is used for this request only."
+            : "Configure an AI provider to generate tailored patches.");
+        } else {
+          setTailoringNotice(null);
+          const demoContext = isDemo ? getDemoContextFromBrowser() : undefined;
+          if (isDemo && (!demoContext?.masterTypst || demoContext.masterTypst !== workingTypst || localStorage.getItem("resumeforge_typst_source") !== workingTypst)) {
+            throw new Error("The browser resume changed. Reload the demo draft before generating patches.");
+          }
+          const patchRes = await fetch(isDemo ? "/api/demo/generate-patches" : "/api/ai/generate-patches", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               providerConfig: aiConfig,
-              jobId: job.id,
               jobRequirements: {
                 requiredSkills: reqs.requiredSkills,
                 preferredSkills: reqs.preferredSkills,
@@ -309,24 +366,41 @@ export function ApplySheet({
                 roleTitle: job.roleTitle || undefined,
                 company: job.company || undefined,
               },
+              ...(isDemo ? (demoContext || {}) : { jobId: job.id }),
             }),
           });
           const patchJson = await patchRes.json();
           if (patchRes.ok && patchJson.success && Array.isArray(patchJson.data?.verified)) {
-            const batch = patchJson.data.batch;
-            if (!batch) throw new Error("Save this job before applying a persistent tailored variant.");
-            if (workingTypst !== batch.baseTypstSource) throw new Error("The resume changed during generation. Generate patches again.");
-            setPatchBatch(batch);
-            setPendingPatches(patchJson.data.verified);
-            setPatchDecisions(Object.fromEntries(patchJson.data.verified.map((patch: PatchProposal) => [patch.id, "pending"])));
-            if (masterFacts) {
+            const verified = patchJson.data.verified as PatchProposal[];
+            setPatchGaps(Array.isArray(patchJson.data.gaps) ? patchJson.data.gaps as Gap[] : []);
+            if (verified.length > 0) {
+              if (isDemo) {
+                if (workingTypst !== demoContext?.masterTypst || localStorage.getItem("resumeforge_typst_source") !== workingTypst) {
+                  throw new Error("The browser resume changed during generation. Generate patches again.");
+                }
+                setDemoLocalPatches(true);
+                setDemoPatchBaseSource(workingTypst);
+                setPatchBatch(null);
+              } else {
+                const batch = patchJson.data.batch;
+                if (!batch) throw new Error("Save this job before applying a persistent tailored variant.");
+                if (workingTypst !== batch.baseTypstSource) throw new Error("The resume changed during generation. Generate patches again.");
+                setPatchBatch(batch);
+              }
+              setPendingPatches(verified);
+              setPatchDecisions(Object.fromEntries(verified.map((patch) => [patch.id, "pending"])));
+              setSkillsNeedingAck([]);
+            }
+            if (masterFacts && verified.length > 0) {
               const unacknowledged = checkGuardrail(workingTypst, masterFacts, { patches: patchJson.data.verified }).violations
                 .filter((violation) => violation.kind === "skill" && typeof violation.actual === "string")
                 .map((violation) => violation.actual as string);
               setSkillsNeedingAck(Array.from(new Set(unacknowledged)));
             }
-            setCurrentStep("tailor");
-            return;
+            if (verified.length > 0) {
+              setCurrentStep("tailor");
+              return;
+            }
           }
           if (!patchRes.ok) throw new Error(patchJson.error || "AI patch generation failed.");
         }
@@ -537,7 +611,7 @@ export function ApplySheet({
           </div>
 
           {/* Step 2 & 3: Tailoring & Guardrail Results */}
-          {patchBatch && pendingPatches.length > 0 && (
+          {(patchBatch || demoLocalPatches) && pendingPatches.length > 0 && (
             <div className="space-y-3" data-testid="apply-sheet-patch-review">
               <h4 className="text-xs font-semibold text-slate-200">Review proposed changes</h4>
               {pendingPatches.map((patch) => (
@@ -551,7 +625,7 @@ export function ApplySheet({
               ))}
             </div>
           )}
-          {patchBatch && skillsNeedingAck.length > 0 && (
+          {(patchBatch || demoLocalPatches) && skillsNeedingAck.length > 0 && (
             <div className="space-y-2 rounded-lg border border-amber-800/60 bg-amber-950/30 p-3 text-xs text-amber-200">
               <p>Confirm any unverified skills you have real experience with before applying:</p>
               {skillsNeedingAck.map((skill) => (
@@ -562,6 +636,15 @@ export function ApplySheet({
               ))}
             </div>
           )}
+          {patchGaps.length > 0 && (
+            <div className="space-y-1 rounded-lg border border-amber-800/60 bg-amber-950/30 p-3 text-xs text-amber-200" data-testid="apply-sheet-gaps">
+              <p className="font-semibold">Requirements not covered by verified evidence</p>
+              {patchGaps.map((gap, index) => (
+                <p key={`${gap.requirement}-${index}`}>{gap.requirement}: {gap.recommendation}</p>
+              ))}
+            </div>
+          )}
+          {tailoringNotice && <p className="rounded-lg border border-slate-700 bg-slate-900 p-3 text-xs text-slate-300" role="status">{tailoringNotice}</p>}
           {guardrailResult && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -653,7 +736,7 @@ export function ApplySheet({
               className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs gap-2 shadow-lg shadow-amber-500/20"
             >
               {isProcessing ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-              {patchBatch ? "Apply Verified Patches & Verify" : "Tailor & Verify Guardrail"}
+              {patchBatch || demoLocalPatches ? "Apply Verified Patches & Verify" : "Tailor & Verify Guardrail"}
             </Button>
           ) : (
             <div className="space-y-2 w-full">

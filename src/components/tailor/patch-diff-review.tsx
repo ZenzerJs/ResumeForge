@@ -15,10 +15,10 @@ import {
   Edit3,
 } from "lucide-react";
 import type { PatchProposal, Gap, RejectedPatch } from "@/lib/ai/patch-schema";
-import { extractResumeFacts } from "@/lib/facts/extract";
 import { checkGuardrail } from "@/lib/guardrail/check";
 import { assertCanApplyPatches, markDocumentAsPatched } from "@/lib/guardrail/policy";
 import { applyPatchProposals } from "@/lib/ai/patch-application";
+import type { ResumeFacts } from "@/lib/facts/types";
 
 /**
  * Pure helper that merges accepted patches into Typst source and stamps the document
@@ -44,6 +44,10 @@ interface PatchDiffReviewProps {
   masterTypstSource: string;
   jobId: string;
   batch: { batchId: string; revisionToken: string; baseTypstSource: string; jobId: string } | null;
+  localOnly?: boolean;
+  localBaseTypstSource?: string | null;
+  localStorageSourceKey?: string;
+  masterFactsSnapshot: ResumeFacts | null;
   onApplySuccess?: (variantId: string, mergedContent: string) => void;
 }
 
@@ -78,6 +82,10 @@ export function PatchDiffReview({
   masterTypstSource,
   jobId,
   batch,
+  localOnly = false,
+  localBaseTypstSource,
+  localStorageSourceKey = "resumeforge_typst_source",
+  masterFactsSnapshot,
   onApplySuccess,
 }: PatchDiffReviewProps) {
   const [decisions, setDecisions] = useState<Record<string, PatchDecision>>(() => {
@@ -98,10 +106,7 @@ export function PatchDiffReview({
   const rejectedByUser = verified.filter((p) => decisions[p.id] === "rejected");
   const pendingPatches = verified.filter((p) => decisions[p.id] === "pending");
 
-  const masterFacts = React.useMemo(
-    () => (masterTypstSource ? extractResumeFacts(masterTypstSource) : null),
-    [masterTypstSource]
-  );
+  const masterFacts = masterFactsSnapshot;
 
   const unverifiedSkillsForAccepted = React.useMemo(() => {
     if (!masterFacts || acceptedPatches.length === 0) return [];
@@ -161,11 +166,21 @@ export function PatchDiffReview({
     setApplySuccess(null);
 
     try {
-      if (!batch || batch.jobId !== jobId) {
+      const baseTypstSource = localOnly ? localBaseTypstSource : batch?.baseTypstSource;
+      if (!baseTypstSource) {
+        throw new Error("This proposal is missing its original resume source. Generate patches again before applying.");
+      }
+      if (!localOnly && (!batch || batch.jobId !== jobId)) {
         throw new Error("This proposal has no saved server batch. Generate patches again before applying.");
       }
-      if (masterTypstSource !== batch.baseTypstSource) {
+      if (masterTypstSource !== baseTypstSource) {
         throw new Error("The resume changed after these patches were generated. Generate patches again to protect your edits.");
+      }
+      if (localOnly && localStorage.getItem(localStorageSourceKey) !== baseTypstSource) {
+        throw new Error("The browser draft changed after these patches were generated. Generate patches again to protect your edits.");
+      }
+      if (localOnly && !masterFacts) {
+        throw new Error("Freeze a local master resume before applying patches.");
       }
 
       // Step 0: Guardrail verification (including per-skill acknowledgment for unverified skills)
@@ -176,10 +191,15 @@ export function PatchDiffReview({
       }
 
       // Step 1: Compute merged Typst content with persistent patch marker
-      const reconstructed = applyPatchProposals(batch.baseTypstSource, acceptedPatches);
+      const reconstructed = applyPatchProposals(baseTypstSource, acceptedPatches);
       const acceptedIds = acceptedPatches.map((patch) => patch.id);
-      if (reconstructed.appliedIds.length !== acceptedIds.length || acceptedIds.some((id) => !reconstructed.appliedIds.includes(id))) {
+      if (new Set(acceptedIds).size !== acceptedIds.length || reconstructed.appliedIds.length !== acceptedIds.length || acceptedIds.some((id) => !reconstructed.appliedIds.includes(id))) {
         throw new Error("The server proposal set changed. Generate patches again before applying.");
+      }
+      if (localOnly && masterFacts) {
+        assertCanApplyPatches(reconstructed.typstSource, masterFacts, acceptedPatches, {
+          acknowledgedSkills: Array.from(acknowledgedSkills),
+        });
       }
       const mergedContent = markDocumentAsPatched(reconstructed.typstSource);
 
@@ -198,7 +218,19 @@ export function PatchDiffReview({
         return;
       }
 
+      if (localOnly) {
+        const localVariantId = `demo-local-${Date.now()}`;
+        localStorage.setItem(localStorageSourceKey, mergedContent);
+        localStorage.setItem("resumeforge_has_guest_draft", "true");
+        setCreatedVariantId(localVariantId);
+        setApplySuccess("Sample variant applied to this browser only. It was compiled and checked locally.");
+        onApplySuccess?.(localVariantId, mergedContent);
+        setIsApplying(false);
+        return;
+      }
+
       // Step 3: Persist as ResumeVariant via API
+      if (!batch) throw new Error("This proposal has no saved server batch. Generate patches again before applying.");
       const res = await fetch("/api/ai/apply-patches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -519,7 +551,7 @@ export function PatchDiffReview({
                 </div>
               </div>
 
-              {createdVariantId && (
+              {createdVariantId && !localOnly && (
                 <Link
                   href={`/editor?variantId=${createdVariantId}`}
                   data-testid="open-variant-in-editor-btn"
@@ -547,7 +579,9 @@ export function PatchDiffReview({
             ) : (
               <>
                 <CheckCircle2 className="h-4 w-4" />
-                Apply {acceptedPatches.length} Accepted Patch{acceptedPatches.length !== 1 ? "es" : ""} & Create Variant
+                {localOnly
+                  ? `Apply ${acceptedPatches.length} Accepted Patch${acceptedPatches.length !== 1 ? "es" : ""} to This Browser`
+                  : `Apply ${acceptedPatches.length} Accepted Patch${acceptedPatches.length !== 1 ? "es" : ""} & Create Variant`}
               </>
             )}
           </button>
