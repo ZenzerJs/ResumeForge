@@ -9,6 +9,7 @@ import {
   convertInchesToTwip,
 } from "docx";
 import { ResumeFacts } from "@/lib/facts/types";
+import { managedResumeExport } from "@/lib/export/resume-text";
 
 export interface DocxExportOptions {
   facts?: ResumeFacts;
@@ -121,7 +122,7 @@ export async function generateAtsDocx(
   typstSource: string,
   options?: DocxExportOptions
 ): Promise<Uint8Array> {
-  const { candidateName, contactLine, sections } = parseTypstToSections(typstSource);
+  const { candidateName, contactLine, sections } = managedResumeExport(typstSource)?.sections ?? parseTypstToSections(typstSource);
 
   const docChildren: Paragraph[] = [];
 

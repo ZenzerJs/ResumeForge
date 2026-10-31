@@ -1,12 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { extractResumeFacts } from "@/lib/facts/extract";
 import { checkGuardrail } from "@/lib/guardrail/check";
 import {
-  assertCanApplyPatches,
   assertCanExport,
-  markDocumentAsPatched,
 } from "@/lib/guardrail/policy";
-import { verifyEvidenceCitations, type PatchProposal } from "@/lib/ai/patch-schema";
+import { applyProposalBatch } from "@/lib/ai/patch-batches";
 import { evaluateAtsScore } from "@/lib/ats-evaluator/evaluator";
 import { generateAtsDocx } from "@/lib/export/docx";
 import {
@@ -136,66 +135,53 @@ export async function executeServerTool(
       }
 
       case "search_saved_jobs": {
-        const params = SearchSavedJobsParamsSchema.parse(rawParams) as any;
+        const params = SearchSavedJobsParamsSchema.parse(rawParams);
         const ownerId = requireOwner(userId);
-        const where: Record<string, unknown> = {
-          userId: ownerId,
-          status: params.status || undefined,
-        };
-        const queryText = params.query ?? (params as { search?: string }).search;
+        const queryText = params.search?.trim();
+        const filters: Prisma.JobWhereInput[] = [{
+          OR: [
+            { userId: ownerId },
+            { userId: null, applications: { some: { userId: ownerId } } },
+          ],
+        }];
         if (queryText) {
-          where.OR = [
-            { title: { contains: queryText } },
-            { company: { contains: queryText } },
-          ];
+          filters.push({ OR: [
+            { roleTitle: { contains: queryText, mode: "insensitive" } },
+            { company: { contains: queryText, mode: "insensitive" } },
+          ] });
         }
-        let jobs = await prisma.job.findMany({
-          where: where as any,
-          orderBy: { createdAt: "desc" },
-          take: params.limit ?? 10,
-        });
-
-        if (jobs.length === 0) {
-          try {
-            const sharedWhere: Record<string, unknown> = {
-              userId: null,
-              applications: {
-                some: {
-                  userId: ownerId,
-                  ...(params.status ? { status: params.status as any } : {}),
-                },
+        if (params.status) {
+          filters.push({
+            OR: [
+              { applications: { some: { userId: ownerId, status: params.status } } },
+              {
+                AND: [
+                  { userId: ownerId },
+                  { applications: { none: { userId: ownerId } } },
+                  { status: params.status },
+                ],
               },
-            };
-            if (queryText) {
-              sharedWhere.OR = [
-                { title: { contains: queryText } },
-                { company: { contains: queryText } },
-              ];
-            }
-            const sharedJobs = await prisma.job.findMany({
-              where: sharedWhere as any,
-              orderBy: { createdAt: "desc" },
-              take: params.limit ?? 10,
-            });
-            if (sharedJobs && sharedJobs.length > 0) {
-              jobs = sharedJobs;
-            }
-          } catch {
-            // Test mock or query fallback guard
-          }
+            ],
+          });
         }
+        const jobs = await prisma.job.findMany({
+          where: { AND: filters },
+          include: { applications: { where: { userId: ownerId }, select: { status: true } } },
+          orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+          take: 10,
+        });
 
         return {
           tool: toolName,
           success: true,
           data: {
-            jobs: jobs.map((j: any) => ({
+            jobs: jobs.map((j) => ({
               id: j.id,
-              title: j.title ?? j.roleTitle,
+              title: j.roleTitle,
               company: j.company,
-              status: j.status,
+              status: j.applications[0]?.status ?? j.status,
               createdAt: j.createdAt,
-              hasAnalysis: j.hasAnalysis ?? Boolean(j.extractedRequirements || j.parsedRequirements),
+              hasAnalysis: Boolean(j.extractedRequirements),
             })),
             count: jobs.length,
           },
@@ -205,64 +191,11 @@ export async function executeServerTool(
       case "apply_patches": {
         const params = ApplyPatchesParamsSchema.parse(rawParams);
         const ownerId = requireOwner(userId);
-        let updatedTypst = params.currentTypst;
-
-        const master = await prisma.resume.findFirst({
-          where: { isMaster: true, userId: ownerId },
-        });
-        const evidence = await prisma.evidenceItem.findMany({
-          where: { status: "verified", userId: ownerId },
-          include: { bullets: true },
-        });
-        const masterFacts = extractResumeFacts(master?.typstSource || "", evidence as any);
-        const validEvidenceIds = new Set(evidence.map((item) => item.id));
-        const validBulletIds = new Set(evidence.flatMap((item) => item.bullets.map((bullet) => bullet.id)));
-
-        const proposals: PatchProposal[] = params.acceptedPatches.map((patch) => ({
-          id: patch.id,
-          operation: patch.operation ?? "MODIFY_BULLET",
-          targetSection: "experience",
-          before: patch.before,
-          after: patch.after,
-          evidenceIds: patch.evidenceIds ?? [],
-          rationale: patch.rationale ?? "",
-          confidence: 1,
-        }));
-
-        const verification = verifyEvidenceCitations(
-          { patches: proposals, gaps: [] },
-          validEvidenceIds,
-          validBulletIds
-        );
-        const allowedIds = new Set(verification.verified.map((patch) => patch.id));
-        if (verification.verified.length > 0) {
-          assertCanApplyPatches(params.currentTypst, masterFacts, verification.verified);
-        }
-
-        let appliedCount = 0;
-        for (const patch of params.acceptedPatches) {
-          if (!params.patchIds.includes(patch.id) || !allowedIds.has(patch.id)) continue;
-          if (patch.before && updatedTypst.includes(patch.before)) {
-            updatedTypst = updatedTypst.replace(patch.before, patch.after);
-            appliedCount += 1;
-          }
-        }
-
-        if (appliedCount > 0) {
-          updatedTypst = markDocumentAsPatched(updatedTypst);
-        }
-
+        const data = await applyProposalBatch({ userId: ownerId, ...params });
         return {
           tool: toolName,
           success: true,
-          data: {
-            updatedTypst,
-            appliedCount,
-            rejected: verification.rejected.map((item) => ({
-              id: item.patch.id,
-              reason: item.reason,
-            })),
-          },
+          data,
         };
       }
 
@@ -355,11 +288,6 @@ export async function executeServerTool(
         const totalChars = params.typstSource.length;
         const bulletLines = lines.filter((l) => l.trim().startsWith("-") || l.trim().startsWith("â€¢"));
 
-        // Approximate Typst layout budget (standard 10pt letter page fits ~55 lines or ~3200 chars)
-        const estimatedPages = Math.max(1, Math.ceil(nonEmptyLines.length / 55));
-        const pageLimit = params.pageLimit || 1;
-        const exceedsLimit = estimatedPages > pageLimit;
-
         return {
           tool: toolName,
           success: true,
@@ -368,13 +296,12 @@ export async function executeServerTool(
             nonEmptyLineCount: nonEmptyLines.length,
             characterCount: totalChars,
             bulletCount: bulletLines.length,
-            estimatedPages,
-            pageLimit,
-            exceedsLimit,
-            status: exceedsLimit ? "OVERFLOW" : "WITHIN_BUDGET",
-            recommendation: exceedsLimit
-              ? `Estimated ${estimatedPages} pages exceeds limit of ${pageLimit}. Recommend trimming ${nonEmptyLines.length - 55 * pageLimit} lines.`
-              : `Within budget (${nonEmptyLines.length}/55 lines for single page layout).`,
+            estimatedPages: null,
+            pageLimit: params.pageLimit,
+            exceedsLimit: null,
+            measured: false,
+            status: "NOT_MEASURED",
+            recommendation: "Open the resume preview to compile and measure its actual page count. Source length does not establish page fit.",
           },
         };
       }

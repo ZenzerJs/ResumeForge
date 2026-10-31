@@ -5,6 +5,8 @@ import { ResumeDiagnosticReport, ResumeDiagnosticItem } from "@/lib/schema/resum
 import { applyDeterministicPatch } from "@/lib/diagnostics/deterministicPatcher";
 import { validateMetricGrounding } from "@/lib/diagnostics/deterministicPatcher";
 import { hasSkillWordBoundary } from "@/lib/diagnostics/auditResume";
+import { applyPatchProposals } from "@/lib/ai/patch-application";
+import { markDocumentAsPatched } from "@/lib/guardrail/policy";
 import { BadgeCheck, TriangleAlert, Save } from "lucide-react";
 
 interface RankedMatchLite {
@@ -61,7 +63,7 @@ export function extractDiagnosticSkill(message: string): string {
 }
 
 export type DiagnosticFixActionResult =
-  | { applied: true; patchedTypstAst: string; evidenceId: string }
+  | { applied: true; patchedTypstAst: string; evidenceId: string; targetBulletId: string }
   | { applied: false; error: string };
 
 /**
@@ -135,6 +137,7 @@ export function resolveDiagnosticFixAction(
     applied: true,
     patchedTypstAst: result.patchedTypstAst,
     evidenceId: evidenceMatch.id,
+    targetBulletId,
   };
 }
 
@@ -153,6 +156,8 @@ export const TailorDiagnosticPanel = ({
   const [patchResult, setPatchResult] = useState<string | null>(null);
   const [patchError, setPatchError] = useState<string | null>(null);
   const [appliedIds, setAppliedIds] = useState<string[]>([]);
+  const [descriptors, setDescriptors] = useState<Array<{ evidenceId: string; targetBulletId: string }>>([]);
+  const [baseSource, setBaseSource] = useState<string | null>(null);
   const [isPersisting, setIsPersisting] = useState(false);
   const [persistedVariantId, setPersistedVariantId] = useState<string | null>(null);
   const [persistError, setPersistError] = useState<string | null>(null);
@@ -169,10 +174,11 @@ export const TailorDiagnosticPanel = ({
         return;
       }
       setPatchResult(outcome.patchedTypstAst);
+      setBaseSource((current) => current ?? typstAst);
+      setDescriptors((current) => [...current, { evidenceId: outcome.evidenceId, targetBulletId: outcome.targetBulletId }]);
       setAppliedIds((prev) => [...prev, item.id]);
       setPersistedVariantId(null);
       setPersistError(null);
-      onPatchApplied?.(outcome.patchedTypstAst);
     } catch (err) {
       console.error(err);
       setPatchError("Unexpected error while applying the deterministic fix.");
@@ -194,9 +200,28 @@ export const TailorDiagnosticPanel = ({
 
     setIsPersisting(true);
     try {
-      // Amendment 2: validate Typst compilation BEFORE persisting.
+      if (!baseSource || typstAst !== baseSource) {
+        throw new Error("The resume changed after these fixes were selected. Reapply the fixes to the current text before saving.");
+      }
+      const proposalRes = await fetch("/api/ai/diagnostic-patches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: variantContext!.jobId, descriptors }),
+      });
+      const proposalJson = await proposalRes.json().catch(() => ({}));
+      if (!proposalRes.ok || !proposalJson.success || !proposalJson.data?.batch) {
+        throw new Error(proposalJson.error || "Could not create a saved diagnostic proposal batch.");
+      }
+      const batch = proposalJson.data.batch;
+      if (batch.baseTypstSource !== baseSource) {
+        throw new Error("The saved resume changed while preparing these fixes. Reapply the fixes before saving.");
+      }
+      const reconstructed = applyPatchProposals(batch.baseTypstSource, proposalJson.data.verified || []);
+      const acceptedPatchIds = reconstructed.appliedIds;
+      if (acceptedPatchIds.length === 0) throw new Error("No verified diagnostic fixes were returned.");
+      const preview = markDocumentAsPatched(reconstructed.typstSource);
       const { compileTypstToSvg } = await import("@/lib/typst/compiler");
-      const compileResult = await compileTypstToSvg(patchResult!);
+      const compileResult = await compileTypstToSvg(preview);
       if (!compileResult.success) {
         const errorMsg =
           "error" in compileResult ? compileResult.error.message : "Unknown compilation error";
@@ -210,10 +235,11 @@ export const TailorDiagnosticPanel = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          masterResumeId: variantContext!.masterResumeId,
-          jobId: variantContext!.jobId,
+          batchId: batch.batchId,
+          revisionToken: batch.revisionToken,
+          acceptedPatchIds,
+          acknowledgedSkills: [],
           variantTitle: buildDiagnosticVariantTitle(),
-          mergedTypstContent: patchResult,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -222,6 +248,10 @@ export const TailorDiagnosticPanel = ({
         return;
       }
       setPersistedVariantId(json.data.variantId ?? null);
+      if (typeof json.data.typstContent === "string") {
+        setPatchResult(json.data.typstContent);
+        onPatchApplied?.(json.data.typstContent);
+      }
     } catch (err) {
       setPersistError(err instanceof Error ? err.message : "Failed to save deterministic fix variant.");
     } finally {

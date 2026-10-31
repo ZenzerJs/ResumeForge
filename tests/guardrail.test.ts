@@ -13,6 +13,7 @@ import { mergeAndMarkAcceptedPatches } from "@/components/tailor/patch-diff-revi
 import { applyAcceptedSidebarPatches } from "@/components/editor/ai-sidebar";
 import { resolveDiagnosticFixAction } from "@/components/tailor/tailor-diagnostic-panel";
 import { ResumeFacts } from "@/lib/facts/types";
+import { extractResumeFacts } from "@/lib/facts/extract";
 
 describe("Mechanical Guardrail Engine", () => {
   const masterFacts: ResumeFacts = {
@@ -73,6 +74,20 @@ describe("Mechanical Guardrail Engine", () => {
     const subRes = checkGuardrail(inflatedEmployerTypst, masterFacts);
     expect(subRes.passed).toBe(false);
     expect(subRes.violations.some((v) => v.kind === "employer" && v.severity === "HARD")).toBe(true);
+  });
+
+  it("blocks reconstructed claims against the frozen master snapshot even if candidate facts include them", () => {
+    const reconstructed = `
+#resume-entry(title: "Software Engineer", location: "NYC", date: "May 2022 - Aug 2023")
+- *Netflix* -- *Software Engineer*
+    `;
+    const candidateFacts = extractResumeFacts(reconstructed);
+    expect(candidateFacts.employers.some((employer) => employer.normalized === "netflix")).toBe(true);
+    expect(() => assertCanApplyPatches(reconstructed, masterFacts, [{
+      id: "patch-employer-inflation",
+      after: "*Netflix* -- *Software Engineer*",
+      evidenceIds: ["evid-1"],
+    }])).toThrow(/Unverified employer/);
   });
 
   it("detects unverified job title as a HARD violation", () => {

@@ -18,6 +18,8 @@ import { JobRequirements } from "@/lib/jd-parser/types";
 import { RoleProfile, ROLE_PROFILES, AtsEvaluationResult } from "@/lib/ats-evaluator/types";
 import { auditResume } from "@/lib/diagnostics/auditResume";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
+import { getDemoContextFromBrowser, initializeDemoSamples } from "@/lib/demo-client";
+import { DEMO_JOB } from "@/lib/demo-samples";
 import dynamic from "next/dynamic";
 import { PatchDiffReview } from "./patch-diff-review";
 import { AtsScorePanel } from "./ats-score-panel";
@@ -45,7 +47,6 @@ const TailorDiagnosticPanel = dynamic(
     ssr: false,
   }
 );
-import { FitPercentageDial } from "@/components/tracker/fit-percentage-dial";
 import type { PatchProposal, Gap, RejectedPatch } from "@/lib/ai/patch-schema";
 import { AppShell } from "@/components/design-system/app-shell";
 import { PageSkeleton } from "@/components/design-system/page-skeleton";
@@ -62,6 +63,7 @@ import {
 import { Plus, Columns3 } from "lucide-react";
 import { TechDiffPillList } from "@/components/tracker/tech-diff-pill-list";
 import { tokenizeHighlightedJd } from "@/lib/jd/highlight-keywords";
+import type { ResumeFacts } from "@/lib/facts/types";
 
 interface RankedMatch {
   id: string;
@@ -213,8 +215,12 @@ export function TailorWorkspace() {
   const [patchVerified, setPatchVerified] = useState<PatchProposal[]>([]);
   const [patchRejected, setPatchRejected] = useState<RejectedPatch[]>([]);
   const [patchGaps, setPatchGaps] = useState<Gap[]>([]);
+  const [patchBatch, setPatchBatch] = useState<{ batchId: string; revisionToken: string; baseTypstSource: string; jobId: string } | null>(null);
+  const [patchReviewGeneration, setPatchReviewGeneration] = useState(0);
+  const [demoPatchBaseSource, setDemoPatchBaseSource] = useState<string | null>(null);
   const [masterResumeId, setMasterResumeId] = useState<string | null>(null);
   const [masterTypstSource, setMasterTypstSource] = useState<string>("");
+  const [masterFactsSnapshot, setMasterFactsSnapshot] = useState<ResumeFacts | null>(null);
   const [activeVariantContent, setActiveVariantContent] = useState<string>("");
   const [patchError, setPatchError] = useState<string | null>(null);
   const [savedJobId, setSavedJobId] = useState<string | null>(null);
@@ -229,7 +235,7 @@ export function TailorWorkspace() {
   const [tier2Status, setTier2Status] = useState<{ type: "loading" | "success" | "error"; message: string } | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
 
-  const [atsResult, setAtsResult] = useState<AtsEvaluationResult | null>(null);
+  const [, setAtsResult] = useState<AtsEvaluationResult | null>(null);
 
   const diagnosticReport = useMemo(() => {
     if (activeTab !== "diagnostic") return undefined;
@@ -243,6 +249,36 @@ export function TailorWorkspace() {
   useEffect(() => {
     async function loadMasterOrStarterResume() {
       try {
+        const config = await (await fetch("/api/demo-config")).json();
+        if (config?.demoMode) {
+          initializeDemoSamples();
+          setCompany(DEMO_JOB.company);
+          setRoleTitle(DEMO_JOB.roleTitle);
+          setRawDescription(DEMO_JOB.rawDescription);
+          setExtractedRequirements({
+            requiredSkills: ["TypeScript", "PostgreSQL"],
+            preferredSkills: ["AWS"],
+            domainTerms: ["product analytics"],
+            roleTitle: DEMO_JOB.roleTitle,
+            company: DEMO_JOB.company,
+          });
+        }
+        if (config?.demoMode) {
+          let localSource = localStorage.getItem("resumeforge_typst_source");
+          if (!localSource) {
+            const starterResponse = await fetch("/templates/starter-resume.typ").catch(() => null);
+            localSource = starterResponse?.ok ? await starterResponse.text() : `// Local demo draft\n= Resume\n\n== Skills\nTypeScript, PostgreSQL\n`;
+            localStorage.setItem("resumeforge_typst_source", localSource);
+            localStorage.setItem("resumeforge_has_guest_draft", "true");
+          }
+          setMasterTypstSource(localSource);
+          setActiveVariantContent(localSource);
+          const frozen = localStorage.getItem("resumeforge_demo_master_facts");
+          setMasterFactsSnapshot(frozen ? JSON.parse(frozen) as ResumeFacts : null);
+          return;
+        }
+      } catch {}
+      try {
         const res = await fetch("/api/resumes");
         const json = await res.json();
         if (res.ok && json.success && json.data.length > 0) {
@@ -250,6 +286,7 @@ export function TailorWorkspace() {
           setMasterResumeId(master.id);
           setMasterTypstSource(master.typstSource);
           setActiveVariantContent(master.typstSource);
+          setMasterFactsSnapshot(master.factSnapshot ?? null);
           return;
         }
       } catch {}
@@ -313,10 +350,24 @@ export function TailorWorkspace() {
 
   useEffect(() => {
     if (!jobIdParam) return;
-    savedJobIdRef.current = jobIdParam;
-    setSavedJobId(jobIdParam);
     async function loadJobById() {
       try {
+        const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+        if (demoConfig?.demoMode) {
+          const rawJobs = localStorage.getItem("resumeforge_guest_jobs");
+          const jobs = rawJobs ? JSON.parse(rawJobs) : [];
+          const localJob = Array.isArray(jobs) ? jobs.find((item) => item?.id === jobIdParam) : null;
+          setSavedJobId(null);
+          savedJobIdRef.current = null;
+          if (localJob) {
+            if (localJob.company) setCompany(localJob.company);
+            if (localJob.roleTitle) setRoleTitle(localJob.roleTitle);
+            if (localJob.rawDescription) setRawDescription(convertHtmlToCleanMarkdown(localJob.rawDescription));
+          }
+          return;
+        }
+        savedJobIdRef.current = jobIdParam;
+        setSavedJobId(jobIdParam);
         const res = await fetch(`/api/jobs/${jobIdParam}`);
         const json = await res.json();
         if (res.ok && json.success && json.data) {
@@ -448,18 +499,29 @@ export function TailorWorkspace() {
     setPatchVerified([]);
     setPatchRejected([]);
     setPatchGaps([]);
+    setPatchBatch(null);
+    setDemoPatchBaseSource(null);
+    setPatchReviewGeneration((generation) => generation + 1);
 
     try {
-      const jobId = await ensureJobSaved();
-      if (!jobId) {
-        setPatchError("Failed to save job posting before patch generation.");
-        setPatchStage("error");
-        setIsGeneratingPatches(false);
-        return;
+      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      const isDemo = demoConfig?.demoMode === true;
+      let jobId: string | null = null;
+      let demoContext: ReturnType<typeof getDemoContextFromBrowser>;
+      if (isDemo) {
+        demoContext = getDemoContextFromBrowser();
+        const currentSource = masterTypstSource || activeVariantContent;
+        if (!demoContext?.masterTypst || demoContext.masterTypst !== currentSource) {
+          throw new Error("The local resume changed. Reload the demo workspace before generating patches.");
+        }
+        setDemoPatchBaseSource(currentSource);
+      } else {
+        jobId = await ensureJobSaved();
+        if (!jobId) throw new Error("Failed to save job posting before patch generation.");
       }
 
       setPatchStage("writing");
-      const res = await fetch("/api/ai/generate-patches", {
+      const res = await fetch(isDemo ? "/api/demo/generate-patches" : "/api/ai/generate-patches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -476,6 +538,7 @@ export function TailorWorkspace() {
             roleTitle: roleTitle || undefined,
             company: company || undefined,
           },
+          ...(isDemo ? (demoContext || {}) : { jobId }),
         }),
       });
 
@@ -492,7 +555,8 @@ export function TailorWorkspace() {
       setPatchVerified(json.data.verified || []);
       setPatchRejected(json.data.rejected || []);
       setPatchGaps(json.data.gaps || []);
-      setMasterResumeId(json.data.masterResumeId || null);
+      setPatchBatch(json.data.batch || null);
+      setMasterResumeId(json.data.masterResumeId || (json.data.demo ? "demo-local" : null));
       setPatchStage("done");
     } catch (err) {
       setPatchError(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -608,7 +672,7 @@ export function TailorWorkspace() {
   };
 
   // Ensure a job record exists so CoverLetterPanel can generate,
-  // and keep company / role / description / requirements synced in SQLite.
+  // and keep company / role / description / requirements synced in PostgreSQL.
   useEffect(() => {
     if (!userEditedRef.current) return;
     if (!rawDescription.trim()) return;
@@ -671,13 +735,14 @@ export function TailorWorkspace() {
     return <PageSkeleton variant="tailor" />;
   }
 
+  const selectedView = activeTab === "overview" && highlightCoverLetter ? "cover-letter" : activeTab;
   return (
     <AppShell variant="tailor">
-      <div className="relative z-10 flex-1 pt-8 pb-12 px-4 md:px-8 max-w-7xl mx-auto w-full">
+      <div className="relative z-10 flex-1 pt-8 pb-12 px-4 md:px-8 max-w-[1280px] mx-auto w-full font-body-regular motion-reduce:[&_*]:transition-none motion-reduce:[&_.animate-spin]:animate-none motion-reduce:[&_.animate-pulse]:animate-none">
         <div className="flex justify-between items-end mb-8 gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="font-page-title text-4xl font-extrabold text-[#ff8c00] tracking-tighter mb-1">Tailor</h1>
+              <h1 className="text-[32px] leading-tight font-semibold text-white mb-1">Tailor</h1>
               {isAutoScanning && (
                 <span
                   data-testid="auto-scanning-indicator"
@@ -687,16 +752,16 @@ export function TailorWorkspace() {
                 </span>
               )}
             </div>
-            <p className="font-body-regular text-slate-400 text-sm">
+            <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
               Analyze job requirements and forge targeted materials from your master resume + Evidence Bank.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-[#060e20] px-3 py-1.5">
+            <div className="flex min-h-11 items-center gap-3 rounded-lg border border-slate-700 bg-slate-900 px-3">
               <label
                 htmlFor="tailor-role-profile-select"
-                className="font-mono text-xs text-slate-400 font-medium whitespace-nowrap"
+                className="text-sm text-slate-400 font-medium whitespace-nowrap"
               >
                 Target Profile:
               </label>
@@ -704,7 +769,7 @@ export function TailorWorkspace() {
                 id="tailor-role-profile-select"
                 value={selectedRoleProfile}
                 onChange={(e) => setSelectedRoleProfile(e.target.value as RoleProfile)}
-                className="bg-transparent font-mono text-xs font-semibold text-amber-400 outline-none cursor-pointer"
+                className="min-h-11 bg-transparent text-sm font-medium text-slate-100 outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-500"
                 data-testid="tailor-role-profile-select"
               >
                 {ROLE_PROFILES.map((p) => (
@@ -720,10 +785,10 @@ export function TailorWorkspace() {
               onClick={handleGeneratePatches}
               disabled={isGeneratingPatches}
               data-testid="generate-patches-btn"
-              className="bg-[#ff8c00] text-black font-bold px-6 py-2.5 rounded font-mono text-xs uppercase hover:shadow-[0_0_15px_rgba(255,140,0,0.4)] transition-shadow flex items-center gap-2"
+              className="min-h-11 bg-amber-500 text-slate-950 font-semibold px-5 rounded-lg text-sm hover:bg-amber-400 transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 disabled:opacity-60"
             >
               {isGeneratingPatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              Generate AI Patches
+              Generate AI patches
             </button>
           </div>
         </div>
@@ -731,10 +796,10 @@ export function TailorWorkspace() {
         {(jobIdParam || savedJobId) && (
           <div
             data-testid="active-job-header-banner"
-            className="mb-4 rounded-lg border border-amber-800/50 bg-amber-950/30 px-3 py-2 text-xs text-amber-200 flex justify-between items-center"
+            className="mb-6 rounded-xl border border-slate-800 bg-slate-900 px-5 py-4"
           >
-            <div>Active job: {company || "Untitled"} — {roleTitle || "Role"}</div>
-            <FitPercentageDial compositeScore={atsResult?.overallScore ?? 0} size={40} />
+            <p className="text-xs font-medium text-slate-400">{company || "Untitled company"}</p>
+            <p className="mt-1 break-words text-xl font-semibold leading-snug text-white">{roleTitle || "Untitled role"}</p>
           </div>
         )}
 
@@ -783,71 +848,97 @@ export function TailorWorkspace() {
         )}
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-2 border-b border-slate-800 pb-3 mb-6 overflow-x-auto no-scrollbar" role="tablist">
+        <div
+          className="flex flex-wrap items-center gap-1 border-b border-slate-800 pb-2 mb-6 [&>button:focus-visible]:outline [&>button:focus-visible]:outline-2 [&>button:focus-visible]:outline-amber-400 [&>button:focus-visible]:outline-offset-2"
+          role="tablist"
+          aria-label="Tailor views"
+          onKeyDown={(event) => {
+            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+            const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+            const current = tabs.indexOf(document.activeElement as HTMLButtonElement);
+            if (current < 0) return;
+            const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+            event.preventDefault();
+            tabs[next].focus();
+            tabs[next].click();
+          }}
+        >
           <button
             type="button"
             role="tab"
-            aria-selected={activeTab === "overview"}
-            onClick={() => setActiveTab("overview")}
+            id="tailor-tab-overview"
+            aria-controls="tailor-view-panel"
+            tabIndex={selectedView === "overview" ? 0 : -1}
+            aria-selected={activeTab === "overview" && !highlightCoverLetter}
+            onClick={() => { setHighlightCoverLetter(false); setActiveTab("overview"); }}
             data-testid="tailor-tab-overview"
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-mono font-semibold transition shrink-0 ${
-              activeTab === "overview"
-                ? "bg-amber-500/15 border border-amber-500/40 text-amber-300 shadow-sm"
-                : "border border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-white"
+            className={`flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
+              activeTab === "overview" && !highlightCoverLetter
+                ? "bg-slate-800 text-white"
+                : "text-slate-400 hover:bg-slate-800/60 hover:text-white"
             }`}
           >
             <Sparkles className="h-3.5 w-3.5" />
-            Overview &amp; Materials
+            Overview
           </button>
 
           <button
             type="button"
             role="tab"
+            id="tailor-tab-3-pane"
+            aria-controls="tailor-view-panel"
+            tabIndex={selectedView === "3-pane" ? 0 : -1}
             aria-selected={activeTab === "3-pane"}
-            onClick={() => setActiveTab("3-pane")}
+            onClick={() => { setHighlightCoverLetter(false); setActiveTab("3-pane"); }}
             data-testid="tailor-tab-3-pane"
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-mono font-semibold transition shrink-0 ${
+            className={`flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
               activeTab === "3-pane"
-                ? "bg-amber-500/15 border border-amber-500/40 text-amber-300 shadow-sm"
-                : "border border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-white"
+                ? "bg-slate-800 text-white"
+                : "text-slate-400 hover:bg-slate-800/60 hover:text-white"
             }`}
           >
             <Columns3 className="h-3.5 w-3.5" />
-            3-Pane Workspace
+            Workspace
           </button>
 
           <button
             type="button"
             role="tab"
+            id="tailor-tab-job-info"
+            aria-controls="tailor-view-panel"
+            tabIndex={selectedView === "job-info" ? 0 : -1}
             aria-selected={activeTab === "job-info"}
-            onClick={() => setActiveTab("job-info")}
+            onClick={() => { setHighlightCoverLetter(false); setActiveTab("job-info"); }}
             data-testid="tailor-tab-job-info"
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-mono font-semibold transition shrink-0 ${
+            className={`flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
               activeTab === "job-info"
-                ? "bg-amber-500/15 border border-amber-500/40 text-amber-300 shadow-sm"
-                : "border border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-white"
+                ? "bg-slate-800 text-white"
+                : "text-slate-400 hover:bg-slate-800/60 hover:text-white"
             }`}
           >
             <Briefcase className="h-3.5 w-3.5" />
-            Job Info &amp; Requirements
+            Job info
           </button>
 
           <button
             type="button"
             role="tab"
+            id="tailor-tab-cover-letter"
+            aria-controls="tailor-view-panel"
+            tabIndex={selectedView === "cover-letter" ? 0 : -1}
             aria-selected={activeTab === "overview" && highlightCoverLetter}
             onClick={() => {
               setActiveTab("overview");
               setHighlightCoverLetter(true);
               setTimeout(() => {
-                document.getElementById("cover-letter-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                document.getElementById("cover-letter-section")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
               }, 60);
             }}
             data-testid="tailor-tab-cover-letter"
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-mono font-semibold transition shrink-0 ${
+            className={`flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
               activeTab === "overview" && highlightCoverLetter
-                ? "bg-amber-500/15 border border-amber-500/40 text-amber-300 shadow-sm"
-                : "border border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-white"
+                ? "bg-slate-800 text-white"
+                : "text-slate-400 hover:bg-slate-800/60 hover:text-white"
             }`}
           >
             <FileText className="h-3.5 w-3.5" />
@@ -857,16 +948,19 @@ export function TailorWorkspace() {
           <button
             type="button"
             role="tab"
+            id="tailor-tab-diagnostic"
+            aria-controls="tailor-view-panel"
+            tabIndex={selectedView === "diagnostic" ? 0 : -1}
             aria-selected={activeTab === "diagnostic"}
             onClick={() => {
               setHighlightCoverLetter(false);
               setActiveTab("diagnostic");
             }}
             data-testid="tailor-tab-diagnostic"
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-mono font-semibold transition shrink-0 ${
+            className={`flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
               activeTab === "diagnostic"
-                ? "bg-amber-500/15 border border-amber-500/40 text-amber-300 shadow-sm"
-                : "border border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-white"
+                ? "bg-slate-800 text-white"
+                : "text-slate-400 hover:bg-slate-800/60 hover:text-white"
             }`}
           >
             <AlertTriangle className="h-3.5 w-3.5" />
@@ -874,22 +968,23 @@ export function TailorWorkspace() {
           </button>
         </div>
 
+        <div id="tailor-view-panel" role="tabpanel" tabIndex={0} aria-labelledby={`tailor-tab-${selectedView}`}>
         {activeTab === "3-pane" ? (
           /* 3-Pane Ergonomic Workspace View */
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" data-testid="tailor-3pane-container">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6" data-testid="tailor-3pane-container">
             {/* Left Pane: Job Description with keyword highlights & TechDiffPillList */}
             <section
-              className="glass-panel rounded-lg p-5 flex flex-col gap-4 overflow-hidden glow-effect transition-shadow"
+              className="min-w-0 rounded-xl border border-slate-800 bg-slate-900 p-5 flex flex-col gap-4"
               data-testid="tailor-pane-left"
             >
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800/60">
+              <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-800">
                 <div className="flex items-center gap-2 min-w-0">
                   <Briefcase className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
                   <div className="min-w-0">
-                    <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold truncate">
+                    <h2 className="break-words text-lg leading-snug text-white font-semibold">
                       {roleTitle || "Target Job Posting"}
                     </h2>
-                    <span className="text-[11px] text-slate-400 font-mono truncate block">
+                    <span className="text-sm text-slate-400 block break-words">
                       {company || "Unspecified Company"}
                     </span>
                   </div>
@@ -901,7 +996,7 @@ export function TailorWorkspace() {
                     setActiveTab("job-info");
                   }}
                   data-testid="edit-job-info-btn"
-                  className="text-xs text-amber-400 hover:underline font-mono shrink-0"
+                  className="min-h-11 text-sm text-amber-400 hover:underline shrink-0"
                 >
                   Edit Job &amp; Reqs →
                 </button>
@@ -909,7 +1004,7 @@ export function TailorWorkspace() {
 
               {extractedRequirements && extractedRequirements.requiredSkills.length > 0 && (
                 <div className="space-y-1.5 pb-3 border-b border-slate-800/60">
-                  <span className="text-[11px] text-slate-500 font-mono uppercase tracking-wider block">
+                  <span className="text-xs text-slate-400 font-medium block">
                     Required Skills &amp; Gaps
                   </span>
                   <TechDiffPillList
@@ -922,12 +1017,12 @@ export function TailorWorkspace() {
               )}
 
               <div className="flex-1 min-h-0 flex flex-col">
-                <span className="text-[11px] text-slate-500 font-mono uppercase tracking-wider mb-2 block">
+                <span className="text-xs text-slate-400 font-medium mb-2 block">
                   Job Description (Keywords Highlighted)
                 </span>
                 <div
                   data-testid="tailor-jd-highlighted-view"
-                  className="flex-1 overflow-y-auto max-h-[600px] p-4 bg-[#060e20] border border-slate-800 rounded font-mono text-xs text-slate-300 space-y-2 leading-relaxed"
+                  className="flex-1 overflow-y-auto max-h-[600px] p-4 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-300 space-y-2 leading-relaxed break-words"
                 >
                   {renderHighlightedJd(
                     rawDescription,
@@ -939,13 +1034,13 @@ export function TailorWorkspace() {
 
             {/* Center Pane: Typst AST / source preview & PatchDiffReview */}
             <section
-              className="glass-panel rounded-lg p-5 flex flex-col gap-4 overflow-hidden glow-effect transition-shadow"
+              className="min-w-0 rounded-xl border border-slate-800 bg-slate-900 p-5 flex flex-col gap-4"
               data-testid="tailor-pane-center"
             >
               <div className="flex items-center justify-between pb-3 border-b border-slate-800/60">
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
-                  <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">
+                  <h2 className="text-lg text-white font-semibold">
                     Typst AST &amp; Tailoring
                   </h2>
                 </div>
@@ -953,7 +1048,7 @@ export function TailorWorkspace() {
                   type="button"
                   onClick={handleGeneratePatches}
                   disabled={isGeneratingPatches}
-                  className="text-[11px] font-mono px-2.5 py-1 rounded bg-[#ff8c00] text-black font-bold hover:bg-amber-400 transition flex items-center gap-1.5"
+                  className="min-h-11 text-sm px-3 rounded-lg border border-slate-700 text-slate-200 font-medium hover:bg-slate-800 transition flex items-center gap-1.5"
                 >
                   {isGeneratingPatches ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
                   Generate Patches
@@ -962,17 +1057,25 @@ export function TailorWorkspace() {
 
               {(patchVerified.length > 0 || patchRejected.length > 0 || patchGaps.length > 0) &&
               masterResumeId &&
-              savedJobId ? (
+              (savedJobId || masterResumeId === "demo-local") ? (
                 <PatchDiffReview
+                  key={`${patchReviewGeneration}-${patchBatch?.batchId || "local"}`}
                   verified={patchVerified}
                   rejected={patchRejected}
                   gaps={patchGaps}
-                  masterResumeId={masterResumeId}
                   masterTypstSource={masterTypstSource || activeVariantContent}
-                  jobId={savedJobId}
+                  jobId={savedJobId || "demo-local-job"}
+                  batch={patchBatch}
+                  localOnly={masterResumeId === "demo-local"}
+                  localBaseTypstSource={demoPatchBaseSource}
+                  masterFactsSnapshot={masterFactsSnapshot}
                   onApplySuccess={(_variantId, mergedContent) => {
                     setActiveVariantContent(mergedContent);
                     setSaveStatus("Tailored variant applied — ATS will re-score against updated content.");
+                    if (masterResumeId === "demo-local") {
+                      setMasterTypstSource(mergedContent);
+                      localStorage.setItem("resumeforge_typst_source", mergedContent);
+                    }
                   }}
                 />
               ) : (
@@ -993,13 +1096,13 @@ export function TailorWorkspace() {
 
             {/* Right Pane: Real-time deterministic AtsScorePanel */}
             <section
-              className="glass-panel rounded-lg p-5 flex flex-col gap-4 overflow-hidden glow-effect transition-shadow"
+              className="min-w-0 rounded-xl border border-slate-800 bg-slate-900 p-5 flex flex-col gap-4"
               data-testid="tailor-pane-right"
             >
               <div className="flex items-center justify-between pb-3 border-b border-slate-800/60">
                 <div className="flex items-center gap-2">
                   <ClipboardCheck className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
-                  <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">
+                  <h2 className="text-lg text-white font-semibold">
                     ATS Score &amp; Verification
                   </h2>
                 </div>
@@ -1008,6 +1111,7 @@ export function TailorWorkspace() {
               {extractedRequirements && (activeVariantContent || masterTypstSource) ? (
                 <div className="flex-1 min-h-0 overflow-y-auto max-h-[700px] pr-1">
                   <AtsScorePanel
+                    appearance="tailor"
                     typstContent={activeVariantContent || masterTypstSource}
                     extractedRequirements={extractedRequirements}
                     roleTitle={roleTitle}
@@ -1027,16 +1131,16 @@ export function TailorWorkspace() {
             </section>
           </div>
         ) : (
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-          <div className="xl:col-span-7 flex flex-col gap-6 min-w-0">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] gap-6">
+          <div className="flex flex-col gap-6 min-w-0">
             {activeTab === "overview" ? (
               <>
                 {/* Overview Summary Card */}
-                <section className="glass-panel rounded-lg p-5 glow-effect transition-shadow" data-testid="tailor-overview-panel">
-                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
+                <section className="rounded-xl border border-slate-800 bg-slate-900 p-5" data-testid="tailor-overview-panel">
+                  <div className="flex flex-wrap items-start justify-between gap-3 mb-4 pb-3 border-b border-slate-800">
                     <div className="flex items-center gap-2">
                       <Briefcase className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
-                      <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">
+                      <h2 className="break-words text-lg leading-snug text-white font-semibold">
                         Target Role: {roleTitle || "Untitled Role"}
                       </h2>
                     </div>
@@ -1047,20 +1151,20 @@ export function TailorWorkspace() {
                         setActiveTab("job-info");
                       }}
                       data-testid="edit-job-info-btn"
-                      className="text-xs text-amber-400 hover:underline font-mono"
+                      className="min-h-11 text-sm text-amber-400 hover:underline"
                     >
                       Edit Job &amp; Reqs →
                     </button>
                   </div>
 
                   <div className="flex flex-col gap-3">
-                    <div className="text-xs text-slate-300">
-                      <span className="text-slate-500 font-mono">Company:</span> {company || "Unspecified"}
+                    <div className="text-sm text-slate-300 break-words">
+                      <span className="text-slate-400">Company:</span> {company || "Unspecified"}
                     </div>
 
                     {extractedRequirements && extractedRequirements.requiredSkills.length > 0 && (
                       <div className="space-y-1.5">
-                        <span className="text-[11px] text-slate-500 font-mono uppercase tracking-wider">
+                        <span className="text-xs text-slate-400 font-medium">
                           Key Required Skills &amp; Gaps:
                         </span>
                         <TechDiffPillList
@@ -1076,17 +1180,25 @@ export function TailorWorkspace() {
 
                 {(patchVerified.length > 0 || patchRejected.length > 0 || patchGaps.length > 0) &&
                   masterResumeId &&
-                  savedJobId && (
+                  (savedJobId || masterResumeId === "demo-local") && (
                     <PatchDiffReview
+                      key={`${patchReviewGeneration}-${patchBatch?.batchId || "local"}`}
                       verified={patchVerified}
                       rejected={patchRejected}
                       gaps={patchGaps}
-                      masterResumeId={masterResumeId}
                       masterTypstSource={masterTypstSource || activeVariantContent}
-                      jobId={savedJobId}
+                      jobId={savedJobId || "demo-local-job"}
+                      batch={patchBatch}
+                      localOnly={masterResumeId === "demo-local"}
+                      localBaseTypstSource={demoPatchBaseSource}
+                      masterFactsSnapshot={masterFactsSnapshot}
                       onApplySuccess={(_variantId, mergedContent) => {
                         setActiveVariantContent(mergedContent);
                         setSaveStatus("Tailored variant applied — ATS will re-score against updated content.");
+                        if (masterResumeId === "demo-local") {
+                          setMasterTypstSource(mergedContent);
+                          localStorage.setItem("resumeforge_typst_source", mergedContent);
+                        }
                       }}
                     />
                   )}
@@ -1094,14 +1206,14 @@ export function TailorWorkspace() {
                 <section
                   id="cover-letter-section"
                   data-testid="tailor-cover-letter-section"
-                  className={`glass-panel rounded-lg p-5 flex flex-col glow-effect transition-all ${
+                  className={`rounded-xl border border-slate-800 bg-slate-900 p-5 flex flex-col ${
                     highlightCoverLetter ? "ring-2 ring-amber-500/60 border-amber-500/50" : ""
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2 mb-4 pb-2 border-b border-slate-800/60">
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
-                      <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">
+                      <h2 className="text-lg text-white font-semibold">
                         Generated Cover Letter
                       </h2>
                     </div>
@@ -1138,7 +1250,7 @@ export function TailorWorkspace() {
                 </section>
               </>
             ) : activeTab === "diagnostic" ? (
-              <section className="glass-panel rounded-lg p-5 glow-effect transition-shadow">
+              <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <TailorDiagnosticPanel
                   report={diagnosticReport}
                   typstAst={activeVariantContent}
@@ -1153,17 +1265,17 @@ export function TailorWorkspace() {
             ) : (
               <>
                 {/* Job Info & Requirements View */}
-                <section className="glass-panel rounded-lg p-5 glow-effect transition-shadow" data-testid="tailor-job-info-panel">
+                <section className="rounded-xl border border-slate-800 bg-slate-900 p-5" data-testid="tailor-job-info-panel">
                   <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
                     <div className="flex items-center gap-2">
                       <Briefcase className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
-                      <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">Target Job Posting</h2>
+                      <h2 className="text-lg text-white font-semibold">Target Job Posting</h2>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setActiveTab(previousTab)}
+                      onClick={() => { setHighlightCoverLetter(false); setActiveTab(previousTab); }}
                       data-testid="back-to-overview-btn"
-                      className="text-xs text-amber-400 hover:underline font-mono"
+                      className="min-h-11 text-sm text-amber-400 hover:underline"
                     >
                       {previousTab === "3-pane" ? "← Back to 3-Pane Workspace" : "← Back to Overview"}
                     </button>
@@ -1174,87 +1286,87 @@ export function TailorWorkspace() {
                     {jobDoc.diagnostics.status === "VERIFIED_ATS" && (
                       <div
                         data-testid="confidence-banner-verified-ats"
-                        className="p-2.5 rounded-md bg-emerald-950/60 border border-emerald-800 text-xs text-emerald-300 font-mono flex items-center gap-2"
+                        className="p-3 rounded-lg bg-emerald-950/60 border border-emerald-800 text-sm text-emerald-300 flex items-start gap-2"
                       >
                         <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
-                        <span>✓ Verified ATS Source: Loaded directly from official ATS endpoint. No action needed.</span>
+                        <span>Verified ATS Source: Loaded directly from official ATS endpoint. No action needed.</span>
                       </div>
                     )}
                     {jobDoc.diagnostics.status === "STRUCTURED_PAGE" && (
                       <div
                         data-testid="confidence-banner-structured-page"
-                        className="p-2.5 rounded-md bg-blue-950/60 border border-blue-800 text-xs text-blue-300 font-mono flex items-center gap-2"
+                        className="p-3 rounded-lg bg-blue-950/60 border border-blue-800 text-sm text-blue-300 flex items-start gap-2"
                       >
                         <FileText className="size-4 text-blue-400 shrink-0" />
-                        <span>ℹ Structured Page Extraction: JSON-LD or semantic HTML. Review extracted sections.</span>
+                        <span>Structured Page Extraction: Review extracted sections before tailoring.</span>
                       </div>
                     )}
                     {jobDoc.diagnostics.status === "PARTIAL_EXTRACTION" && (
                       <div
                         data-testid="confidence-banner-partial-extraction"
-                        className="p-2.5 rounded-md bg-amber-950/60 border border-amber-800 text-xs text-amber-300 font-mono flex items-center gap-2"
+                        className="p-3 rounded-lg bg-amber-950/60 border border-amber-800 text-sm text-amber-300 flex items-start gap-2"
                       >
                         <AlertTriangle className="size-4 text-amber-400 shrink-0" />
-                        <span>⚠ Partial Extraction: Description may be incomplete. Paste full description below.</span>
+                        <span>Partial Extraction: Description may be incomplete. Paste full description below.</span>
                       </div>
                     )}
                     {jobDoc.diagnostics.status === "USER_PASTED" && (
                       <div
                         data-testid="confidence-banner-user-pasted"
-                        className="p-2.5 rounded-md bg-slate-900/80 border border-slate-700 text-xs text-slate-300 font-mono flex items-center gap-2"
+                        className="p-3 rounded-lg bg-slate-950 border border-slate-800 text-sm text-slate-300 flex items-start gap-2"
                       >
                         <FileText className="size-4 text-slate-400 shrink-0" />
-                        <span>✎ User Pasted: Candidate-provided source. Edit sections as needed.</span>
+                        <span>User Pasted: Review and edit the job description as needed.</span>
                       </div>
                     )}
                   </div>
 
                   {/* Sub-tab Selector */}
-                  <div className="flex items-center gap-1.5 border-b border-slate-800/80 mb-4 pb-2">
+                  <div className="flex flex-wrap items-center gap-1 rounded-lg bg-slate-950 p-1 mb-5">
                     <button
                       type="button"
                       onClick={() => setJobInfoSubTab("structured")}
                       data-testid="job-subtab-structured"
-                      className={`px-3 py-1.5 text-xs font-mono rounded-lg transition-colors border ${
+                      className={`min-h-11 px-3 text-sm rounded-md transition-colors ${
                         jobInfoSubTab === "structured"
-                          ? "bg-amber-500/15 border-amber-500/40 text-amber-300 font-semibold"
-                          : "border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50"
+                          ? "bg-slate-800 text-white font-medium"
+                          : "text-slate-400 hover:text-white hover:bg-slate-800/50"
                       }`}
                     >
-                      Structured Breakdown
+                      Breakdown
                     </button>
                     <button
                       type="button"
                       onClick={() => setJobInfoSubTab("original")}
                       data-testid="job-subtab-original"
-                      className={`px-3 py-1.5 text-xs font-mono rounded-lg transition-colors border ${
+                      className={`min-h-11 px-3 text-sm rounded-md transition-colors ${
                         jobInfoSubTab === "original"
-                          ? "bg-amber-500/15 border-amber-500/40 text-amber-300 font-semibold"
-                          : "border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50"
+                          ? "bg-slate-800 text-white font-medium"
+                          : "text-slate-400 hover:text-white hover:bg-slate-800/50"
                       }`}
                     >
-                      Original Source
+                      Original source
                     </button>
                     <button
                       type="button"
                       onClick={() => setJobInfoSubTab("details")}
                       data-testid="job-subtab-details"
-                      className={`px-3 py-1.5 text-xs font-mono rounded-lg transition-colors border ${
+                      className={`min-h-11 px-3 text-sm rounded-md transition-colors ${
                         jobInfoSubTab === "details"
-                          ? "bg-amber-500/15 border-amber-500/40 text-amber-300 font-semibold"
-                          : "border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50"
+                          ? "bg-slate-800 text-white font-medium"
+                          : "text-slate-400 hover:text-white hover:bg-slate-800/50"
                       }`}
                     >
-                      Extraction Details
+                      Extraction details
                     </button>
                   </div>
 
                   {/* Subtab 1: Structured Breakdown */}
                   {jobInfoSubTab === "structured" && (
-                    <div className="space-y-4 font-mono text-xs">
+                    <div className="space-y-4 text-sm">
                       {/* Sections breakdown */}
                       <div className="space-y-2.5">
-                        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                        <span className="text-xs font-medium text-slate-400 block">
                           Document Sections ({jobDoc.sections.length})
                         </span>
                         {jobDoc.sections.map((sec) => (
@@ -1268,7 +1380,7 @@ export function TailorWorkspace() {
                                 {sec.kind}
                               </span>
                             </div>
-                            <div className="text-slate-300 text-[11px] whitespace-pre-wrap leading-relaxed">
+                            <div className="text-slate-300 text-sm whitespace-pre-wrap leading-relaxed break-words">
                               {sec.markdown}
                             </div>
                           </div>
@@ -1280,14 +1392,14 @@ export function TailorWorkspace() {
                         <span className="font-semibold text-slate-300 block">
                           Add Custom Requirement (User-Added)
                         </span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <input
                             type="text"
                             value={newUserReqText}
                             onChange={(e) => setNewUserReqText(e.target.value)}
                             placeholder="e.g. 5+ years Go microservices experience"
                             data-testid="add-user-requirement-input"
-                            className="flex-1 bg-slate-900 border border-slate-700 p-1.5 text-xs text-slate-200 rounded outline-none focus:border-[#ff8c00]"
+                            className="min-w-0 min-h-11 flex-1 bg-slate-900 border border-slate-700 px-3 text-sm text-slate-200 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                           />
                           <button
                             type="button"
@@ -1306,7 +1418,7 @@ export function TailorWorkspace() {
                               setNewUserReqText("");
                             }}
                             data-testid="add-user-requirement-btn"
-                            className="px-3 py-1.5 rounded bg-[#ff8c00] text-slate-950 font-bold text-xs hover:bg-amber-400"
+                            className="min-h-11 px-3 rounded-lg border border-slate-700 text-slate-200 font-medium text-sm hover:bg-slate-800"
                           >
                             Add Requirement
                           </button>
@@ -1338,7 +1450,7 @@ export function TailorWorkspace() {
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label htmlFor="tailor-company" className="block font-mono text-xs text-slate-400 mb-1">Company</label>
+                          <label htmlFor="tailor-company" className="block text-xs font-medium text-slate-400 mb-2">Company</label>
                           <input
                             id="tailor-company"
                             name="company"
@@ -1349,11 +1461,11 @@ export function TailorWorkspace() {
                               userEditedRef.current = true;
                               setCompany(e.target.value);
                             }}
-                            className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                            className="w-full min-h-11 bg-slate-950 border border-slate-700 px-3 text-base sm:text-sm text-slate-100 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
                           />
                         </div>
                         <div>
-                          <label htmlFor="tailor-role" className="block font-mono text-xs text-slate-400 mb-1">Role</label>
+                          <label htmlFor="tailor-role" className="block text-xs font-medium text-slate-400 mb-2">Role</label>
                           <input
                             id="tailor-role"
                             name="role"
@@ -1364,19 +1476,22 @@ export function TailorWorkspace() {
                               userEditedRef.current = true;
                               setRoleTitle(e.target.value);
                             }}
-                            className="w-full bg-[#060e20] border-b border-slate-700 p-2 text-xs font-mono text-[#ffb77d] rounded-t outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                            className="w-full min-h-11 bg-slate-950 border border-slate-700 px-3 text-base sm:text-sm text-slate-100 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
                           />
+                          {roleTitle.length > 32 && (
+                            <p className="mt-2 break-words text-sm leading-relaxed text-slate-400">{roleTitle}</p>
+                          )}
                         </div>
                       </div>
                       <div>
-                        <label className="block font-mono text-xs text-slate-400 mb-1 flex justify-between">
+                        <label className="text-xs font-medium text-slate-400 mb-2 flex flex-wrap items-center justify-between gap-2">
                           <span>Raw Description</span>
                           <button
                             type="button"
                             onClick={handleExtract}
                             disabled={isExtracting}
                             data-testid="extract-reqs-btn"
-                            className="text-xs text-[#4edea3] hover:underline font-mono"
+                            className="min-h-11 text-sm text-amber-400 hover:underline"
                           >
                             {isExtracting ? "Scanning..." : "Extract Requirements"}
                           </button>
@@ -1391,7 +1506,7 @@ export function TailorWorkspace() {
                           data-testid="jd-textarea"
                           aria-label="Job description"
                           placeholder={JD_PASTE_TEMPLATE}
-                          className="w-full bg-[#060e20] text-slate-200 font-mono text-xs p-4 rounded border border-slate-800 focus:border-[#ff8c00] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 resize-none leading-relaxed"
+                          className="w-full bg-slate-950 text-slate-200 text-base sm:text-sm p-4 rounded-lg border border-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 resize-y leading-relaxed"
                         />
                         {tier2Status?.type === "error" ? (
                           <pre className="mt-2 whitespace-pre-wrap rounded border border-slate-800 bg-[#060e20] p-3 font-mono text-[10px] leading-relaxed text-slate-500">
@@ -1408,7 +1523,7 @@ export function TailorWorkspace() {
                               setRoleTitle("Senior Backend Engineer");
                               setRawDescription(SAMPLE_BACKEND_JD);
                             }}
-                            className="text-[10px] font-mono px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-white"
+                            className="min-h-11 text-sm px-3 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
                           >
                             Sample Backend JD
                           </button>
@@ -1421,7 +1536,7 @@ export function TailorWorkspace() {
                               setRoleTitle("Frontend Engineer");
                               setRawDescription(SAMPLE_FRONTEND_JD);
                             }}
-                            className="text-[10px] font-mono px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-white"
+                            className="min-h-11 text-sm px-3 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
                           >
                             Sample Frontend JD
                           </button>
@@ -1429,7 +1544,7 @@ export function TailorWorkspace() {
                             type="button"
                             data-testid="save-job-btn"
                             onClick={() => void handleSaveJob()}
-                            className="text-[10px] font-mono px-2 py-1 rounded border border-emerald-700/60 text-emerald-300 hover:text-white"
+                            className="min-h-11 text-sm px-3 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
                           >
                             Save Job
                           </button>
@@ -1440,7 +1555,7 @@ export function TailorWorkspace() {
                               setPreviousTab("job-info");
                               setActiveTab("3-pane");
                             }}
-                            className="text-[10px] font-mono px-2.5 py-1 rounded bg-amber-500/15 border border-amber-500/40 text-amber-300 font-semibold hover:bg-amber-500/25 transition"
+                            className="min-h-11 text-sm px-3 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition"
                           >
                             Open in 3-Pane Tailor →
                           </button>
@@ -1480,11 +1595,11 @@ export function TailorWorkspace() {
                   )}
                 </section>
 
-                <section className="glass-panel rounded-lg p-5 glow-effect transition-shadow">
+                <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
                   <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
                     <div className="flex items-center gap-2">
                       <ClipboardCheck className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
-                      <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">Extracted Requirements</h2>
+                      <h2 className="text-lg text-white font-semibold">Extracted Requirements</h2>
                     </div>
                     <button
                       type="button"
@@ -1570,10 +1685,11 @@ export function TailorWorkspace() {
             )}
           </div>
 
-          <div className="xl:col-span-5 flex flex-col gap-6 min-w-0">
+          <div className="flex flex-col gap-6 min-w-0">
             {extractedRequirements && (activeVariantContent || masterTypstSource) ? (
-              <section className="glass-panel rounded-lg p-5 min-w-0">
+              <section className="rounded-xl border border-slate-800 bg-slate-900 p-5 min-w-0">
                 <AtsScorePanel
+                  appearance="tailor"
                   typstContent={activeVariantContent || masterTypstSource}
                   extractedRequirements={extractedRequirements}
                   roleTitle={roleTitle}
@@ -1586,15 +1702,15 @@ export function TailorWorkspace() {
                 />
               </section>
             ) : (
-              <section className="glass-panel rounded-lg p-5 text-xs text-slate-400">
+              <section className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-sm text-slate-400">
                 Extract job requirements to run ATS scoring against your master resume and Evidence Bank.
               </section>
             )}
 
-            <section className="glass-panel rounded-lg p-5">
+            <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
               <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800/60">
                 <Database className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
-                <h2 className="font-mono text-xs text-[#ff8c00] uppercase tracking-wider font-bold">Evidence Matches</h2>
+                <h2 className="text-lg text-white font-semibold">Evidence Matches</h2>
               </div>
               <div className="space-y-3">
                 {isMatching && (
@@ -1603,7 +1719,7 @@ export function TailorWorkspace() {
                   </div>
                 )}
                 {!isMatching && matches.length === 0 && (
-                  <p className="text-xs text-slate-500">No evidence matches yet. Re-scan after updating the Evidence Bank.</p>
+                  <p className="text-sm text-slate-400">No evidence matches yet. Re-scan after updating the Evidence Bank.</p>
                 )}
                 {matches.slice(0, 6).map((m) => (
                   <div
@@ -1622,12 +1738,12 @@ export function TailorWorkspace() {
                         {m.matchPercentage}% · {m.matchPercentage >= 60 ? "High" : "Low"} Match
                       </span>
                     </div>
-                    <p className="font-mono text-xs text-slate-400 mb-2">
+                    <p className="text-sm text-slate-400 mb-2">
                       {m.organization ? `@ ${m.organization}` : ""}
                       {m.dates ? ` • ${m.dates}` : ""}
                       {m.isDraft ? " · draft" : ""}
                     </p>
-                    <p className="text-xs text-slate-300 line-clamp-2">{m.verifiedSummary}</p>
+                    <p className="text-sm leading-relaxed text-slate-300 line-clamp-2">{m.verifiedSummary}</p>
                     {m.matchedRequirements.length > 0 ? (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {m.matchedRequirements.slice(0, 4).map((req) => (
@@ -1648,6 +1764,7 @@ export function TailorWorkspace() {
           </div>
         </div>
         )}
+        </div>
       </div>
       <QuickAddEvidenceModal
         isOpen={Boolean(gapSkillToResolve)}

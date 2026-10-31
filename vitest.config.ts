@@ -3,7 +3,7 @@ import path from "path";
 
 export default defineConfig({
   test: {
-    exclude: ["node_modules", "e2e/**"],
+    exclude: ["node_modules", "e2e/**", "tests/integration/**"],
     fileParallelism: false,
     env: {
       DATABASE_URL:

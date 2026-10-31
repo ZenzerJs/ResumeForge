@@ -33,10 +33,10 @@
                                            |
                                            v
 +-----------------------------------------------------------------------------------+
-|                               LOCAL STORAGE LAYER                                 |
+|                              PERSISTENCE LAYER                                    |
 |     +-----------------------------------------------------------------------+     |
-|     |                      Prisma ORM + SQLite (dev.db)                     |     |
-|     | (Master Resume, Evidence Items, Jobs, Resume Variants, Patch History) |     |
+|     |                         Prisma ORM + PostgreSQL                         |     |
+|     | (Account-scoped resumes/evidence/variants; shared job catalog)        |     |
 |     +-----------------------------------------------------------------------+     |
 +-----------------------------------------------------------------------------------+
 ```
@@ -63,12 +63,20 @@
 - Secure BYOK interface communicating with external LLM APIs or local proxies.
 - Enforces strict JSON schema validation for generated `Patch` objects.
 
-### 6. Local Storage Module (`/src/lib/prisma.ts` & `/prisma`)
-- Manages SQLite schema migrations, connection pooling, and database persistence.
+### 6. PostgreSQL Persistence Module (`/src/lib/prisma.ts` & `/prisma`)
+- Manages PostgreSQL access through Prisma migrations and typed database queries. Browser localStorage holds guest/demo drafts only; it is not the persistent source of truth for self-hosted accounts.
 
 ---
 
-## 3. Core Data Flow: "Job Posting In → Tailored Variant Out"
+## 3. Runtime modes and ownership
+
+- PostgreSQL is the only source of truth for self-hosted persistent application data. Prisma and migrations own its schema.
+- Signed-in self-hosted users own their resumes, evidence, variants, and application state. The shared job catalog is distinct from private application records.
+- Public demo visitors have no database write access, including when carrying an old account session. Resume/evidence/job drafts use browser storage; sample content is synthetic and labeled.
+- Demo AI requests use visitor-supplied BYOK only. Server environment provider keys are ignored in demo mode. Private-IP protections and provider host/path allowlists remain active.
+- `prisma/seed.ts` is an optional development seed only; it is not run automatically on app startup. Demo samples are stored in browser state, not shared user evidence.
+
+## 4. Core Data Flow: "Job Posting In → Tailored Variant Out"
 
 ```
 [User Pastes Job Posting]

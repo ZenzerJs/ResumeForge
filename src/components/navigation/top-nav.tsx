@@ -62,7 +62,7 @@ function SignOutButton({ className }: { className?: string }) {
   );
 }
 
-function GuestAuthLinks({ className }: { className?: string }) {
+function GuestAuthLinks({ className, signupEnabled }: { className?: string; signupEnabled: boolean }) {
   return (
     <div className={cn("hidden md:flex items-center gap-1", className)}>
       <Link
@@ -71,12 +71,12 @@ function GuestAuthLinks({ className }: { className?: string }) {
       >
         Sign In
       </Link>
-      <Link
+      {signupEnabled ? <Link
         href="/login?mode=signup"
         className="inline-flex min-h-11 items-center rounded-md bg-[#ff8c00] px-3 text-xs font-semibold text-black hover:bg-[#ffa024] focus-visible:ring-2 focus-visible:ring-amber-500/60"
       >
         Sign Up
-      </Link>
+      </Link> : null}
     </div>
   );
 }
@@ -153,8 +153,15 @@ export function TopNav({ actions, badge }: TopNavProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined);
+  const [signupEnabled, setSignupEnabled] = useState(true);
   const drawerRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+
+  useEffect(() => {
+    void fetch("/api/demo-config").then((res) => res.json()).then((config) => {
+      if (config?.signupEnabled === false) setSignupEnabled(false);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -279,7 +286,7 @@ export function TopNav({ actions, badge }: TopNavProps) {
             <SignOutButton className="hidden md:inline-flex" />
           </>
         ) : isGuest ? (
-          <GuestAuthLinks />
+          <GuestAuthLinks signupEnabled={signupEnabled} />
         ) : null}
       </div>
 
@@ -328,12 +335,12 @@ export function TopNav({ actions, badge }: TopNavProps) {
                 >
                   Sign In
                 </Link>
-                <Link
+                {signupEnabled ? <Link
                   href="/login?mode=signup"
                   className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm text-amber-400 hover:bg-slate-800/40 focus-visible:ring-2 focus-visible:ring-amber-500/60"
                 >
                   Sign Up
-                </Link>
+                </Link> : null}
               </>
             )}
           </nav>

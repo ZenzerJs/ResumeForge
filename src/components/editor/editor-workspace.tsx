@@ -40,6 +40,7 @@ import {
 } from "@/lib/guardrail/policy";
 import { cn } from "@/lib/utils";
 import { AppShell } from "@/components/design-system/app-shell";
+import { clearDemoSamplesForPersonalResume, getDemoContextFromBrowser, initializeDemoSamples } from "@/lib/demo-client";
 import { EditorWorkspaceSkeleton } from "@/components/editor/editor-workspace-skeleton";
 
 const STORAGE_KEY = "resumeforge_typst_source";
@@ -267,6 +268,12 @@ export function EditorWorkspace() {
       const res = await fetch("/templates/starter-resume.typ");
       if (res.ok) {
         const text = await res.text();
+        if (process.env.NEXT_PUBLIC_RESUME_LAYOUT_V2 === "true") {
+          const [{ parseTypstToStructuredModel, legacyFormToResumeDocument }, { renderResumeDocument }] = await Promise.all([
+            import("./resume-form-builder"), import("@/lib/typst/resume-document"),
+          ]);
+          return renderResumeDocument(legacyFormToResumeDocument(parseTypstToStructuredModel(text)));
+        }
         return text;
       }
     } catch {
@@ -279,13 +286,19 @@ export function EditorWorkspace() {
    * Task B1: Canonical Loading Priority Algorithm
    * 1. variantId: fetch GET /api/variants/[id]
    * 2. resumeId: fetch GET /api/resumes/[id]
-   * 3. no param: fetch GET /api/resumes to load canonical SQLite master resume
+   * 3. no param: fetch GET /api/resumes to load canonical PostgreSQL master resume
    * 4. fallback: localStorage or starter template only when no DB record exists
    */
   const loadGeneration = useRef(0);
 
   const loadFrozenMasterSnapshot = useCallback(async () => {
     try {
+      const demoConfig = await fetch("/api/demo-config").then((res) => res.json()).catch(() => ({}));
+      if (demoConfig?.demoMode) {
+        const rawSnapshot = localStorage.getItem("resumeforge_demo_master_facts");
+        setMasterFacts(rawSnapshot ? JSON.parse(rawSnapshot) as ResumeFacts : null);
+        return;
+      }
       const [resumesRes, evidRes] = await Promise.all([
         fetch("/api/resumes").catch(() => null),
         fetch("/api/evidence").catch(() => null),
@@ -316,9 +329,34 @@ export function EditorWorkspace() {
       typeof window !== "undefined" &&
       sessionStorage.getItem("resumeforge_ai_patched_buffer") === "true";
     setHasAiPatchedBuffer(persistedAiPatched);
-    void loadFrozenMasterSnapshot();
-
     try {
+      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      if (demoConfig?.demoMode) {
+        initializeDemoSamples();
+        const personalSource = localStorage.getItem(STORAGE_KEY);
+        if (personalSource?.trim()) clearDemoSamplesForPersonalResume(personalSource);
+        await loadFrozenMasterSnapshot();
+        const localSource = localStorage.getItem(STORAGE_KEY);
+        if (current()) {
+          if (localSource?.trim()) {
+            setSource(localSource);
+            setDocMetadata({
+              type: "LOCAL_FALLBACK",
+              title: localSource.includes("// Synthetic sample.") ? "Synthetic Sample Draft" : "Local Draft",
+            });
+          } else {
+            const starter = await loadStarterTemplate();
+            if (!current()) return;
+            setSource(starter);
+            setDocMetadata({ type: "LOCAL_FALLBACK", title: "Local Draft" });
+            localStorage.setItem(STORAGE_KEY, starter);
+            localStorage.setItem("resumeforge_has_guest_draft", "true");
+          }
+          setIsLoadingDocument(false);
+        }
+        return;
+      }
+      void loadFrozenMasterSnapshot();
       // Priority 1: variantId param
       if (variantIdParam && variantIdParam.trim().length > 0) {
         const res = await fetch(`/api/variants/${variantIdParam.trim()}`);
@@ -363,7 +401,7 @@ export function EditorWorkspace() {
         }
       }
 
-      // Priority 3: No param -> fetch canonical SQLite master resume
+      // Priority 3: No param -> fetch canonical PostgreSQL master resume
       const res = await fetch("/api/resumes");
       const json = await res.json();
       if (res.ok && json.success && Array.isArray(json.data) && json.data.length > 0) {
@@ -511,14 +549,15 @@ export function EditorWorkspace() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleShortcutSave]);
 
-  const handleSourceChange = (newVal: string) => {
+  const handleSourceChange = useCallback((newVal: string) => {
     setSource(newVal);
     if (typeof window === "undefined") return;
+    clearDemoSamplesForPersonalResume(newVal);
     if (persistTimer.current) clearTimeout(persistTimer.current);
     persistTimer.current = setTimeout(() => {
       localStorage.setItem(STORAGE_KEY, newVal);
     }, SOURCE_PERSIST_MS);
-  };
+  }, []);
 
   const handleTriggerRepair = useCallback(
     (context: { compileError: string; line?: number; column?: number; sourceExcerpt?: string }) => {
@@ -546,7 +585,7 @@ export function EditorWorkspace() {
       handleSourceChange(patchedSource);
       runCompile(patchedSource);
     },
-    [runCompile]
+    [runCompile, handleSourceChange]
   );
 
   const handleResetTemplate = async () => {
@@ -629,6 +668,25 @@ export function EditorWorkspace() {
     try {
       setIsSavingMaster(true);
       setSaveSuccess(false);
+
+      const demoConfig = await fetch("/api/demo-config").then((res) => res.json()).catch(() => ({}));
+      if (demoConfig?.demoMode) {
+        const demoContext = getDemoContextFromBrowser();
+        const facts = extractResumeFacts(cleanMasterSource, demoContext?.evidenceItems || []);
+        localStorage.setItem("resumeforge_demo_master_facts", JSON.stringify(facts));
+        localStorage.setItem(STORAGE_KEY, cleanMasterSource);
+        localStorage.setItem("resumeforge_has_guest_draft", "true");
+        setMasterFacts(facts);
+        setSource(cleanMasterSource);
+        setBaselineSource(cleanMasterSource);
+        setDocMetadata({ type: "MASTER_RESUME", title: "Local Master Resume", id: "demo-local-master" });
+        setHasAiPatchedBuffer(false);
+        sessionStorage.removeItem("resumeforge_ai_patched_buffer");
+        setShowSaveConfirm(false);
+        setSaveSuccess(true);
+        scheduleUiTimer(() => setSaveSuccess(false), 3000);
+        return;
+      }
 
       const res = await fetch("/api/resumes/save-master", {
         method: "POST",
@@ -1071,6 +1129,7 @@ export function EditorWorkspace() {
                       !hasAiPatchedBuffer &&
                       !isDocumentPatched(source))
                   }
+                  onApplyLayout={handleSourceChange}
                   onResetTemplate={handleResetTemplate}
                   onTriggerRepair={handleTriggerRepair}
                 />
@@ -1145,6 +1204,7 @@ export function EditorWorkspace() {
                     !hasAiPatchedBuffer &&
                     !isDocumentPatched(source))
                 }
+                onApplyLayout={handleSourceChange}
                 onResetTemplate={handleResetTemplate}
                 onTriggerRepair={handleTriggerRepair}
               />

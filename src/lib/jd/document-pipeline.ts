@@ -223,6 +223,7 @@ export function computeContentHash(content: string): string {
  */
 export function htmlToMarkdown(html: string): string {
   let text = html
+    .replace(/\r\n?/g, "\n")
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
     .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
     .replace(/<h[1-2][^>]*>(.*?)(?:<\/h[1-6]>|<\/div>|<\/p>|\n|$)/gi, "\n\n## $1\n\n")
@@ -319,7 +320,7 @@ export function parseJobDescriptionDocument(options: ParseJobDescriptionOptions)
     warnings.push("Empty input provided to document pipeline.");
   }
 
-  const normalizedMarkdown = rawText.trim();
+  const normalizedMarkdown = rawText.replace(/\r\n?/g, "\n").trim();
   const contentHash = computeContentHash(normalizedMarkdown);
 
   // 4. Split into Deterministic Section Spans

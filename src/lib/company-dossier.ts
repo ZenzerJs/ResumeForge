@@ -2,6 +2,7 @@ import { z } from "zod";
 import { extractJsonObject } from "./ai/json-response";
 import { ProviderConfig } from "./ai/types";
 import { sendChatCompletion, resolveServerProviderConfig } from "@/lib/ai/gateway";
+import { isDemoMode } from "@/lib/demo-mode";
 
 export const dossierSchema = z.object({
   companyName: z.string(),
@@ -174,6 +175,7 @@ async function callDossierLlm(providerConfig: ProviderConfig, promptText: string
 }
 
 function detectServerProviderConfig(): ProviderConfig | undefined {
+  if (isDemoMode()) return undefined;
   if (process.env.OPENAI_API_KEY?.trim()) {
     return { provider: "openai", apiKey: process.env.OPENAI_API_KEY.trim() };
   }

@@ -1,0 +1,90 @@
+.tailor {
+  border-color: var(--rf-border);
+  border-radius: 1rem;
+  background: var(--rf-surface);
+  box-shadow: none;
+  font-family: "Hanken Grotesk", sans-serif;
+}
+
+.tailor h2 {
+  font-size: 1.125rem;
+  line-height: 1.5;
+}
+
+.tailor p,
+.tailor ul,
+.tailor label {
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.tailor .engineBadge {
+  border-color: var(--rf-border);
+  background: var(--rf-bg);
+  color: var(--rf-meta);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.tailor .scoreSummary {
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tailor .scoreBadge {
+  padding: 1.25rem;
+  border-color: var(--rf-border);
+  background: var(--rf-bg);
+  color: var(--rf-cloud);
+  gap: 0.25rem;
+}
+
+.tailor .scoreBadge > span {
+  font-size: 0.75rem;
+  color: var(--rf-meta);
+}
+
+.tailor .scoreValue {
+  font-family: inherit;
+  font-size: 3rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+
+.tailor .feedback {
+  min-height: 44px;
+  border: 1px solid var(--rf-border);
+  background: transparent;
+  color: var(--rf-cloud);
+  box-shadow: none;
+  font-size: 0.875rem;
+  transition: background-color 150ms ease;
+}
+
+.tailor .feedback:hover:not(:disabled) {
+  background: var(--rf-surface-elevated);
+}
+
+.tailor button:focus-visible,
+.tailor select:focus-visible {
+  outline: 2px solid var(--rf-amber);
+  outline-offset: 3px;
+}
+
+.tailor .categories > div {
+  background: var(--rf-bg);
+  border-color: var(--rf-border);
+  border-radius: 0.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tailor *,
+  .tailor *::before,
+  .tailor *::after {
+    animation: none;
+    transition: none;
+  }
+}

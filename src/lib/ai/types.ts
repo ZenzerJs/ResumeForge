@@ -89,11 +89,13 @@ export interface ConvertPdfInput {
   rawText: string;
   fileName?: string;
   links?: ExtractedPdfLink[];
+  formattingVersion?: 2;
 }
 
 export interface ConvertPdfResult {
   success: boolean;
   typstSource?: string;
   error?: string;
+  assignments?: unknown;
 }
 

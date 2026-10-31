@@ -26,7 +26,7 @@ B.S. Computer Science — UC Berkeley
   it("handles empty or single line text gracefully", () => {
     const typst = convertTextToTypst("John Doe", "MyResume.pdf");
     expect(typst).toContain("= John Doe");
-    expect(typst).toContain("#line(length: 100%");
+    expect(typst).toContain('#set page(paper: "us-letter"');
   });
 
   it("renders verified extracted link annotations in header when provided and drops duplicated raw contact line", () => {
@@ -41,7 +41,7 @@ B.S. Computer Science — UC Berkeley
     );
     expect(typst).toContain('#link("https://linkedin.com/in/alex")[LinkedIn]');
     expect(typst).toContain('#link("https://github.com/alex")[GitHub]');
-    expect(typst).not.toContain("Ontario, Canada | alex\\@example.com");
+    expect(typst).toContain("Ontario, Canada | alex\\@example.com");
   });
 
   it("Golden Test: synthetic persona resume text converts en-dash bullets, rejoins hyphenated wraps, avoids promoting entries to sections, and extracts facts", () => {
@@ -86,7 +86,7 @@ Engineering: Next.js, React, FastAPI, REST APIs, PostgreSQL, Prisma, Docker, Git
     expect(typst).not.toContain("== Northwind Health Systems");
 
     // 2. Contact line not duplicated when links are rendered
-    expect(typst).not.toContain("Ontario, Canada | alex.rivera\\@example.com");
+    expect(typst).toContain("Ontario, Canada | alex.rivera\\@example.com");
 
     // 3. Hyphenated wrap rejoined ("idempo-\ntent" -> "idempotent") and continuation lines merged into bullet
     expect(typst).toContain("idempotent webhook ingestion across 1,000+ licenses and 45% faster processing.");

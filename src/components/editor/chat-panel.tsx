@@ -42,6 +42,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
   const [streamingTools, setStreamingTools] = useState<ToolCallRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [noKeyError, setNoKeyError] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
 
   const listRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -57,6 +58,10 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
     } catch {
       // ignore
     }
+  }, []);
+
+  useEffect(() => {
+    void fetch("/api/demo-config").then((res) => res.json()).then((config) => setDemoMode(config.demoMode === true)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -86,6 +91,10 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
     async (rawText?: string) => {
       const text = (rawText ?? input).trim();
       if (!text || isStreaming) return;
+      if (demoMode) {
+        setError("Career Assistant chat is unavailable in the public demo because it reads saved account data. Use Tailoring and ATS review with your local draft instead.");
+        return;
+      }
 
       const aiSettings = await resolveClientProviderConfig();
       if (!aiSettings) {
@@ -230,7 +239,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
         abortRef.current = null;
       }
     },
-    [activeJobId, input, isStreaming, messages, typstSource]
+    [activeJobId, demoMode, input, isStreaming, messages, typstSource]
   );
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -250,6 +259,11 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="chat-panel">
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-3">
+        {demoMode && (
+          <p className="rounded-lg border border-slate-800 bg-slate-900/80 p-3 text-xs text-slate-300">
+            Career Assistant chat is unavailable in the public demo because it reads saved account data. Use Tailoring and ATS review with your local draft instead.
+          </p>
+        )}
         {messages.length === 0 && !isStreaming && (
           <div className="flex flex-col items-center text-center py-6 gap-3">
             <div className="rounded-full bg-amber-500/10 border border-amber-500/20 p-3">
@@ -356,7 +370,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
         </div>
       )}
 
-      <div className="border-t border-slate-800 p-3 space-y-2">
+      {!demoMode && <div className="border-t border-slate-800 p-3 space-y-2">
         <textarea
           ref={textareaRef}
           data-testid="chat-input"
@@ -400,7 +414,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
           <Sparkles className="h-3 w-3" />
           Enter to send · Shift+Enter for a new line
         </p>
-      </div>
+      </div>}
     </div>
   );
 }

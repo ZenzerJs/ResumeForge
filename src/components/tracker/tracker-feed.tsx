@@ -35,7 +35,7 @@ import {
   extractSalaryFromNotes,
   isPlaceholderDescription,
 } from "@/lib/ingestion/helpers";
-import { type PostedWithin } from "@/lib/jobs/posted-within";
+import { matchesPostedWithin, type PostedWithin } from "@/lib/jobs/posted-within";
 
 export type { JobItem, JobVariant, JobCoverLetter };
 
@@ -113,6 +113,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const [totalPages, setTotalPages] = useState(1);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
@@ -157,6 +158,62 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const fetchJobs = useCallback(async () => {
     try {
       setIsLoading(true);
+      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      setIsDemoMode(demoConfig?.demoMode === true);
+      if (demoConfig?.demoMode) {
+        let localJobs: JobItem[] = [];
+        try {
+          const raw = localStorage.getItem("resumeforge_guest_jobs");
+          const parsed = raw ? JSON.parse(raw) : [];
+          if (Array.isArray(parsed)) {
+            localJobs = parsed.map((job) => ({
+              ...job,
+              source: job.source || "pasted",
+              status: ALL_STATUSES.includes(job.status) ? job.status : "SAVED",
+              createdAt: job.createdAt || new Date().toISOString(),
+              notes: job.notes || "",
+              extractedRequirements: job.extractedRequirements || { requiredSkills: [], preferredSkills: [], domainTerms: [] },
+              variants: Array.isArray(job.variants) ? job.variants : [],
+              coverLetters: Array.isArray(job.coverLetters) ? job.coverLetters : [],
+            }));
+          }
+        } catch {
+          localJobs = [];
+        }
+        let filtered = localJobs.filter((job) => {
+          const statuses = statusFilter !== "ALL" ? [statusFilter] : filterStatuses;
+          if (statuses?.length && !statuses.includes(job.status)) return false;
+          const search = debouncedSearch.toLowerCase();
+          const fullText = `${job.roleTitle || ""} ${job.company || ""} ${job.rawDescription || ""} ${job.notes || ""}`.toLowerCase();
+          if (search && !fullText.includes(search)) return false;
+          const location = extractLocationFromNotes(job.notes || "").toLowerCase();
+          if (debouncedLocation && !location.includes(debouncedLocation.toLowerCase())) return false;
+          if (workplace !== "all" && !new RegExp(workplace, "i").test(`${location} ${job.notes || ""}`)) return false;
+          if (!matchesPostedWithin(extractPostingDateFromNotes(job.notes || ""), postedWithin, new Date(), job.createdAt)) return false;
+          return true;
+        });
+        if (minSalary !== "0") {
+          const minimum = Number(minSalary);
+          filtered = filtered.filter((job) => {
+            const salary = extractSalaryFromNotes(job.notes || "", job.rawDescription || "");
+            const amount = salary?.match(/[\d,]+/)?.[0]?.replace(/,/g, "");
+            return amount ? Number(amount) >= minimum : false;
+          });
+        }
+        const total = filtered.length;
+        const totalPageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+        const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+        setJobs(visible);
+        setTotalJobs(total);
+        setTotalPages(totalPageCount);
+        setPipelineCounts({
+          applied: filtered.filter((job) => job.status === "APPLIED").length,
+          interviewing: filtered.filter((job) => job.status === "INTERVIEWING").length,
+        });
+        setEditingNotes(Object.fromEntries(visible.map((job) => [job.id, job.notes || ""])));
+        setLastSyncAt(null);
+        return;
+      }
       const params = new URLSearchParams({
         page: String(page),
         limit: String(PAGE_SIZE),
@@ -190,7 +247,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [page, postedWithin, debouncedSearch, debouncedLocation, workplace, statusFilter, filterStatuses]);
+  }, [page, postedWithin, debouncedSearch, debouncedLocation, workplace, statusFilter, filterStatuses, minSalary]);
 
   useEffect(() => {
     fetchJobs();
@@ -211,10 +268,18 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
     }
   }, [isLoading, activeJobId, jobs]);
 
+  useEffect(() => {
+    if (!isDemoMode || isLoading || !activeJobId || jobs.some((job) => job.id === activeJobId)) return;
+    const nextActiveId = jobs[0]?.id ?? null;
+    setActiveJobId(nextActiveId);
+    if (nextActiveId) sessionStorage.setItem("resumeforge_active_job_id", nextActiveId);
+    else sessionStorage.removeItem("resumeforge_active_job_id");
+  }, [isDemoMode, isLoading, activeJobId, jobs]);
+
   // Automatically fetch + persist descriptions for placeholder rows on the current page.
   // The server stores them on the Job row, so each posting is fetched at most once.
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || isDemoMode) return;
     const attempted = hydrateAttemptedRef.current;
     const pending = jobs
       .filter((j) => (j.isPlaceholder ?? isPlaceholderDescription(j.rawDescription)) && !j.extractFailure && !attempted.has(j.id))
@@ -270,27 +335,31 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       }
       if (mountedRef.current) setHydrateProgress(null);
     })();
-  }, [jobs, isLoading, activeJobId]);
+  }, [jobs, isLoading, isDemoMode, activeJobId]);
 
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/connectors/status")
-      .then((res) => res.json())
-      .then((json) => {
+    void (async () => {
+      const demoConfig = await fetch("/api/demo-config").then((res) => res.json()).catch(() => ({}));
+      if (cancelled) return;
+      setIsDemoMode(demoConfig?.demoMode === true);
+      if (demoConfig?.demoMode === true) return;
+      const json = await fetch("/api/connectors/status").then((res) => res.json());
+      {
         if (cancelled || !json?.success) return;
         const times = (json.data?.providers ?? [])
           .map((provider: { lastSyncAt?: string | null }) => provider.lastSyncAt)
           .filter((value: string | null | undefined): value is string => Boolean(value))
           .sort();
         setLastSyncAt(times.at(-1) ?? null);
-      })
-      .catch(() => {
+      }
+    })().catch(() => {
         // Status is optional chrome.
       });
     return () => {
       cancelled = true;
     };
-  }, [isImporting]);
+  }, [isImporting, isDemoMode]);
 
   useEffect(() => {
     if (!isLoading && activeJobId && activeCardRef.current) {
@@ -327,6 +396,18 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const patchJob = async (jobId: string, body: { status?: JobStatus; variantId?: string | null }) => {
     setIsUpdatingStatus((p) => ({ ...p, [jobId]: true }));
     try {
+      if (isDemoMode) {
+        const rows = JSON.parse(localStorage.getItem("resumeforge_guest_jobs") || "[]");
+        if (!Array.isArray(rows)) throw new Error("Invalid local tracker data");
+        const next = rows.map((job) => job.id === jobId ? {
+          ...job,
+          ...(body.status ? { status: body.status, appliedAt: body.status === "APPLIED" ? new Date().toISOString() : job.appliedAt ?? null } : {}),
+          ...(body.variantId !== undefined ? { appliedVariantId: body.variantId } : {}),
+        } : job);
+        localStorage.setItem("resumeforge_guest_jobs", JSON.stringify(next));
+        setJobs((prev) => prev.map((job) => next.find((item) => item.id === jobId) ?? job));
+        return;
+      }
       const res = await fetch(`/api/jobs/${jobId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -357,6 +438,14 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const handleSaveNotes = async (jobId: string) => {
     setIsSavingNotes((p) => ({ ...p, [jobId]: true }));
     try {
+      if (isDemoMode) {
+        const rows = JSON.parse(localStorage.getItem("resumeforge_guest_jobs") || "[]");
+        if (!Array.isArray(rows)) throw new Error("Invalid local tracker data");
+        const notes = editingNotes[jobId] || "";
+        localStorage.setItem("resumeforge_guest_jobs", JSON.stringify(rows.map((job) => job.id === jobId ? { ...job, notes } : job)));
+        setJobs((prev) => prev.map((job) => job.id === jobId ? { ...job, notes } : job));
+        return;
+      }
       await fetch(`/api/jobs/${jobId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -372,6 +461,18 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const handleDeleteJob = async (jobId: string) => {
     if (!confirm("Delete this job posting from the tracker?")) return;
     try {
+      if (isDemoMode) {
+        const rows = JSON.parse(localStorage.getItem("resumeforge_guest_jobs") || "[]");
+        if (!Array.isArray(rows)) throw new Error("Invalid local tracker data");
+        localStorage.setItem("resumeforge_guest_jobs", JSON.stringify(rows.filter((job) => job.id !== jobId)));
+        setJobs((prev) => prev.filter((job) => job.id !== jobId));
+        if (activeJobId === jobId) {
+          setActiveJobId(null);
+          sessionStorage.removeItem("resumeforge_active_job_id");
+          setMobileSheetOpen(false);
+        }
+        return;
+      }
       await fetch(`/api/jobs/${jobId}`, { method: "DELETE" });
       setJobs((prev) => prev.filter((j) => j.id !== jobId));
       if (activeJobId === jobId) {
@@ -387,6 +488,12 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const handleFetchFullText = async (jobId: string) => {
     setIsFetchingTier2((p) => ({ ...p, [jobId]: true }));
     setTier2Notice((p) => ({ ...p, [jobId]: "" }));
+
+    if (isDemoMode) {
+      setTier2Notice((p) => ({ ...p, [jobId]: "Paste the job description in Tailor to use it in this local demo." }));
+      setIsFetchingTier2((p) => ({ ...p, [jobId]: false }));
+      return;
+    }
 
     try {
       const res = await fetch(`/api/jobs/${jobId}/fetch-fulltext`, { method: "POST" });
@@ -421,6 +528,11 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   };
 
   const handleRefreshFromSource = async () => {
+    if (isDemoMode) {
+      setImportNotice("Demo tracker uses browser-local jobs. Add or edit jobs here; live import and connector sync require self-hosting.");
+      window.setTimeout(() => setImportNotice(null), 6000);
+      return;
+    }
     try {
       setIsImporting(true);
       setImportNotice("Syncing live feeds from public connectors & source listings…");

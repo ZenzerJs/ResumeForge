@@ -7,13 +7,16 @@ import { sanitizeError } from "./redact";
 import { buildPatchSystemPrompt, buildPatchUserPrompt } from "./prompt-template";
 import { buildQualitativeReviewSystemPrompt, buildQualitativeReviewUserPrompt, QualitativeReviewPromptInput } from "./qualitative-prompt";
 import { buildCoverLetterSystemPrompt, buildCoverLetterUserPrompt } from "./cover-letter-prompt";
-import { buildPdfToTypstSystemPrompt, buildPdfToTypstUserPrompt } from "./pdf-prompt";
+import { buildPdfToTypstSystemPrompt, buildPdfToTypstUserPrompt, buildPdfSpanSystemPrompt, buildPdfSpanUserPrompt } from "./pdf-prompt";
+import { validateAssignments } from "@/lib/typst/resume-document";
+import { z } from "zod";
 import { GenerateCoverLetterInput } from "./cover-letter-schema";
 import { TypstRepairInput, TypstRepairInputSchema, TypstRepairProposal } from "./repair-schema";
 import { buildEvidenceExtractSystemPrompt, buildEvidenceExtractUserPrompt } from "./evidence-prompt";
 import { FormattedJd, FormattedJdSchema } from "./jd-format-schema";
 import { buildJdFormatSystemPrompt, buildJdFormatUserPrompt, JdFormatPromptInput } from "./jd-format-prompt";
 import { sanitizeTypstSource } from "../typst/sanitizer";
+import { isDemoMode } from "../demo-mode";
 
 /**
  * Resolves server-side defaults and environment variables for AI providers.
@@ -22,7 +25,7 @@ export function resolveServerProviderConfig(config: ProviderConfig): ProviderCon
   if (config.provider === "groq") {
     return {
       ...config,
-      apiKey: config.apiKey?.trim() || process.env.GROQ_API_KEY?.trim() || undefined,
+      apiKey: config.apiKey?.trim() || (!isDemoMode() ? process.env.GROQ_API_KEY?.trim() : undefined) || undefined,
       baseUrl: config.baseUrl || "https://api.groq.com/openai/v1",
       model: config.model || "llama-3.3-70b-versatile",
     };
@@ -30,7 +33,7 @@ export function resolveServerProviderConfig(config: ProviderConfig): ProviderCon
   if (config.provider === "ollama") {
     return {
       ...config,
-      baseUrl: config.baseUrl || process.env.OLLAMA_BASE_URL || "http://localhost:11434/v1",
+      baseUrl: config.baseUrl || (!isDemoMode() ? process.env.OLLAMA_BASE_URL : undefined) || "http://localhost:11434/v1",
       model: config.model || "llama3.2",
       apiKey: config.apiKey || "ollama",
     };
@@ -231,8 +234,8 @@ export async function convertPdfTextToTypst(input: ConvertPdfInput): Promise<Con
   }
 
   const resolvedConfig = resolveServerProviderConfig(parseResult.data);
-  const systemPrompt = buildPdfToTypstSystemPrompt();
-  const userPrompt = buildPdfToTypstUserPrompt(input.rawText, input.fileName, input.links);
+  const systemPrompt = input.formattingVersion === 2 ? buildPdfSpanSystemPrompt() : buildPdfToTypstSystemPrompt();
+  const userPrompt = input.formattingVersion === 2 ? buildPdfSpanUserPrompt(input.rawText) : buildPdfToTypstUserPrompt(input.rawText, input.fileName, input.links);
 
   try {
     let result: ConvertPdfResult;
@@ -258,6 +261,17 @@ export async function convertPdfTextToTypst(input: ConvertPdfInput): Promise<Con
         };
     }
 
+    if (input.formattingVersion === 2) {
+      if (!result.success || !result.typstSource) return { success: false, error: "Empty PDF extraction response" };
+      try {
+        const envelope = z.object({ assignments: z.unknown() }).strict().parse(JSON.parse(result.typstSource));
+        const assignments = validateAssignments(input.rawText, envelope.assignments);
+        if (!assignments.length) return { success: false, error: "Empty PDF extraction assignments" };
+        return { success: true, assignments };
+      } catch {
+        return { success: false, error: "Invalid PDF extraction assignments" };
+      }
+    }
     if (result.success && result.typstSource) {
       result.typstSource = sanitizeTypstSource(result.typstSource);
     }

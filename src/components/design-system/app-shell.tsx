@@ -6,6 +6,7 @@ import { TopNav } from "@/components/navigation/top-nav";
 import { GuestMigrationModal } from "@/components/auth/guest-migration-modal";
 import { fetchSessionPayload } from "@/components/auth/session-user";
 import { cn } from "@/lib/utils";
+import { initializeDemoSamples } from "@/lib/demo-client";
 
 /** Kept for layout/testid affinity; no longer drives decorative atmosphere. */
 export type AtmosphereVariant =
@@ -32,9 +33,14 @@ interface AppShellProps {
 
 function GuestBanner() {
   const [guest, setGuest] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    void fetch("/api/demo-config")
+      .then((res) => res.json())
+      .then((config) => { if (!cancelled) setDemoMode(config?.demoMode === true); })
+      .catch(() => {});
     void fetchSessionPayload().then((json) => {
       if (!cancelled) setGuest(Boolean(json?.guest) || !json?.data);
     });
@@ -50,11 +56,9 @@ function GuestBanner() {
       className="border-b border-slate-800 bg-slate-900/80 px-4 py-2 text-center text-sm text-slate-300"
       data-testid="guest-banner"
     >
-      You’re using a guest session. Work stays in this browser until you{" "}
-      <Link href="/login" className="font-semibold text-amber-400 underline-offset-2 hover:underline">
-        sign in
-      </Link>{" "}
-      to save.
+      {demoMode
+        ? "Public demo: samples are fictional, your drafts stay in this browser, and AI uses your BYOK key. Public signup is disabled."
+        : <>You’re using a guest session. Work stays in this browser until you{" "}<Link href="/login" className="font-semibold text-amber-400 underline-offset-2 hover:underline">sign in</Link>{" "}to save.</>}
     </div>
   );
 }
@@ -76,12 +80,22 @@ export function AppShell({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    void fetch("/api/demo-config")
+      .then((res) => res.json())
+      .then((config) => {
+        if (config?.demoMode !== true) return;
+        initializeDemoSamples();
+      })
+      .catch(() => {});
+
     const isDismissed = localStorage.getItem("resumeforge_migration_dismissed") === "true";
     const isMigrated = localStorage.getItem("resumeforge_draft_migrated") === "true";
     if (isDismissed || isMigrated) return;
 
     fetchSessionPayload()
       .then(async (json) => {
+        const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+        if (demoConfig?.demoMode) return;
         const isAuthUser = json?.data && !json.guest;
         if (isAuthUser) {
           const hasGuestDraft = localStorage.getItem("resumeforge_has_guest_draft") === "true";

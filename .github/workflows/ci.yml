@@ -13,7 +13,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Run actionlint
-        uses: rhysd/actionlint@v1.7.4
+        uses: docker://rhysd/actionlint:1.7.4
 
   verify:
     runs-on: ubuntu-latest
@@ -39,6 +39,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Reject conflict markers
+        run: |
+          if git grep -n -E '^(<<<<<<< |=======$|>>>>>>> )' -- . ':!package-lock.json'; then
+            echo "Unresolved merge conflict markers found"
+            exit 1
+          fi
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -63,5 +70,24 @@ jobs:
       - name: Test
         run: npm run test
 
+      - name: PostgreSQL integration
+        run: npm run test:integration
+
       - name: Build
         run: npm run build
+        env:
+          NEXT_PUBLIC_RESUME_LAYOUT_V2: "true"
+
+      - name: Install Chromium for resume render checks
+        run: npx playwright install --with-deps chromium
+
+      - name: Resume rendering and export gates
+        run: npx playwright test --config playwright.resume-layout-v2.config.ts
+
+      - name: Preserve resume render evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resume-layout-v2-renders
+          path: test-results/resume-layout-v2
+          if-no-files-found: ignore

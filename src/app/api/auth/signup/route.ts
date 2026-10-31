@@ -10,6 +10,7 @@ import {
   createSessionToken,
   getAppAccessSecret,
 } from "@/lib/security/session";
+import { isDemoMode } from "@/lib/demo-mode";
 
 const SignupSchema = z.object({
   email: z.string().email(),
@@ -22,6 +23,12 @@ function publicUser(user: { id: string; email: string; username: string }) {
 }
 
 export async function POST(request: Request) {
+  if (isDemoMode()) {
+    return NextResponse.json(
+      { success: false, error: "Public signup is disabled in the demo. Use a self-hosted install for accounts.", code: "DEMO_SIGNUP_DISABLED" },
+      { status: 403 }
+    );
+  }
   if (!getAppAccessSecret()) {
     return NextResponse.json(
       { success: false, error: "Server is missing APP_ACCESS_SECRET" },

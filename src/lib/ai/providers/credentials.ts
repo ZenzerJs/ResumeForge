@@ -1,3 +1,5 @@
+import { isDemoMode } from "@/lib/demo-mode";
+
 function hostnameOf(raw: string | undefined): string | null {
   const trimmed = raw?.trim();
   if (!trimmed) return null;
@@ -23,8 +25,8 @@ export function resolveProviderCredentials(input: {
 }): { apiKey: string | undefined; baseUrl: string } {
   const clientKey = input.configApiKey?.trim() || undefined;
   const clientBase = input.configBaseUrl?.trim() || undefined;
-  const envKey = input.envApiKey?.trim() || undefined;
-  const envBase = input.envBaseUrl?.trim() || undefined;
+  const envKey = isDemoMode() ? undefined : input.envApiKey?.trim() || undefined;
+  const envBase = isDemoMode() ? undefined : input.envBaseUrl?.trim() || undefined;
   const baseUrl = (clientBase || envBase || input.defaultBaseUrl).replace(/\/+$/, "");
 
   const trusted = new Set(input.officialHosts.map((host) => host.toLowerCase()));

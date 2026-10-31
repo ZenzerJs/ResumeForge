@@ -100,14 +100,25 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedPdfResult> {
     let info: Record<string, unknown> = {};
 
     if (pdfParseModule?.PDFParse) {
-      const parser = new pdfParseModule.PDFParse({ data: buffer, disableWorker: true, pagerender });
-      const textResult = await parser.getText();
-      rawText =
-        typeof textResult === "string"
-          ? textResult
-          : textResult?.text ||
-            (textResult?.pages ? textResult.pages.map((p: PdfPage) => p.text || "").join("\n") : "");
-      numpages = textResult?.total || 1;
+      const parser = new pdfParseModule.PDFParse({ data: buffer, disableWorker: true });
+      try {
+        const textResult = await parser.getText({ parseHyperlinks: false });
+        rawText =
+          typeof textResult === "string"
+            ? textResult
+            : textResult?.text ||
+              (textResult?.pages ? textResult.pages.map((p: PdfPage) => p.text || "").join("\n") : "");
+        numpages = textResult?.total || 1;
+        const pdfInfo = await parser.getInfo({ parsePageInfo: true });
+        info = pdfInfo.info || {};
+        for (const page of pdfInfo.pages || []) {
+          for (const link of page.links || []) {
+            if (typeof link.url === "string") pushUniqueLink(extractedLinks, link.url, link.text, page.pageNumber);
+          }
+        }
+      } finally {
+        await parser.destroy();
+      }
     } else if (typeof pdfParseModule === "function") {
       const data = await pdfParseModule(buffer, { pagerender });
       rawText = data.text || "";
@@ -194,6 +205,87 @@ const SECTION_HEADER_WHITELIST = new Set([
 ]);
 
 const BULLET_LINE_REGEX = /^[-–—•*▪|]\s+/;
+
+/** Conservative V2 fallback: classify only obvious lines, retaining uncertain text. */
+export function classifyPdfTextFallback(rawText: string) {
+  const assignments: import("@/lib/typst/resume-document").ResumeAssignment[] = [];
+  const lines = /[^\r\n]+/g;
+  let match: RegExpExecArray | null;
+  let first = true;
+  let inSection = false;
+  let inSkills = false;
+  let inProjects = false;
+  let expectRole = false;
+  while ((match = lines.exec(rawText))) {
+    const line = match[0];
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const start = match.index + line.indexOf(trimmed);
+    const span = { start, end: start + trimmed.length };
+    const isSection = SECTION_HEADER_WHITELIST.has(trimmed.toLowerCase().replace(/\s+/g, " ")) ||
+      (trimmed.length < 40 && /^[A-Z][A-Z &/]+$/.test(trimmed));
+    const isCategory = /^[A-Za-z0-9\s&/+_-]{2,40}:\s*\S/.test(trimmed);
+    const followingLines = rawText.slice(match.index + line.length).split(/\r?\n/).filter((s) => s.trim());
+    const following = followingLines[0] || "";
+    const isProjectTitle = inProjects && /\|\s*(?:GitHub|Live Demo)\b/i.test(trimmed) && BULLET_LINE_REGEX.test(following.trim());
+    const previous = assignments[assignments.length - 1];
+    const gap = previous ? rawText.slice(previous.span.end, start) : "";
+    if (previous && (previous.kind === "bullet" || (previous.kind === "skill" && inSkills)) &&
+        /^[ \t]*\r?\n[ \t]*$/.test(gap) && !isSection && !isCategory && !BULLET_LINE_REGEX.test(trimmed) &&
+        !TRAILING_DATE_REGEX.test(trimmed) && !TRAILING_LOCATION_REGEX.test(trimmed) && !isProjectTitle &&
+        (/^[a-z0-9(,]/.test(trimmed) || (!TRAILING_DATE_REGEX.test(following) && (previous.kind === "skill" ? /,\s*$/.test(rawText.slice(previous.span.start, previous.span.end)) : !/[.!?]\s*$/.test(rawText.slice(previous.span.start, previous.span.end)))))) {
+      previous.span.end = span.end;
+      continue;
+    }
+    if (first) {
+      assignments.push({ kind: "name", span });
+      first = false;
+    } else if (isSection) {
+      assignments.push({ kind: "section", span });
+      inSection = true;
+      inSkills = /^(skills|technical skills|technologies|tech stack|tools & technologies|skills & technologies)$/i.test(trimmed);
+      inProjects = /^(projects|personal projects|selected projects|side projects|technical projects)$/i.test(trimmed);
+    } else if (BULLET_LINE_REGEX.test(trimmed)) {
+      assignments.push({ kind: "bullet", span });
+    } else if (inSkills && isCategory) {
+      assignments.push({ kind: "skill", span });
+    } else if (expectRole) {
+      const date = trimmed.match(TRAILING_DATE_REGEX);
+      if (date && date.index !== undefined && date.index > 0) {
+        assignments.push({ kind: "entry-role", span: { start, end: start + date.index } });
+        const dateStart = start + date.index + date[0].indexOf(date[1]);
+        assignments.push({ kind: "entry-date", span: { start: dateStart, end: dateStart + date[1].length } });
+      }
+      else if (inProjects && BULLET_LINE_REGEX.test(following.trim())) {
+        assignments.push({ kind: "entry-role", span });
+      }
+      expectRole = false;
+    } else if (inProjects && TRAILING_DATE_REGEX.test(trimmed) && BULLET_LINE_REGEX.test((followingLines[1] || "").trim())) {
+      const date = trimmed.match(TRAILING_DATE_REGEX)!;
+      if (date.index !== undefined && date.index > 0) {
+        assignments.push({ kind: "entry-title", span: { start, end: start + date.index } });
+        const dateStart = start + date.index + date[0].indexOf(date[1]);
+        assignments.push({ kind: "entry-date", span: { start: dateStart, end: dateStart + date[1].length } });
+        expectRole = true;
+      }
+    } else if (isProjectTitle) {
+      assignments.push({ kind: "entry-title", span });
+    } else if (inSection && TRAILING_DATE_REGEX.test(following)) {
+      const location = trimmed.match(TRAILING_LOCATION_REGEX);
+      if (location && location.index !== undefined && location.index > 0) {
+        assignments.push({ kind: "entry-title", span: { start, end: start + location.index } });
+        const locationStart = start + location.index + location[0].indexOf(location[1]);
+        assignments.push({ kind: "entry-location", span: { start: locationStart, end: locationStart + location[1].length } });
+      } else {
+        assignments.push({ kind: "entry-title", span });
+      }
+      expectRole = true;
+    } else if (!inSection && (/@|https?:\/\/|linkedin\.com|github\.com|\b\d{3}[-. )]\d{3}/i.test(trimmed) || /^(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s]*)?$/i.test(trimmed))) {
+      assignments.push({ kind: "contact", span });
+    }
+  }
+  return assignments;
+}
 
 const TRAILING_DATE_REGEX =
   /\s+((?:Expected\s+|Graduated\s+)?(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{4}|\d{1,2}\/\d{4}|\d{4})(?:\s*(?:[-–—‒]|to)\s*(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{4}|\d{1,2}\/\d{4}|\d{4}|Present|Current|Now))?)$/i;
@@ -285,14 +377,6 @@ export function convertTextToTypst(
       preamble.push(line);
     }
   }
-
-  // 3. Drop raw contact line from preamble when renderedLinks is emitted
-  const isContactLine = (line: string) =>
-    /@|linkedin|github|portfolio|https?:\/\/|\(\d{3}\)|\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b/i.test(line) ||
-    (line.includes("|") && /\b(canada|usa|ontario|ca|ny|tx|wa|remote)\b/i.test(line));
-
-  const filteredPreamble =
-    links.length > 0 ? preamble.filter((l) => !isContactLine(l)) : preamble;
 
   sections.sort((a, b) => {
     const diff = canonicalSectionRank(a.title) - canonicalSectionRank(b.title);
@@ -414,7 +498,7 @@ export function convertTextToTypst(
   };
 
   const bodyContent = [
-    ...filteredPreamble.map(formatBodyLine),
+    ...preamble.map(formatBodyLine),
     ...sections.flatMap((sec) => [
       `\n== ${sanitizeForTypst(sec.title)}\n`,
       ...formatStructuredSection(sec),
@@ -430,7 +514,19 @@ export function convertTextToTypst(
         "\n"
       : "";
 
-  return `#let entry(
+  return `#set page(paper: "us-letter", margin: (x: 1.5cm, y: 1.35cm))
+#set text(font: "Liberation Sans", size: 9.5pt, fill: rgb("#111827"))
+#set par(leading: 0.55em)
+#set list(marker: [•], spacing: 0.28em, indent: 0em, body-indent: 0.45em)
+#show heading.where(level: 1): it => align(center, text(size: 19pt, weight: "bold", it.body))
+#show heading.where(level: 2): it => block(width: 100%, above: 0.85em, below: 0.35em)[
+  #text(size: 10pt, weight: "bold", tracking: 0.04em, upper(it.body))
+  #v(-0.35em)
+  #line(length: 100%, stroke: 0.5pt + rgb("#9CA3AF"))
+]
+#show link: set text(fill: rgb("#1155CC"))
+
+#let entry(
   title: "",
   role: "",
   location: "",
@@ -452,9 +548,7 @@ export function convertTextToTypst(
 
 = ${sanitizeForTypst(titleLine)}
 ${renderedLinks}
-#v(4pt)
-#line(length: 100%, stroke: 0.5pt + rgb("#CBD5E1"))
-#v(6pt)
+#v(3pt)
 
 ${bodyContent}
 `;

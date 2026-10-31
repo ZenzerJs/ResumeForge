@@ -1,14 +1,57 @@
 import { describe, it, expect } from "vitest";
 import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import JSZip from "jszip";
 import { checkGuardrail } from "@/lib/guardrail/check";
 import { assertCanExport, GuardrailBlockError } from "@/lib/guardrail/policy";
 import { evaluateAtsScore } from "@/lib/ats-evaluator/evaluator";
 import { generateApplicationPackageZip } from "@/lib/export/zip";
-import { ApplySheet } from "@/components/tracker/apply-sheet";
+import { ApplySheet, ApplySheetPatchCard, selectAcceptedPatchProposals } from "@/components/tracker/apply-sheet";
+import type { PatchProposal } from "@/lib/ai/patch-schema";
+import { applyPatchProposals } from "@/lib/ai/patch-application";
 import { ResumeFacts } from "@/lib/facts/types";
 
 describe("One-Click Apply Pipeline", () => {
+  const proposal: PatchProposal = {
+    id: "patch-1",
+    operation: "MODIFY_BULLET",
+    targetSection: "Experience",
+    before: "Built APIs",
+    after: "Built verified APIs with TypeScript",
+    rationale: "Clarifies the verified technology used.",
+    confidence: 0.9,
+    evidenceIds: ["evidence-1"],
+  };
+
+  it("shows before and after text with explicit accept and reject controls", () => {
+    const markup = renderToStaticMarkup(React.createElement(ApplySheetPatchCard, {
+      patch: proposal,
+      decision: "pending",
+      onAccept: () => {},
+      onReject: () => {},
+    }));
+
+    expect(markup).toContain("Built APIs");
+    expect(markup).toContain("Built verified APIs with TypeScript");
+    expect(markup).toContain("apply-sheet-accept-patch-1");
+    expect(markup).toContain("apply-sheet-reject-patch-1");
+    expect(markup).toContain("Clarifies the verified technology used.");
+  });
+
+  it("selects only proposals the user explicitly accepted", () => {
+    const second = { ...proposal, id: "patch-2" };
+    expect(selectAcceptedPatchProposals([proposal, second], { "patch-1": "accepted", "patch-2": "pending" })).toEqual([proposal]);
+  });
+
+  it("reconstructs the preview from only the accepted server-bound proposals", () => {
+    const second = { ...proposal, id: "patch-2", before: "TypeScript", after: "JavaScript" };
+    const accepted = selectAcceptedPatchProposals([proposal, second], { "patch-1": "accepted", "patch-2": "rejected" });
+    expect(applyPatchProposals("- Built APIs\n", accepted)).toEqual({
+      typstSource: "- Built verified APIs with TypeScript\n",
+      appliedIds: ["patch-1"],
+    });
+  });
+
   const masterFacts: ResumeFacts = {
     version: 1,
     snapshotAt: "2026-08-14T00:00:00.000Z",

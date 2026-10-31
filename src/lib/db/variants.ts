@@ -105,6 +105,9 @@ export async function getVariantById(variantId: string, userId?: string) {
     include: {
       patches: {
         orderBy: { createdAt: "asc" },
+        include: {
+          citations: { include: { evidence: true, bullet: true } },
+        },
       },
     },
   });

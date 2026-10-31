@@ -4,7 +4,9 @@ import React, { useRef, useState, useCallback, useEffect } from "react";
 import CodeMirror, { ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { EditorView } from "@codemirror/view";
 import { ShieldCheck, LayoutList, Code2, Plus } from "lucide-react";
-import { ResumeFormBuilder } from "./resume-form-builder";
+import { ResumeFormBuilder, legacyFormToResumeDocument, parseTypstToStructuredModel, serializeStructuredModelToTypst } from "./resume-form-builder";
+import { ManagedResumeForm } from "./managed-resume-form";
+import { isResumeLayoutV2Enabled, parseManagedResume, renderResumeDocument } from "@/lib/typst/resume-document";
 
 interface CodeEditorProps {
   value: string;
@@ -54,9 +56,35 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
     setMarkedCount((n) => n + 1);
   }, []);
 
+  const handleReformat = async () => {
+    const managed = parseManagedResume(value);
+    if (managed) {
+      if (window.confirm("Reformat this managed resume as a draft?")) onChange(managed.prefix + renderResumeDocument(managed.document, "comfortable", managed.links));
+      return;
+    }
+    try {
+      const response = await fetch("/templates/starter-resume.typ");
+      const starter = await response.text();
+      const model = parseTypstToStructuredModel(value);
+      const canonical = serializeStructuredModelToTypst(model).trim() === value.trim();
+      if (!response.ok || (value.trim() !== starter.trim() && !canonical)) {
+        window.alert("This source cannot be reformatted safely. Continue editing it in Typst Code.");
+        return;
+      }
+      if (window.confirm("Reformat this resume as a draft? Review the result before saving.")) onChange(renderResumeDocument(legacyFormToResumeDocument(model)));
+    } catch { window.alert("Could not verify this source for reformatting."); }
+  };
+
   const handleInsertEntrySnippet = useCallback(() => {
-    const snippet = `\n#entry(\n  title: "Organization Name",\n  role: "Role Title",\n  location: "City, State",\n  date: "2024 – Present",\n  details: [\n    - Delivered measurable technical impact.\n  ]\n)\n`;
-    onChange((value || "") + snippet);
+    const snippet = value.includes("// ResumeForge layout v2")
+      ? `\n#entry(title: "", role: "", location: "", date: "")\n- \n`
+      : `\n#entry(\n  title: "Organization Name",\n  role: "Role Title",\n  location: "City, State",\n  date: "2024 – Present",\n  details: [\n    - Delivered measurable technical impact.\n  ]\n)\n`;
+    const view = editorRef.current?.view;
+    if (view) {
+      const position = view.state.selection.main.to;
+      view.dispatch(view.state.update({ changes: { from: position, insert: snippet }, selection: { anchor: position + snippet.length }, scrollIntoView: true }));
+      view.focus();
+    } else onChange((value || "") + snippet);
   }, [value, onChange]);
 
   return (
@@ -128,6 +156,7 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
               </button>
             </>
           )}
+          {isResumeLayoutV2Enabled() && <button type="button" onClick={() => void handleReformat()} className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">Reformat draft</button>}
           <span className="hidden sm:inline font-mono text-[10px] text-slate-500">
             {editorMode === "visual" ? "Guided Mode" : "CodeMirror 6"}
           </span>
@@ -136,7 +165,7 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
 
       <div className="relative flex-1 overflow-auto">
         {editorMode === "visual" ? (
-          <ResumeFormBuilder value={value} onChange={onChange} />
+          parseManagedResume(value) ? <ManagedResumeForm value={value} onChange={onChange} /> : <ResumeFormBuilder value={value} onChange={onChange} />
         ) : (
           <CodeMirror
             ref={editorRef}

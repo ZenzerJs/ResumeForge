@@ -55,20 +55,12 @@ export const ProposePatchesParamsSchema = z.object({
 });
 
 export const ApplyPatchesParamsSchema = z.object({
-  variantId: z.string().optional(),
-  masterResumeId: z.string().optional(),
-  patchIds: z.array(z.string()),
-  acceptedPatches: z.array(z.object({
-    id: z.string(),
-    before: z.string(),
-    after: z.string(),
-    evidenceIds: z.array(z.string()).optional(),
-    operation: z.enum(["MODIFY_BULLET", "ADD_SKILL", "REORDER_BULLETS", "TWEAK_SUMMARY", "REPORT_GAP"]).optional(),
-    rationale: z.string().optional(),
-  })),
-  currentTypst: z.string(),
-  masterFacts: z.any().optional(),
-});
+  batchId: z.string().uuid(),
+  revisionToken: z.string().length(64),
+  acceptedPatchIds: z.array(z.string().uuid()).min(1).max(100),
+  acknowledgedSkills: z.array(z.string().max(80)).max(100).default([]),
+  variantTitle: z.string().trim().min(1).max(160),
+}).strict();
 
 export const ExportDocxParamsSchema = z.object({
   typstSource: z.string(),
@@ -83,8 +75,8 @@ export const SearchEvidenceParamsSchema = z.object({
 });
 
 export const InspectLayoutBudgetParamsSchema = z.object({
-  typstSource: z.string(),
-  pageLimit: z.number().optional().default(1),
+  typstSource: z.string().trim().min(1),
+  pageLimit: z.number().int().min(1).max(2).optional().default(1),
   roleProfile: z.string().optional(),
 });
 
@@ -218,7 +210,7 @@ export const CHAT_TOOL_SCHEMAS = [
     type: "function" as const,
     function: {
       name: "inspect_layout_budget",
-      description: "Check if Typst source fits within page limits and get layout statistics.",
+      description: "Get source statistics only. Actual page fit requires browser Typst compilation; this tool returns NOT_MEASURED and cannot approve export.",
       parameters: {
         type: "object",
         properties: {

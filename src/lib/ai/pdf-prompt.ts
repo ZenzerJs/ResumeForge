@@ -193,3 +193,14 @@ ${rawText}
 
 Return ONLY the compiled Typst markup source code.`;
 }
+
+/** Extraction-only contract: offsets refer to the exact supplied JavaScript string. */
+export function buildPdfSpanSystemPrompt(): string {
+  return `You classify portions of extracted resume text. Return only a JSON object with one key, "assignments", containing a nonempty array of objects in this exact form: {"kind":"name","span":{"start":0,"end":4}}.
+Allowed kinds: name, contact, section, paragraph, bullet, entry-title, entry-role, entry-location, entry-date, skill.
+Offsets are zero-based UTF-16 code unit offsets into the exact source text, with an exclusive end. Each span must be nonempty, in bounds, and must not overlap any other span. Preserve source order. Do not include text, code, extra fields, inferred information, or placeholders. Leave uncertain text unassigned; it will be retained for review.`;
+}
+
+export function buildPdfSpanUserPrompt(rawText: string): string {
+  return `Classify spans in this exact JSON-encoded source string. Escape sequences are JSON encoding, not additional characters in the source. Return only the JSON object.\n${JSON.stringify(rawText)}`;
+}
