@@ -1,0 +1,41 @@
+Morgan Example
+morgan@example.test | 555-010-1234
+Education
+Example State University Toronto, ON
+Bachelor of Science in Computer Science and Applied Information Systems May 2023
+– Studied software design, data management, and distributed computing through practical coursework.
+– Collaborated on a capstone application with a multidisciplinary student team.
+Experience
+Northwind Systems Toronto, ON
+Software Engineer Jan 2024 – Present
+– Built reliable services that process incoming requests and coordinate changes across several independent systems,
+including automated checks and clear reporting for the support team.
+– Improved deployment workflows by documenting routine operations and adding reusable validation steps for releases,
+reducing manual effort while maintaining a clear record of the changes.
+– Developed shared interface components and coordinated reviews with teammates across product and engineering groups,
+with accessible behavior and consistent formatting across screens.
+Contoso Research Remote
+Developer Jun 2023 – Dec 2023
+– Maintained internal tools and worked with colleagues to improve reporting and support everyday operational needs.
+Projects
+Atlas Workspace | GitHub | Live Demo Jan 2024 – Present
+TypeScript, React, PostgreSQL, Docker, testing tools
+– Created an application for organizing records and tracking changes with a searchable interface and review workflow,
+including practical checks that help users identify incomplete or inconsistent information before saving their work.
+– Added structured reporting and reusable components to support a range of everyday tasks across different workflows,
+with automated coverage and documentation for future maintenance by collaborators and project contributors.
+– Documented setup steps and included examples that make the application easier to explore and run locally.
+Beacon Analysis Platform | GitHub | Live Demo Feb 2023 – Nov 2023
+Python, FastAPI, React, PostgreSQL, automated tests
+– Built a data processing workflow with clear status indicators and a searchable results view for users to review,
+including checks that report unexpected inputs and preserve a useful history of processing outcomes.
+– Designed an interface for exploring results and comparing outputs across several categories of information.
+Cedar Collaborative Planning System | GitHub | Live Demo Jan 2022 – Oct 2022
+JavaScript, Node.js, React, SQL, testing libraries
+– Developed a collaborative planning tool with shared lists and status updates for multiple concurrent users,
+including basic validation and responsive layouts that support common desktop and mobile screen sizes.
+– Added automated tests and documented key workflows to support maintenance and future improvements.
+Technical Skills
+Languages: TypeScript, JavaScript, Python, SQL, HTML, CSS, Bash
+Frameworks: React, Node.js, FastAPI, Next.js, Express, testing tools, component libraries
+Tools: Git, Docker, PostgreSQL, cloud services, CI pipelines, issue tracking, documentation, monitoring systems

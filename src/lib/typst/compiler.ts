@@ -49,27 +49,44 @@ export function parseTypstError(rawError: unknown): { message: string; line?: nu
 }
 
 let isInitialized = false;
+let compileQueue: Promise<void> = Promise.resolve();
+function serialized<T>(work: () => Promise<T>): Promise<T> {
+  const result = compileQueue.then(work);
+  compileQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
 
 async function ensureTypstInitialized() {
   if (typeof window === "undefined") return;
   if (!isInitialized) {
-    try {
-      $typst.setCompilerInitOptions({
+    $typst.setCompilerInitOptions({
         getModule: () => "/wasm/typst_ts_web_compiler_bg.wasm",
         beforeBuild: [
-          loadFonts([], {
-            assets: ["text"],
-            assetUrlPrefix: "/fonts/typst/",
-          }),
+          loadFonts([
+            "/fonts/typst/LibertinusSerif-Regular.otf",
+            "/fonts/typst/LibertinusSerif-Bold.otf",
+            "/fonts/typst/LibertinusSerif-Italic.otf",
+            "/fonts/typst/LibertinusSerif-BoldItalic.otf",
+            "/fonts/typst/LibertinusSerif-Semibold.otf",
+            "/fonts/typst/LibertinusSerif-SemiboldItalic.otf",
+            "/fonts/typst/NewCM10-Regular.otf",
+            "/fonts/typst/NewCM10-Bold.otf",
+            "/fonts/typst/NewCM10-Italic.otf",
+            "/fonts/typst/NewCM10-BoldItalic.otf",
+            "/fonts/typst/NewCMMath-Regular.otf",
+            "/fonts/typst/NewCMMath-Book.otf",
+            "/fonts/typst/NewCMMath-Bold.otf",
+            "/fonts/typst/DejaVuSansMono.ttf",
+            "/fonts/typst/DejaVuSansMono-Bold.ttf",
+            "/fonts/typst/DejaVuSansMono-Oblique.ttf",
+            "/fonts/typst/DejaVuSansMono-BoldOblique.ttf",
+          ], { assets: false }),
         ],
       });
       $typst.setRendererInitOptions({
         getModule: () => "/wasm/typst_ts_renderer_bg.wasm",
       });
-      isInitialized = true;
-    } catch {
-      // Ignore if already set or initialization fails softly
-    }
+    isInitialized = true;
   }
 }
 
@@ -85,8 +102,10 @@ export async function compileTypstToSvg(source: string): Promise<CompileResult> 
   }
 
   try {
-    await ensureTypstInitialized();
-    const svgResult = await $typst.svg({ mainContent: source });
+    const svgResult = await serialized(async () => {
+      await ensureTypstInitialized();
+      return $typst.svg({ mainContent: source });
+    });
     if (!svgResult) {
       return {
         success: false,
@@ -113,10 +132,36 @@ export async function compileTypstToPdf(source: string): Promise<Uint8Array> {
     throw new Error("PDF compilation requires browser environment.");
   }
 
-  await ensureTypstInitialized();
-  const pdfBytes = await $typst.pdf({ mainContent: source });
+  const pdfBytes = await serialized(async () => {
+    await ensureTypstInitialized();
+    return $typst.pdf({ mainContent: source });
+  });
   if (!pdfBytes) {
     throw new Error("Failed to compile Typst document to PDF.");
   }
   return pdfBytes;
+}
+/** Compile and measure the exact source; optionally render each PDF page for preview. */
+export async function measureTypstDocument(source: string, renderPages = false) {
+  const pdf = await compileTypstToPdf(source);
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  pdfjs.GlobalWorkerOptions.workerSrc = "/workers/pdf.worker.min.mjs";
+  const task = pdfjs.getDocument({ data: new Uint8Array(pdf) });
+  try {
+    const document = await task.promise;
+    const pageCount = document.numPages;
+    const pageImages: string[] = [];
+    if (renderPages) for (let index = 1; index <= pageCount; index++) {
+      const page = await document.getPage(index);
+      const viewport = page.getViewport({ scale: 1.5 });
+      const canvas = window.document.createElement("canvas");
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Could not render document preview.");
+      await page.render({ canvas, canvasContext: context, viewport }).promise;
+      pageImages.push(canvas.toDataURL("image/png"));
+    }
+    return { source, pageCount, pdf, pageImages };
+  } finally { await task.destroy(); }
 }

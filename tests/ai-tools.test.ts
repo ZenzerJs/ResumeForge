@@ -67,8 +67,7 @@ describe("AI Model Tool Protocol & Executor", () => {
     expect(result.error).toBe("Tool failed");
   });
 
-  it("executes inspect_layout_budget detecting page limits and overflow", async () => {
-    // 1-page sample source within budget
+  it("does not claim page fit from source length without compilation", async () => {
     const compactSource = Array.from({ length: 35 }, (_, i) => `- Built feature ${i + 1} with high reliability.`).join("\n");
     const compactResult = await executeServerTool("inspect_layout_budget", {
       typstSource: compactSource,
@@ -76,9 +75,10 @@ describe("AI Model Tool Protocol & Executor", () => {
     });
 
     expect(compactResult.success).toBe(true);
-    expect(compactResult.data.estimatedPages).toBe(1);
-    expect(compactResult.data.exceedsLimit).toBe(false);
-    expect(compactResult.data.status).toBe("WITHIN_BUDGET");
+    expect(compactResult.data.estimatedPages).toBeNull();
+    expect(compactResult.data.exceedsLimit).toBeNull();
+    expect(compactResult.data.measured).toBe(false);
+    expect(compactResult.data.status).toBe("NOT_MEASURED");
 
     // Overflow source exceeding 1-page budget
     const overflowSource = Array.from({ length: 120 }, (_, i) => `- Built feature ${i + 1} with high reliability.`).join("\n");
@@ -88,11 +88,19 @@ describe("AI Model Tool Protocol & Executor", () => {
     });
 
     expect(overflowResult.success).toBe(true);
-    expect(overflowResult.data.estimatedPages).toBeGreaterThan(1);
-    expect(overflowResult.data.exceedsLimit).toBe(true);
-    expect(overflowResult.data.status).toBe("OVERFLOW");
-    expect(overflowResult.data.recommendation).toContain("Recommend trimming");
+    expect(overflowResult.data.estimatedPages).toBeNull();
+    expect(overflowResult.data.exceedsLimit).toBeNull();
+    expect(overflowResult.data.status).toBe("NOT_MEASURED");
+    expect(overflowResult.data.recommendation).toContain("compile and measure");
   });
+
+  it.each([{}, { typstSource: null }, { typstSource: "" }, { typstSource: "  " }, { typstSource: "resume", pageLimit: 0 }])(
+    "rejects invalid layout inspection inputs: %j", async (input) => {
+      const result = await executeServerTool("inspect_layout_budget", input);
+      expect(result.success).toBe(false);
+      expect(result.data).toBeUndefined();
+    }
+  );
 
   it("executes search_evidence with parameter validation", async () => {
     const result = await executeServerTool(

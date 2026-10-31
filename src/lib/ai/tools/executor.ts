@@ -288,11 +288,6 @@ export async function executeServerTool(
         const totalChars = params.typstSource.length;
         const bulletLines = lines.filter((l) => l.trim().startsWith("-") || l.trim().startsWith("â€¢"));
 
-        // Approximate Typst layout budget (standard 10pt letter page fits ~55 lines or ~3200 chars)
-        const estimatedPages = Math.max(1, Math.ceil(nonEmptyLines.length / 55));
-        const pageLimit = params.pageLimit || 1;
-        const exceedsLimit = estimatedPages > pageLimit;
-
         return {
           tool: toolName,
           success: true,
@@ -301,13 +296,12 @@ export async function executeServerTool(
             nonEmptyLineCount: nonEmptyLines.length,
             characterCount: totalChars,
             bulletCount: bulletLines.length,
-            estimatedPages,
-            pageLimit,
-            exceedsLimit,
-            status: exceedsLimit ? "OVERFLOW" : "WITHIN_BUDGET",
-            recommendation: exceedsLimit
-              ? `Estimated ${estimatedPages} pages exceeds limit of ${pageLimit}. Recommend trimming ${nonEmptyLines.length - 55 * pageLimit} lines.`
-              : `Within budget (${nonEmptyLines.length}/55 lines for single page layout).`,
+            estimatedPages: null,
+            pageLimit: params.pageLimit,
+            exceedsLimit: null,
+            measured: false,
+            status: "NOT_MEASURED",
+            recommendation: "Open the resume preview to compile and measure its actual page count. Source length does not establish page fit.",
           },
         };
       }

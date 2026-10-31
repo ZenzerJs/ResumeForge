@@ -2,13 +2,19 @@ import JSZip from "jszip";
 import { ResumeFacts } from "@/lib/facts/types";
 import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
 import { assertCanExport } from "@/lib/guardrail/policy";
+import { assertLayoutExportReady, type LayoutMeasurement } from "@/lib/typst/resume-document";
 import { compileTypstToPdf } from "@/lib/typst/compiler";
 import { generateAtsDocx } from "@/lib/export/docx";
+import { managedResumeExport } from "@/lib/export/resume-text";
 
 export const ZIP_MANIFEST_SCHEMA_VERSION = 1;
 
 export interface ApplicationPackageZipOptions {
   typstSource: string;
+  compiledPdf?: Uint8Array;
+  layoutMeasurement?: LayoutMeasurement | null;
+  twoPageApproval?: string | null;
+  reviewApproval?: string | null;
   masterFacts?: ResumeFacts | null;
   allowUnfrozenMasterSelfExport?: boolean;
   coverLetter?: string | null;
@@ -179,7 +185,10 @@ export async function computeSha256(data: Uint8Array | string): Promise<string> 
  * Converts Typst markup source to clean human-readable plain text.
  */
 export function cleanTypstToText(source: string): string {
+  const managed = managedResumeExport(source);
+  if (managed) return managed.text;
   return source
+    .replace(/^\s*\/\/.*$/gm, "")
     .replace(/#(show|set|let)[^\n]*\n?/g, "")
     .replace(/==+\s*(.*?)\n/g, "\n--- $1 ---\n")
     .replace(/=+\s*(.*?)\n/g, "\n=== $1 ===\n")
@@ -288,6 +297,9 @@ export async function generateApplicationPackageZip(
     timestamp: new Date().toISOString(),
   });
 
+  assertLayoutExportReady(snapshot.typstSource, options.layoutMeasurement, options.twoPageApproval, options.reviewApproval);
+  if (snapshot.typstSource.includes("// ResumeForge layout v2") && !options.compiledPdf) throw new Error("Layout v2 requires the measured browser-compiled PDF.");
+
   // 2. Mechanical Guardrail Gate
   assertCanExport(snapshot.typstSource, snapshot.masterFacts, {
     allowUnfrozenMasterSelfExport: options.allowUnfrozenMasterSelfExport,
@@ -295,6 +307,10 @@ export async function generateApplicationPackageZip(
 
   // 3. Generate PDF and DOCX concurrently
   const getPdfBytes = async (): Promise<Uint8Array> => {
+    if (options.compiledPdf) return new Uint8Array(options.compiledPdf);
+    if (typeof window === "undefined" && snapshot.typstSource.includes("// ResumeForge layout v2")) {
+      throw new Error("Layout v2 requires a browser-compiled PDF.");
+    }
     try {
       return await compileTypstToPdf(snapshot.typstSource);
     } catch (err: any) {

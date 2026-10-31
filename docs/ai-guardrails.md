@@ -4,6 +4,8 @@
 
 ResumeForge enforces a strict structural contract on all AI LLM output. AI agents must NEVER return unstructured prose or unreviewed full resume rewrites. AI agents MUST return a valid JSON array of `PatchProposal` objects adhering to the TypeScript / JSON schema below.
 
+The PDF import V2 extraction step is a narrow exception: it may return only validated, non-overlapping source-span assignments into the exact extracted text. It cannot generate candidate text or Typst. The server resolves those spans and renders them deterministically, retaining unassigned content for review. This exception does not apply to resume tailoring, which remains subject to the Patch and evidence rules below.
+
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",

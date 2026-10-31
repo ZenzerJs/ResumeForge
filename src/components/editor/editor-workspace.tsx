@@ -268,6 +268,12 @@ export function EditorWorkspace() {
       const res = await fetch("/templates/starter-resume.typ");
       if (res.ok) {
         const text = await res.text();
+        if (process.env.NEXT_PUBLIC_RESUME_LAYOUT_V2 === "true") {
+          const [{ parseTypstToStructuredModel, legacyFormToResumeDocument }, { renderResumeDocument }] = await Promise.all([
+            import("./resume-form-builder"), import("@/lib/typst/resume-document"),
+          ]);
+          return renderResumeDocument(legacyFormToResumeDocument(parseTypstToStructuredModel(text)));
+        }
         return text;
       }
     } catch {
@@ -543,7 +549,7 @@ export function EditorWorkspace() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleShortcutSave]);
 
-  const handleSourceChange = (newVal: string) => {
+  const handleSourceChange = useCallback((newVal: string) => {
     setSource(newVal);
     if (typeof window === "undefined") return;
     clearDemoSamplesForPersonalResume(newVal);
@@ -551,7 +557,7 @@ export function EditorWorkspace() {
     persistTimer.current = setTimeout(() => {
       localStorage.setItem(STORAGE_KEY, newVal);
     }, SOURCE_PERSIST_MS);
-  };
+  }, []);
 
   const handleTriggerRepair = useCallback(
     (context: { compileError: string; line?: number; column?: number; sourceExcerpt?: string }) => {
@@ -579,7 +585,7 @@ export function EditorWorkspace() {
       handleSourceChange(patchedSource);
       runCompile(patchedSource);
     },
-    [runCompile]
+    [runCompile, handleSourceChange]
   );
 
   const handleResetTemplate = async () => {
@@ -1123,6 +1129,7 @@ export function EditorWorkspace() {
                       !hasAiPatchedBuffer &&
                       !isDocumentPatched(source))
                   }
+                  onApplyLayout={handleSourceChange}
                   onResetTemplate={handleResetTemplate}
                   onTriggerRepair={handleTriggerRepair}
                 />
@@ -1197,6 +1204,7 @@ export function EditorWorkspace() {
                     !hasAiPatchedBuffer &&
                     !isDocumentPatched(source))
                 }
+                onApplyLayout={handleSourceChange}
                 onResetTemplate={handleResetTemplate}
                 onTriggerRepair={handleTriggerRepair}
               />
