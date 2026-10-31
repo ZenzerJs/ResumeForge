@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { buildResumeDocument, typstContent, typstString, type ResumeAssignment } from "@/lib/typst/resume-document";
 import {
   User,
   Briefcase,
@@ -44,6 +45,10 @@ export interface StructuredResumeModel {
   skills: ResumeSkillGroup[];
 }
 
+function decodeTypstContent(value: string): string {
+  return value.replace(/\\([\\#\[\]*_@$<>`~\/=+^.-])/g, "$1");
+}
+
 function makeId(prefix: string, idx: number): string {
   return `${prefix}-${idx}-${Math.random().toString(36).slice(2, 6)}`;
 }
@@ -65,29 +70,29 @@ export function parseTypstToStructuredModel(source: string): StructuredResumeMod
   }
 
   // Name extraction
-  let fullName = "Alex Morgan";
+  let fullName = "";
   const headerNameMatch =
     source.match(/#text\([\s\S]*?size:\s*(?:1[4-9]|2[0-9])pt[\s\S]*?\)\s*\[([^\]]+)\]/) ||
     source.match(/^=\s+(.+)$/m);
   if (headerNameMatch?.[1]) {
-    fullName = headerNameMatch[1].trim();
+    fullName = decodeTypstContent(headerNameMatch[1].trim());
   }
 
   const emailMatch = source.match(/mailto:([^\s"\]]+)/) || source.match(/([\w.+-]+@[\w-]+\.[\w.-]+)/);
-  const email = emailMatch?.[1]?.replace(/\\@/g, "@") || "alex.morgan@example.com";
+  const email = emailMatch?.[1]?.replace(/\\@/g, "@") || "";
 
   const phoneMatch =
     source.match(/#sym\.dot\s*(\+?[\d\s().-]{7,25})\s*#sym\.dot/) ||
     source.match(/(\+?\d[\d\s().-]{7,}\d)/);
-  const phone = phoneMatch?.[1]?.trim() || "(555) 019-2834";
+  const phone = phoneMatch?.[1]?.trim() || "";
 
   const githubMatch = source.match(/github\.com\/([A-Za-z0-9_.-]+)/i);
-  const github = githubMatch?.[1] ? `github.com/${githubMatch[1]}` : "github.com/alexmorgan";
+  const github = githubMatch?.[1] ? `github.com/${githubMatch[1]}` : "";
 
   const linkedinMatch = source.match(/linkedin\.com\/in\/([A-Za-z0-9_.-]+)/i);
-  const linkedin = linkedinMatch?.[1] ? `linkedin.com/in/${linkedinMatch[1]}` : "linkedin.com/in/alexmorgan";
+  const linkedin = linkedinMatch?.[1] ? `linkedin.com/in/${linkedinMatch[1]}` : "";
 
-  let location = "San Francisco, CA";
+  let location = "";
   const locMatch =
     source.match(/#text\([^)]*size:\s*9pt[^)]*\)\[\s*([^#\n]+?)\s*#sym\.dot/) ||
     source.match(/\[\s*([^#\n\[\]]+?)\s*#sym\.dot/);
@@ -118,7 +123,7 @@ export function parseTypstToStructuredModel(source: string): StructuredResumeMod
         .split("\n")
         .map((l) => l.trim())
         .filter((l) => l.startsWith("- "))
-        .map((l) => l.replace(/^-\s+/, "").trim());
+        .map((l) => decodeTypstContent(l.replace(/^-\s+/, "").trim()));
 
       if (title || role || bullets.length > 0) {
         items.push({
@@ -205,62 +210,11 @@ export function parseTypstToStructuredModel(source: string): StructuredResumeMod
         }
         return {
           id: makeId("skill", sIdx),
-          category: "Core Skills",
+          category: "",
           items: clean,
         };
       });
     }
-  }
-
-  if (experience.length === 0) {
-    experience = [
-      {
-        id: makeId("exp", 0),
-        title: "TechCorp Systems",
-        role: "Software Engineer",
-        location: "San Francisco, CA",
-        date: "Jun 2024 – Present",
-        bullets: [
-          "Developed high-throughput REST and GraphQL API endpoints serving over 100k daily active requests.",
-        ],
-      },
-    ];
-  }
-
-  if (education.length === 0) {
-    education = [
-      {
-        id: makeId("edu", 0),
-        title: "University of California, Berkeley",
-        role: "B.S. in Computer Science",
-        location: "Berkeley, CA",
-        date: "May 2025",
-        bullets: ["GPA: 3.8 / 4.0 | Coursework: Distributed Systems, Databases, Algorithms."],
-      },
-    ];
-  }
-
-  if (projects.length === 0) {
-    projects = [
-      {
-        id: makeId("proj", 0),
-        title: "ResumeForge — Evidence-Grounded Resume Workspace",
-        role: "Creator & Lead Developer",
-        location: "",
-        date: "2026",
-        bullets: [
-          "Built a local-first web workspace using Next.js and Typst WASM compilation for instant PDF rendering.",
-        ],
-      },
-    ];
-  }
-
-  if (skills.length === 0) {
-    skills = [
-      { id: makeId("skill", 0), category: "Languages", items: "TypeScript, JavaScript, Python, Go, SQL" },
-      { id: makeId("skill", 1), category: "Frameworks", items: "React, Next.js, Node.js, Tailwind CSS, Prisma" },
-      { id: makeId("skill", 2), category: "Tools & Cloud", items: "Docker, PostgreSQL, Git, AWS, CI/CD" },
-    ];
   }
 
   return {
@@ -294,7 +248,7 @@ export function serializeStructuredModelToTypst(model: StructuredResumeModel): s
     spacious: "(x: 1.5cm, y: 1.3cm)",
   };
 
-  const escapedEmailDisplay = model.email.replace(/@/g, "\\@");
+  const escapedEmailDisplay = typstContent(model.email);
   const githubClean = model.github.replace(/^https?:\/\//, "");
   const linkedinClean = model.linkedin.replace(/^https?:\/\//, "");
 
@@ -304,7 +258,7 @@ export function serializeStructuredModelToTypst(model: StructuredResumeModel): s
         const bulletLines = entry.bullets
           .map((b) => b.trim())
           .filter(Boolean)
-          .map((b) => `    - ${b}`)
+          .map((b) => `    - ${typstContent(b)}`)
           .join("\n");
         return `#entry(
   title: "${escapeTypstString(entry.title)}",
@@ -312,7 +266,7 @@ export function serializeStructuredModelToTypst(model: StructuredResumeModel): s
   location: "${escapeTypstString(entry.location)}",
   date: "${escapeTypstString(entry.date)}",
   details: [
-${bulletLines || "    - Delivered key technical milestones."}
+${bulletLines}
   ]
 )`;
       })
@@ -320,11 +274,11 @@ ${bulletLines || "    - Delivered key technical milestones."}
 
   const skillLines = model.skills
     .filter((s) => s.category.trim() || s.items.trim())
-    .map((s) => `    - *${s.category.trim()}:* ${s.items.trim()}`)
+    .map((s) => `    - *${typstContent(s.category.trim())}:* ${typstContent(s.items.trim())}`)
     .join("\n");
 
   const summaryBlock = model.summary.trim()
-    ? `\n// SUMMARY\n#section("Summary")\n${model.summary.trim()}\n`
+    ? `\n// SUMMARY\n#section("Summary")\n${typstContent(model.summary.trim())}\n`
     : "";
 
   return `// ResumeForge Canonical Resume Template (Typst)
@@ -392,10 +346,10 @@ ${bulletLines || "    - Delivered key technical milestones."}
 
 // HEADER
 #align(center)[
-  #text(size: 18pt, weight: "bold", fill: rgb("#111827"))[${model.fullName || "Your Name"}] \\
+  #text(size: 18pt, weight: "bold", fill: rgb("#111827"))[${typstContent(model.fullName)}] \\
   #v(2pt)
   #text(size: 9pt, fill: rgb("#475569"))[
-    ${model.location} #sym.dot #link("mailto:${model.email}")[${escapedEmailDisplay}] #sym.dot ${model.phone} #sym.dot #link("https://${githubClean}")[${githubClean}] #sym.dot #link("https://${linkedinClean}")[${linkedinClean}]
+    ${[model.location && typstContent(model.location), model.email && `#link(${typstString(`mailto:${model.email}`)})[${escapedEmailDisplay}]`, model.phone && typstContent(model.phone), githubClean && `#link(${typstString(`https://${githubClean}`)})[${typstContent(githubClean)}]`, linkedinClean && `#link(${typstString(`https://${linkedinClean}`)})[${typstContent(linkedinClean)}]`].filter(Boolean).join(" #sym.dot ")}
   ]
 ]
 ${summaryBlock}
@@ -418,10 +372,39 @@ ${renderEntryList(model.projects)}
 #section("Skills")
 #entry(
   details: [
-${skillLines || "    - *Core Skills:* TypeScript, React, Node.js"}
+${skillLines}
   ]
 )
 `;
+}
+
+/** Convert an already verified legacy form model to the source-backed layout. */
+export function legacyFormToResumeDocument(model: StructuredResumeModel) {
+  let source = "";
+  const assignments: ResumeAssignment[] = [];
+  const add = (kind: ResumeAssignment["kind"], text: string) => {
+    if (!text.trim()) return;
+    if (source) source += "\n";
+    const start = source.length;
+    source += text;
+    assignments.push({ kind, span: { start, end: source.length } });
+  };
+  add("name", model.fullName);
+  for (const contact of [model.location, model.email, model.phone, model.github, model.linkedin]) add("contact", contact);
+  if (model.summary) { add("section", "Summary"); add("paragraph", model.summary); }
+  for (const [title, entries] of [["Experience", model.experience], ["Education", model.education], ["Projects", model.projects]] as const) {
+    if (!entries.length) continue;
+    add("section", title);
+    for (const entry of entries) {
+      add("entry-title", entry.title); add("entry-role", entry.role); add("entry-location", entry.location); add("entry-date", entry.date);
+      for (const bullet of entry.bullets) add("bullet", bullet);
+    }
+  }
+  if (model.skills.length) {
+    add("section", "Skills");
+    for (const skill of model.skills) add("skill", [skill.category, skill.items].filter(Boolean).join(": "));
+  }
+  return buildResumeDocument(source, assignments);
 }
 
 interface ResumeFormBuilderProps {
@@ -447,7 +430,9 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
     });
   }, [value]);
 
+  const safeToEdit = serializeStructuredModelToTypst(parseTypstToStructuredModel(value)).trim() === value.trim();
   const commitModel = (next: StructuredResumeModel) => {
+    if (!safeToEdit) return;
     setModel(next);
     onChange(serializeStructuredModelToTypst(next));
   };
@@ -502,11 +487,11 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
   const addEntry = (listKey: "experience" | "education" | "projects") => {
     const newItem: ResumeEntryItem = {
       id: makeId(listKey, model[listKey].length),
-      title: listKey === "education" ? "University Name" : listKey === "projects" ? "Project Title" : "Company Name",
-      role: listKey === "education" ? "Degree & Major" : "Role Title",
-      location: "City, State",
-      date: "2024 – Present",
-      bullets: ["Delivered measurable impact using modern engineering practices."],
+      title: "",
+      role: "",
+      location: "",
+      date: "",
+      bullets: [""],
     };
     commitModel({ ...model, [listKey]: [...model[listKey], newItem] });
   };
@@ -515,6 +500,12 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
     const nextList = model[listKey].filter((item) => item.id !== id);
     commitModel({ ...model, [listKey]: nextList });
   };
+
+  if (!safeToEdit) return (
+    <div data-testid="resume-form-builder-unavailable" className="p-6 text-sm text-slate-200" role="status">
+      This source cannot be safely edited in the form without losing content. Use Typst Code to edit it.
+    </div>
+  );
 
   return (
     <div

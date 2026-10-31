@@ -75,8 +75,8 @@ export const SearchEvidenceParamsSchema = z.object({
 });
 
 export const InspectLayoutBudgetParamsSchema = z.object({
-  typstSource: z.string(),
-  pageLimit: z.number().optional().default(1),
+  typstSource: z.string().trim().min(1),
+  pageLimit: z.number().int().min(1).max(2).optional().default(1),
   roleProfile: z.string().optional(),
 });
 
@@ -210,7 +210,7 @@ export const CHAT_TOOL_SCHEMAS = [
     type: "function" as const,
     function: {
       name: "inspect_layout_budget",
-      description: "Check if Typst source fits within page limits and get layout statistics.",
+      description: "Get source statistics only. Actual page fit requires browser Typst compilation; this tool returns NOT_MEASURED and cannot approve export.",
       parameters: {
         type: "object",
         properties: {

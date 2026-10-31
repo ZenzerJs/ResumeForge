@@ -22,6 +22,7 @@ import {
 import { QualitativeReviewPanel } from "./qualitative-review-panel";
 import { AtsQualitativeReviewResult } from "@/lib/ai/qualitative-schema";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
+import styles from "./ats-score-panel.module.css";
 
 interface AtsScorePanelProps {
   typstContent: string;
@@ -40,6 +41,7 @@ interface AtsScorePanelProps {
   onProfileChange?: (profile: RoleProfile) => void;
   onEvaluationComplete?: (result: AtsEvaluationResult | null) => void;
   className?: string;
+  appearance?: "default" | "tailor";
 }
 
 const STATUS_BADGES: Record<
@@ -80,8 +82,10 @@ export function AtsScorePanel({
   onProfileChange,
   onEvaluationComplete,
   className = "",
+  appearance = "default",
 }: AtsScorePanelProps) {
   const [selectedProfile, setSelectedProfile] = useState<RoleProfile>(initialProfile);
+  const evaluationProfile = appearance === "tailor" ? initialProfile : selectedProfile;
   const [result, setResult] = useState<AtsEvaluationResult | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
@@ -129,8 +133,8 @@ export function AtsScorePanel({
   }, [typstContent, extractedRequirements, roleTitle, useMasterResume, includeEvidenceBank, onEvaluationComplete]);
 
   useEffect(() => {
-    runEvaluation(selectedProfile);
-  }, [runEvaluation, selectedProfile]);
+    runEvaluation(evaluationProfile);
+  }, [runEvaluation, evaluationProfile]);
 
   const handleFetchQualitativeReview = async () => {
     if (!result) return;
@@ -202,7 +206,7 @@ export function AtsScorePanel({
 
   return (
     <div
-      className={`@container bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg space-y-6 min-w-0 ${className}`}
+      className={`@container bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg space-y-6 min-w-0 ${appearance === "tailor" ? styles.tailor : ""} ${className}`}
       data-testid="ats-score-panel"
     >
       {/* Header & Overall Match Meter — stacked in the Tailor sidebar */}
@@ -211,25 +215,25 @@ export function AtsScorePanel({
           <h2 className="text-base font-semibold text-white flex flex-wrap items-center gap-2">
             <BarChart3 className="h-5 w-5 shrink-0 text-amber-400" />
             <span>ATS Quality Score</span>
-            <span className="text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full whitespace-nowrap">
+            <span className={`text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full whitespace-nowrap ${styles.engineBadge}`}>
               Deterministic Engine
             </span>
           </h2>
           <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-            Rule-based evaluation of tailored ResumeVariant against job description & role overlay
+            {appearance === "tailor" ? "See how your resume aligns with this job and where evidence is missing." : "Rule-based evaluation of tailored ResumeVariant against job description & role overlay"}
           </p>
         </div>
 
         {result && (
-          <div className="flex flex-col @md:flex-row @md:items-stretch gap-3 min-w-0">
+          <div className={`flex flex-col @md:flex-row @md:items-stretch gap-3 min-w-0 ${styles.scoreSummary}`}>
             <div
               data-testid="overall-score-badge"
-              className={`px-4 py-3 rounded-2xl border flex flex-col items-start justify-center min-w-0 ${scoreColor}`}
+              className={`px-4 py-3 rounded-2xl border flex flex-col items-start justify-center min-w-0 ${scoreColor} ${styles.scoreBadge}`}
             >
               <span className="text-[10px] uppercase tracking-wider font-semibold opacity-80">
                 Overall Match
               </span>
-              <div className="text-3xl font-extrabold tracking-tight font-mono leading-tight">
+              <div className={`text-3xl font-extrabold tracking-tight font-mono leading-tight ${styles.scoreValue}`}>
                 {result.overallScore} <span className="text-sm font-normal text-slate-400">/ 100</span>
               </div>
             </div>
@@ -239,7 +243,7 @@ export function AtsScorePanel({
               onClick={handleFetchQualitativeReview}
               disabled={isLoadingQualitative || !result}
               data-testid="get-ai-feedback-btn"
-              className="px-4 py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-600/20 transition @md:shrink-0"
+              className={`px-4 py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-600/20 transition @md:shrink-0 ${styles.feedback}`}
             >
               {isLoadingQualitative ? (
                 <>
@@ -258,7 +262,7 @@ export function AtsScorePanel({
       </div>
 
       {/* Interactive Role Profile Selector */}
-      <div className="space-y-2">
+      {appearance !== "tailor" && <div className="space-y-2">
         <label className="block text-xs font-semibold text-slate-300 flex items-center gap-2">
           <Layers className="h-3.5 w-3.5 text-amber-400" />
           Target Role Profile Weighting
@@ -271,6 +275,7 @@ export function AtsScorePanel({
                 key={profile}
                 type="button"
                 onClick={() => handleSelectProfile(profile)}
+                aria-pressed={isSelected}
                 data-testid={`profile-btn-${profile}`}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
                   isSelected
@@ -284,7 +289,7 @@ export function AtsScorePanel({
             );
           })}
         </div>
-      </div>
+      </div>}
 
       {evalError && (
         <div className="p-3 bg-red-950/50 border border-red-800/50 rounded-lg flex items-center gap-2 text-xs text-red-300">
@@ -295,7 +300,7 @@ export function AtsScorePanel({
 
       {/* 4 Rubric Category Breakdown Cards */}
       {result && (
-        <div className="grid grid-cols-1 gap-3" data-testid="category-breakdown-grid">
+        <div className={`grid grid-cols-1 gap-3 ${styles.categories}`} data-testid="category-breakdown-grid">
           {/* Category 1: Base Resume Health (30 pts) */}
           <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 min-w-0">
             <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">

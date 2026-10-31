@@ -400,3 +400,7 @@ ATS evaluation and AI tailoring require structured knowledge of target job requi
 - **Positive**: Complete auditability and provenance for every job requirement matched against candidate evidence.
 - **Positive**: Distinguishes between native ATS structured postings and partial SPA shell extracts.
 
+
+- Resume layout v2 uses source-backed extraction and a [shared Typst renderer](../src/lib/typst/resume-document.ts), opt-in via `NEXT_PUBLIC_RESUME_LAYOUT_V2` (default `false`), for consistent formatting with [content-preservation tests](../tests/resume-layout-v2-audit.test.ts); rejected AI-written layouts and silently rewriting saved resumes.
+- Resume layout v2 adds explicit [PDF link placement](../src/components/editor/managed-resume-form.tsx) under the same flag so repeated labels can be attached to user-selected source text; rejected guessing destinations from annotation order, with [placement and preservation tests](../tests/resume-polish.test.ts).
+- Resume layout v2 keeps unresolved-link review in the app and fits spacing before reducing body text; rejected adding workflow sections to candidate PDFs, with [dense extracted-source regression coverage](../tests/pdf-v2-import.test.ts) and [measured fitting tests](../tests/layout-fit.test.ts).
