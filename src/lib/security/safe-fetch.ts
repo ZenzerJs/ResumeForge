@@ -1,84 +1,28 @@
-const PRIVATE_IPV4 =
-  /^(127\.|10\.|0\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/;
-const BLOCKED_HOSTS = new Set([
-  "localhost",
-  "metadata.google.internal",
-  "metadata.google.com",
-  "instance-data",
-]);
+import { lookup } from "node:dns";
+import type { LookupFunction } from "node:net";
+import { Agent } from "undici";
+import { assertSafePublicUrl, isLocalDevHost, isPublicIpAddress, UnsafeUrlError } from "./safe-url";
 
-export class UnsafeUrlError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "UnsafeUrlError";
-  }
-}
+export { assertSafePublicUrl, isSafeHref, UnsafeUrlError } from "./safe-url";
 
-function hostnameIsBlocked(hostname: string): boolean {
-  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
-  if (BLOCKED_HOSTS.has(host)) return true;
-  if (host === "::1" || host.startsWith("fe80:") || host.startsWith("fc") || host.startsWith("fd")) {
-    return true;
-  }
-  if (PRIVATE_IPV4.test(host)) return true;
-  if (host.endsWith(".localhost") || host.endsWith(".internal")) return true;
-  return false;
-}
-
-function isLocalDevHost(hostname: string): boolean {
-  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
-  return host === "localhost" || host === "127.0.0.1" || host === "::1";
-}
-
-export function isSafeHref(url: string | null | undefined): boolean {
-  if (!url) return false;
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-export function assertSafePublicUrl(
-  rawUrl: string,
-  options?: { allowLocalhost?: boolean; allowedHosts?: string[] }
-): URL {
-  let parsed: URL;
-  try {
-    parsed = new URL(rawUrl);
-  } catch {
-    throw new UnsafeUrlError("Invalid URL");
-  }
-
-  const allowLocalhost =
-    options?.allowLocalhost ?? process.env.NODE_ENV !== "production";
-
-  if (parsed.protocol !== "https:") {
-    if (!(allowLocalhost && parsed.protocol === "http:" && isLocalDevHost(parsed.hostname))) {
-      throw new UnsafeUrlError("Only HTTPS URLs are allowed");
+// Validate addresses in the socket's own lookup, so a second DNS resolution
+// cannot rebind a previously checked public hostname to a private address.
+const publicLookup: LookupFunction = (hostname, options, callback) => {
+  lookup(hostname, { ...options, all: true }, (error, addresses) => {
+    if (error) {
+      callback(error, "", 0);
+      return;
     }
-  }
-
-  if (parsed.username || parsed.password) {
-    throw new UnsafeUrlError("URLs with credentials are not allowed");
-  }
-
-  if (options?.allowedHosts && options.allowedHosts.length > 0) {
-    const allowed = new Set(options.allowedHosts.map((h) => h.toLowerCase()));
-    if (!allowed.has(parsed.hostname.toLowerCase())) {
-      throw new UnsafeUrlError(`Host ${parsed.hostname} is not on the import allowlist`);
+    if (addresses.length === 0 || addresses.some(({ address }) => !isPublicIpAddress(address))) {
+      callback(new UnsafeUrlError("Host resolved to a private or reserved address"), "", 0);
+      return;
     }
-  }
+    if (options.all) callback(null, addresses);
+    else callback(null, addresses[0].address, addresses[0].family);
+  });
+};
 
-  if (!allowLocalhost || !isLocalDevHost(parsed.hostname)) {
-    if (hostnameIsBlocked(parsed.hostname)) {
-      throw new UnsafeUrlError("Private or loopback hosts are not allowed");
-    }
-  }
-
-  return parsed;
-}
+const publicDispatcher = new Agent({ connect: { lookup: publicLookup } });
 
 export function getImportAllowlist(): string[] {
   const extra = (process.env.ALLOWED_IMPORT_HOSTS || "")
@@ -107,9 +51,10 @@ export async function safeFetch(
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   const parentSignal = init.signal;
+  const onAbort = () => controller.abort(parentSignal?.reason);
   if (parentSignal) {
-    if (parentSignal.aborted) controller.abort();
-    else parentSignal.addEventListener("abort", () => controller.abort(), { once: true });
+    if (parentSignal.aborted) onAbort();
+    else parentSignal.addEventListener("abort", onAbort, { once: true });
   }
 
   try {
@@ -117,11 +62,16 @@ export async function safeFetch(
     const hops = followRedirects ? maxRedirects : 0;
 
     for (let hop = 0; hop <= hops; hop++) {
-      const res = await fetch(current, {
+      const allowLocalhost = options?.allowLocalhost ?? process.env.NODE_ENV !== "production";
+      const fetchInit = {
         ...init,
-        redirect: "manual",
+        redirect: "manual" as const,
         signal: controller.signal,
-      });
+        dispatcher: allowLocalhost && isLocalDevHost(new URL(current).hostname)
+          ? undefined
+          : publicDispatcher,
+      };
+      const res = await fetch(current, fetchInit);
 
       const isRedirect = res.status >= 300 && res.status < 400;
       if (!isRedirect || hop === hops) {
@@ -145,5 +95,6 @@ export async function safeFetch(
     throw new UnsafeUrlError("Too many redirects");
   } finally {
     clearTimeout(timeoutId);
+    parentSignal?.removeEventListener("abort", onAbort);
   }
 }

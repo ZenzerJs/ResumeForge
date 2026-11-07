@@ -23,7 +23,7 @@ import {
   Building2,
   Search,
 } from "lucide-react";
-import { isSafeHref } from "@/lib/security/safe-fetch";
+import { isSafeHref } from "@/lib/security/safe-url";
 import {
   synthesizeStarInterviewPrep,
   formatStarStoryForClipboard,

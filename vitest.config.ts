@@ -2,6 +2,10 @@ import { defineConfig } from "vitest/config";
 import path from "path";
 
 export default defineConfig({
+  // Next.js preserves JSX; the test runner must compile it before import analysis.
+  oxc: {
+    jsx: { runtime: "automatic" },
+  },
   test: {
     exclude: ["node_modules", "e2e/**", "tests/integration/**"],
     fileParallelism: false,

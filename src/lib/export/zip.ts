@@ -1,10 +1,7 @@
-import JSZip from "jszip";
 import { ResumeFacts } from "@/lib/facts/types";
 import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
 import { assertCanExport } from "@/lib/guardrail/policy";
 import { assertLayoutExportReady, type LayoutMeasurement } from "@/lib/typst/resume-document";
-import { compileTypstToPdf } from "@/lib/typst/compiler";
-import { generateAtsDocx } from "@/lib/export/docx";
 import { managedResumeExport } from "@/lib/export/resume-text";
 
 export const ZIP_MANIFEST_SCHEMA_VERSION = 1;
@@ -312,6 +309,7 @@ export async function generateApplicationPackageZip(
       throw new Error("Layout v2 requires a browser-compiled PDF.");
     }
     try {
+      const { compileTypstToPdf } = await import("@/lib/typst/compiler");
       return await compileTypstToPdf(snapshot.typstSource);
     } catch (err: any) {
       if (typeof window === "undefined" && err?.message?.includes("browser environment")) {
@@ -322,6 +320,7 @@ export async function generateApplicationPackageZip(
   };
 
   const getDocxBytes = async (): Promise<Uint8Array> => {
+    const { generateAtsDocx } = await import("@/lib/export/docx");
     return await generateAtsDocx(snapshot.typstSource, {
       facts: snapshot.masterFacts || undefined,
     });
@@ -387,6 +386,7 @@ export async function generateApplicationPackageZip(
   const manifestContent = JSON.stringify(manifest, null, 2);
 
   // 7. Bundle ZIP with JSZip
+  const { default: JSZip } = await import("jszip");
   const zip = new JSZip();
   for (const entry of entries) {
     zip.file(entry.name, entry.content);

@@ -20,7 +20,7 @@ import {
 import { normalizeCompany } from "@/lib/company";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { isSafeHref } from "@/lib/security/safe-fetch";
+import { isSafeHref } from "@/lib/security/safe-url";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
 
 export interface CompanyDossierData {

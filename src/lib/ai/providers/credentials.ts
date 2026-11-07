@@ -1,19 +1,21 @@
 import { isDemoMode } from "@/lib/demo-mode";
 
-function hostnameOf(raw: string | undefined): string | null {
+function originOf(raw: string | undefined): string | null {
   const trimmed = raw?.trim();
   if (!trimmed) return null;
   try {
     const withProto = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-    return new URL(withProto).hostname.toLowerCase();
+    const parsed = new URL(withProto);
+    if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password) return null;
+    return parsed.origin;
   } catch {
     return null;
   }
 }
 
 /**
- * Server env API keys attach only when the caller did not choose a foreign base URL.
- * A request-supplied baseUrl on a non-official host must bring its own apiKey.
+ * Server env API keys attach only to trusted origins, including scheme and port.
+ * A request-supplied baseUrl on a different origin must bring its own apiKey.
  */
 export function resolveProviderCredentials(input: {
   configApiKey?: string;
@@ -29,16 +31,16 @@ export function resolveProviderCredentials(input: {
   const envBase = isDemoMode() ? undefined : input.envBaseUrl?.trim() || undefined;
   const baseUrl = (clientBase || envBase || input.defaultBaseUrl).replace(/\/+$/, "");
 
-  const trusted = new Set(input.officialHosts.map((host) => host.toLowerCase()));
-  const envHost = hostnameOf(envBase);
-  const defaultHost = hostnameOf(input.defaultBaseUrl);
-  if (envHost) trusted.add(envHost);
-  if (defaultHost) trusted.add(defaultHost);
+  const trusted = new Set(input.officialHosts.map(originOf).filter((origin) => origin !== null));
+  const envOrigin = originOf(envBase);
+  const defaultOrigin = originOf(input.defaultBaseUrl);
+  if (envOrigin) trusted.add(envOrigin);
+  if (defaultOrigin) trusted.add(defaultOrigin);
 
   let apiKey = clientKey;
   if (!apiKey) {
-    const clientHost = hostnameOf(clientBase);
-    if (!clientBase || (clientHost !== null && trusted.has(clientHost))) {
+    const clientOrigin = originOf(clientBase);
+    if (!clientBase || (clientOrigin !== null && trusted.has(clientOrigin))) {
       apiKey = envKey;
     }
   }

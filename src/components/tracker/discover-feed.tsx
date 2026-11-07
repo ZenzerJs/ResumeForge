@@ -24,7 +24,7 @@ import { StatusPill } from "@/components/design-system/status-pill";
 import { CommandButton } from "@/components/design-system/command-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrackerSubNav } from "@/components/tracker/tracker-sub-nav";
-import { isSafeHref } from "@/lib/security/safe-fetch";
+import { isSafeHref } from "@/lib/security/safe-url";
 import { type PostedWithin } from "@/lib/jobs/posted-within";
 import type { ScoreBreakdown } from "@/lib/scoring/blended-sort";
 import type { CompatibilityResult } from "@/lib/scoring/compatibility-engine";

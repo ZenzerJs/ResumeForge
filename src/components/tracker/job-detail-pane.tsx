@@ -34,7 +34,7 @@ import {
 } from "@/lib/jobs/evidence-match-checklist";
 import type { EvidenceItemWithBullets } from "@/lib/matching/matcher";
 import type { JobItem } from "@/components/tracker/job-types";
-import { isSafeHref } from "@/lib/security/safe-fetch";
+import { isSafeHref } from "@/lib/security/safe-url";
 import { JobDescriptionMarkdown } from "@/components/tracker/job-description-markdown";
 import dynamic from "next/dynamic";
 

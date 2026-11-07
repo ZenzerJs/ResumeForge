@@ -20,7 +20,7 @@ import {
   isPlaceholderDescription,
 } from "@/lib/ingestion/helpers";
 import type { JobItem } from "@/components/tracker/job-types";
-import { isSafeHref } from "@/lib/security/safe-fetch";
+import { isSafeHref } from "@/lib/security/safe-url";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABELS: Record<JobStatus, string> = {

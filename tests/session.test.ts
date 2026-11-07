@@ -72,4 +72,52 @@ describe("session helpers", () => {
     });
     expect(originAllowed(request)).toBe(false);
   });
+
+  it.each([
+    "null",
+    "",
+    "not-a-url",
+    "http://localhost.attacker.example:3005",
+    "http://127.0.0.1.attacker.example:3005",
+    "http://0.0.0.0.attacker.example:3005",
+    "http://[::1]:3006",
+    "https://localhost:3005",
+    "ftp://localhost:3005",
+  ])("rejects invalid or foreign origin %s", (origin) => {
+    expect(originAllowed(new Request("http://localhost:3005/api/auth/login", {
+      method: "POST",
+      headers: { origin, host: "localhost:3005" },
+    }))).toBe(false);
+  });
+
+  it.each(["http://127.0.0.1:3005", "http://[::1]:3005", "http://0.0.0.0:3005"])(
+    "allows exact loopback alias %s on the same port",
+    (origin) => {
+      expect(originAllowed(new Request("http://localhost:3005/api/auth/login", {
+        method: "POST",
+        headers: { origin, host: "localhost:3005" },
+      }))).toBe(true);
+    }
+  );
+
+  it("validates HTTPS origins behind a TLS-terminating proxy", () => {
+    expect(originAllowed(new Request("http://internal:3000/api/auth/login", {
+      method: "POST",
+      headers: {
+        origin: "https://resumeforge.example",
+        "x-forwarded-host": "resumeforge.example",
+        "x-forwarded-proto": "https",
+      },
+    }))).toBe(true);
+  });
+
+  it("validates Referer when Origin is absent and permits non-browser requests", () => {
+    expect(originAllowed(new Request("http://localhost:3005/api/auth/login"))).toBe(true);
+    expect(originAllowed(new Request("http://localhost:3005/api/auth/login", {
+      headers: { referer: "null" },
+    }))).toBe(false);
+    expect(originAllowed(new Request("http://localhost:3005/api/auth/login", {
+      headers: { referer: "http://localhost:3005/login" },
+    }))).toBe(true);
+  });
 });

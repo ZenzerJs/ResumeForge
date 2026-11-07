@@ -17,16 +17,23 @@ import { FormattedJd, FormattedJdSchema } from "./jd-format-schema";
 import { buildJdFormatSystemPrompt, buildJdFormatUserPrompt, JdFormatPromptInput } from "./jd-format-prompt";
 import { sanitizeTypstSource } from "../typst/sanitizer";
 import { isDemoMode } from "../demo-mode";
+import { resolveProviderCredentials } from "./providers/credentials";
 
 /**
  * Resolves server-side defaults and environment variables for AI providers.
  */
 export function resolveServerProviderConfig(config: ProviderConfig): ProviderConfig {
   if (config.provider === "groq") {
+    const credentials = resolveProviderCredentials({
+      configApiKey: config.apiKey,
+      configBaseUrl: config.baseUrl,
+      envApiKey: process.env.GROQ_API_KEY,
+      defaultBaseUrl: "https://api.groq.com/openai/v1",
+      officialHosts: ["api.groq.com"],
+    });
     return {
       ...config,
-      apiKey: config.apiKey?.trim() || (!isDemoMode() ? process.env.GROQ_API_KEY?.trim() : undefined) || undefined,
-      baseUrl: config.baseUrl || "https://api.groq.com/openai/v1",
+      ...credentials,
       model: config.model || "llama-3.3-70b-versatile",
     };
   }

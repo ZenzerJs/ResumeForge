@@ -186,9 +186,12 @@ function headerHost(request: Request): string | null {
   }
 }
 
-function urlHost(value: string): string | null {
+function httpUrl(value: string): URL | null {
   try {
-    return new URL(value).host.toLowerCase();
+    const parsed = new URL(value);
+    return ["http:", "https:"].includes(parsed.protocol) && !parsed.username && !parsed.password
+      ? parsed
+      : null;
   } catch {
     return null;
   }
@@ -201,22 +204,22 @@ export function originAllowed(request: Request): boolean {
   const origin = request.headers.get("origin");
   const referer = request.headers.get("referer");
 
-  const targetHost = origin ? urlHost(origin) : referer ? urlHost(referer) : null;
-  if (!targetHost) return true; // Same-origin navigations or non-browser clients
+  if (origin === null && referer === null) return true; // Non-browser clients
+  const target = httpUrl(origin ?? referer ?? "");
+  if (!target) return false;
 
-  if (targetHost === expectedHost) return true;
+  const forwardedProto = (request.headers.get("x-forwarded-proto") || "").split(",")[0].trim();
+  const protocol = forwardedProto ? `${forwardedProto}:` : new URL(request.url).protocol;
+  const expected = httpUrl(`${protocol}//${expectedHost}`);
+  if (!expected || target.protocol !== expected.protocol) return false;
+  if (target.host === expected.host) return true;
 
   // Localhost / Loopback aliases handling (localhost:3000 vs 127.0.0.1:3000 vs 0.0.0.0:3000)
-  const isLoopback = (h: string) =>
-    h.startsWith("localhost") ||
-    h.startsWith("127.0.0.1") ||
-    h.startsWith("[::1]") ||
-    h.startsWith("0.0.0.0");
+  const isLoopback = (hostname: string) =>
+    ["localhost", "127.0.0.1", "[::1]", "0.0.0.0"].includes(hostname);
 
-  if (isLoopback(expectedHost) && isLoopback(targetHost)) {
-    const expectedPort = expectedHost.split(":")[1] || "";
-    const targetPort = targetHost.split(":")[1] || "";
-    return expectedPort === targetPort;
+  if (isLoopback(expected.hostname) && isLoopback(target.hostname)) {
+    return expected.port === target.port;
   }
 
   return false;

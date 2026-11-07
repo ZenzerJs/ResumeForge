@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { testProviderConnection } from "../src/lib/ai/gateway";
+import { resolveProviderCredentials } from "../src/lib/ai/providers/credentials";
 
 describe("AI Provider Gateway Connection Tests", () => {
   const originalFetch = globalThis.fetch;
@@ -93,4 +94,58 @@ describe("AI Provider Gateway Connection Tests", () => {
     expect(res.success).toBe(true);
     expect(res.message).toContain("custom OpenAI-compatible endpoint");
   });
+});
+
+describe("server provider credential isolation", () => {
+  beforeEach(() => {
+    vi.stubEnv("DEMO_MODE", "false");
+    vi.stubEnv("GROQ_API_KEY", "synthetic-server-groq-key");
+    vi.stubEnv("CUSTOM_OPENAI_API_KEY", undefined);
+    vi.stubEnv("CUSTOM_OPENAI_BASE_URL", undefined);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response('{"data":[]}'));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it.each(["https://attacker.example", "https://api.groq.com:8443/openai/v1"])(
+    "never sends the server Groq key to %s",
+    async (baseUrl) => {
+      await testProviderConnection({ provider: "groq", baseUrl });
+      expect(fetch).toHaveBeenCalledOnce();
+      const headers = new Headers(vi.mocked(fetch).mock.calls[0][1]?.headers);
+      expect(headers.has("authorization")).toBe(false);
+    }
+  );
+
+  it("uses the server Groq key only at the official origin", async () => {
+    await testProviderConnection({ provider: "groq" });
+    expect(fetch).toHaveBeenCalledWith("https://api.groq.com/openai/v1/models", expect.any(Object));
+    const headers = new Headers(vi.mocked(fetch).mock.calls[0][1]?.headers);
+    expect(headers.get("authorization")).toBe("Bearer synthetic-server-groq-key");
+  });
+
+  it("still permits an explicit BYOK key at a custom endpoint", async () => {
+    await testProviderConnection({
+      provider: "groq",
+      baseUrl: "https://custom.example/v1",
+      apiKey: "synthetic-user-key",
+    });
+    const headers = new Headers(vi.mocked(fetch).mock.calls[0][1]?.headers);
+    expect(headers.get("authorization")).toBe("Bearer synthetic-user-key");
+  });
+
+  it.each(["http://api.openai.com", "https://api.openai.com:8443", "https://user@api.openai.com"])(
+    "does not trust a changed provider origin or URL credentials: %s",
+    (configBaseUrl) => {
+      expect(resolveProviderCredentials({
+        configBaseUrl,
+        envApiKey: "synthetic-server-key",
+        defaultBaseUrl: "https://api.openai.com",
+        officialHosts: ["api.openai.com"],
+      }).apiKey).toBeUndefined();
+    }
+  );
 });
