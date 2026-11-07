@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, Loader2, RefreshCw, Compass } from "lucide-react";
+import { Briefcase, Loader2, RefreshCw, Compass, LayoutList, Send, Bookmark, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface TrackerSubNavProps {
@@ -21,7 +21,7 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
 
   const linkClass = (active: boolean) =>
     cn(
-      "flex shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+      "flex shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
       active
         ? "bg-amber-500/15 border border-amber-500/40 text-amber-300"
         : "border border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-slate-200",
@@ -35,39 +35,47 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
             data-testid="tracker-page-title"
             className="flex shrink-0 items-center gap-1.5 border-r border-slate-800 pr-3 text-xs font-bold text-slate-100"
           >
-            <Briefcase className="h-3.5 w-3.5 text-slate-400" />
+            <Briefcase className="h-3.5 w-3.5 text-primary" />
             Jobs
           </h1>
           <Link
             href="/tracker/feed"
             className={linkClass(isFeed)}
+            aria-current={isFeed ? "page" : undefined}
             data-testid="tracker-tab-feed"
           >
             <Compass className="mr-1 h-3.5 w-3.5" />
             Discover / Feed
           </Link>
-          <Link href="/tracker" className={linkClass(isAll)} data-testid="tracker-tab-all">
+          <Link href="/tracker" className={linkClass(isAll)} aria-current={isAll ? "page" : undefined} data-testid="tracker-tab-all">
+            <LayoutList className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
             All Applications
           </Link>
           <Link
             href="/tracker/applied"
             className={linkClass(isApplied)}
+            aria-current={isApplied ? "page" : undefined}
             data-testid="tracker-tab-applied"
           >
+            <Send className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
             Applied
           </Link>
           <Link
             href="/tracker/saved"
             className={linkClass(isSaved)}
+            aria-current={isSaved ? "page" : undefined}
             data-testid="tracker-tab-saved"
           >
+            <Bookmark className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
             Saved
           </Link>
           <Link
             href="/tracker/outcomes"
             className={linkClass(isOutcomes)}
+            aria-current={isOutcomes ? "page" : undefined}
             data-testid="tracker-tab-outcomes"
           >
+            <BarChart3 className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
             Outcomes
           </Link>
         </div>
@@ -96,6 +104,7 @@ export function TrackerRefreshButton({
       type="button"
       onClick={onClick}
       disabled={isImporting}
+      aria-label={isImporting ? "Refreshing from source" : "Refresh from source"}
       data-testid="refresh-from-source-btn"
       className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:bg-slate-800 disabled:opacity-50"
       title={syncLabel}

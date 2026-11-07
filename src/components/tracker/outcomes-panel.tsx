@@ -42,7 +42,7 @@ export function OutcomesPanel() {
   const totalTracked = data ? FUNNEL.reduce((sum, key) => sum + (data.funnel[key] ?? 0), 0) : 0;
 
   return (
-    <AppShell variant="tracker">
+    <AppShell variant="tracker" layout="page">
       <TrackerSubNav />
       <div className="mx-auto w-full max-w-4xl space-y-6 p-4">
         <div>

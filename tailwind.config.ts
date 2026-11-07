@@ -24,32 +24,16 @@ const config: Config = {
   			'margin-mobile': '16px',
   			'panel-padding': '20px'
   		},
-  		fontFamily: {
-  			'page-title': [
-  				'Hanken Grotesk',
-  				'sans-serif'
-  			],
-  			'page-title-mobile': [
-  				'Hanken Grotesk',
-  				'sans-serif'
-  			],
-  			'body-regular': [
-  				'Hanken Grotesk',
-  				'sans-serif'
-  			],
-  			'body-dense': [
-  				'Hanken Grotesk',
-  				'sans-serif'
-  			],
-  			'section-label': [
-  				'JetBrains Mono',
-  				'monospace'
-  			],
-  			'mono-data': [
-  				'JetBrains Mono',
-  				'monospace'
-  			]
-  		},
+      fontFamily: {
+        sans: ['var(--font-hanken)', 'sans-serif'],
+        mono: ['var(--font-mono)', 'monospace'],
+        'page-title': ['var(--font-hanken)', 'sans-serif'],
+        'page-title-mobile': ['var(--font-hanken)', 'sans-serif'],
+        'body-regular': ['var(--font-hanken)', 'sans-serif'],
+        'body-dense': ['var(--font-hanken)', 'sans-serif'],
+        'section-label': ['var(--font-mono)', 'monospace'],
+        'mono-data': ['var(--font-mono)', 'monospace']
+      },
   		fontSize: {
   			'page-title': [
   				'40px',

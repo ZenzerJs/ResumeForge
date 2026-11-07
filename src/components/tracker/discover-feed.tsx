@@ -17,10 +17,10 @@ import {
   ChevronRight,
   DollarSign,
   Globe2,
+  Compass,
+  SlidersHorizontal,
 } from "lucide-react";
 import { AppShell } from "@/components/design-system/app-shell";
-import { PageHeader } from "@/components/design-system/page-header";
-import { StatusPill } from "@/components/design-system/status-pill";
 import { CommandButton } from "@/components/design-system/command-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrackerSubNav } from "@/components/tracker/tracker-sub-nav";
@@ -147,7 +147,7 @@ const CURATED_COMPANIES: { label: string; query: string }[] = [
 ];
 
 const FILTER_CONTROL =
-  "min-h-11 rounded-md border border-slate-700 bg-rf-elevated px-2.5 text-[12.5px] text-rf-cloud placeholder-slate-500 transition-colors duration-150 focus:border-amber-500/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60";
+  "min-h-11 rounded-md border border-slate-700 bg-rf-elevated px-2.5 text-sm text-rf-cloud placeholder-slate-500 transition-colors duration-150 focus:border-amber-500/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60";
 
 export function DiscoverFeed() {
   const [jobs, setJobs] = useState<IngestedJobItem[]>([]);
@@ -357,7 +357,7 @@ export function DiscoverFeed() {
   };
 
   return (
-    <AppShell variant="tracker">
+    <AppShell variant="tracker" layout="page">
       <TrackerSubNav
         actions={
           <CommandButton
@@ -365,6 +365,7 @@ export function DiscoverFeed() {
             size="sm"
             disabled={isSyncing}
             onClick={handleSyncPublicFeeds}
+            aria-label={isSyncing ? "Syncing public feeds" : "Sync public feeds"}
             data-testid="sync-connectors-btn"
           >
             {isSyncing ? (
@@ -378,12 +379,30 @@ export function DiscoverFeed() {
       />
 
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 md:p-8">
-        <PageHeader
-          eyebrow="Browse live listings"
-          title="Discovered Jobs"
-          description="Live tech listings ingested from Greenhouse, Lever, Ashby, Adzuna, Jobicy, Remotive, and RemoteOK. Save roles directly into your application tracker."
-          statusBadge={<StatusPill status="slate" label={`${totalJobs} Ingested`} />}
-        />
+        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-6">
+          <div className="flex min-w-0 items-start gap-3 border-l-2 border-primary pl-3 sm:gap-4 sm:pl-4">
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary sm:h-12 sm:w-12"
+              aria-hidden="true"
+            >
+              <Compass className="h-6 w-6" />
+            </div>
+            <div className="min-w-0 space-y-1">
+              <p className="font-mono text-[11px] font-semibold uppercase tracking-wider text-primary">
+                Find your next role
+              </p>
+              <h2 className="text-2xl font-bold tracking-tight text-rf-cloud md:text-3xl">
+                Discovered Jobs
+              </h2>
+              <p className="max-w-2xl text-sm text-slate-300">
+                Explore roles from public job boards and save the ones you want to pursue.
+              </p>
+            </div>
+          </div>
+          <span className="rounded-full border border-slate-700 bg-rf-elevated px-3 py-1.5 text-xs font-semibold text-rf-cloud">
+            {totalJobs} {totalJobs === 1 ? "role" : "roles"}
+          </span>
+        </header>
 
         {notification ? (
           <div
@@ -421,6 +440,7 @@ export function DiscoverFeed() {
                 key={company.label}
                 type="button"
                 onClick={() => setSearchQuery(isActive && company.query !== "" ? "" : company.query)}
+                aria-pressed={isActive}
                 data-testid={`curated-chip-${(company.query || "all").toLowerCase()}`}
                 className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
                   isActive
@@ -435,7 +455,11 @@ export function DiscoverFeed() {
         </div>
 
         {/* Filter Toolbar */}
-        <div className="flex flex-col gap-3 rounded-xl border border-slate-800/80 bg-rf-surface p-4">
+        <div className="flex flex-col gap-3 rounded-xl border border-slate-700/70 bg-rf-surface p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-rf-cloud">
+            <SlidersHorizontal className="h-4 w-4 text-primary" aria-hidden="true" />
+            Search and filters
+          </div>
           <div className="relative w-full">
             <label htmlFor="discover-search-input" className="sr-only">
               Search company, role, or keywords
@@ -447,7 +471,7 @@ export function DiscoverFeed() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search company, title, keywords…"
-              className="h-11 w-full rounded-md border border-slate-800 bg-rf-bg pl-9 pr-3 text-xs text-rf-cloud placeholder:text-slate-500 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+              className="h-11 w-full rounded-md border border-slate-800 bg-rf-bg pl-9 pr-3 text-sm text-rf-cloud placeholder:text-slate-500 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
               data-testid="discover-search-input"
             />
           </div>
@@ -591,6 +615,7 @@ export function DiscoverFeed() {
                     ? "border-slate-500 bg-slate-700 text-white"
                     : "border-slate-700 bg-rf-elevated text-slate-400 hover:text-white"
                 }`}
+                aria-pressed={canadianOnly}
                 data-testid="discover-canadian-toggle"
               >
                 <Globe2 className="h-3.5 w-3.5" />
@@ -612,6 +637,7 @@ export function DiscoverFeed() {
                     ? "border border-slate-500 bg-slate-700 text-white"
                     : "border border-transparent text-slate-400 hover:bg-slate-800 hover:text-white"
                 }`}
+                aria-pressed={postedWithin === opt.value}
                 data-testid={`posted-within-${opt.value}`}
               >
                 {opt.label}
@@ -667,9 +693,14 @@ export function DiscoverFeed() {
                 >
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
-                        <Building2 className="h-3.5 w-3.5 text-slate-400" />
-                        {j.companyName}
+                      <span className="flex min-w-0 items-center gap-2.5 text-sm font-semibold text-slate-200">
+                        <span
+                          aria-hidden="true"
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-sm font-bold text-primary"
+                        >
+                          {j.companyName.trim().charAt(0).toUpperCase() || "?"}
+                        </span>
+                        <span className="break-words">{j.companyName}</span>
                       </span>
                       <div className="flex items-center gap-1.5">
                         <span className="rounded border border-slate-700 bg-slate-800/80 px-1.5 py-0.5 font-mono text-[10px] text-slate-300 uppercase">
@@ -677,6 +708,10 @@ export function DiscoverFeed() {
                         </span>
                       </div>
                     </div>
+
+                    <h3 className="break-words text-base font-bold leading-snug tracking-tight text-white">
+                      {j.title}
+                    </h3>
 
                     {/* Signal Badge Pill with Popover, Funding & H1B Sub-Badges */}
                     {(() => {
@@ -743,10 +778,6 @@ export function DiscoverFeed() {
                         </div>
                       );
                     })()}
-
-                    <h3 className="text-sm font-bold leading-snug tracking-tight text-white">
-                      {j.title}
-                    </h3>
 
                     <div className="mt-1 flex flex-col gap-1 font-mono text-xs text-slate-400">
                       <span className="flex items-center gap-1.5">
@@ -825,7 +856,7 @@ export function DiscoverFeed() {
                         type="button"
                         disabled={promotingId === j.id}
                         onClick={() => handlePromoteJob(j)}
-                        className="flex items-center gap-1.5 rounded-md border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:border-amber-500 hover:bg-amber-500 hover:text-slate-950 focus-visible:border-amber-500 focus-visible:bg-amber-500 focus-visible:text-slate-950 disabled:opacity-50"
+                        className="flex min-h-11 items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-xs font-bold text-slate-950 transition-colors hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
                         data-testid={`promote-btn-${j.id}`}
                       >
                         {promotingId === j.id ? (
@@ -850,20 +881,20 @@ export function DiscoverFeed() {
               type="button"
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-3 py-1.5 text-xs text-rf-meta transition hover:text-rf-cloud disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-3 py-1.5 text-xs text-rf-cloud transition hover:text-white disabled:opacity-40"
               data-testid="discover-page-prev"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
               Prev
             </button>
-            <span className="text-xs text-slate-500" data-testid="discover-page-indicator">
+            <span className="text-center text-xs text-slate-300" data-testid="discover-page-indicator">
               Page {page} of {totalPages} ({totalJobs} total roles)
             </span>
             <button
               type="button"
               disabled={page >= totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-3 py-1.5 text-xs text-rf-meta transition hover:text-rf-cloud disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-3 py-1.5 text-xs text-rf-cloud transition hover:text-white disabled:opacity-40"
               data-testid="discover-page-next"
             >
               Next

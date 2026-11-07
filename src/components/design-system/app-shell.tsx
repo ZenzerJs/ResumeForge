@@ -22,6 +22,8 @@ export type AtmosphereVariant =
 interface AppShellProps {
   children: React.ReactNode;
   variant?: AtmosphereVariant;
+  /** Page layouts scroll with the document; workspaces manage their own panes. */
+  layout?: "page" | "workspace";
   /** @deprecated Unused — ambient glow removed for performance. */
   isCompiling?: boolean;
   className?: string;
@@ -66,12 +68,13 @@ function GuestBanner() {
 export function AppShell({
   children,
   variant = "quiet",
+  layout,
   className = "",
   badge,
   actions,
   hideNav = false,
 }: AppShellProps) {
-  const lockViewport = variant === "editor" || variant === "tracker";
+  const lockViewport = layout ? layout === "workspace" : variant === "editor" || variant === "tracker";
   /** Editor actions are too wide for the global header; give them their own bar. */
   const useToolbar = variant === "editor" && Boolean(actions || badge);
   const [showMigrationModal, setShowMigrationModal] = useState(false);
