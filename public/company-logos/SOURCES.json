@@ -112,5 +112,275 @@
     "path": "public/company-logos/github.png",
     "bytes": 33270,
     "format": "png"
+  },
+  "twilio": {
+    "url": "https://www.twilio.com/favicon.ico",
+    "path": "public/company-logos/twilio.ico",
+    "bytes": 15086,
+    "format": "ico"
+  },
+  "wealthfront": {
+    "url": "https://www.wealthfront.com/favicon.ico",
+    "path": "public/company-logos/wealthfront.ico",
+    "bytes": 3638,
+    "format": "ico"
+  },
+  "netflix": {
+    "url": "https://www.netflix.com/favicon.ico",
+    "path": "public/company-logos/netflix.ico",
+    "bytes": 16958,
+    "format": "ico"
+  },
+  "salesforce": {
+    "url": "https://www.salesforce.com/etc/designs/sfdc-www/en_us/favicon.ico",
+    "path": "public/company-logos/salesforce.ico",
+    "bytes": 5430,
+    "format": "ico"
+  },
+  "oracle": {
+    "url": "https://www.oracle.com/favicon.ico",
+    "path": "public/company-logos/oracle.ico",
+    "bytes": 15406,
+    "format": "ico"
+  },
+  "ibm": {
+    "url": "https://www.ibm.com/favicon.ico",
+    "path": "public/company-logos/ibm.ico",
+    "bytes": 5558,
+    "format": "ico"
+  },
+  "cisco": {
+    "url": "https://www.cisco.com/favicon.ico",
+    "path": "public/company-logos/cisco.ico",
+    "bytes": 1406,
+    "format": "ico"
+  },
+  "lyft": {
+    "url": "https://www.lyft.com/favicon.ico",
+    "path": "public/company-logos/lyft.png",
+    "bytes": 1939,
+    "format": "png"
+  },
+  "instacart": {
+    "url": "https://www.instacart.com/favicon.ico",
+    "path": "public/company-logos/instacart.png",
+    "bytes": 1283,
+    "format": "png"
+  },
+  "pinterest": {
+    "url": "https://www.pinterest.com/favicon.ico",
+    "path": "public/company-logos/pinterest.png",
+    "bytes": 1663,
+    "format": "png"
+  },
+  "roblox": {
+    "url": "https://www.roblox.com/favicon.ico",
+    "path": "public/company-logos/roblox.ico",
+    "bytes": 16958,
+    "format": "ico"
+  },
+  "unity": {
+    "url": "https://unity.com/favicon.ico",
+    "path": "public/company-logos/unity.ico",
+    "bytes": 15086,
+    "format": "ico"
+  },
+  "epic games": {
+    "url": "https://www.epicgames.com/favicon.ico",
+    "path": "public/company-logos/epic-games.ico",
+    "bytes": 15086,
+    "format": "ico"
+  },
+  "box": {
+    "url": "https://box.com/favicon.ico",
+    "path": "public/company-logos/box.ico",
+    "bytes": 15086,
+    "format": "ico"
+  },
+  "mongodb": {
+    "url": "https://www.mongodb.com/favicon.ico",
+    "path": "public/company-logos/mongodb.ico",
+    "bytes": 32988,
+    "format": "ico"
+  },
+  "gitlab": {
+    "url": "https://gitlab.com/assets/favicon-72a2cad5025aa931d6ea56c3201d1f18e68a8cd39788c7c80d5b2b82aa5143ef.png",
+    "path": "public/company-logos/gitlab.png",
+    "bytes": 591,
+    "format": "png"
+  },
+  "robinhood": {
+    "url": "https://www.robinhood.com/favicon.ico",
+    "path": "public/company-logos/robinhood.ico",
+    "bytes": 15086,
+    "format": "ico"
+  },
+  "scotiabank": {
+    "url": "https://www.scotiabank.com/favicon.ico",
+    "path": "public/company-logos/scotiabank.ico",
+    "bytes": 894,
+    "format": "ico"
+  },
+  "bmo": {
+    "url": "https://www.bmo.com/favicon.ico",
+    "path": "public/company-logos/bmo.ico",
+    "bytes": 10990,
+    "format": "ico"
+  },
+  "workday": {
+    "url": "https://www.workday.com/favicon.ico",
+    "path": "public/company-logos/workday.ico",
+    "bytes": 4286,
+    "format": "ico"
+  },
+  "hubspot": {
+    "url": "https://www.hubspot.com/hubfs/HubSpot_Logos/HubSpot-Inversed-Favicon.png",
+    "path": "public/company-logos/hubspot.png",
+    "bytes": 5123,
+    "format": "png"
+  },
+  "accenture": {
+    "url": "https://www.accenture.com/favicon.ico",
+    "path": "public/company-logos/accenture.ico",
+    "bytes": 15406,
+    "format": "ico"
+  },
+  "figma": {
+    "url": "https://static.figma.com/app/icon/2/icon-128.png",
+    "path": "public/company-logos/figma.png",
+    "bytes": 1990,
+    "format": "png"
+  },
+  "databricks": {
+    "url": "https://docs.databricks.com/aws/en/favicon.ico",
+    "path": "public/company-logos/databricks.ico",
+    "bytes": 34494,
+    "format": "ico"
+  },
+  "elastic": {
+    "url": "https://www.elastic.co/apple-touch-icon.png",
+    "path": "public/company-logos/elastic.png",
+    "bytes": 6676,
+    "format": "png"
+  },
+  "adobe": {
+    "url": "https://help.adobe.com/favicon.ico",
+    "path": "public/company-logos/adobe.ico",
+    "bytes": 1150,
+    "format": "ico"
+  },
+  "amd": {
+    "url": "https://docs.amd.com/favicon.ico",
+    "path": "public/company-logos/amd.ico",
+    "bytes": 1150,
+    "format": "ico"
+  },
+  "atlassian": {
+    "url": "https://docs.atlassian.com/favicon.ico",
+    "path": "public/company-logos/atlassian.png",
+    "bytes": 8563,
+    "format": "png"
+  },
+  "docker": {
+    "url": "https://docs.docker.com/favicon.ico",
+    "path": "public/company-logos/docker.ico",
+    "bytes": 76693,
+    "format": "ico"
+  },
+  "mastercard": {
+    "url": "https://developer.mastercard.com/favicon.ico",
+    "path": "public/company-logos/mastercard.ico",
+    "bytes": 5430,
+    "format": "ico"
+  },
+  "american express": {
+    "url": "https://developer.americanexpress.com/favicon.ico",
+    "path": "public/company-logos/american-express.png",
+    "bytes": 18972,
+    "format": "png"
+  },
+  "intuit": {
+    "url": "https://developer.intuit.com/favicon.ico",
+    "path": "public/company-logos/intuit.ico",
+    "bytes": 18686,
+    "format": "ico"
+  },
+  "zapier": {
+    "url": "https://cdn.zapier.com/zapier/images/favicon.ico",
+    "path": "public/company-logos/zapier.ico",
+    "bytes": 57638,
+    "format": "ico"
+  },
+  "retool": {
+    "url": "https://docs.retool.com/favicon.ico",
+    "path": "public/company-logos/retool.ico",
+    "bytes": 888,
+    "format": "ico"
+  },
+  "tesla": {
+    "url": "https://developer.tesla.com/favicon.ico",
+    "path": "public/company-logos/tesla.ico",
+    "bytes": 5430,
+    "format": "ico"
+  },
+  "spotify": {
+    "url": "https://open.spotifycdn.com/cdn/images/favicon32.b64ecc03.png",
+    "path": "public/company-logos/spotify.png",
+    "bytes": 1129,
+    "format": "png"
+  },
+  "paypal": {
+    "url": "https://www.paypalobjects.com/marketing/web/icons/monogram/pp64.png",
+    "path": "public/company-logos/paypal.png",
+    "bytes": 706,
+    "format": "png"
+  },
+  "twitch": {
+    "url": "https://assets.twitch.tv/assets/favicon-32-5c61aa63605bca4f740d.png",
+    "path": "public/company-logos/twitch.png",
+    "bytes": 382,
+    "format": "png"
+  },
+  "hootsuite": {
+    "url": "https://www.hootsuite.com/images/apple-touch-icon.png",
+    "path": "public/company-logos/hootsuite.png",
+    "bytes": 4376,
+    "format": "png"
+  },
+  "deel": {
+    "url": "https://www.deel.com/icon.png?e9556fbc67fbe781",
+    "path": "public/company-logos/deel.png",
+    "bytes": 774,
+    "format": "png"
+  },
+  "plaid": {
+    "url": "https://plaid.com/assets/img/favicons/favicon-32x32.png",
+    "path": "public/company-logos/plaid.png",
+    "bytes": 1727,
+    "format": "png"
+  },
+  "nvidia": {
+    "url": "https://developer.nvidia.com/assets/favicon-81bff16cada05fcff11e5711f7e6212bdc2e0a32ee57cd640a8cf66c87a6cbe6.ico",
+    "path": "public/company-logos/nvidia.ico",
+    "bytes": 25214,
+    "format": "ico"
+  },
+  "notion": {
+    "url": "https://www.notion.com/front-static/favicon.ico",
+    "path": "public/company-logos/notion.ico",
+    "bytes": 32038,
+    "format": "ico"
+  },
+  "palantir": {
+    "url": "https://www.palantir.com/favicon.ico",
+    "path": "public/company-logos/palantir.ico",
+    "bytes": 6518,
+    "format": "ico"
+  },
+  "1password": {
+    "url": "https://1password.com/favicon.ico",
+    "path": "public/company-logos/1password.ico",
+    "bytes": 15406,
+    "format": "ico"
   }
 }

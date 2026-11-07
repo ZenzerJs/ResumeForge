@@ -28,7 +28,7 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
     );
 
   return (
-    <div className="shrink-0 border-b border-slate-800 bg-slate-950/80 backdrop-blur">
+    <div className="shrink-0 border-b border-slate-800 bg-[#0d1727]/95">
       <div className="flex h-11 items-center justify-between gap-2 px-4">
         <div className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto sm:gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <h1

@@ -25,8 +25,12 @@ describe("curated company icons", () => {
   it("resolves normalized known names and exact aliases only", () => {
     expect(companyLogo("  COINBASE  ")).toBe("/company-logos/coinbase.png");
     expect(companyLogo("Coinbase, Inc.")).toBe("/company-logos/coinbase.png");
+    expect(companyLogo("Figma, Inc.")).toBe("/company-logos/figma.png");
+    expect(companyLogo("Databricks")).toBe("/company-logos/databricks.ico");
+    expect(companyLogo("Databricks Ventures")).toBeNull();
     expect(companyLogo("Coinbase Ventures")).toBeNull();
     expect(companyLogo("Unknown")).toBeNull();
+    expect(companyLogo("constructor")).toBeNull();
     expect(companyLogo(null)).toBeNull();
   });
 });
@@ -36,13 +40,80 @@ describe("curated asset provenance", () => {
   it("ships bounded PNG or ICO bytes with recorded official source URLs", () => {
     const root = process.cwd();
     const sources = JSON.parse(readFileSync(path.join(root, "public/company-logos/SOURCES.json"), "utf8")) as Record<string, { url: string; path: string; bytes: number; format: string }>;
-    expect(Object.keys(sources)).toHaveLength(19);
-    const domains = ["coinbase.com", "stripe.com", "shopify.com", "linear.app", "vercel.com", "anthropic.com", "openai.com", "cloudflare.com", "datadoghq.com", "wealthsimple.com", "cohere.com", "tailscale.com", "ramp.com", "google.com", "microsoft.com", "amazon.com", "apple.com", "fbcdn.net", "github.com"];
+    // Each recorded host was reviewed for the named employer; do not accept arbitrary CDNs.
+    const officialHosts: Record<string, string> = {
+      "coinbase": "www.coinbase.com",
+      "stripe": "stripe.com",
+      "shopify": "cdn.shopify.com",
+      "linear": "linear.app",
+      "vercel": "assets.vercel.com",
+      "anthropic": "www.anthropic.com",
+      "openai": "developers.openai.com",
+      "cloudflare": "www.cloudflare.com",
+      "datadog": "www.datadoghq.com",
+      "wealthsimple": "www.wealthsimple.com",
+      "cohere": "cohere.com",
+      "tailscale": "tailscale.com",
+      "ramp": "ramp.com",
+      "google": "www.google.com",
+      "microsoft": "learn.microsoft.com",
+      "amazon": "www.amazon.com",
+      "apple": "www.apple.com",
+      "meta": "static.xx.fbcdn.net",
+      "github": "github.com",
+      "twilio": "www.twilio.com",
+      "wealthfront": "www.wealthfront.com",
+      "netflix": "www.netflix.com",
+      "salesforce": "www.salesforce.com",
+      "oracle": "www.oracle.com",
+      "ibm": "www.ibm.com",
+      "cisco": "www.cisco.com",
+      "lyft": "www.lyft.com",
+      "instacart": "www.instacart.com",
+      "pinterest": "www.pinterest.com",
+      "roblox": "www.roblox.com",
+      "unity": "unity.com",
+      "epic games": "www.epicgames.com",
+      "box": "box.com",
+      "mongodb": "www.mongodb.com",
+      "gitlab": "gitlab.com",
+      "robinhood": "www.robinhood.com",
+      "scotiabank": "www.scotiabank.com",
+      "bmo": "www.bmo.com",
+      "workday": "www.workday.com",
+      "hubspot": "www.hubspot.com",
+      "accenture": "www.accenture.com",
+      "figma": "static.figma.com",
+      "databricks": "docs.databricks.com",
+      "elastic": "www.elastic.co",
+      "adobe": "help.adobe.com",
+      "amd": "docs.amd.com",
+      "atlassian": "docs.atlassian.com",
+      "docker": "docs.docker.com",
+      "mastercard": "developer.mastercard.com",
+      "american express": "developer.americanexpress.com",
+      "intuit": "developer.intuit.com",
+      "zapier": "cdn.zapier.com",
+      "retool": "docs.retool.com",
+      "tesla": "developer.tesla.com",
+      "spotify": "open.spotifycdn.com",
+      "paypal": "www.paypalobjects.com",
+      "twitch": "assets.twitch.tv",
+      "hootsuite": "www.hootsuite.com",
+      "deel": "www.deel.com",
+      "plaid": "plaid.com",
+      "nvidia": "developer.nvidia.com",
+      "notion": "www.notion.com",
+      "palantir": "www.palantir.com",
+      "1password": "1password.com",
+    };
+    expect(Object.keys(sources).sort()).toEqual(Object.keys(officialHosts).sort());
     for (const [name, source] of Object.entries(sources)) {
       expect(companyLogo(name)).toBe(`/${source.path.replace(/^public\//, "")}`);
       const url = new URL(source.url);
       expect(url.protocol).toBe("https:");
-      expect(domains.some(domain => url.hostname === domain || url.hostname.endsWith(`.${domain}`))).toBe(true);
+      expect(url.hostname).toBe(officialHosts[name]);
+      expect(source.path).toMatch(/^public\/company-logos\/[a-z0-9-]+\.(?:png|ico)$/);
       const bytes = readFileSync(path.join(root, source.path));
       expect(bytes.length).toBe(source.bytes);
       expect(bytes.length).toBeLessThanOrEqual(262144);

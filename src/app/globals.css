@@ -120,6 +120,52 @@
   }
 }
 
+
+/* The full-page texture is static; only the small band below moves. */
+.tracker-wave-canvas {
+  background-image:
+    linear-gradient(rgba(8, 14, 28, 0.92), rgba(8, 14, 28, 0.92)),
+    url("/workspace-wave.svg");
+  background-size: auto, 360px 144px;
+  background-repeat: repeat;
+}
+
+/* A small repeating band, rather than a canvas or frame-by-frame script. */
+.workspace-wave {
+  position: fixed;
+  inset: auto 0 0;
+  height: 144px;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.22;
+  mask-image: linear-gradient(transparent, black 45%);
+}
+
+.workspace-wave-texture {
+  width: calc(100% + 360px);
+  height: 100%;
+  background: url("/workspace-wave.svg") repeat-x left bottom / 360px 144px;
+  animation: workspace-wave-drift 72s linear infinite;
+}
+
+.workspace-wave-texture[data-paused="true"] {
+  animation-play-state: paused;
+}
+
+@keyframes workspace-wave-drift {
+  to { transform: translateX(-360px); }
+}
+
+/* Home has no workspace marker, preserving its existing navigation. */
+[data-workspace-theme] > header {
+  background-color: rgba(13, 23, 39, 0.96);
+  border-color: rgba(165, 185, 213, 0.22);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-wave-texture { animation: none; }
+}
+
 /* Page transition */
 @layer utilities {
   .ink-navy {

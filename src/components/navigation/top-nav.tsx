@@ -15,6 +15,8 @@ import {
   Bell,
   Terminal,
   Code2,
+  Pause,
+  Play,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -37,6 +39,7 @@ const NAV_LINKS = [
 interface TopNavProps {
   actions?: React.ReactNode;
   badge?: React.ReactNode;
+  backgroundMotion?: { paused: boolean; onToggle: () => void };
 }
 
 function SignOutButton({ className }: { className?: string }) {
@@ -149,7 +152,7 @@ function NavUtilities({ pathname }: { pathname: string }) {
   );
 }
 
-export function TopNav({ actions, badge }: TopNavProps) {
+export function TopNav({ actions, badge, backgroundMotion }: TopNavProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined);
@@ -270,6 +273,18 @@ export function TopNav({ actions, badge }: TopNavProps) {
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
         {actions}
+        {backgroundMotion && (
+          <button
+            type="button"
+            onClick={backgroundMotion.onToggle}
+            aria-label={backgroundMotion.paused ? "Resume background motion" : "Pause background motion"}
+            title={backgroundMotion.paused ? "Resume background motion" : "Pause background motion"}
+            data-testid="workspace-motion-toggle"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-slate-300 hover:bg-slate-800/60 hover:text-white focus-visible:ring-2 focus-visible:ring-amber-500/60 motion-reduce:hidden"
+          >
+            {backgroundMotion.paused ? <Play className="h-4 w-4" aria-hidden /> : <Pause className="h-4 w-4" aria-hidden />}
+          </button>
+        )}
         <NavUtilities pathname={pathname} />
         {user ? (
           <>

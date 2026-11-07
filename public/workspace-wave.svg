@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="144" viewBox="0 0 360 144">
+  <g font-family="monospace" font-size="13" letter-spacing="2" fill="#8fa8c7" opacity=".65">
+    <text x="0" y="24">.   .  :  :  .   .     .  :  :  .   .</text>
+    <text x="0" y="44">  .  :  +  :  .     .  :  +  :  .</text>
+    <text x="0" y="64">:  +  :  .   .  :  +  :  .   .  :</text>
+    <text x="0" y="84">.  :  .     .  :  +  :  .     .  :</text>
+    <text x="0" y="104">  .     .  :  :  .     .  :  :  .</text>
+    <text x="0" y="124">.   .  :  .   .     .  :  .   .  :</text>
+  </g>
+  <g font-family="monospace" font-size="13" letter-spacing="2" fill="#ff8c00" opacity=".4">
+    <text x="45" y="64">.</text><text x="235" y="44">.</text><text x="156" y="104">.</text>
+  </g>
+</svg>

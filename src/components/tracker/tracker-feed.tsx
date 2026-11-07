@@ -812,7 +812,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       {viewMode === "kanban" ? (
         <div
           data-testid="tracker-kanban-board"
-          className="flex min-h-0 flex-1 gap-4 overflow-x-auto bg-rf-bg p-4"
+          className="flex min-h-0 flex-1 gap-4 overflow-x-auto bg-transparent p-4"
         >
           {(["SAVED", "APPLIED", "INTERVIEWING", "OFFER", "REJECTED"] as JobStatus[]).map(
             (stage) => {
