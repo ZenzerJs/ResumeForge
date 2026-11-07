@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: "./e2e",
   testMatch: "suggestion-preview-verification.spec.ts",
   workers: 1,
+  outputDir: "test-results/suggestion-preview-run",
   timeout: 120000,
   reporter: "list",
   use: { baseURL: "http://127.0.0.1:3147", ...devices["Desktop Chrome"], trace: "retain-on-failure" },

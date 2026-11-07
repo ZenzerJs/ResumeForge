@@ -1,5 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
+import { mkdirSync } from "node:fs";
+
+const artifacts = path.join("test-results", "suggestion-preview-run", "screenshots");
 
 const base = `#set page(width: 8.5in, height: 11in, margin: 0.8in)
 = Work Experience
@@ -55,19 +58,28 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
     await expect(preview.getByText(/1 conflicting or invalid suggestion/)).toBeVisible();
     const original = await preview.getByRole("img", { name: "Resume page 1" }).getAttribute("src");
     await preview.getByRole("button", { name: "Suggested", exact: true }).click();
+    await preview.getByRole("button", { name: "Original", exact: true }).click();
+    await preview.getByRole("button", { name: "Suggested", exact: true }).click();
+    await preview.getByRole("button", { name: "Original", exact: true }).click();
+    await expect.poll(async () => preview.getByRole("img", { name: "Resume page 1" }).getAttribute("src"), { timeout: 90000 }).toBe(original);
+    await expect(preview.getByRole("button", { name: "Original", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await preview.getByRole("button", { name: "Suggested", exact: true }).click();
     await expect.poll(async () => preview.getByRole("img", { name: "Resume page 1" }).getAttribute("src"), { timeout: 90000 }).not.toBe(original);
     const geometry = await preview.getByRole("button", { name: "Review suggestion 1, pending" }).evaluate(button => {
       const marker = button.getBoundingClientRect();
       const pageRect = button.parentElement!.getBoundingClientRect();
-      return { x: marker.x, y: marker.y, right: marker.right, bottom: marker.bottom, pageX: pageRect.x, pageY: pageRect.y, pageRight: pageRect.right, pageBottom: pageRect.bottom };
+      const highlight = button.previousElementSibling!.getBoundingClientRect();
+      return { highlightLeft: highlight.left, x: marker.x, y: marker.y, right: marker.right, bottom: marker.bottom, pageX: pageRect.x, pageY: pageRect.y, pageRight: pageRect.right, pageBottom: pageRect.bottom };
     });
+    expect(geometry.right).toBeLessThanOrEqual(geometry.highlightLeft + 1);
     expect(geometry.x).toBeGreaterThanOrEqual(geometry.pageX - 14);
     expect(geometry.y).toBeGreaterThanOrEqual(geometry.pageY - 14);
     expect(geometry.right).toBeLessThanOrEqual(geometry.pageRight + 14);
     expect(geometry.bottom).toBeLessThanOrEqual(geometry.pageBottom + 14);
     const widths = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth }));
     expect(widths.document).toBeLessThanOrEqual(widths.viewport + 1);
-    await preview.screenshot({ path: path.join("test-results", `suggestion-preview-${viewport.name}-suggested.png`) });
+    mkdirSync(artifacts, { recursive: true });
+    await preview.screenshot({ path: path.join(artifacts, `${viewport.name}-suggested.png`), style: "header { visibility: hidden !important; }" });
     await preview.getByRole("button", { name: "Review suggestion 1, pending" }).click();
     await expect(preview.getByText(/Clarify scope/)).toBeVisible();
     await expect(preview.getByText(/evidence-1/)).toBeVisible();
@@ -78,7 +90,7 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
     await expect.poll(async () => preview.getByRole("img", { name: "Resume page 1" }).getAttribute("src"), { timeout: 90000 }).toBe(original);
     expect(await page.evaluate(() => localStorage.getItem("resumeforge_typst_source"))).toBe(base);
     expect(writes).toEqual([]);
-    await preview.screenshot({ path: path.join("test-results", `suggestion-preview-${viewport.name}.png`) });
+    await preview.screenshot({ path: path.join(artifacts, `${viewport.name}-rejected.png`), style: "header { visibility: hidden !important; }" });
     await page.evaluate(() => { localStorage.setItem("resumeforge_typst_source", "changed elsewhere"); window.dispatchEvent(new Event("focus")); });
     await expect(page.getByText(/Preview unavailable: this proposal no longer matches/)).toBeVisible();
     expect(errors).toEqual([]);
