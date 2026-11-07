@@ -165,3 +165,37 @@ export async function measureTypstDocument(source: string, renderPages = false) 
     return { source, pageCount, pdf, pageImages };
   } finally { await task.destroy(); }
 }
+
+/** Render the exact PDF and expose conservative, normalized text-item rectangles. */
+export async function renderTypstReview(source: string, renderPages = true) {
+  const pdf = await compileTypstToPdf(source);
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  pdfjs.GlobalWorkerOptions.workerSrc = "/workers/pdf.worker.min.mjs";
+  const task = pdfjs.getDocument({ data: new Uint8Array(pdf) });
+  try {
+    const document = await task.promise;
+    const pages: string[] = [];
+    const items: import("@/lib/typst/preview-mapping").PreviewTextItem[] = [];
+    for (let index = 1; index <= document.numPages; index++) {
+      const page = await document.getPage(index);
+      const viewport = page.getViewport({ scale: 1.5 });
+      if (renderPages) {
+        const canvas = window.document.createElement("canvas");
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Could not render document preview.");
+        await page.render({ canvas, canvasContext: context, viewport }).promise;
+        pages.push(canvas.toDataURL("image/png"));
+      }
+      const content = await page.getTextContent();
+      for (const item of content.items) {
+        if (!("str" in item) || !item.str.trim() || Math.abs(item.transform[1]) > 0.01 || Math.abs(item.transform[2]) > 0.01) continue;
+        const [x1, y1] = viewport.convertToViewportPoint(item.transform[4], item.transform[5]);
+        const [x2, y2] = viewport.convertToViewportPoint(item.transform[4] + item.width, item.transform[5] + item.height);
+        items.push({ text: item.str, page: index - 1, left: Math.min(x1, x2) / viewport.width * 100, top: Math.min(y1, y2) / viewport.height * 100, width: Math.abs(x2 - x1) / viewport.width * 100, height: Math.abs(y2 - y1) / viewport.height * 100 });
+      }
+    }
+    return { pages, items };
+  } finally { await task.destroy(); }
+}

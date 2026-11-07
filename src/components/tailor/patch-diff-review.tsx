@@ -19,6 +19,7 @@ import { checkGuardrail } from "@/lib/guardrail/check";
 import { assertCanApplyPatches, markDocumentAsPatched } from "@/lib/guardrail/policy";
 import { applyPatchProposals } from "@/lib/ai/patch-application";
 import type { ResumeFacts } from "@/lib/facts/types";
+import { SuggestionPreview } from "./suggestion-preview";
 
 /**
  * Pure helper that merges accepted patches into Typst source and stamps the document
@@ -96,6 +97,7 @@ export function PatchDiffReview({
     return initial;
   });
 
+  const [selectedPatch, setSelectedPatch] = useState<string | null>(null);
   const [isApplying, setIsApplying] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [applySuccess, setApplySuccess] = useState<string | null>(null);
@@ -302,6 +304,18 @@ export function PatchDiffReview({
         </div>
       </div>
 
+      {verified.length > 0 && <SuggestionPreview
+        base={localOnly ? localBaseTypstSource : batch?.baseTypstSource}
+        current={masterTypstSource}
+        validBatch={localOnly || Boolean(batch && batch.jobId === jobId)}
+        localStorageSourceKey={localOnly ? localStorageSourceKey : undefined}
+        patches={verified}
+        decisions={decisions}
+        selected={selectedPatch}
+        onSelect={setSelectedPatch}
+        onDecision={handleDecision}
+      />}
+
       {/* Gap Reports Panel */}
       {gaps.length > 0 && (
         <div className="space-y-3" data-testid="gaps-panel">
@@ -394,7 +408,7 @@ export function PatchDiffReview({
             </span>
           </h3>
 
-          {verified.map((patch) => {
+          {verified.map((patch, patchIndex) => {
             const decision = decisions[patch.id];
             const opStyle = OPERATION_STYLES[patch.operation] || { bg: "bg-slate-800", text: "text-slate-300" };
 
@@ -416,7 +430,7 @@ export function PatchDiffReview({
                     <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${opStyle.bg} ${opStyle.text} border border-current/20`}>
                       {patch.operation.replace(/_/g, " ")}
                     </span>
-                    <span className="text-xs text-slate-300 font-medium">{patch.targetSection}</span>
+                    <button type="button" onClick={() => setSelectedPatch(patch.id)} aria-pressed={selectedPatch === patch.id} className="text-xs text-slate-300 font-medium underline">{patchIndex + 1}. {patch.targetSection}</button>
                     <span className="text-[10px] text-slate-500 font-mono">
                       Confidence: {Math.round(patch.confidence * 100)}%
                     </span>
@@ -432,6 +446,8 @@ export function PatchDiffReview({
                           : "bg-slate-800 hover:bg-emerald-900/60 text-slate-400 hover:text-emerald-300"
                       }`}
                       title="Accept patch"
+                      aria-label={`Accept suggestion ${patchIndex + 1}`}
+                      aria-pressed={decision === "accepted"}
                     >
                       <Check className="h-3.5 w-3.5" />
                     </button>
@@ -445,6 +461,8 @@ export function PatchDiffReview({
                           : "bg-slate-800 hover:bg-red-900/60 text-slate-400 hover:text-red-300"
                       }`}
                       title="Reject patch"
+                      aria-label={`Reject suggestion ${patchIndex + 1}`}
+                      aria-pressed={decision === "rejected"}
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
