@@ -796,7 +796,7 @@ export function TailorWorkspace() {
         {(jobIdParam || savedJobId) && (
           <div
             data-testid="active-job-header-banner"
-            className="mb-6 rounded-xl border border-slate-800 bg-slate-900 px-5 py-4"
+            className="mb-6 rounded-xl border border-[var(--rf-surface-border)] bg-rf-surface px-5 py-4"
           >
             <p className="text-xs font-medium text-slate-400">{company || "Untitled company"}</p>
             <p className="mt-1 break-words text-xl font-semibold leading-snug text-white">{roleTitle || "Untitled role"}</p>
@@ -974,7 +974,7 @@ export function TailorWorkspace() {
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6" data-testid="tailor-3pane-container">
             {/* Left Pane: Job Description with keyword highlights & TechDiffPillList */}
             <section
-              className="min-w-0 rounded-xl border border-slate-800 bg-slate-900 p-5 flex flex-col gap-4"
+              className="min-w-0 rounded-xl border border-[var(--rf-surface-border)] bg-rf-surface p-5 flex flex-col gap-4"
               data-testid="tailor-pane-left"
             >
               <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-800">
@@ -1034,7 +1034,7 @@ export function TailorWorkspace() {
 
             {/* Center Pane: Typst AST / source preview & PatchDiffReview */}
             <section
-              className="min-w-0 rounded-xl border border-slate-800 bg-slate-900 p-5 flex flex-col gap-4"
+              className="min-w-0 rounded-xl border border-[var(--rf-surface-border)] bg-rf-surface p-5 flex flex-col gap-4"
               data-testid="tailor-pane-center"
             >
               <div className="flex items-center justify-between pb-3 border-b border-slate-800/60">
@@ -1096,7 +1096,7 @@ export function TailorWorkspace() {
 
             {/* Right Pane: Real-time deterministic AtsScorePanel */}
             <section
-              className="min-w-0 rounded-xl border border-slate-800 bg-slate-900 p-5 flex flex-col gap-4"
+              className="min-w-0 rounded-xl border border-[var(--rf-surface-border)] bg-rf-surface p-5 flex flex-col gap-4"
               data-testid="tailor-pane-right"
             >
               <div className="flex items-center justify-between pb-3 border-b border-slate-800/60">
@@ -1136,7 +1136,7 @@ export function TailorWorkspace() {
             {activeTab === "overview" ? (
               <>
                 {/* Overview Summary Card */}
-                <section className="rounded-xl border border-slate-800 bg-slate-900 p-5" data-testid="tailor-overview-panel">
+                <section className="rounded-xl border border-[var(--rf-surface-border)] bg-rf-surface p-5" data-testid="tailor-overview-panel">
                   <div className="flex flex-wrap items-start justify-between gap-3 mb-4 pb-3 border-b border-slate-800">
                     <div className="flex items-center gap-2">
                       <Briefcase className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
@@ -1206,7 +1206,7 @@ export function TailorWorkspace() {
                 <section
                   id="cover-letter-section"
                   data-testid="tailor-cover-letter-section"
-                  className={`rounded-xl border border-slate-800 bg-slate-900 p-5 flex flex-col ${
+                  className={`rounded-xl border border-[var(--rf-surface-border)] bg-rf-surface p-5 flex flex-col ${
                     highlightCoverLetter ? "ring-2 ring-amber-500/60 border-amber-500/50" : ""
                   }`}
                 >
@@ -1250,7 +1250,7 @@ export function TailorWorkspace() {
                 </section>
               </>
             ) : activeTab === "diagnostic" ? (
-              <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+              <section className="rounded-xl border border-[var(--rf-surface-border)] bg-rf-surface p-5">
                 <TailorDiagnosticPanel
                   report={diagnosticReport}
                   typstAst={activeVariantContent}
@@ -1265,7 +1265,7 @@ export function TailorWorkspace() {
             ) : (
               <>
                 {/* Job Info & Requirements View */}
-                <section className="rounded-xl border border-slate-800 bg-slate-900 p-5" data-testid="tailor-job-info-panel">
+                <section className="rounded-xl border border-[var(--rf-surface-border)] bg-rf-surface p-5" data-testid="tailor-job-info-panel">
                   <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
                     <div className="flex items-center gap-2">
                       <Briefcase className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
@@ -1595,7 +1595,7 @@ export function TailorWorkspace() {
                   )}
                 </section>
 
-                <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+                <section className="rounded-xl border border-[var(--rf-surface-border)] bg-rf-surface p-5">
                   <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
                     <div className="flex items-center gap-2">
                       <ClipboardCheck className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
@@ -1687,7 +1687,7 @@ export function TailorWorkspace() {
 
           <div className="flex flex-col gap-6 min-w-0">
             {extractedRequirements && (activeVariantContent || masterTypstSource) ? (
-              <section className="rounded-xl border border-slate-800 bg-slate-900 p-5 min-w-0">
+              <section className="rounded-xl border border-[var(--rf-surface-border)] bg-rf-surface p-5 min-w-0">
                 <AtsScorePanel
                   appearance="tailor"
                   typstContent={activeVariantContent || masterTypstSource}
@@ -1702,12 +1702,12 @@ export function TailorWorkspace() {
                 />
               </section>
             ) : (
-              <section className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-sm text-slate-400">
+              <section className="rounded-xl border border-[var(--rf-surface-border)] bg-rf-surface p-5 text-sm text-slate-400">
                 Extract job requirements to run ATS scoring against your master resume and Evidence Bank.
               </section>
             )}
 
-            <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <section className="rounded-xl border border-[var(--rf-surface-border)] bg-rf-surface p-5">
               <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800/60">
                 <Database className="h-4 w-4 text-[#ff8c00] shrink-0" aria-hidden />
                 <h2 className="text-lg text-white font-semibold">Evidence Matches</h2>

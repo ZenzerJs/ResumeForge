@@ -27,8 +27,10 @@ import { TrackerSubNav } from "@/components/tracker/tracker-sub-nav";
 import { isSafeHref } from "@/lib/security/safe-url";
 import { type PostedWithin } from "@/lib/jobs/posted-within";
 import type { ScoreBreakdown } from "@/lib/scoring/blended-sort";
+import { displayScore } from "@/lib/scoring/blended-display";
 import type { CompatibilityResult } from "@/lib/scoring/compatibility-engine";
 import { JobCardSignalBadge } from "@/components/tracker/job-card-signal-badge";
+import { CompanyAvatar } from "@/components/tracker/company-avatar";
 import { FitPercentageDial } from "@/components/tracker/fit-percentage-dial";
 import { TechDiffPillList } from "@/components/tracker/tech-diff-pill-list";
 import { normalizeCompanyIntel, formatFundingBadge, formatH1BBadge } from "@/lib/companyIntel";
@@ -682,7 +684,7 @@ export function DiscoverFeed() {
             {jobs.map((j) => {
               const salaryStr = formatSalary(j);
               const isAlreadyTracked = Boolean(j.trackedJob);
-              const matchScore = typeof j.blendedScore === "number" ? j.blendedScore : null;
+              const matchScore = displayScore(j.blendedScore);
               const requiredCount = j.compatibility?.totalRequiredCount ?? 0;
 
               return (
@@ -694,12 +696,7 @@ export function DiscoverFeed() {
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="flex min-w-0 items-center gap-2.5 text-sm font-semibold text-slate-200">
-                        <span
-                          aria-hidden="true"
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-sm font-bold text-primary"
-                        >
-                          {j.companyName.trim().charAt(0).toUpperCase() || "?"}
-                        </span>
+                        <CompanyAvatar company={j.companyName} />
                         <span className="break-words">{j.companyName}</span>
                       </span>
                       <div className="flex items-center gap-1.5">
@@ -736,15 +733,14 @@ export function DiscoverFeed() {
                           : null;
                       return (
                         <div className="flex flex-wrap items-center gap-2 my-0.5">
-                          {hasEvidence && matchScore !== null ? (
+                          {hasEvidence ? (
                             <div className="flex items-center gap-2">
                               <FitPercentageDial
                                 compositeScore={matchScore}
-                                breakdown={j.scoreBreakdown as any}
+                                breakdown={j.scoreBreakdown}
                                 size={28}
                                 showLabel={false}
                               />
-                              <span className="font-mono text-xs text-slate-200">{matchScore}%</span>
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">

@@ -16,7 +16,7 @@ export function Surface({
   ...props
 }: SurfaceProps) {
   const variantStyles = {
-    primary: "bg-rf-surface border border-slate-800/80 shadow-md",
+    primary: "bg-rf-surface border border-[var(--rf-surface-border)] shadow-md",
     elevated: "bg-rf-elevated border border-slate-700/60 shadow-lg",
     flat: "bg-rf-bg border border-slate-800/60",
     transparent: "bg-slate-950/40 border border-slate-800/40 backdrop-blur-sm",

@@ -701,7 +701,7 @@ export function LibraryWorkspace() {
         {isLoading ? (
           <div className="grid gap-4">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="rounded-xl border border-slate-800 bg-[#121929] p-5">
+              <div key={i} className="rounded-xl border border-[var(--rf-surface-border)] bg-rf-surface p-5">
                 <Skeleton className="h-4 w-48 mb-3" />
                 <Skeleton className="h-3 w-full mb-2" />
                 <Skeleton className="h-3 w-3/4" />
@@ -709,7 +709,7 @@ export function LibraryWorkspace() {
             ))}
           </div>
         ) : filteredItems.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-800 bg-[#121929]/50 p-12 text-center">
+          <div className="rounded-xl border border-dashed border-[var(--rf-surface-border)] bg-rf-surface/50 p-12 text-center">
             <FileJson className="mx-auto h-8 w-8 text-slate-600 mb-2" />
             <h3 className="text-sm font-semibold text-slate-300">No evidence items found</h3>
             <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
@@ -726,7 +726,7 @@ export function LibraryWorkspace() {
                 <div
                   key={item.id}
                   data-testid="evidence-item-card"
-                  className="rounded-xl border border-slate-800 bg-[#121929]/90 hover:border-slate-700 transition-colors p-5 overflow-hidden"
+                  className="rounded-xl border border-[var(--rf-surface-border)] bg-rf-surface hover:border-slate-700 transition-colors p-5 overflow-hidden"
                 >
                   {/* Card Header Row */}
                   <div className="flex items-start justify-between gap-4">
@@ -837,7 +837,7 @@ export function LibraryWorkspace() {
         ) : (
           <div className="grid gap-4" data-testid="duplicate-review-queue">
             {items.filter((item) => item.needsReview).length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-800 bg-[#121929]/50 text-center p-10 text-slate-400 text-xs font-mono">
+              <div className="rounded-xl border border-dashed border-[var(--rf-surface-border)] bg-rf-surface/50 text-center p-10 text-slate-400 text-xs font-mono">
                 No duplicate or overlapping evidence items need review.
               </div>
             ) : (
@@ -847,7 +847,7 @@ export function LibraryWorkspace() {
                   <div
                     key={item.id}
                     data-testid={`duplicate-review-card-${item.id}`}
-                    className="rounded-xl border border-slate-800 bg-[#121929]/90 p-5"
+                    className="rounded-xl border border-[var(--rf-surface-border)] bg-rf-surface p-5"
                   >
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-base font-bold text-white">
@@ -1044,7 +1044,7 @@ export function LibraryWorkspace() {
       {/* Modal Dialog for Create/Edit */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-xl border border-slate-800 bg-[#121929] p-6 shadow-2xl">
+          <div className="w-full max-w-lg rounded-xl border border-[var(--rf-surface-border)] bg-rf-surface p-6 shadow-2xl">
             <h2 className="text-base font-bold text-white mb-4">
               {editingItem ? "Edit Evidence Item" : "Create Evidence Item"}
             </h2>

@@ -1,0 +1,116 @@
+{
+  "coinbase": {
+    "url": "https://www.coinbase.com/favicon.ico",
+    "path": "public/company-logos/coinbase.png",
+    "bytes": 870,
+    "format": "png"
+  },
+  "stripe": {
+    "url": "https://stripe.com/favicon.ico",
+    "path": "public/company-logos/stripe.ico",
+    "bytes": 15086,
+    "format": "ico"
+  },
+  "shopify": {
+    "url": "https://cdn.shopify.com/b/shopify-brochure2-assets/61cc781fe73f11e9d4bd160d27cc627b.png",
+    "path": "public/company-logos/shopify.png",
+    "bytes": 2578,
+    "format": "png"
+  },
+  "linear": {
+    "url": "https://linear.app/static/apple-touch-icon.png?v=2",
+    "path": "public/company-logos/linear.png",
+    "bytes": 25274,
+    "format": "png"
+  },
+  "vercel": {
+    "url": "https://assets.vercel.com/image/upload/q_auto/front/favicon/vercel/apple-touch-icon-57x57.png",
+    "path": "public/company-logos/vercel.png",
+    "bytes": 265,
+    "format": "png"
+  },
+  "anthropic": {
+    "url": "https://www.anthropic.com/images/icons/favicon-32x32.png",
+    "path": "public/company-logos/anthropic.png",
+    "bytes": 1359,
+    "format": "png"
+  },
+  "openai": {
+    "url": "https://developers.openai.com/favicon.png",
+    "path": "public/company-logos/openai.png",
+    "bytes": 1841,
+    "format": "png"
+  },
+  "cloudflare": {
+    "url": "https://www.cloudflare.com/favicon.ico",
+    "path": "public/company-logos/cloudflare.png",
+    "bytes": 908,
+    "format": "png"
+  },
+  "datadog": {
+    "url": "https://www.datadoghq.com/favicon.ico",
+    "path": "public/company-logos/datadog.ico",
+    "bytes": 40436,
+    "format": "ico"
+  },
+  "wealthsimple": {
+    "url": "https://www.wealthsimple.com/icon1.png?39b8825bd6a1a38d",
+    "path": "public/company-logos/wealthsimple.png",
+    "bytes": 2790,
+    "format": "png"
+  },
+  "cohere": {
+    "url": "https://cohere.com/apple-touch-icon.png",
+    "path": "public/company-logos/cohere.png",
+    "bytes": 8022,
+    "format": "png"
+  },
+  "tailscale": {
+    "url": "https://tailscale.com/favicon.png",
+    "path": "public/company-logos/tailscale.png",
+    "bytes": 17645,
+    "format": "png"
+  },
+  "ramp": {
+    "url": "https://ramp.com/favicon-16x16.png",
+    "path": "public/company-logos/ramp.png",
+    "bytes": 525,
+    "format": "png"
+  },
+  "google": {
+    "url": "https://www.google.com/favicon.ico",
+    "path": "public/company-logos/google.ico",
+    "bytes": 5430,
+    "format": "ico"
+  },
+  "microsoft": {
+    "url": "https://learn.microsoft.com/favicon.ico",
+    "path": "public/company-logos/microsoft.ico",
+    "bytes": 17174,
+    "format": "ico"
+  },
+  "amazon": {
+    "url": "https://www.amazon.com/favicon.ico",
+    "path": "public/company-logos/amazon.ico",
+    "bytes": 15086,
+    "format": "ico"
+  },
+  "apple": {
+    "url": "https://www.apple.com/favicon.ico",
+    "path": "public/company-logos/apple.ico",
+    "bytes": 22382,
+    "format": "ico"
+  },
+  "meta": {
+    "url": "https://static.xx.fbcdn.net/rsrc.php/y5/r/m4nf26cLQxS.ico",
+    "path": "public/company-logos/meta.ico",
+    "bytes": 5558,
+    "format": "ico"
+  },
+  "github": {
+    "url": "https://github.com/fluidicon.png",
+    "path": "public/company-logos/github.png",
+    "bytes": 33270,
+    "format": "png"
+  }
+}

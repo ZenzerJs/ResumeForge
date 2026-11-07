@@ -209,7 +209,7 @@ export function TopNav({ actions, badge }: TopNavProps) {
   const isGuest = user === null;
 
   return (
-    <header className="bg-[#0b1326]/90 backdrop-blur-xl border-b border-slate-800/80 fixed top-0 w-full z-50 flex items-center justify-between gap-3 px-4 md:px-8 h-16 pt-[env(safe-area-inset-top)] max-w-full overflow-visible">
+    <header className="bg-rf-bg/90 backdrop-blur-xl border-b border-slate-800/80 fixed top-0 w-full z-50 flex items-center justify-between gap-3 px-4 md:px-8 h-16 pt-[env(safe-area-inset-top)] max-w-full overflow-visible">
       <div className="flex items-center gap-8 min-w-0">
         <Link
           href="/"

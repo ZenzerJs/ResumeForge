@@ -22,6 +22,7 @@ import {
 import type { JobItem } from "@/components/tracker/job-types";
 import { isSafeHref } from "@/lib/security/safe-url";
 import { cn } from "@/lib/utils";
+import { CompanyAvatar } from "@/components/tracker/company-avatar";
 
 const STATUS_LABELS: Record<JobStatus, string> = {
   SAVED: "Saved",
@@ -33,10 +34,6 @@ const STATUS_LABELS: Record<JobStatus, string> = {
 };
 
 const ALL_STATUSES = Object.keys(STATUS_LABELS) as JobStatus[];
-
-export function companyAvatarClass(_company?: string | null): string {
-  return "border border-slate-700 bg-slate-800 text-slate-200";
-}
 
 interface JobListRowProps {
   job: JobItem;
@@ -71,7 +68,6 @@ export function JobListRow({
   const datePosted = extractPostingDateFromNotes(job.notes);
   const salary = extractSalaryFromNotes(job.notes, job.rawDescription);
   const isPlaceholder = job.isPlaceholder ?? isPlaceholderDescription(job.rawDescription);
-  const companyInitial = job.company ? job.company[0].toUpperCase() : "J";
   const hasCoverLetter = Boolean(job.coverLetters && job.coverLetters.length > 0);
 
   useEffect(() => {
@@ -105,14 +101,7 @@ export function JobListRow({
           : "bg-rf-bg hover:bg-[#0e1219]",
       )}
     >
-      <div
-        className={cn(
-          "flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg text-sm font-bold",
-          companyAvatarClass(job.company),
-        )}
-      >
-        {companyInitial}
-      </div>
+      <CompanyAvatar company={job.company} className="h-[34px] w-[34px]" />
 
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">

@@ -14,6 +14,21 @@
     --rf-border: rgba(148, 163, 184, 0.22);
     --rf-amber: #ff8c00;
     --rf-emerald: #4edea3;
+    /* RGB channels let Tailwind apply opacity modifiers to scoped tokens. */
+    --rf-bg-rgb: 11 19 38;
+    --rf-surface-rgb: 23 31 51;
+    --rf-elevated-rgb: 34 42 61;
+    --theme-background: 11 19 38;
+    --theme-card: 23 31 51;
+    --theme-popover: 23 31 51;
+    --theme-muted: 34 42 61;
+    --theme-accent: 34 42 61;
+    --theme-input: 43 53 80;
+    --theme-border: 148 163 184;
+    --theme-border-alpha: 0.2;
+    --rf-popover-surface: #0f172a;
+    --rf-popover-border: rgba(51, 65, 85, 0.8);
+    --rf-surface-border: rgba(30, 41, 59, 0.8);
 
     /* Theme colors */
     --background: #0b1326;
@@ -36,6 +51,28 @@
     --input: #1e293b;
     --ring: #ff8c00;
     --radius: 0.25rem;
+  }
+
+  /* Portals are siblings of AppShell, so scope through the containing body. */
+  body:has([data-workspace-theme]) {
+    --rf-bg: #080e1c;
+    --rf-surface: #1c2940;
+    --rf-surface-elevated: #2b3b55;
+    --rf-border: rgba(165, 185, 213, 0.42);
+    --rf-bg-rgb: 8 14 28;
+    --rf-surface-rgb: 28 41 64;
+    --rf-elevated-rgb: 43 59 85;
+    --theme-background: 8 14 28;
+    --theme-card: 28 41 64;
+    --theme-popover: 41 59 85;
+    --theme-muted: 43 59 85;
+    --theme-accent: 43 59 85;
+    --theme-input: 12 21 38;
+    --theme-border: 165 185 213;
+    --theme-border-alpha: 0.42;
+    --rf-popover-surface: #293b55;
+    --rf-popover-border: rgba(165, 185, 213, 0.48);
+    --rf-surface-border: rgba(165, 185, 213, 0.32);
   }
 
   * {

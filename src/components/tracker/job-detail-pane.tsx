@@ -1,5 +1,6 @@
 "use client";
 
+import { CompanyAvatar } from "@/components/tracker/company-avatar";
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -172,7 +173,7 @@ export function JobDetailPane({
   const datePosted = extractPostingDateFromNotes(detailJob.notes);
   const salary = extractSalaryFromNotes(detailJob.notes, detailJob.rawDescription);
   const isPlaceholder = isPlaceholderDescription(detailJob.rawDescription);
-  const companyInitial = detailJob.company ? detailJob.company[0].toUpperCase() : "J";
+
 
   const checklist: EvidenceMatchChecklist = useMemo(
     () => buildEvidenceMatchChecklist(detailJob.extractedRequirements, evidence),
@@ -323,9 +324,7 @@ export function JobDetailPane({
         {/* Detail Header Card */}
         <div className="bg-rf-surface border border-outline-variant rounded-xl p-6">
           <div className="flex gap-6 items-start">
-            <div className="w-16 h-16 rounded-lg bg-surface-variant border border-outline flex items-center justify-center shrink-0 text-3xl font-bold text-primary">
-              {companyInitial}
-            </div>
+            <CompanyAvatar company={job.company} className="h-16 w-16 text-3xl" />
             <div className="flex-1">
               <h1 className="font-page-title-mobile text-2xl md:text-3xl text-on-surface mb-2 tracking-tighter font-bold">
                 {job.roleTitle || "Untitled Role"}

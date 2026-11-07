@@ -169,6 +169,7 @@ export function AppShell({
         "relative flex flex-col bg-rf-bg bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(255,140,0,0.06),transparent)] text-rf-body",
         lockViewport ? "h-dvh max-h-dvh overflow-hidden" : "min-h-screen overflow-x-hidden"
       )}
+      data-workspace-theme={variant === "landing" ? undefined : ""}
       data-testid={`app-shell-${variant}`}
     >
       {!hideNav ? (
