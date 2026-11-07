@@ -6,7 +6,6 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { cleanupStalePositions } from "@/lib/db/jobs";
 import { CreateJobSchema } from "@/lib/jd-parser/types";
 import { getImportAllowlist, isSafeHref, safeFetch, UnsafeUrlError } from "@/lib/security/safe-fetch";
 import { normalizeLocation } from "@/lib/ingestion/helpers";
@@ -198,7 +197,7 @@ export function parseMarkdownTable(content: string): ParsedJobRow[] {
 }
 
 /**
- * Bulk imports Tier 1 job metadata records into SQLite database.
+ * Bulk imports Tier 1 job metadata records into the PostgreSQL database.
  * Deduplicates against existing jobs and sets placeholder rawDescription.
  */
 export async function importTier1Jobs(input: ImportTier1Input = {}): Promise<ImportTier1Result> {
@@ -326,7 +325,6 @@ export async function importTier1Jobs(input: ImportTier1Input = {}): Promise<Imp
     });
   }
 
-  await cleanupStalePositions().catch(() => null);
 
   createdCount = payloads.length;
   const createdJobs =

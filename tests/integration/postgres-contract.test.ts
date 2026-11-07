@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { executeServerTool } from "@/lib/ai/tools/executor";
-import { cleanupStalePositions } from "@/lib/db/jobs";
+import { cleanupStalePositions, getJobsList } from "@/lib/db/jobs";
 import { POST as cleanupPOST } from "@/app/api/jobs/cleanup/route";
 import { NextRequest } from "next/server";
 import { createTestUser } from "../helpers/auth";
@@ -302,80 +302,61 @@ describe("real PostgreSQL contracts", () => {
       expect(await prisma.resumeVariant.findUnique({ where: { id: variant.id } })).not.toBeNull();
       expect(await prisma.coverLetter.findUnique({ where: { id: letter.id } })).not.toBeNull();
       expect(await prisma.job.findUnique({ where: { id: pendingJob.id } })).not.toBeNull();
-      expect(await prisma.job.findUnique({ where: { id: removableJob.id } })).toBeNull();
+      expect(await prisma.job.findUnique({ where: { id: removableJob.id } })).not.toBeNull();
     } finally {
       if (originalSecret === undefined) delete process.env.JOB_SYNC_SECRET;
       else process.env.JOB_SYNC_SECRET = originalSecret;
     }
   });
 
-  it("blocks cleanup behind a concurrent application FK and keeps the committed job link", async () => {
+  it("filters expired board results and counts while keeping a saved application visible", async () => {
+    const suffix = crypto.randomUUID();
+    const owner = await createUser(`board-${suffix}@test.invalid`);
+    const staleDate = new Date(Date.now() - 90 * 86_400_000);
+    const freshDate = new Date(Date.now() - 40 * 86_400_000);
+    const stale = await prisma.job.create({ data: { company: suffix, rawDescription: "old", createdAt: staleDate } });
+    const saved = await prisma.job.create({ data: { company: suffix, rawDescription: "saved", createdAt: staleDate } });
+    const fresh = await prisma.job.create({ data: { company: suffix, rawDescription: "fresh", createdAt: freshDate } });
+    jobIds.push(stale.id, saved.id, fresh.id);
+    const extraStaleIds = Array.from({ length: 501 }, () => crypto.randomUUID());
+    jobIds.push(...extraStaleIds);
+    await prisma.job.createMany({
+      data: extraStaleIds.map((id) => ({
+        id,
+        company: suffix,
+        rawDescription: "older board listing",
+        createdAt: new Date(staleDate.getTime() - 86_400_000),
+      })),
+    });
+    await prisma.jobApplication.create({ data: { userId: owner.id, jobId: saved.id, status: "APPLIED" } });
+    const guest = await getJobsList({ q: suffix, limit: 1 });
+    expect(guest.meta.total).toBe(1);
+    expect(guest.data.map(j => j.id)).toEqual([fresh.id]);
+    const personal = await getJobsList({ q: suffix, userId: owner.id, limit: 1 });
+    expect(personal.meta.total).toBe(2);
+    expect(personal.meta.counts.applied).toBe(1);
+    const second = await getJobsList({ q: suffix, userId: owner.id, page: 2, limit: 1 });
+    expect(second.data.map(j => j.id)).toEqual([saved.id]);
+    const audit = await cleanupStalePositions({ dryRun: true });
+    expect(audit.expired.jobs).toBeGreaterThanOrEqual(2);
+    expect(audit.preserved.applications).toBeGreaterThanOrEqual(1);
+    expect(audit.totalDeleted).toBe(0);
+    expect(await prisma.job.findUnique({ where: { id: stale.id } })).not.toBeNull();
+  });
+
+  it("preserves a concurrently saved listing during expiry audit", async () => {
     const suffix = crypto.randomUUID();
     const owner = await createUser(`race-${suffix}@test.invalid`);
     const now = new Date();
-    const staleDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-    const raceJob = await prisma.job.create({
-      data: { rawDescription: "Racing application", createdAt: staleDate },
-    });
-    const freeJob = await prisma.job.create({
-      data: { rawDescription: "Unreferenced listing", createdAt: staleDate },
-    });
-    jobIds.push(raceJob.id, freeJob.id);
-    const linked = await prisma.ingestedJob.create({
-      data: {
-        fingerprint: `${suffix}-race`, externalId: `${suffix}-race`, source: "MANUAL",
-        companyName: "Fixture", title: "Race", location: "Remote", description: "fixture",
-        descriptionHtml: "fixture", applyUrl: "https://example.invalid/race", trackedJobId: raceJob.id,
-        createdAt: staleDate, updatedAt: staleDate,
-      },
-    });
-    await prisma.ingestedJob.create({
-      data: {
-        fingerprint: `${suffix}-free`, externalId: `${suffix}-free`, source: "MANUAL",
-        companyName: "Fixture", title: "Free", location: "Remote", description: "fixture",
-        descriptionHtml: "fixture", applyUrl: "https://example.invalid/free", trackedJobId: freeJob.id,
-        createdAt: staleDate, updatedAt: staleDate,
-      },
-    });
-    const applicationId = crypto.randomUUID();
-    let releaseWriter!: () => void;
-    let announceInsert!: () => void;
-    const writerGate = new Promise<void>((resolve) => { releaseWriter = resolve; });
-    const inserted = new Promise<void>((resolve) => { announceInsert = resolve; });
-    let cleanupSettled = false;
-    const writer = prisma.$transaction(async (tx) => {
-      await tx.jobApplication.create({ data: { id: applicationId, userId: owner.id, jobId: raceJob.id } });
-      announceInsert();
-      await writerGate;
-    }, { timeout: 30000 });
-    let cleanup: ReturnType<typeof cleanupStalePositions> | undefined;
-    try {
-      await Promise.race([
-        inserted,
-        writer.then(() => { throw new Error("Application writer unexpectedly completed before cleanup began."); }),
-      ]);
-      cleanup = cleanupStalePositions({ maxAgeDays: 30, now }).finally(() => { cleanupSettled = true; });
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      expect(cleanupSettled).toBe(false);
-      const waiting = await prisma.$queryRaw<Array<{ wait_event_type: string | null }>>`
-        SELECT wait_event_type FROM pg_stat_activity
-        WHERE datname = current_database() AND query ILIKE '%FOR UPDATE%' AND pid <> pg_backend_pid()
-      `;
-      expect(waiting.some((row) => row.wait_event_type === "Lock")).toBe(true);
-      releaseWriter();
-      await writer;
-      const result = await cleanup;
-      expect(result.deletedJobs).toBe(1);
-      expect(await prisma.job.findUnique({ where: { id: raceJob.id } })).not.toBeNull();
-      expect(await prisma.jobApplication.findUnique({ where: { id: applicationId } })).not.toBeNull();
-      expect(await prisma.ingestedJob.findUnique({ where: { id: linked.id } })).toMatchObject({ trackedJobId: raceJob.id });
-      expect(await prisma.job.findUnique({ where: { id: freeJob.id } })).toBeNull();
-    } finally {
-      releaseWriter();
-      await writer.catch(() => undefined);
-      await cleanup?.catch(() => undefined);
-      await prisma.ingestedJob.deleteMany({ where: { fingerprint: { in: [`${suffix}-race`, `${suffix}-free`] } } });
-    }
+    const staleDate = new Date(now.getTime() - 90 * 86_400_000);
+    const job = await prisma.job.create({ data: { rawDescription: "Racing application", createdAt: staleDate } });
+    jobIds.push(job.id);
+    await Promise.all([
+      prisma.jobApplication.create({ data: { userId: owner.id, jobId: job.id } }),
+      cleanupStalePositions({ now }),
+    ]);
+    expect(await prisma.job.findUnique({ where: { id: job.id } })).not.toBeNull();
+    expect(await prisma.jobApplication.findUnique({ where: { userId_jobId: { userId: owner.id, jobId: job.id } } })).not.toBeNull();
   });
 
   it("rolls back records from a failed transaction", async () => {

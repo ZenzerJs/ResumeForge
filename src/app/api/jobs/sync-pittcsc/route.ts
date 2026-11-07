@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { parsePittCSCMarkdown } from "@/lib/ingestion/pittcsc-parser";
 import { sanitizeError } from "@/lib/ai/redact";
 import { isSafeHref } from "@/lib/security/safe-fetch";
-import { cleanupStalePositions } from "@/lib/db/jobs";
+import { initialPostingDate, stablePostingDate } from "@/lib/jobs/expiry";
 
 export async function POST(req: Request) {
   try {
@@ -44,6 +44,11 @@ export async function POST(req: Request) {
 
     for (const job of parsedJobs) {
       const applyUrl = isSafeHref(job.applyUrl) ? job.applyUrl : "";
+      const existing = await prisma.discoveredJob.findUnique({
+        where: { externalId: job.externalId },
+        select: { datePosted: true, createdAt: true },
+      });
+      const capturedAt = new Date();
       await prisma.discoveredJob.upsert({
         where: { externalId: job.externalId },
         update: {
@@ -51,7 +56,9 @@ export async function POST(req: Request) {
           roleTitle: job.roleTitle,
           location: job.location,
           applyUrl,
-          datePosted: job.datePosted,
+          datePosted: existing
+            ? stablePostingDate(existing.datePosted, job.datePosted, existing.createdAt, capturedAt)
+            : initialPostingDate(job.datePosted, capturedAt),
           isClosed: job.isClosed,
           updatedAt: new Date(),
         },
@@ -61,7 +68,7 @@ export async function POST(req: Request) {
           roleTitle: job.roleTitle,
           location: job.location,
           applyUrl,
-          datePosted: job.datePosted,
+          datePosted: initialPostingDate(job.datePosted, capturedAt),
           jobType,
           isClosed: job.isClosed,
         },
@@ -69,12 +76,10 @@ export async function POST(req: Request) {
       upsertCount++;
     }
 
-    const cleanup = await cleanupStalePositions().catch(() => null);
 
     return NextResponse.json({
       success: true,
       processed: upsertCount,
-      ...(cleanup ? { cleanup } : {}),
     });
   } catch (err) {
     console.error("Pitt CSC Sync error:", sanitizeError(err));

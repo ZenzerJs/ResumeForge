@@ -28,19 +28,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let maxAgeDays = 30;
+    let dryRun = true;
     try {
       const body = await req.json();
-      if (typeof body?.maxAgeDays === "number" && Number.isFinite(body.maxAgeDays) && body.maxAgeDays >= 1) {
-        maxAgeDays = Math.floor(body.maxAgeDays);
-      }
+      if (typeof body?.dryRun === "boolean") dryRun = body.dryRun;
     } catch {
-      // Optional JSON body
+      // A missing body defaults to a dry-run.
     }
-
-    const result = await cleanupStalePositions({
-      maxAgeDays,
-    });
+    const result = await cleanupStalePositions({ dryRun });
 
     return NextResponse.json({
       success: true,

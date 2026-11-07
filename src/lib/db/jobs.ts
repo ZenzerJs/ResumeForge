@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { isBoardEligible, jobMaxAgeDays } from "@/lib/jobs/expiry";
 import { prisma } from "@/lib/prisma";
 import { JobRequirements, JobRequirementsSchema } from "@/lib/jd-parser/types";
 import {
@@ -281,62 +282,82 @@ export async function getJobsList(query: JobListQuery = {}) {
     }
   }
 
-  const jobs = await prisma.job.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    include: jobIncludeForViewer(query.userId),
-  });
-
-  const mapped = jobs.map((job) => {
-    const item = withViewerOutcome(job, query.userId);
-    return {
-      ...item,
-      extractedRequirements: parseRequirementsJson(job.extractedRequirements),
-      isPlaceholder: isPlaceholderDescription(item.rawDescription),
-    };
-  });
-
-  const statusFiltered = mapped.filter((job) => {
-    if (isAllStatus) return true;
-    const statuses = (Array.isArray(rawStatus) ? rawStatus : [rawStatus]).filter(
-      (s) => (s as string) !== "ALL"
-    );
-    return statuses.includes(job.status);
-  });
-
+  const now = new Date();
   const postedWithin = query.postedWithin ?? "all";
-  const postedFiltered =
-    postedWithin === "all"
-      ? statusFiltered
-      : filterByPostedWithin(
-          statusFiltered,
-          postedWithin,
-          (j) => {
-            const raw = extractPostingDateFromNotes(j.notes)?.trim() || null;
-            if (!raw || /^apply$/i.test(raw)) return null;
-            return raw;
-          },
-          (j) => j.createdAt
-        );
-
   const workplace = query.workplace ?? "all";
-  const filtered =
-    workplace === "all"
-      ? postedFiltered
-      : postedFiltered.filter((j) => matchesWorkplaceFilter(j.notes, workplace));
-
-  const total = filtered.length;
   const start = (page - 1) * limit;
+  let total = 0;
   let applied = 0;
   let interviewing = 0;
-  for (const job of filtered) {
-    if (job.status === "APPLIED" || job.status === "INTERVIEWING" || job.status === "OFFER") {
-      applied += 1;
+  let cursor: string | undefined;
+  const data: Array<Omit<Prisma.JobGetPayload<{ include: typeof jobListInclude }>, "applications" | "extractedRequirements" | "status"> & {
+    status: JobStatus;
+    appliedAt: Date | null;
+    appliedVariantId: string | null;
+    extractedRequirements: JobRequirements;
+    isPlaceholder: boolean;
+  }> = [];
+
+  for (;;) {
+    const jobs = await prisma.job.findMany({
+      where,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      take: 500,
+      include: {
+        ...jobIncludeForViewer(query.userId),
+        patchProposalBatches: {
+          where: query.userId ? { userId: query.userId } : { id: "__none__" },
+          select: { id: true },
+        },
+      },
+    });
+
+    for (const job of jobs) {
+      const hasPersonalHistory = Boolean(
+        query.userId && (
+          job.userId === query.userId ||
+          job.applications?.length ||
+          job.variants?.length ||
+          job.coverLetters?.length ||
+          ("patchProposalBatches" in job &&
+            Array.isArray(job.patchProposalBatches) &&
+            job.patchProposalBatches.length)
+        )
+      );
+      const posted = extractPostingDateFromNotes(job.notes)?.trim() || null;
+      const cleanedPosted = posted && !/^apply$/i.test(posted) ? posted : null;
+      if (!hasPersonalHistory && !isBoardEligible(cleanedPosted, job.createdAt, now)) continue;
+
+      const item = withViewerOutcome(job, query.userId);
+      const statuses = (Array.isArray(rawStatus) ? rawStatus : [rawStatus]).filter(
+        (status) => (status as string) !== "ALL"
+      );
+      if (!isAllStatus && !statuses.includes(item.status)) continue;
+      if (postedWithin !== "all" &&
+          filterByPostedWithin([item], postedWithin, () => cleanedPosted, () => job.createdAt, now).length === 0) continue;
+      if (workplace !== "all" && !matchesWorkplaceFilter(job.notes, workplace)) continue;
+
+      if (item.status === "APPLIED" || item.status === "INTERVIEWING" || item.status === "OFFER") applied++;
+      if (item.status === "INTERVIEWING") interviewing++;
+      if (total >= start && total < start + limit) {
+        // The scoped proposal lookup is internal and must not leak into board responses.
+        const { patchProposalBatches: _internal, ...visible } = item as typeof item & { patchProposalBatches?: unknown };
+        void _internal;
+        data.push({
+          ...visible,
+          extractedRequirements: parseRequirementsJson(job.extractedRequirements),
+          isPlaceholder: isPlaceholderDescription(job.rawDescription),
+        });
+      }
+      total++;
     }
-    if (job.status === "INTERVIEWING") interviewing += 1;
+    if (jobs.length < 500) break;
+    cursor = jobs[jobs.length - 1].id;
   }
+
   return {
-    data: filtered.slice(start, start + limit),
+    data,
     meta: {
       page,
       limit,
@@ -419,152 +440,81 @@ function parseRequirementsJson(jsonStr: string): JobRequirements {
 }
 
 
-import { resolvePostedAgeDays } from "@/lib/jobs/posted-within";
 
 export interface CleanupStalePositionsOptions {
-  /** Maximum age in days before a position is purged. Defaults to 30 (1 month). */
   maxAgeDays?: number;
-  /** Reference time for age comparison. Defaults to new Date(). */
   now?: Date;
+  dryRun?: boolean;
 }
 
-export interface CleanupStalePositionsResult {
-  deletedIngestedJobs: number;
-  deletedDiscoveredJobs: number;
-  deletedJobs: number;
-  totalDeleted: number;
-  cutoffDate: string;
-  maxAgeDays: number;
-}
-
-/**
- * Purges positions older than `maxAgeDays` (default: 30 days / 1 month) across
- * `IngestedJob`, `DiscoveredJob`, and untracked/unapplied `Job` records.
- */
-export async function cleanupStalePositions(
-  options: CleanupStalePositionsOptions = {}
-): Promise<CleanupStalePositionsResult> {
-  const maxAgeDays = Math.max(1, options.maxAgeDays ?? 30);
+/** A non-destructive visibility audit. Identity and all linked history stay intact. */
+export async function cleanupStalePositions(options: CleanupStalePositionsOptions = {}) {
   const now = options.now ?? new Date();
-  const cutoffMs = now.getTime() - maxAgeDays * 24 * 60 * 60 * 1000;
-  const cutoffDate = new Date(cutoffMs);
-
-  // 1. Clean stale Job rows first so any linked IngestedJob rows can also be cleaned
-  const candidateJobs = await prisma.job.findMany({
-    where: { userId: null, status: "SAVED" },
-    select: { id: true, notes: true, createdAt: true },
-  });
-
-  const staleJobIds: string[] = [];
-  for (const job of candidateJobs) {
-    const rawPosted = extractPostingDateFromNotes(job.notes)?.trim() || null;
-    const cleanedPosted = rawPosted && !/^apply$/i.test(rawPosted) ? rawPosted : null;
-    const ageDays = resolvePostedAgeDays(cleanedPosted, now, job.createdAt);
-    const createdMs = new Date(job.createdAt).getTime();
-    const isStale =
-      (ageDays !== null && ageDays > maxAgeDays) ||
-      (!Number.isNaN(createdMs) && createdMs < cutoffMs);
-
-    if (isStale) {
-      staleJobIds.push(job.id);
-    }
-  }
-
-  let deletedJobs = 0;
-  if (staleJobIds.length > 0) {
-    deletedJobs = await prisma.$transaction(async (tx) => {
-      // FK inserts acquire KEY SHARE on Job. Lock parents first, then use a
-      // fresh READ COMMITTED snapshot to see references committed while waiting.
-      // This also prevents new references between the check and deletion.
-      await tx.$queryRaw(Prisma.sql`
-        SELECT "id" FROM "Job"
-        WHERE "id" IN (${Prisma.join(staleJobIds)})
-        ORDER BY "id" FOR UPDATE
-      `);
-      const removableWhere: Prisma.JobWhereInput = {
-        id: { in: staleJobIds },
-        userId: null,
-        status: "SAVED",
-        applications: { none: {} },
-        patchProposalBatches: { none: {} },
-        variants: { none: {} },
-        coverLetters: { none: {} },
-      };
-      const removableJobs = await tx.job.findMany({
-        where: removableWhere,
-        select: { id: true },
-      });
-      const removableIds = removableJobs.map((job) => job.id);
-      if (removableIds.length === 0) return 0;
-
-      await tx.ingestedJob.updateMany({
-        where: { trackedJobId: { in: removableIds } },
-        data: { trackedJobId: null },
-      });
-      const delJobsRes = await tx.job.deleteMany({
-        where: {
-          ...removableWhere,
-          id: { in: removableIds },
-        },
-      });
-      return delJobsRes.count;
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
-  }
-
-  // 2. Clean stale IngestedJob rows (unlinked to active tracked jobs)
-  const candidateIngested = await prisma.ingestedJob.findMany({
-    where: { trackedJobId: null },
-    select: { id: true, postedAt: true, createdAt: true },
-  });
-
-  const staleIngestedIds: string[] = [];
-  for (const item of candidateIngested) {
-    const effectiveDate = item.postedAt ?? item.createdAt;
-    const effectiveMs = new Date(effectiveDate).getTime();
-    if (!Number.isNaN(effectiveMs) && effectiveMs < cutoffMs) {
-      staleIngestedIds.push(item.id);
-    }
-  }
-
-  let deletedIngestedJobs = 0;
-  if (staleIngestedIds.length > 0) {
-    const delIngestedRes = await prisma.ingestedJob.deleteMany({
-      where: { id: { in: staleIngestedIds }, trackedJobId: null },
+  const maxAgeDays = options.maxAgeDays ?? jobMaxAgeDays();
+  // Bounded pages keep memory independent of catalog and history size.
+  const expired = { jobs: 0, ingestedJobs: 0, discoveredJobs: 0 };
+  const preserved = { applications: 0, variants: 0, coverLetters: 0, proposalBatches: 0, linkedIngestedJobs: 0 };
+  const pageSize = 500;
+  for (let cursor: string | undefined; ;) {
+    const rows = await prisma.job.findMany({
+      orderBy: { id: "asc" },
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      take: pageSize,
+      select: {
+        id: true,
+        notes: true,
+        createdAt: true,
+        _count: { select: { applications: true, variants: true, coverLetters: true, patchProposalBatches: true } },
+      },
     });
-    deletedIngestedJobs = delIngestedRes.count;
-  }
-
-  // 3. Clean stale DiscoveredJob rows
-  const candidateDiscovered = await prisma.discoveredJob.findMany({
-    select: { id: true, datePosted: true, createdAt: true },
-  });
-
-  const staleDiscoveredIds: string[] = [];
-  for (const item of candidateDiscovered) {
-    const ageDays = resolvePostedAgeDays(item.datePosted, now, item.createdAt);
-    const createdMs = new Date(item.createdAt).getTime();
-    if (
-      (ageDays !== null && ageDays > maxAgeDays) ||
-      (!Number.isNaN(createdMs) && createdMs < cutoffMs)
-    ) {
-      staleDiscoveredIds.push(item.id);
+    for (const j of rows) {
+      if (isBoardEligible(extractPostingDateFromNotes(j.notes), j.createdAt, now, maxAgeDays)) continue;
+      expired.jobs++;
+      if (j._count?.applications) preserved.applications++;
+      if (j._count?.variants) preserved.variants++;
+      if (j._count?.coverLetters) preserved.coverLetters++;
+      if (j._count?.patchProposalBatches) preserved.proposalBatches++;
     }
+    if (rows.length < pageSize) break;
+    cursor = rows[rows.length - 1].id;
   }
-
-  let deletedDiscoveredJobs = 0;
-  if (staleDiscoveredIds.length > 0) {
-    const delDiscoveredRes = await prisma.discoveredJob.deleteMany({
-      where: { id: { in: staleDiscoveredIds } },
+  for (let cursor: string | undefined; ;) {
+    const rows = await prisma.ingestedJob.findMany({
+      orderBy: { id: "asc" },
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      take: pageSize,
+      select: { id: true, postedAt: true, createdAt: true, trackedJobId: true },
     });
-    deletedDiscoveredJobs = delDiscoveredRes.count;
+    for (const j of rows) {
+      if (isBoardEligible(j.postedAt ? new Date(j.postedAt).toISOString() : null, j.createdAt, now, maxAgeDays)) continue;
+      expired.ingestedJobs++;
+      if (j.trackedJobId) preserved.linkedIngestedJobs++;
+    }
+    if (rows.length < pageSize) break;
+    cursor = rows[rows.length - 1].id;
   }
-
+  for (let cursor: string | undefined; ;) {
+    const rows = await prisma.discoveredJob.findMany({
+      orderBy: { id: "asc" },
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      take: pageSize,
+      select: { id: true, datePosted: true, createdAt: true },
+    });
+    for (const j of rows) {
+      if (!isBoardEligible(j.datePosted, j.createdAt, now, maxAgeDays)) expired.discoveredJobs++;
+    }
+    if (rows.length < pageSize) break;
+    cursor = rows[rows.length - 1].id;
+  }
   return {
-    deletedIngestedJobs,
-    deletedDiscoveredJobs,
-    deletedJobs,
-    totalDeleted: deletedIngestedJobs + deletedDiscoveredJobs + deletedJobs,
-    cutoffDate: cutoffDate.toISOString(),
+    dryRun: options.dryRun ?? false,
     maxAgeDays,
+    cutoffDate: new Date(now.getTime() - maxAgeDays * 86_400_000).toISOString(),
+    expired,
+    preserved,
+    deletedJobs: 0,
+    deletedIngestedJobs: 0,
+    deletedDiscoveredJobs: 0,
+    totalDeleted: 0,
   };
 }

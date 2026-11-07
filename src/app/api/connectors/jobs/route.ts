@@ -13,6 +13,7 @@ import {
 } from "@/lib/scoring/compatibility-engine";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
 import { getRequestUserId } from "@/lib/security/auth-request";
+import { jobMaxAgeDays } from "@/lib/jobs/expiry";
 import { loadScoringEvidence } from "@/lib/scoring/user-evidence";
 
 export const dynamic = "force-dynamic";
@@ -60,6 +61,13 @@ export async function GET(req: NextRequest) {
 
     const postedWithin = searchParams.get("postedWithin") || "all";
     const andConditions: Prisma.IngestedJobWhereInput[] = [];
+
+    const cutoff = new Date(Date.now() - jobMaxAgeDays() * 86_400_000);
+    const now = new Date();
+    andConditions.push({ OR: [
+      { postedAt: { gte: cutoff, lte: now } },
+      { AND: [{ OR: [{ postedAt: null }, { postedAt: { gt: now } }] }, { createdAt: { gte: cutoff } }] },
+    ] });
 
     if (canadianOnly) {
       andConditions.push({ isCanadianEligible: true });

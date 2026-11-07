@@ -1,5 +1,4 @@
 import { prisma } from "../prisma";
-import { cleanupStalePositions } from "../db/jobs";
 import { generateJobFingerprint } from "./dedupe";
 import { AdzunaCaConnector } from "./providers/adzuna";
 import { AshbyConnector } from "./providers/ashby";
@@ -84,7 +83,7 @@ export async function syncSingleConnector(
 
       const existing = await prisma.ingestedJob.findUnique({
         where: { fingerprint },
-        select: { id: true },
+        select: { id: true, postedAt: true, createdAt: true },
       });
 
       await prisma.ingestedJob.upsert({
@@ -96,7 +95,10 @@ export async function syncSingleConnector(
           description: item.descriptionPlain,
           descriptionHtml: item.descriptionHtml,
           applyUrl: item.applyUrl,
-          postedAt: item.postedAt,
+          postedAt: item.postedAt && item.postedAt <= new Date() &&
+            (!existing?.postedAt || item.postedAt.getTime() > new Date(existing.postedAt).getTime())
+            ? item.postedAt
+            : existing?.postedAt ?? null,
           salaryMin: item.compensation?.min,
           salaryMax: item.compensation?.max,
           salaryCurrency: item.compensation?.currency || "CAD",
@@ -114,7 +116,7 @@ export async function syncSingleConnector(
           description: item.descriptionPlain,
           descriptionHtml: item.descriptionHtml,
           applyUrl: item.applyUrl,
-          postedAt: item.postedAt,
+          postedAt: item.postedAt && item.postedAt <= new Date() ? item.postedAt : null,
           salaryMin: item.compensation?.min,
           salaryMax: item.compensation?.max,
           salaryCurrency: item.compensation?.currency || "CAD",
@@ -176,7 +178,7 @@ export async function syncSingleConnector(
 
 /**
  * Runs all active connectors in parallel using Promise.allSettled,
- * then purges positions older than 30 days (1 month).
+ * with expiry audited independently.
  */
 export async function syncAllConnectors(options?: {
   sources?: SourceConnector[];
@@ -188,7 +190,6 @@ export async function syncAllConnectors(options?: {
   const tasks = targetKeys.map((key) => syncSingleConnector(CONNECTORS[key]));
   const settlements = await Promise.allSettled(tasks);
 
-  await cleanupStalePositions().catch(() => null);
 
   return settlements.map((s, idx) => {
     const key = targetKeys[idx];
