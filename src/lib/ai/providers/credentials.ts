@@ -1,4 +1,15 @@
 import { isDemoMode } from "@/lib/demo-mode";
+import type { ProviderConfig } from "../types";
+
+const SERVER_MANAGED_LOCAL_CONFIGS = new WeakSet<ProviderConfig>();
+
+export function markServerManagedLocalConfig(config: ProviderConfig): void {
+  SERVER_MANAGED_LOCAL_CONFIGS.add(config);
+}
+
+export function isServerManagedLocalConfig(config: ProviderConfig): boolean {
+  return SERVER_MANAGED_LOCAL_CONFIGS.has(config);
+}
 
 function originOf(raw: string | undefined): string | null {
   const trimmed = raw?.trim();
@@ -13,18 +24,23 @@ function originOf(raw: string | undefined): string | null {
   }
 }
 
-/**
- * Server env API keys attach only to trusted origins, including scheme and port.
- * A request-supplied baseUrl on a different origin must bring its own apiKey.
- */
-export function resolveProviderCredentials(input: {
+export interface ProviderCredentialInput {
   configApiKey?: string;
   configBaseUrl?: string;
   envApiKey?: string;
   envBaseUrl?: string;
   defaultBaseUrl: string;
   officialHosts: string[];
-}): { apiKey: string | undefined; baseUrl: string } {
+  allowDefaultLocalhost?: boolean;
+}
+
+/**
+ * Server env API keys attach only to trusted origins, including scheme and port.
+ * A request-supplied baseUrl on a different origin must bring its own apiKey.
+ */
+export function resolveProviderCredentialsWithHostPolicy(
+  input: ProviderCredentialInput
+): { apiKey: string | undefined; baseUrl: string; allowLocalhost: boolean } {
   const clientKey = input.configApiKey?.trim() || undefined;
   const clientBase = input.configBaseUrl?.trim() || undefined;
   const envKey = isDemoMode() ? undefined : input.envApiKey?.trim() || undefined;
@@ -45,5 +61,16 @@ export function resolveProviderCredentials(input: {
     }
   }
 
+  // Only allow development loopback for server-configured local providers, never caller-selected URLs.
+  const isServerLocal = !clientBase && (Boolean(envBase) || Boolean(input.allowDefaultLocalhost));
+  const allowLocalhost = process.env.NODE_ENV !== "production" && isServerLocal;
+
+  return { apiKey, baseUrl, allowLocalhost };
+}
+
+export function resolveProviderCredentials(
+  input: ProviderCredentialInput
+): { apiKey: string | undefined; baseUrl: string } {
+  const { apiKey, baseUrl } = resolveProviderCredentialsWithHostPolicy(input);
   return { apiKey, baseUrl };
 }

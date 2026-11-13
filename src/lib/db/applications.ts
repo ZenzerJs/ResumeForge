@@ -1,5 +1,8 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { JobStatus } from "@/lib/db/jobs";
+
+type DbClient = Prisma.TransactionClient | typeof prisma;
 
 export class ApplicationInputError extends Error {
   constructor(message: string) {
@@ -17,13 +20,21 @@ export interface UpsertApplicationInput {
 export async function upsertApplication(
   userId: string,
   jobId: string,
-  input: UpsertApplicationInput
+  input: UpsertApplicationInput,
+  tx?: Prisma.TransactionClient
 ) {
-  const job = await prisma.job.findFirst({ where: { id: jobId }, select: { id: true } });
+  const db: DbClient = tx ?? prisma;
+  const job = await db.job.findFirst({
+    where: {
+      id: jobId,
+      OR: [{ userId: null }, { userId }],
+    },
+    select: { id: true },
+  });
   if (!job) return null;
 
   if (input.variantId) {
-    const variant = await prisma.resumeVariant.findFirst({
+    const variant = await db.resumeVariant.findFirst({
       where: {
         id: input.variantId,
         jobId,
@@ -36,7 +47,7 @@ export async function upsertApplication(
     }
   }
 
-  const existing = await prisma.jobApplication.findFirst({
+  const existing = await db.jobApplication.findFirst({
     where: { userId, jobId },
   });
 
@@ -55,11 +66,11 @@ export async function upsertApplication(
   };
 
   const saved = existing
-    ? await prisma.jobApplication.update({
+    ? await db.jobApplication.update({
         where: { id: existing.id },
         data,
       })
-    : await prisma.jobApplication.create({
+    : await db.jobApplication.create({
         data: {
           userId,
           jobId,
@@ -68,7 +79,7 @@ export async function upsertApplication(
       });
 
   if (!existing || existing.status !== nextStatus) {
-    await prisma.applicationEvent.create({
+    await db.applicationEvent.create({
       data: {
         applicationId: saved.id,
         fromStatus: existing?.status ?? null,

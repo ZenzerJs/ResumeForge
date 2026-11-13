@@ -5,10 +5,21 @@ import { demoAllowsMutation, isDemoMode } from "@/lib/demo-mode";
 
 export const HEAVY_ENDPOINT_LIMITS: Record<string, { limit: number; windowMs: number }> = {
   "/api/jobs/bulk-import": { limit: 10, windowMs: 60_000 },
+  "/api/jobs/hydrate": { limit: 10, windowMs: 60_000 },
   "/api/resumes/upload-pdf": { limit: 10, windowMs: 60_000 },
   "/api/jobs/extract": { limit: 15, windowMs: 60_000 },
   "/api/connectors/sync": { limit: 5, windowMs: 60_000 },
 };
+
+const FETCH_FULLTEXT_LIMIT = {
+  namespace: "heavy:/api/jobs/[id]/fetch-fulltext",
+  limit: 15,
+  windowMs: 60_000,
+};
+
+function isFetchFulltextPath(pathname: string): boolean {
+  return /^\/api\/jobs\/[^/]+\/fetch-fulltext$/.test(pathname);
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -58,6 +69,16 @@ export async function middleware(request: NextRequest) {
     }
   } else if (heavyConfig) {
     if (!rateLimit(clientKey(request, `heavy:${pathname}`), heavyConfig.limit, heavyConfig.windowMs)) {
+      return NextResponse.json({ success: false, error: "Too many requests" }, { status: 429 });
+    }
+  } else if (isFetchFulltextPath(pathname)) {
+    if (
+      !rateLimit(
+        clientKey(request, FETCH_FULLTEXT_LIMIT.namespace),
+        FETCH_FULLTEXT_LIMIT.limit,
+        FETCH_FULLTEXT_LIMIT.windowMs
+      )
+    ) {
       return NextResponse.json({ success: false, error: "Too many requests" }, { status: 429 });
     }
   } else if (pathname.startsWith("/api/companies/") && pathname.endsWith("/dossier/generate")) {

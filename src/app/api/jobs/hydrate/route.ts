@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchAndCacheJobFullText } from "@/lib/ingestion/tier2-fetcher";
 import { isPlaceholderDescription } from "@/lib/ingestion/helpers";
 import { getJobById } from "@/lib/db/jobs";
-import { getRequestUserId } from "@/lib/security/auth-request";
+import { requireUserId } from "@/lib/security/auth-request";
 import { sanitizeError } from "@/lib/ai/redact";
 
 const MAX_IDS_PER_REQUEST = 8;
@@ -23,7 +23,9 @@ interface HydrateResult {
  */
 export async function POST(req: NextRequest) {
   try {
-    const userId = await getRequestUserId(req);
+    const authResult = await requireUserId(req);
+    if (authResult instanceof NextResponse) return authResult;
+    const userId = authResult;
 
     const body = (await req.json().catch(() => ({}))) as { ids?: unknown; retry?: unknown };
     const ids = Array.isArray(body.ids)
@@ -43,12 +45,12 @@ export async function POST(req: NextRequest) {
         const id = queue.shift();
         if (!id) return;
         try {
-          const job = await getJobById(id);
+          const job = await getJobById(id, userId);
           if (!job) {
             results.push({ id, status: "skipped" });
             continue;
           }
-          if (job.userId !== null && job.userId !== userId) {
+          if (job.userId != null && job.userId !== userId) {
             results.push({ id, status: "skipped" });
             continue;
           }
@@ -60,7 +62,7 @@ export async function POST(req: NextRequest) {
             results.push({ id, status: "skipped" });
             continue;
           }
-          const res = await fetchAndCacheJobFullText(id);
+          const res = await fetchAndCacheJobFullText(id, { viewerUserId: userId });
           if (res.success && res.data) {
             results.push({ id, status: "ok", rawDescription: res.data.rawDescription });
           } else {

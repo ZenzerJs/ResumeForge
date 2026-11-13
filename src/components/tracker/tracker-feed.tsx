@@ -303,6 +303,9 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           });
           const json = await res.json();
           if (!mountedRef.current) return;
+          if (res.status === 401 || res.status === 429) {
+            break;
+          }
           if (res.ok && json.success) {
             const results = (json.results ?? []) as Array<{ id: string; status: string; rawDescription?: string }>;
             const filled = new Map<string, string>(
@@ -446,13 +449,27 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         setJobs((prev) => prev.map((job) => job.id === jobId ? { ...job, notes } : job));
         return;
       }
-      await fetch(`/api/jobs/${jobId}`, {
+      const res = await fetch(`/api/jobs/${jobId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notes: editingNotes[jobId] || "" }),
       });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.success) {
+        const nextNotes = json.data?.notes ?? (editingNotes[jobId] || "");
+        setJobs((prev) => prev.map((job) => (job.id === jobId ? { ...job, notes: nextNotes } : job)));
+        setTier2Notice((p) => ({ ...p, [jobId]: "" }));
+      } else {
+        const msg =
+          res.status === 404
+            ? "Shared catalog postings are read-only and cannot have notes edited."
+            : json?.error || "Unable to save notes on this job posting.";
+        setTier2Notice((p) => ({ ...p, [jobId]: msg }));
+        setImportNotice(msg);
+      }
     } catch {
       console.error("Failed to save notes");
+      setImportNotice("Network error saving notes.");
     } finally {
       setIsSavingNotes((p) => ({ ...p, [jobId]: false }));
     }
@@ -473,7 +490,19 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         }
         return;
       }
-      await fetch(`/api/jobs/${jobId}`, { method: "DELETE" });
+      const res = await fetch(`/api/jobs/${jobId}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        const msg =
+          res.status === 409
+            ? json?.error || "Cannot delete this job posting because it has dependent history."
+            : res.status === 404
+              ? "Only your personal job postings can be deleted; shared catalog postings cannot be deleted."
+              : json?.error || "Failed to delete job posting.";
+        setTier2Notice((p) => ({ ...p, [jobId]: msg }));
+        setImportNotice(msg);
+        return;
+      }
       setJobs((prev) => prev.filter((j) => j.id !== jobId));
       if (activeJobId === jobId) {
         setActiveJobId(null);
@@ -482,6 +511,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       }
     } catch {
       console.error("Failed to delete job");
+      setImportNotice("Network error deleting job posting.");
     }
   };
 

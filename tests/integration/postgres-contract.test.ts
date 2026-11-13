@@ -9,9 +9,11 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { createPatchCitations, readPatchCitations } from "@/lib/ai/patch-citations";
 import { DELETE as evidenceDELETE } from "@/app/api/evidence/[id]/route";
+import { PATCH as jobByIdPATCH, DELETE as jobByIdDELETE } from "@/app/api/jobs/[id]/route";
 import { createProposalBatch, createDiagnosticProposalBatch, applyProposalBatch } from "@/lib/ai/patch-batches";
 import { applyPatchProposals } from "@/lib/ai/patch-application";
 import { getVariantById } from "@/lib/db/variants";
+import { authedRequest } from "../helpers/auth";
 
 describe("real PostgreSQL contracts", () => {
   const userIds: string[] = [];
@@ -457,6 +459,70 @@ describe("real PostgreSQL contracts", () => {
     expect(sparseDiagnostic).toContain("Built payment API with reliable transaction processing.");
     expect(sparseDiagnostic).toContain("Built resilient workflow service.");
     expect(sparseDiagnostic).toContain("- Old diagnostic two");
+  });
+
+  it("rolls back mixed job PATCH on forbidden catalog fields and returns 409 on blocked owned job DELETE", async () => {
+    const suffix = crypto.randomUUID();
+    const owner = await createTestUser(`job-owner-${suffix}@test.invalid`);
+    const other = await createTestUser(`job-other-${suffix}@test.invalid`);
+    userIds.push(owner.user.id, other.user.id);
+
+    const sharedJob = await prisma.job.create({
+      data: { company: "Shared Co", roleTitle: "SRE", rawDescription: "Kubernetes TypeScript." },
+    });
+    const ownedJob = await prisma.job.create({
+      data: { userId: owner.user.id, company: "Owned Co", roleTitle: "SRE", rawDescription: "Owned draft." },
+    });
+    jobIds.push(sharedJob.id, ownedJob.id);
+
+    const mixedForbidden = await jobByIdPATCH(
+      authedRequest(
+        `http://localhost:3000/api/jobs/${sharedJob.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "APPLIED", company: "Hijacked Co" }),
+        },
+        other.cookie
+      ),
+      { params: Promise.resolve({ id: sharedJob.id }) }
+    );
+    expect(mixedForbidden.status).toBe(404);
+    expect(
+      await prisma.jobApplication.findFirst({ where: { userId: other.user.id, jobId: sharedJob.id } })
+    ).toBeNull();
+
+    // Attach owner application + master + proposal batch so DELETE is blocked with 409 and preserves owner state.
+    await prisma.jobApplication.create({
+      data: { userId: owner.user.id, jobId: ownedJob.id, status: "APPLIED" },
+    });
+    const master = await prisma.resume.create({
+      data: { userId: owner.user.id, title: "M", typstSource: "= M", isMaster: true, isProtected: true },
+    });
+    await prisma.patchProposalBatch.create({
+      data: {
+        userId: owner.user.id,
+        masterResumeId: master.id,
+        jobId: ownedJob.id,
+        revisionToken: `tok-${suffix}`,
+        masterFingerprint: "m-fp",
+        jobFingerprint: "j-fp",
+        citationFingerprint: "c-fp",
+        proposals: [],
+        gaps: [],
+        expiresAt: new Date(Date.now() + 3600_000),
+      },
+    });
+
+    const blockedDelete = await jobByIdDELETE(
+      authedRequest(`http://localhost:3000/api/jobs/${ownedJob.id}`, { method: "DELETE" }, owner.cookie),
+      { params: Promise.resolve({ id: ownedJob.id }) }
+    );
+    expect(blockedDelete.status).toBe(409);
+    expect(await prisma.job.findUnique({ where: { id: ownedJob.id } })).not.toBeNull();
+    expect(
+      await prisma.jobApplication.findFirst({ where: { userId: owner.user.id, jobId: ownedJob.id } })
+    ).not.toBeNull();
   });
 
 });

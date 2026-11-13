@@ -11,6 +11,16 @@ import {
 } from "@/lib/ai/chat-loop";
 import { POST as chatPOST } from "@/app/api/ai/chat/route";
 import { sendChatCompletion } from "@/lib/ai/gateway";
+import { guestSaveResponse, requireUserId } from "@/lib/security/auth-request";
+import { prisma } from "@/lib/prisma";
+
+vi.mock("@/lib/security/auth-request", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/security/auth-request")>();
+  return {
+    ...actual,
+    requireUserId: vi.fn().mockResolvedValue("user-chat-1"),
+  };
+});
 
 vi.mock("@/lib/ai/gateway", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/ai/gateway")>();
@@ -23,6 +33,7 @@ vi.mock("@/lib/ai/gateway", async (importOriginal) => {
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     job: {
+      findFirst: vi.fn().mockResolvedValue(null),
       findUnique: vi.fn().mockResolvedValue(null),
     },
   },
@@ -31,6 +42,8 @@ vi.mock("@/lib/prisma", () => ({
 describe("Career assistant chat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(requireUserId).mockResolvedValue("user-chat-1");
+    vi.mocked(prisma.job.findFirst).mockResolvedValue(null);
   });
 
   it("system prompt includes master guardrails and tool names", () => {
@@ -123,6 +136,52 @@ describe("Career assistant chat", () => {
     });
     expect(ok).toContain("get_ats_score");
     expect(scoreChunks.some((c) => (c as { type: string }).type === "tool_result")).toBe(true);
+  });
+
+  it("chat API route returns 401 before body parsing or SSE when unauthenticated", async () => {
+    vi.mocked(requireUserId).mockResolvedValueOnce(guestSaveResponse());
+    const badJsonReq = new Request("http://localhost/api/ai/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{not-json",
+    });
+
+    const response = await chatPOST(badJsonReq);
+    expect(response.status).toBe(401);
+    expect(response.headers.get("Content-Type")).toContain("application/json");
+    expect(sendChatCompletion).not.toHaveBeenCalled();
+    expect(prisma.job.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("chat API route scopes activeJobId lookup and omits unauthorized jobs", async () => {
+    vi.mocked(prisma.job.findFirst).mockResolvedValueOnce(null);
+    vi.mocked(sendChatCompletion).mockResolvedValueOnce({
+      content: "Checked without private job.",
+      toolCalls: [],
+    });
+
+    const response = await chatPOST(
+      new Request("http://localhost/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: "Summarize the target role." }],
+          providerConfig: { provider: "openai", apiKey: "sk-test" },
+          context: { activeJobId: "private-other-job" },
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await response.text();
+    expect(prisma.job.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: "private-other-job" }),
+        select: { id: true, roleTitle: true, company: true },
+      })
+    );
+    const messagesPassed = vi.mocked(sendChatCompletion).mock.calls[0][1];
+    expect(JSON.stringify(messagesPassed)).not.toContain("private-other-job");
   });
 
   it("chat API route emits SSE error when provider config is missing", async () => {

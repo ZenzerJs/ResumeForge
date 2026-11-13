@@ -317,3 +317,13 @@
     }
   }
 }
+
+.typst-preview-svg svg.typst-doc {
+  fill: none;
+}
+
+.typst-preview-svg .pseudo-link {
+  fill: transparent;
+  cursor: pointer;
+  pointer-events: all;
+}

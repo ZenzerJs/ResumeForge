@@ -412,13 +412,20 @@ export function TailorWorkspace() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
-          const updateJson = await updateRes.json();
+          const updateJson = await updateRes.json().catch(() => ({}));
           if (updateRes.ok && updateJson.success) {
             setSaveStatus("Job posting saved to database.");
             return existingId;
           }
+          if (updateRes.status === 404) {
+            setSaveStatus("Shared catalog postings are read-only; using your edits in-session.");
+            return existingId;
+          }
+          setSaveStatus(updateJson?.error || "Unable to update saved job posting.");
+          return existingId;
         } catch {
-          // fall through to create if update fails unexpectedly
+          setSaveStatus("Network error updating job posting.");
+          return existingId;
         }
       }
       return existingId;
@@ -431,6 +438,7 @@ export function TailorWorkspace() {
         body: JSON.stringify({
           ...payload,
           source: "pasted",
+          personal: true,
         }),
       });
       const saveJson = await saveRes.json().catch(() => ({}));
@@ -701,6 +709,10 @@ export function TailorWorkspace() {
         });
         const json = await res.json();
         if (generation !== scanGenerationRef.current) return;
+        if (res.status === 401) {
+          setErrorMessage(json.error || "Sign in to extract job requirements.");
+          return;
+        }
         if (res.ok && json.success && json.data) {
           setExtractedRequirements(json.data);
           if (json.data.roleTitle && !roleTitleRef.current) {

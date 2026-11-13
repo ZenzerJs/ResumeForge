@@ -198,9 +198,34 @@ export function AtsSandboxSection() {
   const [isEditingSnippet, setIsEditingSnippet] = useState<boolean>(false);
   const [previewTab, setPreviewTab] = useState<"svg" | "source">("svg");
   const [svgOutput, setSvgOutput] = useState<string | null>(PRESET_STATIC_SVGS.backend);
+  const [sanitizedSvg, setSanitizedSvg] = useState<{
+    raw: string;
+    clean: string | null;
+    error: string | null;
+  } | null>(null);
   const [isCompiling, setIsCompiling] = useState<boolean>(false);
   const [compileError, setCompileError] = useState<string | null>(null);
   const [showDerivationLog, setShowDerivationLog] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!svgOutput) {
+      setSanitizedSvg(null);
+      return;
+    }
+    let cancelled = false;
+    import("@/lib/typst/svg-sanitize").then(({ sanitizeTypstSvg }) => {
+      if (cancelled) return;
+      const res = sanitizeTypstSvg(svgOutput);
+      setSanitizedSvg(
+        res.ok
+          ? { raw: svgOutput, clean: res.svg, error: null }
+          : { raw: svgOutput, clean: null, error: res.error }
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [svgOutput]);
 
   // Switch presets
   const handleSelectPreset = (preset: PresetRole) => {
@@ -235,9 +260,11 @@ export function AtsSandboxSection() {
 
     const timer = setTimeout(() => {
       import("@/lib/typst/compiler")
-        .then(({ compileTypstToSvg }) => compileTypstToSvg(customSnippet))
+        .then(({ compileTypstToSvg }) =>
+          compileTypstToSvg(customSnippet, { callerId: "ats-sandbox", mode: "live" }),
+        )
         .then((result) => {
-          if (cancelled) return;
+          if (cancelled || ("superseded" in result && result.superseded)) return;
           if (result.success) {
             setSvgOutput(result.svg);
           } else {
@@ -599,11 +626,26 @@ export function AtsSandboxSection() {
                       Error compiling Typst: {compileError}
                     </div>
                   ) : svgOutput ? (
-                    <div
-                      className="w-full bg-white rounded-lg shadow-xl overflow-hidden p-2"
-                      style={{ maxWidth: "580px" }}
-                      dangerouslySetInnerHTML={{ __html: svgOutput }}
-                    />
+                    sanitizedSvg?.raw === svgOutput && sanitizedSvg.error ? (
+                      <div
+                        data-testid="sandbox-svg-error"
+                        role="alert"
+                        className="text-xs md:text-sm text-rose-300 font-mono p-4 border border-rose-800 rounded-xl bg-rose-950/40"
+                      >
+                        {sanitizedSvg.error}
+                      </div>
+                    ) : sanitizedSvg?.raw === svgOutput && sanitizedSvg.clean ? (
+                      <div
+                        className="typst-preview-svg w-full bg-white rounded-lg shadow-xl overflow-hidden p-2 [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-w-full"
+                        style={{ maxWidth: "580px" }}
+                        dangerouslySetInnerHTML={{ __html: sanitizedSvg.clean }}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-3 text-slate-400 text-xs md:text-sm font-mono">
+                        <Loader2 className="h-6 w-6 animate-spin text-amber-400" />
+                        <span>Verifying SVG preview...</span>
+                      </div>
+                    )
                   ) : (
                     <div className="text-xs md:text-sm text-slate-500 font-mono">
                       Ready to compile. Select a role above.

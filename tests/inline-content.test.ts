@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createInlineRenderer, renderInlineContent } from "@/lib/typst/inline-content";
+import { createInlineRenderer, renderInlineContent, safeDestination } from "@/lib/typst/inline-content";
 
 describe("source-backed inline contact links", () => {
   it("links combined contact fields without losing phone, location, or separators", () => {
@@ -31,5 +31,15 @@ describe("source-backed inline contact links", () => {
     expect(renderer.render('Hi #eval("danger") [x] *text*')).toBe('Hi \\#eval("danger") \\[x\\] \\*text\\*');
     expect(renderer.render("Strong text", [{ start: 0, end: 6, kind: "bold" }])).toBe("#strong[Strong] text");
     expect(() => renderer.render("short", [{ start: 0, end: 100, kind: "bold" }])).toThrow();
+  });
+
+  it("validates only safe HTTP(S) and mailto destinations via safeDestination", () => {
+    expect(safeDestination("https://example.com")).toBe("https://example.com/");
+    expect(safeDestination("mailto:alex@example.com")).toBe("mailto:alex@example.com");
+    expect(safeDestination("javascript:alert(1)")).toBeNull();
+    expect(safeDestination("data:text/html,<script>alert(1)</script>")).toBeNull();
+    expect(safeDestination("file:///etc/passwd")).toBeNull();
+    expect(safeDestination("https://user:pass@example.com/")).toBeNull();
+    expect(safeDestination("https://example.com/\r\ninjected")).toBeNull();
   });
 });

@@ -5,13 +5,17 @@ import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from
 import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
 import type { ChatCompletionResult } from "./custom";
 import { safeFetch } from "@/lib/security/safe-fetch";
-import { resolveProviderCredentials } from "./credentials";
+import { resolveProviderCredentialsWithHostPolicy } from "./credentials";
 
-function providerFetch(url: string, init?: RequestInit): Promise<Response> {
+function providerFetch(url: string, init?: RequestInit, allowLocalhost = false): Promise<Response> {
   return safeFetch(url, init ?? {}, {
     timeoutMs: 130_000,
-    allowLocalhost: process.env.NODE_ENV !== "production",
+    allowLocalhost,
   });
+}
+
+function scopedProviderFetch(allowLocalhost: boolean) {
+  return (url: string, init?: RequestInit) => providerFetch(url, init, allowLocalhost);
 }
 
 function geminiHeaders(apiKey: string): HeadersInit {
@@ -30,7 +34,7 @@ function resolveGeminiModel(model: string | undefined, fallback = "gemini-2.5-fl
 }
 
 export async function testGeminiConnection(config: ProviderConfig): Promise<TestConnectionResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.GEMINI_API_KEY,
@@ -49,7 +53,7 @@ export async function testGeminiConnection(config: ProviderConfig): Promise<Test
 
   const startTime = Date.now();
   try {
-    const res = await providerFetch(`${baseUrl}/v1beta/models`, {
+  const res = await scopedProviderFetch(allowLocalhost)(`${baseUrl}/v1beta/models`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -105,7 +109,7 @@ export async function generateGeminiPatches(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.GEMINI_API_KEY,
@@ -120,7 +124,7 @@ export async function generateGeminiPatches(
   }
 
   try {
-    const res = await providerFetch(
+    const res = await scopedProviderFetch(allowLocalhost)(
       `${baseUrl}/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
@@ -168,7 +172,7 @@ export async function generateGeminiQualitativeReview(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.GEMINI_API_KEY,
@@ -183,7 +187,7 @@ export async function generateGeminiQualitativeReview(
   }
 
   try {
-    const res = await providerFetch(
+    const res = await scopedProviderFetch(allowLocalhost)(
       `${baseUrl}/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
@@ -231,7 +235,7 @@ export async function generateGeminiCoverLetter(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.GEMINI_API_KEY,
@@ -246,7 +250,7 @@ export async function generateGeminiCoverLetter(
   }
 
   try {
-    const res = await providerFetch(
+    const res = await scopedProviderFetch(allowLocalhost)(
       `${baseUrl}/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
@@ -294,7 +298,7 @@ export async function convertGeminiPdfTextToTypst(
   systemPrompt: string,
   userPrompt: string
 ): Promise<ConvertPdfResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.GEMINI_API_KEY,
@@ -309,7 +313,7 @@ export async function convertGeminiPdfTextToTypst(
   }
 
   try {
-    const res = await providerFetch(
+    const res = await scopedProviderFetch(allowLocalhost)(
       `${baseUrl}/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
@@ -355,7 +359,7 @@ export async function repairTypstWithGemini(
   config: ProviderConfig,
   input: TypstRepairInput
 ): Promise<{ success: boolean; data?: TypstRepairProposal; error?: string }> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.GEMINI_API_KEY,
@@ -373,7 +377,7 @@ export async function repairTypstWithGemini(
   const userPrompt = buildTypstRepairUserPrompt(input);
 
   try {
-    const res = await providerFetch(
+    const res = await scopedProviderFetch(allowLocalhost)(
       `${baseUrl}/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
@@ -436,7 +440,7 @@ export async function chatGemini(
   messages: Array<{ role: string; content: string }>,
   tools: any[],
 ): Promise<ChatCompletionResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.GEMINI_API_KEY,
@@ -474,7 +478,7 @@ export async function chatGemini(
     body.tools = [{ functionDeclarations }];
   }
 
-  const res = await providerFetch(
+  const res = await scopedProviderFetch(allowLocalhost)(
     `${baseUrl}/v1beta/models/${model}:generateContent`,
     {
       method: "POST",

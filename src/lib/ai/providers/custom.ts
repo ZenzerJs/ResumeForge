@@ -4,11 +4,38 @@ import { stripCodeFences } from "../utils";
 import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from "../repair-schema";
 import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
 import { safeFetch } from "@/lib/security/safe-fetch";
-import { resolveProviderCredentials } from "./credentials";
+import { isServerManagedLocalConfig, resolveProviderCredentialsWithHostPolicy } from "./credentials";
 
-async function customFetch(url: string, init?: RequestInit): Promise<Response> {
+function resolveCustomCredentials(config: ProviderConfig) {
+  const isServerManagedOllama =
+    config.provider === "ollama" && isServerManagedLocalConfig(config);
+  return resolveProviderCredentialsWithHostPolicy({
+    configApiKey: config.apiKey,
+    configBaseUrl: isServerManagedOllama ? undefined : config.baseUrl,
+    envApiKey:
+      config.provider === "ollama" ? undefined : process.env.CUSTOM_OPENAI_API_KEY,
+    envBaseUrl:
+      config.provider === "ollama"
+        ? isServerManagedOllama
+          ? config.baseUrl
+          : process.env.OLLAMA_BASE_URL
+        : process.env.CUSTOM_OPENAI_BASE_URL,
+    defaultBaseUrl:
+      config.provider === "ollama"
+        ? "http://localhost:11434/v1"
+        : "http://localhost:8000",
+    officialHosts: [],
+    allowDefaultLocalhost: config.provider !== "groq",
+  });
+}
+
+async function customFetch(
+  url: string,
+  init?: RequestInit,
+  allowLocalhost = false,
+): Promise<Response> {
   return safeFetch(url, init ?? {}, {
-    allowLocalhost: process.env.NODE_ENV !== "production",
+    allowLocalhost,
     timeoutMs: 120_000,
   });
 }
@@ -27,14 +54,7 @@ export async function chatCustom(
   messages: Array<{ role: string; content: string }>,
   tools: any[],
 ): Promise<ChatCompletionResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.CUSTOM_OPENAI_API_KEY,
-    envBaseUrl: process.env.CUSTOM_OPENAI_BASE_URL,
-    defaultBaseUrl: "http://localhost:8000",
-    officialHosts: [],
-  });
+  const { apiKey, baseUrl, allowLocalhost } = resolveCustomCredentials(config);
   const model = config.model?.trim() || "default";
 
   const completionsUrl = baseUrl.endsWith("/v1")
@@ -54,7 +74,7 @@ export async function chatCustom(
     method: "POST",
     headers,
     body: JSON.stringify(body),
-  });
+  }, allowLocalhost);
 
   if (!res.ok) {
     let errBody = "";
@@ -88,14 +108,7 @@ export async function chatCustom(
  * Connects to any local or self-hosted endpoint that implements OpenAI-compatible API schemas.
  */
 export async function testCustomConnection(config: ProviderConfig): Promise<TestConnectionResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.CUSTOM_OPENAI_API_KEY,
-    envBaseUrl: process.env.CUSTOM_OPENAI_BASE_URL,
-    defaultBaseUrl: "http://localhost:8000",
-    officialHosts: [],
-  });
+  const { apiKey, baseUrl, allowLocalhost } = resolveCustomCredentials(config);
 
   const startTime = Date.now();
   try {
@@ -112,14 +125,14 @@ export async function testCustomConnection(config: ProviderConfig): Promise<Test
     let res = await customFetch(targetUrl, {
       method: "GET",
       headers,
-    });
+    }, allowLocalhost);
 
     // Fallback: try raw /models if /v1/models returns 404
     if (res.status === 404 && !baseUrl.endsWith("/v1")) {
       res = await customFetch(`${baseUrl}/models`, {
         method: "GET",
         headers,
-      });
+      }, allowLocalhost);
     }
 
     const latencyMs = Date.now() - startTime;
@@ -173,14 +186,7 @@ export async function generateCustomPatches(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.CUSTOM_OPENAI_API_KEY,
-    envBaseUrl: process.env.CUSTOM_OPENAI_BASE_URL,
-    defaultBaseUrl: "http://localhost:8000",
-    officialHosts: [],
-  });
+  const { apiKey, baseUrl, allowLocalhost } = resolveCustomCredentials(config);
   const model = config.model?.trim() || "default";
 
   const completionsUrl = baseUrl.endsWith("/v1")
@@ -206,7 +212,7 @@ export async function generateCustomPatches(
         ],
         temperature: 0.3,
       }),
-    });
+    }, allowLocalhost);
 
     if (!res.ok) {
       let errBody = "";
@@ -240,14 +246,7 @@ export async function generateCustomQualitativeReview(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.CUSTOM_OPENAI_API_KEY,
-    envBaseUrl: process.env.CUSTOM_OPENAI_BASE_URL,
-    defaultBaseUrl: "http://localhost:8000",
-    officialHosts: [],
-  });
+  const { apiKey, baseUrl, allowLocalhost } = resolveCustomCredentials(config);
   const model = config.model?.trim() || "default";
 
   const completionsUrl = baseUrl.endsWith("/v1")
@@ -273,7 +272,7 @@ export async function generateCustomQualitativeReview(
         ],
         temperature: 0.3,
       }),
-    });
+    }, allowLocalhost);
 
     if (!res.ok) {
       let errBody = "";
@@ -307,14 +306,7 @@ export async function generateCustomCoverLetter(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.CUSTOM_OPENAI_API_KEY,
-    envBaseUrl: process.env.CUSTOM_OPENAI_BASE_URL,
-    defaultBaseUrl: "http://localhost:8000",
-    officialHosts: [],
-  });
+  const { apiKey, baseUrl, allowLocalhost } = resolveCustomCredentials(config);
   const model = config.model?.trim() || "default";
 
   const completionsUrl = baseUrl.endsWith("/v1")
@@ -340,7 +332,7 @@ export async function generateCustomCoverLetter(
         ],
         temperature: 0.4,
       }),
-    });
+    }, allowLocalhost);
 
     if (!res.ok) {
       let errBody = "";
@@ -374,14 +366,7 @@ export async function convertCustomPdfTextToTypst(
   systemPrompt: string,
   userPrompt: string
 ): Promise<ConvertPdfResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.CUSTOM_OPENAI_API_KEY,
-    envBaseUrl: process.env.CUSTOM_OPENAI_BASE_URL,
-    defaultBaseUrl: "http://localhost:8000",
-    officialHosts: [],
-  });
+  const { apiKey, baseUrl, allowLocalhost } = resolveCustomCredentials(config);
   const model = config.model?.trim() || "default";
 
   const completionsUrl = baseUrl.endsWith("/v1")
@@ -408,7 +393,7 @@ export async function convertCustomPdfTextToTypst(
         temperature: 0.2,
       }),
       signal: AbortSignal.timeout(30000),
-    });
+    }, allowLocalhost);
 
     if (!res.ok) {
       let errBody = "";
@@ -439,14 +424,7 @@ export async function repairTypstWithCustom(
   config: ProviderConfig,
   input: TypstRepairInput
 ): Promise<{ success: boolean; data?: TypstRepairProposal; error?: string }> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.CUSTOM_OPENAI_API_KEY,
-    envBaseUrl: process.env.CUSTOM_OPENAI_BASE_URL,
-    defaultBaseUrl: "http://localhost:8000",
-    officialHosts: [],
-  });
+  const { apiKey, baseUrl, allowLocalhost } = resolveCustomCredentials(config);
   const model = config.model?.trim() || "default";
 
   const systemPrompt = buildTypstRepairSystemPrompt();
@@ -472,7 +450,7 @@ export async function repairTypstWithCustom(
         temperature: 0.1,
       }),
       signal: AbortSignal.timeout(30000),
-    });
+    }, allowLocalhost);
 
     if (!res.ok) {
       let errBody = "";

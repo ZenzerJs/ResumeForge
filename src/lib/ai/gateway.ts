@@ -17,14 +17,20 @@ import { FormattedJd, FormattedJdSchema } from "./jd-format-schema";
 import { buildJdFormatSystemPrompt, buildJdFormatUserPrompt, JdFormatPromptInput } from "./jd-format-prompt";
 import { sanitizeTypstSource } from "../typst/sanitizer";
 import { isDemoMode } from "../demo-mode";
-import { resolveProviderCredentials } from "./providers/credentials";
+import {
+  isServerManagedLocalConfig,
+  markServerManagedLocalConfig,
+  resolveProviderCredentials,
+} from "./providers/credentials";
+
+export { isServerManagedLocalConfig };
 
 /**
  * Resolves server-side defaults and environment variables for AI providers.
  */
 export function resolveServerProviderConfig(config: ProviderConfig): ProviderConfig {
   if (config.provider === "groq") {
-    const credentials = resolveProviderCredentials({
+    const { apiKey, baseUrl } = resolveProviderCredentials({
       configApiKey: config.apiKey,
       configBaseUrl: config.baseUrl,
       envApiKey: process.env.GROQ_API_KEY,
@@ -33,17 +39,26 @@ export function resolveServerProviderConfig(config: ProviderConfig): ProviderCon
     });
     return {
       ...config,
-      ...credentials,
+      apiKey,
+      baseUrl,
       model: config.model || "llama-3.3-70b-versatile",
     };
   }
   if (config.provider === "ollama") {
-    return {
+    const hasCallerBase = Boolean(config.baseUrl?.trim());
+    const resolved: ProviderConfig = {
       ...config,
-      baseUrl: config.baseUrl || (!isDemoMode() ? process.env.OLLAMA_BASE_URL : undefined) || "http://localhost:11434/v1",
+      baseUrl:
+        config.baseUrl?.trim() ||
+        (!isDemoMode() ? process.env.OLLAMA_BASE_URL : undefined) ||
+        "http://localhost:11434/v1",
       model: config.model || "llama3.2",
       apiKey: config.apiKey || "ollama",
     };
+    if (!hasCallerBase) {
+      markServerManagedLocalConfig(resolved);
+    }
+    return resolved;
   }
   return config;
 }

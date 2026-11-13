@@ -104,7 +104,10 @@ export function SuggestionPreview({
     void (async () => {
       try {
         const { renderTypstReview } = await import("@/lib/typst/compiler");
-        const rendered = await renderTypstReview(source);
+        const rendered = await renderTypstReview(source, true, {
+          callerId: "suggestion-preview",
+          mode: "live",
+        });
         if (cancelled) return;
         const locations: Record<string, PreviewLocation[]> = {};
         for (const patch of snapshot.anchors) {
@@ -136,7 +139,10 @@ export function SuggestionPreview({
             sentinel +
             source.slice(index + rawText.length);
           try {
-            const probe = await renderTypstReview(probeSource, false);
+            const probe = await renderTypstReview(probeSource, false, {
+              callerId: "suggestion-preview",
+              mode: "live",
+            });
             if (
               provesPreviewMapping(rendered.items, probe.items, text, sentinel)
             )

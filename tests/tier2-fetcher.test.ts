@@ -251,18 +251,73 @@ describe("Task 8.4: Tier 2 On-Demand Full-Text Fetcher", () => {
       return new Response("not used", { status: 404 });
     });
 
-    const res1 = await fetchAndCacheJobFullText(testJobId);
+    const unauthRes = await fetchAndCacheJobFullText(testJobId);
+    expect(unauthRes.success).toBe(false);
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    const res1 = await fetchAndCacheJobFullText(testJobId, { allowSharedCacheWrite: true });
     expect(res1.success).toBe(true);
     expect(res1.cached).toBe(false);
     expect(res1.data?.rawDescription).toContain("Python");
     expect(res1.data?.rawDescription).toContain("## Job description");
     expect(fetchSpy).toHaveBeenCalledTimes(1);
 
-    const res2 = await fetchAndCacheJobFullText(testJobId);
+    const res2 = await fetchAndCacheJobFullText(testJobId, { allowSharedCacheWrite: true });
     expect(res2.success).toBe(true);
     expect(res2.cached).toBe(true);
     expect(res2.data?.rawDescription).toContain("Python");
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("gates fetchAndCacheJobFullText writes by ownership without mutating shared listings", async () => {
+    const apiJson = {
+      title: "Software Engineer Intern",
+      content:
+        "<p>Full job description text with Python, Docker, and Linux requirement details for candidates. Join our engineering team to ship backend systems, distributed databases, and resilient cloud pipelines at scale.</p>",
+    };
+
+    const fetchSpy = vi.spyOn(global, "fetch").mockImplementation(async () =>
+      new Response(JSON.stringify(apiJson), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+
+    const sharedRes = await fetchAndCacheJobFullText(testJobId, { viewerUserId: "viewer-1" });
+    expect(sharedRes.success).toBe(true);
+    expect(sharedRes.cached).toBe(false);
+    expect(sharedRes.data?.rawDescription).toContain("Python");
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    // Shared DB row stays untouched on user request paths.
+    const dbShared = await prisma.job.findUnique({ where: { id: testJobId } });
+    expect(isTier1Placeholder(dbShared?.rawDescription || "")).toBe(true);
+    expect(dbShared?.extractFailure ?? null).toBeNull();
+
+    const foreignJob = await prisma.job.create({
+      data: {
+        userId: "owner-1",
+        company: "PrivateCo",
+        roleTitle: "Engineer",
+        rawDescription: "[Pending Import] Full job description text not yet fetched...",
+        notes: `Apply Link: ${applyUrl}`,
+      },
+    });
+
+    try {
+      const foreignRes = await fetchAndCacheJobFullText(foreignJob.id, { viewerUserId: "viewer-1" });
+      expect(foreignRes.success).toBe(false);
+      expect(foreignRes.data).toBeUndefined();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      const ownerRes = await fetchAndCacheJobFullText(foreignJob.id, { viewerUserId: "owner-1" });
+      expect(ownerRes.success).toBe(true);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      const dbOwned = await prisma.job.findUnique({ where: { id: foreignJob.id } });
+      expect(isTier1Placeholder(dbOwned?.rawDescription || "")).toBe(false);
+    } finally {
+      await prisma.job.deleteMany({ where: { id: foreignJob.id } });
+    }
   });
 });
 
@@ -286,5 +341,32 @@ describe("safeFetch redirect SSRF guard", () => {
         { followRedirects: true, allowLocalhost: false }
       )
     ).rejects.toBeInstanceOf(UnsafeUrlError);
+  });
+
+  it("rejects blocked job URLs before ATS discovery or reader fallback with zero outbound requests", async () => {
+    const fetchSpy = vi.spyOn(global, "fetch");
+
+    for (const blockedUrl of [
+      "http://127.0.0.1/myworkdayjobs.com/site/job/123",
+      "https://localhost/boards/jobs/1",
+      "https://169.254.169.254/latest/meta-data",
+      "http://careers.example.com/jobs/1",
+    ]) {
+      const result = await extractFullTextFromUrl(blockedUrl);
+      expect(result.success).toBe(false);
+    }
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("does not proxy arbitrary non-ATS hosts through Jina Reader on failure", async () => {
+    const fetchSpy = vi
+      .spyOn(global, "fetch")
+      .mockResolvedValue(new Response("Forbidden", { status: 403 }));
+
+    const result = await extractFullTextFromUrl("https://arbitrary-company.example/careers/123");
+    expect(result.success).toBe(false);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0][0])).toBe("https://arbitrary-company.example/careers/123");
   });
 });

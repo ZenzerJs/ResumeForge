@@ -5,17 +5,21 @@ import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from
 import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
 import type { ChatCompletionResult } from "./custom";
 import { safeFetch } from "@/lib/security/safe-fetch";
-import { resolveProviderCredentials } from "./credentials";
+import { resolveProviderCredentialsWithHostPolicy } from "./credentials";
 
-function providerFetch(url: string, init?: RequestInit): Promise<Response> {
+function providerFetch(
+  url: string,
+  init?: RequestInit,
+  allowLocalhost = false,
+): Promise<Response> {
   return safeFetch(url, init ?? {}, {
     timeoutMs: 130_000,
-    allowLocalhost: process.env.NODE_ENV !== "production",
+    allowLocalhost,
   });
 }
 
 export async function testAnthropicConnection(config: ProviderConfig): Promise<TestConnectionResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.ANTHROPIC_API_KEY,
@@ -41,7 +45,7 @@ export async function testAnthropicConnection(config: ProviderConfig): Promise<T
         "anthropic-version": "2023-06-01",
       },
       signal: AbortSignal.timeout(5000),
-    });
+    }, allowLocalhost);
 
     const latencyMs = Date.now() - startTime;
 
@@ -88,7 +92,7 @@ export async function generateAnthropicPatches(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.ANTHROPIC_API_KEY,
@@ -117,7 +121,7 @@ export async function generateAnthropicPatches(
         messages: [{ role: "user", content: userPrompt }],
         temperature: 0.3,
       }),
-    });
+    }, allowLocalhost);
 
     if (!res.ok) {
       let errBody = "";
@@ -152,7 +156,7 @@ export async function generateAnthropicQualitativeReview(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.ANTHROPIC_API_KEY,
@@ -181,7 +185,7 @@ export async function generateAnthropicQualitativeReview(
         messages: [{ role: "user", content: userPrompt }],
         temperature: 0.3,
       }),
-    });
+    }, allowLocalhost);
 
     if (!res.ok) {
       let errBody = "";
@@ -216,7 +220,7 @@ export async function generateAnthropicCoverLetter(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.ANTHROPIC_API_KEY,
@@ -245,7 +249,7 @@ export async function generateAnthropicCoverLetter(
         messages: [{ role: "user", content: userPrompt }],
         temperature: 0.4,
       }),
-    });
+    }, allowLocalhost);
 
     if (!res.ok) {
       let errBody = "";
@@ -280,7 +284,7 @@ export async function convertAnthropicPdfTextToTypst(
   systemPrompt: string,
   userPrompt: string
 ): Promise<ConvertPdfResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.ANTHROPIC_API_KEY,
@@ -310,7 +314,7 @@ export async function convertAnthropicPdfTextToTypst(
         temperature: 0.2,
       }),
       signal: AbortSignal.timeout(30000),
-    });
+    }, allowLocalhost);
 
     if (!res.ok) {
       let errBody = "";
@@ -342,7 +346,7 @@ export async function repairTypstWithAnthropic(
   config: ProviderConfig,
   input: TypstRepairInput
 ): Promise<{ success: boolean; data?: TypstRepairProposal; error?: string }> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.ANTHROPIC_API_KEY,
@@ -375,7 +379,7 @@ export async function repairTypstWithAnthropic(
         temperature: 0.1,
       }),
       signal: AbortSignal.timeout(30000),
-    });
+    }, allowLocalhost);
 
     if (!res.ok) {
       let errBody = "";
@@ -424,7 +428,7 @@ export async function chatAnthropic(
   messages: Array<{ role: string; content: string }>,
   tools: any[],
 ): Promise<ChatCompletionResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.ANTHROPIC_API_KEY,
@@ -472,7 +476,7 @@ export async function chatAnthropic(
     },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(120_000),
-  });
+  }, allowLocalhost);
 
   if (!res.ok) {
     let errBody = "";

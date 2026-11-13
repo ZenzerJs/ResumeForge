@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 import { ProviderConfigSchema } from "@/lib/ai/types";
 import { testProviderConnection } from "@/lib/ai/gateway";
 import { sanitizeError } from "@/lib/ai/redact";
+import { requireUserId } from "@/lib/security/auth-request";
 
 export async function POST(request: Request) {
+  const auth = await requireUserId(request);
+  if (auth instanceof Response) return auth;
+
   try {
     const body = await request.json();
     const parseResult = ProviderConfigSchema.safeParse(body);

@@ -64,7 +64,7 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
   });
 
   it("1. Job card Open Original Posting uses the correct persisted URL", async () => {
-    const job = await getJobById(testJobId);
+    const job = await getJobById(testJobId, userId);
     expect(job).not.toBeNull();
     const extractedUrl = extractApplyUrlFromNotes(job?.notes);
     expect(extractedUrl).toBe(applyUrl);
@@ -85,7 +85,7 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
   });
 
   it("3. Tailor Resume preserves the exact jobId", async () => {
-    const job = await getJobById(testJobId);
+    const job = await getJobById(testJobId, userId);
     expect(job?.id).toBe(testJobId);
   });
 
@@ -187,7 +187,7 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
       status: "DRAFT",
     });
 
-    const fetchedJob = await getJobById(testJobId);
+    const fetchedJob = await getJobById(testJobId, userId);
     expect(fetchedJob?.variants).toHaveLength(1);
     expect(fetchedJob?.variants[0].id).toBe(testVariantId);
 
@@ -223,7 +223,7 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
   });
 
   it("9. The cross-page flow works with a real imported job fixture", async () => {
-    const job = await getJobById(testJobId);
+    const job = await getJobById(testJobId, userId);
     expect(job?.company).toBe("IMC Trading");
     expect(job?.roleTitle).toBe("Machine Learning Research Intern");
 

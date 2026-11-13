@@ -13,6 +13,19 @@ import {
   type PostedWithin,
 } from "@/lib/jobs/posted-within";
 
+type DbClient = Prisma.TransactionClient | typeof prisma;
+
+export class JobDeleteConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "JobDeleteConflictError";
+  }
+}
+
+export function sharedOrSelfJobWhere(viewerUserId?: string | null): Prisma.JobWhereInput {
+  return viewerUserId ? { OR: [{ userId: null }, { userId: viewerUserId }] } : { userId: null };
+}
+
 export type JobStatus = "SAVED" | "APPLIED" | "INTERVIEWING" | "OFFER" | "REJECTED" | "ARCHIVED";
 
 export interface CreateJobInput {
@@ -24,8 +37,7 @@ export interface CreateJobInput {
   status?: JobStatus;
   appliedAt?: Date | string | null;
   notes?: string | null;
-  /** Ignored. Jobs are a shared catalog, not owned by a user. */
-  userId?: string;
+  userId?: string | null;
 }
 
 export interface UpdateJobInput {
@@ -69,6 +81,7 @@ export async function createJob(input: CreateJobInput) {
       status: input.status || "SAVED",
       appliedAt: input.appliedAt ? new Date(input.appliedAt) : null,
       notes: input.notes || null,
+      userId: input.userId ?? null,
       dossierId,
     },
     include: {
@@ -87,13 +100,20 @@ export async function createJob(input: CreateJobInput) {
   };
 }
 
-export async function updateJob(id: string, input: UpdateJobInput, viewerUserId?: string | null) {
-  const existing = await prisma.job.findFirst({
-    where: { id },
+export async function updateJob(
+  id: string,
+  input: UpdateJobInput,
+  viewerUserId?: string | null,
+  db: DbClient = prisma
+) {
+  if (!viewerUserId) return null;
+
+  const existing = await db.job.findFirst({
+    where: { id, userId: viewerUserId },
   });
   if (!existing) return null;
 
-  const dataToUpdate: Record<string, unknown> = {};
+  const dataToUpdate: Prisma.JobUpdateManyMutationInput = {};
   if (input.company !== undefined) dataToUpdate.company = input.company;
   if (input.roleTitle !== undefined) dataToUpdate.roleTitle = input.roleTitle;
   if (input.notes !== undefined) dataToUpdate.notes = input.notes;
@@ -102,11 +122,19 @@ export async function updateJob(id: string, input: UpdateJobInput, viewerUserId?
     dataToUpdate.extractedRequirements = JSON.stringify(input.extractedRequirements);
   }
 
-  const updated = await prisma.job.update({
-    where: { id },
-    data: dataToUpdate,
+  if (Object.keys(dataToUpdate).length > 0) {
+    const updatedCount = await db.job.updateMany({
+      where: { id, userId: viewerUserId },
+      data: dataToUpdate,
+    });
+    if (updatedCount.count === 0) return null;
+  }
+
+  const updated = await db.job.findFirst({
+    where: { id, userId: viewerUserId },
     include: jobIncludeForViewer(viewerUserId),
   });
+  if (!updated) return null;
 
   return {
     ...withViewerOutcome(updated, viewerUserId),
@@ -201,7 +229,9 @@ export interface JobListQuery {
 export async function getJobsList(query: JobListQuery = {}) {
   const page = Math.max(1, query.page ?? 1);
   const limit = Math.min(100, Math.max(1, query.limit ?? 40));
-  const where: Prisma.JobWhereInput = {};
+  const where: Prisma.JobWhereInput = {
+    AND: [sharedOrSelfJobWhere(query.userId)],
+  };
 
   if (query.q?.trim()) {
     const q = query.q.trim();
@@ -368,9 +398,13 @@ export async function getJobsList(query: JobListQuery = {}) {
   };
 }
 
-export async function getJobById(id: string, viewerUserId?: string | null) {
-  const job = await prisma.job.findFirst({
-    where: { id },
+export async function getJobById(
+  id: string,
+  viewerUserId?: string | null,
+  db: DbClient = prisma
+) {
+  const job = await db.job.findFirst({
+    where: { id, ...sharedOrSelfJobWhere(viewerUserId) },
     include: jobIncludeForViewer(viewerUserId),
   });
 
@@ -383,47 +417,86 @@ export async function getJobById(id: string, viewerUserId?: string | null) {
 }
 
 export async function deleteJob(id: string, userId?: string) {
-  const existing = await prisma.job.findFirst({
-    where: { id, ...(userId ? { OR: [{ userId }, { userId: null }] } : {}) },
-  });
-  if (!existing) {
+  if (!userId) {
     throw new Error("Job not found");
   }
 
-  if (userId && existing.userId === null) {
-    const [otherApps, otherVariants, otherLetters] = await Promise.all([
-      prisma.jobApplication.findFirst({
-        where: { jobId: id, NOT: { userId } },
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.job.findFirst({
+      where: { id, userId },
+    });
+    if (!existing) {
+      throw new Error("Job not found");
+    }
+
+    const [proposalBatch, otherApps, variants, coverLetters] = await Promise.all([
+      tx.patchProposalBatch.findFirst({
+        where: { jobId: id },
+        select: { id: true },
       }),
-      prisma.resumeVariant.findFirst({
-        where: { jobId: id, NOT: { masterResume: { userId } } },
+      tx.jobApplication.findFirst({
+        where: { jobId: id, userId: { not: userId } },
+        select: { id: true },
       }),
-      prisma.coverLetter.findFirst({
-        where: {
-          jobId: id,
-          NOT: {
-            OR: [{ userId }, { variant: { masterResume: { userId } } }],
-          },
-        },
+      tx.resumeVariant.findMany({
+        where: { jobId: id },
+        include: { masterResume: { select: { userId: true } } },
+      }),
+      tx.coverLetter.findMany({
+        where: { jobId: id },
+        select: { id: true, userId: true, variantId: true },
       }),
     ]);
 
-    const isReferencedByOthers = Boolean(otherApps || otherVariants || otherLetters);
-    if (isReferencedByOthers) {
-      await Promise.all([
-        prisma.jobApplication.deleteMany({ where: { jobId: id, userId } }),
-        prisma.coverLetter.deleteMany({ where: { jobId: id, userId } }),
-        prisma.resumeVariant.deleteMany({ where: { jobId: id, masterResume: { userId } } }),
-      ]);
-      return existing;
+    const ownedVariantIds = new Set<string>();
+    let hasOtherVariants = false;
+    for (const v of variants) {
+      if (v.masterResume?.userId === userId) {
+        ownedVariantIds.add(v.id);
+      } else {
+        hasOtherVariants = true;
+      }
     }
-  }
 
-  await prisma.jobApplication.deleteMany({ where: { jobId: id } });
-  await prisma.coverLetter.deleteMany({ where: { jobId: id } });
-  await prisma.resumeVariant.deleteMany({ where: { jobId: id } });
-  await prisma.job.delete({ where: { id } });
-  return existing;
+    const ownedLetterIds: string[] = [];
+    let hasOtherLetters = false;
+    for (const cl of coverLetters) {
+      const ownedDirect = cl.userId === userId;
+      const ownedViaVariant =
+        cl.userId == null && cl.variantId != null && ownedVariantIds.has(cl.variantId);
+      if (ownedDirect || ownedViaVariant) {
+        ownedLetterIds.push(cl.id);
+      } else {
+        hasOtherLetters = true;
+      }
+    }
+
+    if (proposalBatch || otherApps || hasOtherVariants || hasOtherLetters) {
+      throw new JobDeleteConflictError(
+        "Cannot delete job posting because it has dependent proposal history or external references."
+      );
+    }
+
+    await tx.jobApplication.deleteMany({ where: { jobId: id, userId } });
+    if (ownedLetterIds.length > 0) {
+      await tx.coverLetter.deleteMany({
+        where: { id: { in: ownedLetterIds } },
+      });
+    }
+    if (ownedVariantIds.size > 0) {
+      await tx.resumeVariant.deleteMany({
+        where: { id: { in: Array.from(ownedVariantIds) }, masterResume: { userId } },
+      });
+    }
+
+    const deleted = await tx.job.deleteMany({
+      where: { id, userId },
+    });
+    if (deleted.count === 0) {
+      throw new Error("Job not found");
+    }
+    return existing;
+  });
 }
 
 function parseRequirementsJson(jsonStr: string): JobRequirements {

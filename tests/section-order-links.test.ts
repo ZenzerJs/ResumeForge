@@ -108,4 +108,23 @@ p
     expect(withLinks).toContain('#link("https://linkedin.com/in/alex")[LinkedIn]');
     expect(withLinks).toContain('#link("mailto:alex@example.com")');
   });
+
+  it("escapes link labels, validates safe destinations, and deduplicates normalized URLs in ensureTypstLinks", () => {
+    const source = `#align(center)[
+  #text(size: 18pt)[Alex]
+  #link("https://linkedin.com/in/alex")[LinkedIn]
+]`;
+    const result = ensureTypstLinks(source, [
+      { url: "https://linkedin.com/in/alex", label: "Duplicate" },
+      { url: "https://example.com", label: "Site [Main] #1" },
+      { url: "https://example.com/", label: "Normalized Dup" },
+      { url: "javascript:alert(1)", label: "XSS [Click]" },
+    ]);
+
+    expect(result).not.toContain("Duplicate");
+    expect(result).not.toContain("Normalized Dup");
+    expect(result).toContain('#link("https://example.com/")[Site \\[Main\\] \\#1]');
+    expect(result).not.toContain('#link("javascript:');
+    expect(result).toContain("XSS \\[Click\\]");
+  });
 });

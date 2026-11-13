@@ -328,7 +328,9 @@ export function ApplySheet({
             body: JSON.stringify({ rawDescription: job.rawDescription }),
           });
           const extJson = await extRes.json();
-          if (extRes.ok && extJson.success && extJson.data) {
+          if (extRes.status === 401) {
+            setTailoringNotice(extJson?.error || "Sign in to extract job requirements.");
+          } else if (extRes.ok && extJson.success && extJson.data) {
             reqs = {
               requiredSkills: extJson.data.requiredSkills || [],
               preferredSkills: extJson.data.preferredSkills || [],

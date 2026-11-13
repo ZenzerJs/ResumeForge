@@ -17,6 +17,7 @@ export const CreateJobSchema = z.object({
   rawDescription: z.string().min(1, "Job description cannot be empty").max(200_000),
   source: z.enum(["pasted", "manual", "simplify-jobs"]).default("pasted"),
   extractedRequirements: JobRequirementsSchema.optional(),
+  personal: z.boolean().optional(),
 });
 
 export type CreateJobInput = z.infer<typeof CreateJobSchema>;

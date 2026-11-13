@@ -47,21 +47,24 @@ describe("getJobsList location and workplace filters", () => {
     });
     createdIds.push(chicago.id, remote.id, hybrid.id);
 
-    const byCity = await getJobsList({ q: "LocFilter", location: "Chicago" });
+    const byCity = await getJobsList({ q: "LocFilter", location: "Chicago", userId });
     expect(byCity.data.map((j) => j.company)).toEqual(["LocFilter Chicago Co"]);
 
-    const byRemote = await getJobsList({ q: "LocFilter", workplace: "remote" });
+    const byRemote = await getJobsList({ q: "LocFilter", workplace: "remote", userId });
     expect(byRemote.data.map((j) => j.company)).toEqual(["LocFilter Remote Co"]);
 
-    const byHybrid = await getJobsList({ q: "LocFilter", workplace: "hybrid" });
+    const byHybrid = await getJobsList({ q: "LocFilter", workplace: "hybrid", userId });
     expect(byHybrid.data.map((j) => j.company)).toEqual(["LocFilter Hybrid Co"]);
 
-    const byOnsite = await getJobsList({ q: "LocFilter", workplace: "onsite" });
+    const byOnsite = await getJobsList({ q: "LocFilter", workplace: "onsite", userId });
     expect(byOnsite.data.map((j) => j.company)).toEqual(["LocFilter Chicago Co"]);
   });
 
   afterAll(async () => {
-    await Promise.all(createdIds.map((id) => deleteJob(id)));
+    await Promise.all(createdIds.map((id) => deleteJob(id, userId)));
+    if (userId) {
+      await prisma.user.deleteMany({ where: { id: userId } });
+    }
   });
 });
 

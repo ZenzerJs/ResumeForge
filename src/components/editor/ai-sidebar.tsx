@@ -251,7 +251,10 @@ export function AiSidebar({
       const extractJson = await extractRes.json();
 
       if (!extractRes.ok || !extractJson.success) {
-        const errMsg = extractJson.error || "Failed to extract job requirements.";
+        const errMsg =
+          extractRes.status === 401
+            ? extractJson.error || "Sign in to extract job requirements."
+            : extractJson.error || "Failed to extract job requirements.";
         setError(errMsg);
         setTailorStage("error");
         return;
@@ -273,7 +276,7 @@ export function AiSidebar({
         const saveRes = await fetch("/api/jobs", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rawDescription: jdText, source: "pasted" }),
+          body: JSON.stringify({ rawDescription: jdText, source: "pasted", personal: true }),
         });
         const saveJson = await saveRes.json();
         if (saveRes.ok && saveJson.success && typeof saveJson.data?.id === "string") {

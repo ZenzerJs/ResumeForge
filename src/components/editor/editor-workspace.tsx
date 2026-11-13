@@ -496,8 +496,13 @@ export function EditorWorkspace() {
     setIsCompiling(true);
 
     const { compileTypstToSvg } = await import("@/lib/typst/compiler");
-    const result = await compileTypstToSvg(codeToCompile);
-    if (generation !== compileGeneration.current) return;
+    const result = await compileTypstToSvg(codeToCompile, {
+      callerId: "editor-workspace",
+      mode: "live",
+    });
+    if (generation !== compileGeneration.current || ("superseded" in result && result.superseded)) {
+      return;
+    }
 
     setIsCompiling(false);
 

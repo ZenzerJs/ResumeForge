@@ -5,17 +5,21 @@ import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from
 import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
 import type { ChatCompletionResult } from "./custom";
 import { safeFetch } from "@/lib/security/safe-fetch";
-import { resolveProviderCredentials } from "./credentials";
+import { resolveProviderCredentialsWithHostPolicy } from "./credentials";
 
-function providerFetch(url: string, init?: RequestInit): Promise<Response> {
+function providerFetch(
+  url: string,
+  init?: RequestInit,
+  allowLocalhost = false,
+): Promise<Response> {
   return safeFetch(url, init ?? {}, {
     timeoutMs: 130_000,
-    allowLocalhost: process.env.NODE_ENV !== "production",
+    allowLocalhost,
   });
 }
 
 export async function testOpenAIConnection(config: ProviderConfig): Promise<TestConnectionResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.OPENAI_API_KEY,
@@ -41,7 +45,7 @@ export async function testOpenAIConnection(config: ProviderConfig): Promise<Test
         "Content-Type": "application/json",
       },
       signal: AbortSignal.timeout(5000),
-    });
+    }, allowLocalhost);
 
     const latencyMs = Date.now() - startTime;
 
@@ -90,7 +94,7 @@ export async function generateOpenAIPatches(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.OPENAI_API_KEY,
@@ -120,7 +124,7 @@ export async function generateOpenAIPatches(
         temperature: 0.3,
         response_format: { type: "json_object" },
       }),
-    });
+    }, allowLocalhost);
 
     if (!res.ok) {
       let errBody = "";
@@ -154,7 +158,7 @@ export async function generateOpenAIQualitativeReview(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.OPENAI_API_KEY,
@@ -184,7 +188,7 @@ export async function generateOpenAIQualitativeReview(
         temperature: 0.3,
         response_format: { type: "json_object" },
       }),
-    });
+    }, allowLocalhost);
 
     if (!res.ok) {
       let errBody = "";
@@ -218,7 +222,7 @@ export async function generateOpenAICoverLetter(
   systemPrompt: string,
   userPrompt: string
 ): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.OPENAI_API_KEY,
@@ -248,7 +252,7 @@ export async function generateOpenAICoverLetter(
         temperature: 0.4,
         response_format: { type: "json_object" },
       }),
-    });
+    }, allowLocalhost);
 
     if (!res.ok) {
       let errBody = "";
@@ -282,7 +286,7 @@ export async function convertOpenAIPdfTextToTypst(
   systemPrompt: string,
   userPrompt: string
 ): Promise<ConvertPdfResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.OPENAI_API_KEY,
@@ -312,7 +316,7 @@ export async function convertOpenAIPdfTextToTypst(
         temperature: 0.2,
       }),
       signal: AbortSignal.timeout(30000),
-    });
+    }, allowLocalhost);
 
     if (!res.ok) {
       let errBody = "";
@@ -343,7 +347,7 @@ export async function repairTypstWithOpenAI(
   config: ProviderConfig,
   input: TypstRepairInput
 ): Promise<{ success: boolean; data?: TypstRepairProposal; error?: string }> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.OPENAI_API_KEY,
@@ -376,7 +380,7 @@ export async function repairTypstWithOpenAI(
         temperature: 0.1,
       }),
       signal: AbortSignal.timeout(30000),
-    });
+    }, allowLocalhost);
 
     if (!res.ok) {
       let errBody = "";
@@ -423,7 +427,7 @@ export async function chatOpenAI(
   messages: Array<{ role: string; content: string }>,
   tools: any[],
 ): Promise<ChatCompletionResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.OPENAI_API_KEY,
@@ -451,7 +455,7 @@ export async function chatOpenAI(
     },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(120_000),
-  });
+  }, allowLocalhost);
 
   if (!res.ok) {
     let errBody = "";

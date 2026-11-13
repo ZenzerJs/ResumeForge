@@ -57,8 +57,7 @@ export function assertSafePublicUrl(
     throw new UnsafeUrlError("Invalid URL");
   }
 
-  const allowLocalhost =
-    options?.allowLocalhost ?? process.env.NODE_ENV !== "production";
+  const allowLocalhost = options?.allowLocalhost ?? false;
 
   if (parsed.protocol !== "https:") {
     if (!(allowLocalhost && parsed.protocol === "http:" && isLocalDevHost(parsed.hostname))) {

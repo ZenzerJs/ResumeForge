@@ -1,10 +1,20 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { deleteJob, getJobById, updateJob } from "@/lib/db/jobs";
+import { deleteJob, getJobById, JobDeleteConflictError, updateJob } from "@/lib/db/jobs";
 import { ApplicationInputError, upsertApplication } from "@/lib/db/applications";
 import { JobRequirementsSchema } from "@/lib/jd-parser/types";
 import { sanitizeError } from "@/lib/ai/redact";
+import { prisma } from "@/lib/prisma";
 import { getRequestUserId, requireUserId } from "@/lib/security/auth-request";
+
+function isForeignKeyConstraintError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: unknown }).code === "P2003"
+  );
+}
 
 const UpdateJobSchema = z.object({
   company: z.string().optional(),
@@ -66,35 +76,47 @@ export async function PATCH(
     }
 
     const { status, appliedAt, variantId, ...catalog } = validation.data;
-    if (status !== undefined || appliedAt !== undefined || variantId !== undefined) {
-      try {
-        const application = await upsertApplication(userId, id, { status, appliedAt, variantId });
-        if (!application) {
-          return NextResponse.json({ success: false, error: "Job posting not found" }, { status: 404 });
-        }
-      } catch (err) {
-        if (err instanceof ApplicationInputError) {
-          return NextResponse.json({ success: false, error: err.message }, { status: 400 });
-        }
-        throw err;
-      }
-    }
-
+    const hasApplicationUpdate =
+      status !== undefined || appliedAt !== undefined || variantId !== undefined;
     const hasCatalogUpdate = Object.values(catalog).some((value) => value !== undefined);
-    if (hasCatalogUpdate) {
-      const updatedJob = await updateJob(id, catalog, userId);
-      if (!updatedJob) {
-        return NextResponse.json({ success: false, error: "Job posting not found" }, { status: 404 });
-      }
-    }
 
-    const job = await getJobById(id, userId);
+    const job = await prisma.$transaction(async (tx) => {
+      if (hasCatalogUpdate) {
+        const ownedJob = await tx.job.findFirst({
+          where: { id, userId },
+          select: { id: true },
+        });
+        if (!ownedJob) return null;
+      } else {
+        const visibleJob = await tx.job.findFirst({
+          where: { id, OR: [{ userId: null }, { userId }] },
+          select: { id: true },
+        });
+        if (!visibleJob) return null;
+      }
+
+      if (hasApplicationUpdate) {
+        const application = await upsertApplication(userId, id, { status, appliedAt, variantId }, tx);
+        if (!application) return null;
+      }
+
+      if (hasCatalogUpdate) {
+        const updatedJob = await updateJob(id, catalog, userId, tx);
+        if (!updatedJob) return null;
+      }
+
+      return getJobById(id, userId, tx);
+    });
+
     if (!job) {
       return NextResponse.json({ success: false, error: "Job posting not found" }, { status: 404 });
     }
 
     return NextResponse.json({ success: true, data: job });
   } catch (err) {
+    if (err instanceof ApplicationInputError) {
+      return NextResponse.json({ success: false, error: err.message }, { status: 400 });
+    }
     return NextResponse.json(
       { success: false, error: "Failed to update job", message: sanitizeError(err) },
       { status: 500 }
@@ -113,11 +135,20 @@ export async function DELETE(
     const { id } = await params;
     try {
       await deleteJob(id, userId);
-    } catch (err: any) {
-      if (err?.message === "Job not found") {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === "Job not found") {
         return NextResponse.json(
           { success: false, error: "Job posting not found" },
           { status: 404 }
+        );
+      }
+      if (err instanceof JobDeleteConflictError || isForeignKeyConstraintError(err)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Cannot delete this job posting because it is referenced by existing history.",
+          },
+          { status: 409 }
         );
       }
       throw err;

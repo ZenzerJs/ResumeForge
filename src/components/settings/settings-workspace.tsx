@@ -251,8 +251,13 @@ export function SettingsWorkspace() {
 
       const data = await res.json();
       setTestResult({
-        success: data.success,
-        message: data.message,
+        success: Boolean(data.success),
+        message:
+          data.message ||
+          data.error ||
+          (res.status === 401
+            ? "Sign in to test AI provider connections."
+            : "Connection test failed."),
         latencyMs: data.latencyMs,
       });
     } catch (err) {

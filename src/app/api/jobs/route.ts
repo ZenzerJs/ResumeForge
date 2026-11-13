@@ -76,7 +76,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const job = await createJob({ ...validation.data });
+    const { personal, ...jobInput } = validation.data;
+    const job = await createJob({
+      ...jobInput,
+      ...(personal ? { userId: gated } : {}),
+    });
     return NextResponse.json({ success: true, data: job }, { status: 201 });
   } catch (err) {
     return NextResponse.json(

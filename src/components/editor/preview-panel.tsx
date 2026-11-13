@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { assertLayoutExportReady, isResumeLayoutV2Enabled, parseManagedResume } from "@/lib/typst/resume-document";
+import { sanitizeTypstSvg } from "@/lib/typst/svg-sanitize";
 import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2, BarChart3, Sparkles, FileText, ChevronDown, Package } from "lucide-react";
 import dynamic from "next/dynamic";
 import { cleanTypstToText, sanitizeZipFilename } from "@/lib/export/zip";
@@ -74,6 +75,24 @@ export function PreviewPanel({
   const [isFitting, setIsFitting] = useState(false);
   const [twoPageApproval, setTwoPageApproval] = useState<string | null>(null);
   const [reviewApproval, setReviewApproval] = useState<string | null>(null);
+  const [sanitizedSvg, setSanitizedSvg] = useState<{
+    raw: string;
+    clean: string | null;
+    error: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!svg) {
+      setSanitizedSvg(null);
+      return;
+    }
+    const result = sanitizeTypstSvg(svg);
+    if (result.ok) {
+      setSanitizedSvg({ raw: svg, clean: result.svg, error: null });
+    } else {
+      setSanitizedSvg({ raw: svg, clean: null, error: result.error });
+    }
+  }, [svg]);
   useEffect(() => {
     let cancelled = false;
     setMeasurement(null);
@@ -94,17 +113,19 @@ export function PreviewPanel({
         const hasTwoPageApproval = source.includes(`// @layout-two-pages-approved: ${hash}\n`);
         if (onApplyLayout && !hasTwoPageApproval && parseManagedResume(source)) {
           const { fitManagedLayout } = await import("@/lib/typst/layout-fit");
-          const fitted = await fitManagedLayout(source, 1, async (candidate) => (await measureTypstDocument(candidate)).pageCount);
+          const fitted = await fitManagedLayout(source, 1, async (candidate) => (await measureTypstDocument(candidate, false, { callerId: "editor-preview-measure", mode: "live" })).pageCount);
           if (cancelled || sourceRef.current !== source) return;
           if (fitted.status === "fit" && fitted.source !== source) { onApplyLayout(fitted.source); return; }
         }
-        const result = await measureTypstDocument(source, true);
+        const result = await measureTypstDocument(source, true, { callerId: "editor-preview-measure", mode: "live" });
         if (!cancelled) {
           setPageImages({ source: result.source, pages: result.pageImages });
           setMeasurement({ source: result.source, pages: result.pageCount, pdf: result.pdf });
         }
       } catch (err) {
-        if (!cancelled) setMeasurementError(err instanceof Error ? err.message : "Could not measure the compiled document.");
+        if (!cancelled && !(err instanceof Error && err.name === "SupersededCompileError")) {
+          setMeasurementError(err instanceof Error ? err.message : "Could not measure the compiled document.");
+        }
       }
     })(); }, 400);
     return () => { cancelled = true; window.clearTimeout(timer); };
@@ -170,7 +191,7 @@ export function PreviewPanel({
       assertCanExport(source, masterFacts, { allowUnfrozenMasterSelfExport });
 
       const { compileTypstToPdf } = await import("@/lib/typst/compiler");
-      const pdfBytes = measuredPdf() || await compileTypstToPdf(source);
+      const pdfBytes = measuredPdf() || await compileTypstToPdf(source, { mode: "export" });
       if (sourceRef.current !== source) throw new Error("The document changed during export. Try again.");
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
@@ -587,13 +608,29 @@ export function PreviewPanel({
             ))}
           </div>
         ) : svg ? (
-          <div className="w-full max-w-[850px] rounded-sm bg-white p-4 sm:p-8 shadow-md border border-slate-200">
+          sanitizedSvg?.raw === svg && sanitizedSvg.error ? (
             <div
-              data-testid="typst-preview-svg"
-              className="typst-preview-svg w-full overflow-hidden [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-w-full"
-              dangerouslySetInnerHTML={{ __html: svg }}
-            />
-          </div>
+              data-testid="typst-preview-sanitize-error"
+              role="alert"
+              className="w-full max-w-[850px] rounded-md border border-red-300 bg-red-50 p-4 text-xs text-red-800 shadow-sm"
+            >
+              <p className="font-semibold">Unsafe or invalid preview blocked</p>
+              <p className="mt-1 text-red-700">{sanitizedSvg.error}</p>
+            </div>
+          ) : sanitizedSvg?.raw === svg && sanitizedSvg.clean ? (
+            <div className="w-full max-w-[850px] rounded-sm bg-white p-4 sm:p-8 shadow-md border border-slate-200">
+              <div
+                data-testid="typst-preview-svg"
+                className="typst-preview-svg w-full overflow-hidden [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-w-full"
+                dangerouslySetInnerHTML={{ __html: sanitizedSvg.clean }}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+              <Loader2 className="h-6 w-6 animate-spin mb-2 text-amber-500" />
+              <p className="text-xs">Verifying SVG preview...</p>
+            </div>
+          )
         ) : (
           <div className="flex flex-col items-center justify-center h-64 text-slate-400">
             <Loader2 className="h-8 w-8 animate-spin mb-2 text-amber-500" />

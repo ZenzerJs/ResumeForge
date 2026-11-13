@@ -59,12 +59,14 @@ export async function safeFetch(
 
   try {
     let current = parsed.toString();
+    let currentHeaders: HeadersInit | undefined = init.headers;
     const hops = followRedirects ? maxRedirects : 0;
+    const allowLocalhost = options?.allowLocalhost ?? false;
 
     for (let hop = 0; hop <= hops; hop++) {
-      const allowLocalhost = options?.allowLocalhost ?? process.env.NODE_ENV !== "production";
-      const fetchInit = {
+      const fetchInit: RequestInit & { dispatcher?: Agent } = {
         ...init,
+        headers: currentHeaders,
         redirect: "manual" as const,
         signal: controller.signal,
         dispatcher: allowLocalhost && isLocalDevHost(new URL(current).hostname)
@@ -88,7 +90,16 @@ export async function safeFetch(
       }
 
       const next = new URL(location, current).toString();
-      assertSafePublicUrl(next, options);
+      assertSafePublicUrl(next, { ...options, allowLocalhost });
+      if (new URL(next).origin !== new URL(current).origin && currentHeaders) {
+        const stripped = new Headers(currentHeaders);
+        stripped.delete("authorization");
+        stripped.delete("proxy-authorization");
+        stripped.delete("cookie");
+        stripped.delete("x-api-key");
+        stripped.delete("x-goog-api-key");
+        currentHeaders = stripped;
+      }
       current = next;
     }
 

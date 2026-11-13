@@ -7,6 +7,9 @@ import { requireUserId } from "@/lib/security/auth-request";
 import { isDemoMode } from "@/lib/demo-mode";
 
 export async function POST(request: Request) {
+  const auth = await requireUserId(request);
+  if (auth instanceof Response) return auth;
+
   try {
     const body = await request.json();
     const { providerConfig, ...inputData } = body || {};
@@ -51,10 +54,7 @@ export async function POST(request: Request) {
     }
 
     let providerConfigToUse = providerConfig;
-    if ((!providerConfigToUse || !providerConfigToUse.apiKey) && !isDemoMode()) {
-      const auth = await requireUserId(request);
-      if (auth instanceof Response) return auth;
-
+    if ((!providerConfigToUse || !providerConfigToUse.provider) && !isDemoMode()) {
       if (process.env.OPENAI_API_KEY) {
         providerConfigToUse = { provider: "openai", apiKey: process.env.OPENAI_API_KEY, model: "gpt-4o" };
       } else if (process.env.ANTHROPIC_API_KEY) {

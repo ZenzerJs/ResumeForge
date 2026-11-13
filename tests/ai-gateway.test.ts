@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { testProviderConnection } from "../src/lib/ai/gateway";
 import { resolveProviderCredentials } from "../src/lib/ai/providers/credentials";
+import { POST as testConnectionPOST } from "../src/app/api/ai/test-connection/route";
+import { POST as repairTypstPOST } from "../src/app/api/ai/repair-typst/route";
 
 describe("AI Provider Gateway Connection Tests", () => {
   const originalFetch = globalThis.fetch;
@@ -83,16 +85,88 @@ describe("AI Provider Gateway Connection Tests", () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ data: [{ id: "local-model" }] }),
+      json: async () => ({ data: [{ id: "remote-model" }] }),
     } as Response);
 
     const res = await testProviderConnection({
       provider: "custom",
-      baseUrl: "http://localhost:8000",
+      baseUrl: "https://custom-llm.example/v1",
     });
 
     expect(res.success).toBe(true);
     expect(res.message).toContain("custom OpenAI-compatible endpoint");
+  });
+
+  it("rejects caller-selected loopback URLs with zero outbound fetches, while allowing server-configured local provider in dev", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: [{ id: "local-model" }] }),
+    } as Response);
+    globalThis.fetch = fetchSpy;
+
+    const callerCustom = await testProviderConnection({
+      provider: "custom",
+      baseUrl: "http://localhost:8000",
+    });
+    expect(callerCustom.success).toBe(false);
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    const callerOllama = await testProviderConnection({
+      provider: "ollama",
+      baseUrl: "http://127.0.0.1:11434/v1",
+    });
+    expect(callerOllama.success).toBe(false);
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    const serverOllama = await testProviderConnection({ provider: "ollama" });
+    expect(serverOllama.success).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects unauthenticated test-connection and repair-typst requests with 401 and zero outbound calls", async () => {
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy;
+
+    const testConnRes = await testConnectionPOST(
+      new Request("http://localhost/api/ai/test-connection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "openai", apiKey: "sk-byok-test" }),
+      })
+    );
+    expect(testConnRes.status).toBe(401);
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    const repairByokRes = await repairTypstPOST(
+      new Request("http://localhost/api/ai/repair-typst", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: "= Jane",
+          compileError: "line 1 error",
+          providerConfig: { provider: "custom", apiKey: "dummy", baseUrl: "https://attacker.example" },
+        }),
+      })
+    );
+    expect(repairByokRes.status).toBe(401);
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    vi.stubEnv("DEMO_MODE", "true");
+    const repairDemoRes = await repairTypstPOST(
+      new Request("http://localhost/api/ai/repair-typst", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: "= Jane",
+          compileError: "line 1 error",
+          providerConfig: { provider: "openai", apiKey: "sk-demo" },
+        }),
+      })
+    );
+    expect(repairDemoRes.status).toBe(401);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
   });
 });
 

@@ -1,16 +1,6 @@
 import type { ExtractedPdfLink } from "@/lib/pdf/parser";
-
-function escapeTypstUrl(url: string): string {
-  return url.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-}
-
-function escapeTypstLabel(text: string): string {
-  return text
-    .replace(/\\/g, "\\\\")
-    .replace(/#/g, "\\#")
-    .replace(/\$/g, "\\$")
-    .replace(/@/g, "\\@");
-}
+import { safeDestination } from "@/lib/typst/inline-content";
+import { typstContent, typstString } from "@/lib/typst/resume-document";
 
 /**
  * Ensures every scraped PDF hyperlink appears in Typst source as #link(...).
@@ -19,15 +9,36 @@ function escapeTypstLabel(text: string): string {
 export function ensureTypstLinks(source: string, links: ExtractedPdfLink[]): string {
   if (!source || !links?.length) return source;
 
-  const missing = links.filter(
-    (l) => l.url && !source.toLowerCase().includes(l.url.toLowerCase())
-  );
-  if (missing.length === 0) return source;
+  const lowerSource = source.toLowerCase();
+  const seenDestinations = new Set<string>();
+  const renderedParts: string[] = [];
 
-  const rendered = missing
-    .map((l) => `#link("${escapeTypstUrl(l.url)}")[${escapeTypstLabel(l.label || l.url)}]`)
-    .join(" #sym.dot ");
+  for (const l of links) {
+    if (!l.url) continue;
+    const canonical = safeDestination(l.url);
+    if (!canonical) {
+      const visible = l.label || l.url;
+      if (!lowerSource.includes(visible.toLowerCase())) {
+        renderedParts.push(typstContent(visible));
+      }
+      continue;
+    }
 
+    const canonicalLower = canonical.toLowerCase();
+    const rawLower = l.url.trim().toLowerCase();
+    if (seenDestinations.has(canonicalLower)) continue;
+    seenDestinations.add(canonicalLower);
+
+    if (lowerSource.includes(canonicalLower) || lowerSource.includes(rawLower)) {
+      continue;
+    }
+
+    renderedParts.push(`#link(${typstString(canonical)})[${typstContent(l.label || canonical)}]`);
+  }
+
+  if (renderedParts.length === 0) return source;
+
+  const rendered = renderedParts.join(" #sym.dot ");
   const injection = `\n#v(2pt)\n#align(center)[#text(size: 9pt, fill: rgb("#475569"))[${rendered}]]\n`;
 
   const alignStart = source.indexOf("#align(center)");

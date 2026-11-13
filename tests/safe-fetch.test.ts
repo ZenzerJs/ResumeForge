@@ -107,4 +107,39 @@ describe("safeFetch socket DNS validation", () => {
     await safeFetch("https://public.example/", { signal: controller.signal });
     expect(remove).toHaveBeenCalledWith("abort", add.mock.calls[0][1]);
   });
+
+  it("rejects loopback by default when allowLocalhost is omitted", async () => {
+    await expect(safeFetch("http://127.0.0.1:8000/")).rejects.toBeInstanceOf(UnsafeUrlError);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("strips credential headers when redirecting across origins", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        new Response(null, { status: 302, headers: { location: "https://other-origin.example/hook" } })
+      )
+      .mockResolvedValueOnce(new Response("ok"));
+
+    await safeFetch(
+      "https://first.example/start",
+      {
+        headers: {
+          Authorization: "Bearer secret-token",
+          "x-api-key": "ant-key",
+          "x-goog-api-key": "gem-key",
+          Cookie: "rf_session=abc",
+          Accept: "application/json",
+        },
+      },
+      { followRedirects: true }
+    );
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const secondHeaders = new Headers(vi.mocked(fetch).mock.calls[1][1]?.headers);
+    expect(secondHeaders.has("authorization")).toBe(false);
+    expect(secondHeaders.has("x-api-key")).toBe(false);
+    expect(secondHeaders.has("x-goog-api-key")).toBe(false);
+    expect(secondHeaders.has("cookie")).toBe(false);
+    expect(secondHeaders.get("accept")).toBe("application/json");
+  });
 });
