@@ -54,6 +54,17 @@ describe("Phase 12 Orchestrator & Promotion Pipeline", () => {
     expect(jobs[0].companyName).toBe("Shopify");
     expect(jobs[0].isCanadianEligible).toBe(true);
     expect(jobs[0].fingerprint).toHaveLength(64);
+    expect(jobs[0].cityNorm).toBe("toronto");
+    expect(jobs[0].lat).toBeCloseTo(43.6532, 2);
+    expect(jobs[0].lng).toBeCloseTo(-79.3832, 2);
+    expect(jobs[0].parsedRequirements).toMatchObject({
+      geoRemote: true,
+      requirements: {
+        requiredSkills: expect.any(Array),
+        preferredSkills: expect.any(Array),
+        domainTerms: expect.any(Array),
+      },
+    });
 
     const logs = await prisma.connectorSyncLog.findMany({
       where: { source: "GREENHOUSE" },
@@ -99,6 +110,41 @@ describe("Phase 12 Orchestrator & Promotion Pipeline", () => {
 
     const count = await prisma.ingestedJob.count({ where: { externalId: "mock_lever_1" } });
     expect(count).toBe(1);
+
+    // Re-sync with unknown city and new skills clears obsolete coordinates and updates parsedRequirements
+    const updatedClient: ConnectorClient = {
+      ...mockClient,
+      fetchJobs: async (): Promise<RawJobListing[]> => [
+        {
+          externalId: "mock_lever_1",
+          source: "lever",
+          companyName: "Certn",
+          title: "Full Stack Engineer",
+          location: "Atlantis, Unknown",
+          isCanadianEligible: true,
+          workplaceType: "on_site",
+          descriptionHtml: "<p>Required: TypeScript and PostgreSQL</p>",
+          descriptionPlain: "Required: TypeScript and PostgreSQL",
+          applyUrl: "https://jobs.lever.co/certn/999",
+          postedAt: new Date("2026-08-11T12:00:00Z"),
+          metadata: {},
+        },
+      ],
+    };
+    await syncSingleConnector(updatedClient);
+    const updatedRow = await prisma.ingestedJob.findFirstOrThrow({
+      where: { externalId: "mock_lever_1" },
+    });
+    expect(updatedRow.lat).toBeNull();
+    expect(updatedRow.lng).toBeNull();
+    expect(updatedRow.cityNorm).toBeNull();
+    expect(updatedRow.workplaceType).toBe("ON_SITE");
+    expect(updatedRow.parsedRequirements).toMatchObject({
+      geoRemote: false,
+      requirements: {
+        requiredSkills: expect.arrayContaining(["TypeScript", "PostgreSQL"]),
+      },
+    });
   });
 
   it("3. promoteIngestedJobToTrackedJob promotes IngestedJob to Job and links trackedJobId", async () => {

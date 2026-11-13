@@ -22,6 +22,14 @@ const AtsScorePanel = dynamic(
 );
 
 const APPROVAL_LINE = /^\/\/ @layout-(two-pages|review)-approved: ([a-f0-9]{64})\r?\n/gm;
+const EMPTY_EXTRACTED_REQUIREMENTS = {
+  requiredSkills: [] as string[],
+  preferredSkills: [] as string[],
+  domainTerms: [] as string[],
+};
+const BLANK_PAGE_PLACEHOLDER =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 850 1100'%3E%3C/svg%3E";
+const MAX_SETTLED_MEASUREMENTS = 4;
 function approvalBase(source: string) { return source.replace(APPROVAL_LINE, ""); }
 async function approvalHash(source: string) {
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(approvalBase(source)));
@@ -70,7 +78,11 @@ export function PreviewPanel({
   sourceRef.current = source;
   const v2 = isResumeLayoutV2Enabled() && source.includes("// ResumeForge layout v2");
   const [measurement, setMeasurement] = useState<{ source: string; pages: number; pdf: Uint8Array } | null>(null);
-  const [pageImages, setPageImages] = useState<{ source: string; pages: string[] } | null>(null);
+  const [pageImages, setPageImages] = useState<{ source: string; pages: Record<number, string> } | null>(null);
+  const [visiblePages, setVisiblePages] = useState<number[]>([1]);
+  const settledCacheRef = useRef<Map<string, { source: string; pages: number; pdf: Uint8Array }>>(new Map());
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const pageSlotRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const [measurementError, setMeasurementError] = useState<string | null>(null);
   const [isFitting, setIsFitting] = useState(false);
   const [twoPageApproval, setTwoPageApproval] = useState<string | null>(null);
@@ -93,67 +105,245 @@ export function PreviewPanel({
       setSanitizedSvg({ raw: svg, clean: null, error: result.error });
     }
   }, [svg]);
+  const cacheSettledMeasurement = (entry: { source: string; pages: number; pdf: Uint8Array }) => {
+    const cache = settledCacheRef.current;
+    if (cache.has(entry.source)) cache.delete(entry.source);
+    cache.set(entry.source, entry);
+    while (cache.size > MAX_SETTLED_MEASUREMENTS) {
+      const oldest = cache.keys().next().value;
+      if (oldest === undefined) break;
+      cache.delete(oldest);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     setMeasurement(null);
     setPageImages(null);
+    setVisiblePages([1]);
     setMeasurementError(null);
     setTwoPageApproval(null);
     setReviewApproval(null);
     if (!v2 || !source.trim()) return () => { cancelled = true; };
+
     void approvalHash(source).then((hash) => {
-      if (cancelled) return;
+      if (cancelled || sourceRef.current !== source) return;
       if (source.includes(`// @layout-two-pages-approved: ${hash}\n`)) setTwoPageApproval(source);
       if (source.includes(`// @layout-review-approved: ${hash}\n`)) setReviewApproval(source);
     }).catch(() => { /* No saved approval can be trusted without a digest. */ });
+
+    const cached = settledCacheRef.current.get(source);
+    if (cached) {
+      setMeasurement(cached);
+      return () => { cancelled = true; };
+    }
+
     const timer = window.setTimeout(() => { void (async () => {
       try {
-        const { measureTypstDocument } = await import("@/lib/typst/compiler");
-        const hash = await approvalHash(source);
+        const [{ measureTypstPageCount }, hash] = await Promise.all([
+          import("@/lib/typst/compiler"),
+          approvalHash(source),
+        ]);
+        if (cancelled || sourceRef.current !== source) return;
+
+        const current = await measureTypstPageCount(source, { callerId: "editor-preview-measure", mode: "live" });
+        if (cancelled || sourceRef.current !== source) return;
+
+        const currentEntry = { source: current.source, pages: current.pageCount, pdf: current.pdf };
+        cacheSettledMeasurement(currentEntry);
+
         const hasTwoPageApproval = source.includes(`// @layout-two-pages-approved: ${hash}\n`);
-        if (onApplyLayout && !hasTwoPageApproval && parseManagedResume(source)) {
+        // Fit additional profiles only when the current settled source exceeds the 1-page budget.
+        if (current.pageCount > 1 && onApplyLayout && !hasTwoPageApproval && parseManagedResume(source)) {
           const { fitManagedLayout } = await import("@/lib/typst/layout-fit");
-          const fitted = await fitManagedLayout(source, 1, async (candidate) => (await measureTypstDocument(candidate, false, { callerId: "editor-preview-measure", mode: "live" })).pageCount);
+          const measuredInPass = new Map<string, { source: string; pages: number; pdf: Uint8Array }>([
+            [source, currentEntry],
+          ]);
+          const fitted = await fitManagedLayout(source, 1, async (candidate) => {
+            if (cancelled || sourceRef.current !== source) {
+              throw new Error("Superseded layout measurement");
+            }
+            const existing = measuredInPass.get(candidate) || settledCacheRef.current.get(candidate);
+            if (existing) return existing.pages;
+            const measured = await measureTypstPageCount(candidate, { callerId: "editor-preview-measure", mode: "live" });
+            const entry = { source: measured.source, pages: measured.pageCount, pdf: measured.pdf };
+            measuredInPass.set(candidate, entry);
+            cacheSettledMeasurement(entry);
+            return measured.pageCount;
+          });
           if (cancelled || sourceRef.current !== source) return;
-          if (fitted.status === "fit" && fitted.source !== source) { onApplyLayout(fitted.source); return; }
+          if (fitted.status === "fit" && fitted.source !== source) {
+            onApplyLayout(fitted.source);
+            return;
+          }
         }
-        const result = await measureTypstDocument(source, true, { callerId: "editor-preview-measure", mode: "live" });
-        if (!cancelled) {
-          setPageImages({ source: result.source, pages: result.pageImages });
-          setMeasurement({ source: result.source, pages: result.pageCount, pdf: result.pdf });
+
+        if (!cancelled && sourceRef.current === source) {
+          setMeasurement(currentEntry);
         }
       } catch (err) {
-        if (!cancelled && !(err instanceof Error && err.name === "SupersededCompileError")) {
+        if (
+          !cancelled &&
+          sourceRef.current === source &&
+          !(err instanceof Error && (err.name === "SupersededCompileError" || err.message === "Superseded layout measurement"))
+        ) {
           setMeasurementError(err instanceof Error ? err.message : "Could not measure the compiled document.");
         }
       }
     })(); }, 400);
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [source, v2, onApplyLayout]);
-  const measuredPdf = () => {
+
+  useEffect(() => {
+    if (!v2 || !measurement || measurement.source !== source) return;
+    if (typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const newlyVisible: number[] = [];
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const pageAttr = (entry.target as HTMLElement).dataset.pageSlot;
+          const pageNumber = pageAttr ? Number(pageAttr) : NaN;
+          if (Number.isInteger(pageNumber) && pageNumber >= 1) {
+            newlyVisible.push(pageNumber);
+          }
+        }
+        if (newlyVisible.length > 0) {
+          setVisiblePages((prev) => {
+            const merged = new Set(prev);
+            let changed = false;
+            for (const pageNumber of newlyVisible) {
+              if (!merged.has(pageNumber)) {
+                merged.add(pageNumber);
+                changed = true;
+              }
+            }
+            return changed ? Array.from(merged).sort((a, b) => a - b) : prev;
+          });
+        }
+      },
+      { root: scrollContainerRef.current, rootMargin: "40px 0px", threshold: 0.01 },
+    );
+
+    for (let pageNumber = 1; pageNumber <= measurement.pages; pageNumber++) {
+      const el = pageSlotRefs.current.get(pageNumber);
+      if (el) observer.observe(el);
+    }
+
+    return () => observer.disconnect();
+  }, [v2, measurement, source]);
+
+  useEffect(() => {
+    if (!v2 || !measurement || measurement.source !== source) return;
+    const currentImages = pageImages?.source === measurement.source ? pageImages.pages : {};
+    const missingPages = visiblePages.filter(
+      (pageNumber) => pageNumber >= 1 && pageNumber <= measurement.pages && !currentImages[pageNumber],
+    );
+    if (missingPages.length === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { renderPdfPages } = await import("@/lib/typst/compiler");
+        const rendered = await renderPdfPages(measurement.pdf, missingPages);
+        if (cancelled || sourceRef.current !== measurement.source) return;
+        setPageImages((prev) => {
+          const base = prev?.source === measurement.source ? prev.pages : {};
+          return {
+            source: measurement.source,
+            pages: { ...base, ...rendered },
+          };
+        });
+      } catch (err) {
+        if (!cancelled && sourceRef.current === measurement.source) {
+          setMeasurementError(err instanceof Error ? err.message : "Could not render document preview.");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [v2, measurement, source, visiblePages, pageImages]);
+
+  const resolveMeasuredExport = async () => {
     if (!v2) return undefined;
-    if (sourceRef.current !== source) throw new Error("The document changed. Try again.");
-    assertLayoutExportReady(source, measurement, twoPageApproval, reviewApproval);
-    if (!measurement) throw new Error("Wait for the current document to compile and measure before export.");
-    return measurement.pdf;
+    const activeSource = source;
+    if (sourceRef.current !== activeSource) throw new Error("The document changed. Try again.");
+
+    let currentMeasurement =
+      measurement?.source === activeSource
+        ? measurement
+        : settledCacheRef.current.get(activeSource) || null;
+    let currentTwoPageApproval = twoPageApproval;
+    let currentReviewApproval = reviewApproval;
+
+    if (!currentMeasurement) {
+      const [{ measureTypstPageCount }, hash] = await Promise.all([
+        import("@/lib/typst/compiler"),
+        approvalHash(activeSource),
+      ]);
+      if (sourceRef.current !== activeSource) throw new Error("The document changed during export. Try again.");
+      const measured = await measureTypstPageCount(activeSource, {
+        callerId: "editor-preview-measure",
+        mode: "export",
+      });
+      if (sourceRef.current !== activeSource) throw new Error("The document changed during export. Try again.");
+      currentMeasurement = { source: measured.source, pages: measured.pageCount, pdf: measured.pdf };
+      cacheSettledMeasurement(currentMeasurement);
+      setMeasurement(currentMeasurement);
+      if (activeSource.includes(`// @layout-two-pages-approved: ${hash}\n`)) {
+        currentTwoPageApproval = activeSource;
+        setTwoPageApproval(activeSource);
+      }
+      if (activeSource.includes(`// @layout-review-approved: ${hash}\n`)) {
+        currentReviewApproval = activeSource;
+        setReviewApproval(activeSource);
+      }
+    }
+
+    assertLayoutExportReady(activeSource, currentMeasurement, currentTwoPageApproval, currentReviewApproval);
+    return {
+      pdf: currentMeasurement.pdf,
+      measurement: currentMeasurement,
+      twoPageApproval: currentTwoPageApproval,
+      reviewApproval: currentReviewApproval,
+    };
   };
 
   const approve = async (kind: "two-pages" | "review") => {
     if (!onApplyLayout) return;
     try {
       let approvedSource = source;
+      let approvedMeasurement: { source: string; pages: number; pdf: Uint8Array } | null = null;
       if (kind === "two-pages" && parseManagedResume(source)) {
-        const [{ fitManagedLayout }, { measureTypstDocument }] = await Promise.all([
+        const [{ fitManagedLayout }, { measureTypstPageCount }] = await Promise.all([
           import("@/lib/typst/layout-fit"), import("@/lib/typst/compiler"),
         ]);
-        const result = await fitManagedLayout(source, 2, async (candidate) => (await measureTypstDocument(candidate)).pageCount);
+        const result = await fitManagedLayout(source, 2, async (candidate) => {
+          const existing = settledCacheRef.current.get(candidate);
+          if (existing) {
+            approvedMeasurement = existing;
+            return existing.pages;
+          }
+          const measured = await measureTypstPageCount(candidate, { callerId: "editor-preview-fit", mode: "live" });
+          const entry = { source: measured.source, pages: measured.pageCount, pdf: measured.pdf };
+          cacheSettledMeasurement(entry);
+          approvedMeasurement = entry;
+          return measured.pageCount;
+        });
         if (result.status !== "fit") throw new Error("Could not find a readable two-page layout.");
         approvedSource = result.source;
       }
       const hash = await approvalHash(approvedSource);
       if (sourceRef.current !== source) throw new Error("The document changed. Review it again.");
       const existing = kind === "two-pages" ? /^\/\/ @layout-two-pages-approved: [a-f0-9]{64}\r?\n/gm : /^\/\/ @layout-review-approved: [a-f0-9]{64}\r?\n/gm;
-      onApplyLayout(`// @layout-${kind}-approved: ${hash}\n${approvedSource.replace(existing, "")}`);
+      const finalSource = `// @layout-${kind}-approved: ${hash}\n${approvedSource.replace(existing, "")}`;
+      if (approvedMeasurement) {
+        const currentMeasurement = approvedMeasurement as { source: string; pages: number; pdf: Uint8Array };
+        cacheSettledMeasurement({ source: finalSource, pages: currentMeasurement.pages, pdf: currentMeasurement.pdf });
+      }
+      onApplyLayout(finalSource);
     } catch (err) { setExportError(err instanceof Error ? err.message : "Could not record approval."); }
   };
 
@@ -163,8 +353,14 @@ export function PreviewPanel({
     setExportError(null);
     try {
       const { fitManagedLayout } = await import("@/lib/typst/layout-fit");
-      const { measureTypstDocument } = await import("@/lib/typst/compiler");
-      const result = await fitManagedLayout(source, 1, async (candidate) => (await measureTypstDocument(candidate)).pageCount);
+      const { measureTypstPageCount } = await import("@/lib/typst/compiler");
+      const result = await fitManagedLayout(source, 1, async (candidate) => {
+        const existing = settledCacheRef.current.get(candidate);
+        if (existing) return existing.pages;
+        const measured = await measureTypstPageCount(candidate, { callerId: "editor-preview-fit", mode: "live" });
+        cacheSettledMeasurement({ source: measured.source, pages: measured.pageCount, pdf: measured.pdf });
+        return measured.pageCount;
+      });
       if (sourceRef.current !== source) throw new Error("The document changed while fitting. Try again.");
       if (result.status === "fit") onApplyLayout(result.source);
       else if (result.status === "no-fit") throw new Error("This resume does not fit on one page with the readable profiles. Review content or use two pages.");
@@ -190,8 +386,9 @@ export function PreviewPanel({
       // Phase 11.2 Mechanical Guardrail Gate
       assertCanExport(source, masterFacts, { allowUnfrozenMasterSelfExport });
 
+      const resolvedExport = await resolveMeasuredExport();
       const { compileTypstToPdf } = await import("@/lib/typst/compiler");
-      const pdfBytes = measuredPdf() || await compileTypstToPdf(source, { mode: "export" });
+      const pdfBytes = resolvedExport?.pdf || await compileTypstToPdf(source, { mode: "export" });
       if (sourceRef.current !== source) throw new Error("The document changed during export. Try again.");
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
@@ -309,14 +506,14 @@ export function PreviewPanel({
       setIsExporting(true);
       setExportError(null);
 
-      const compiledPdf = measuredPdf();
+      const resolvedExport = await resolveMeasuredExport();
       const { generateApplicationPackageZip } = await import("@/lib/export/zip");
       const zipBytes = await generateApplicationPackageZip({
         typstSource: source,
-        compiledPdf,
-        layoutMeasurement: v2 ? measurement : undefined,
-        twoPageApproval,
-        reviewApproval,
+        compiledPdf: resolvedExport?.pdf,
+        layoutMeasurement: v2 ? (resolvedExport?.measurement ?? measurement) : undefined,
+        twoPageApproval: resolvedExport ? resolvedExport.twoPageApproval : twoPageApproval,
+        reviewApproval: resolvedExport ? resolvedExport.reviewApproval : reviewApproval,
         masterFacts: masterFacts || undefined,
         allowUnfrozenMasterSelfExport,
         job: roleTitle
@@ -463,7 +660,7 @@ export function PreviewPanel({
         {measurement?.source === source && measurement.pages > 2 && " · Review content to reduce this resume to two pages."}
       </div>}
       {/* Main Preview Container */}
-      <div className="relative flex-1 min-h-0 overflow-auto p-4 md:p-6 flex flex-col items-center">
+      <div ref={scrollContainerRef} className="relative flex-1 min-h-0 overflow-auto p-4 md:p-6 flex flex-col items-center">
         {/* Task 9.5: ATS Grade Overlay Breakdown */}
         {showGrade && (
           <div data-testid="editor-ats-score-overlay" className="w-full max-w-[850px] mb-6">
@@ -487,13 +684,7 @@ export function PreviewPanel({
             ) : (
               <AtsScorePanel
                 typstContent={source}
-                extractedRequirements={
-                  extractedRequirements || {
-                    requiredSkills: [],
-                    preferredSkills: [],
-                    domainTerms: [],
-                  }
-                }
+                extractedRequirements={extractedRequirements || EMPTY_EXTRACTED_REQUIREMENTS}
                 roleTitle={roleTitle}
               />
             )}
@@ -597,15 +788,34 @@ export function PreviewPanel({
         )}
 
         {/* Paper Sheet Preview Container */}
-        {v2 && pageImages?.source === source ? (
+        {v2 && measurement?.source === source ? (
           <div className="w-full max-w-[850px] space-y-5" data-testid="layout-page-preview">
-            {pageImages.pages.map((image, index) => (
-              <div key={index} className="overflow-hidden border border-slate-200 bg-white shadow-md">
-                {/* Browser-rendered pages reflect the same PDF bytes used for export. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={image} alt={`Resume page ${index + 1}`} className="block h-auto w-full" />
-              </div>
-            ))}
+            {Array.from({ length: measurement.pages }, (_, index) => {
+              const pageNumber = index + 1;
+              const renderedImage =
+                pageImages?.source === source ? pageImages.pages[pageNumber] : undefined;
+              return (
+                <div
+                  key={pageNumber}
+                  data-page-slot={pageNumber}
+                  ref={(el) => {
+                    if (el) pageSlotRefs.current.set(pageNumber, el);
+                    else pageSlotRefs.current.delete(pageNumber);
+                  }}
+                  className="overflow-hidden border border-slate-200 bg-white shadow-md"
+                >
+                  {/* Browser-rendered pages reflect the same PDF bytes used for export. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={renderedImage || BLANK_PAGE_PLACEHOLDER}
+                    alt={`Resume page ${pageNumber}`}
+                    data-page-number={pageNumber}
+                    data-page-rendered={renderedImage ? "true" : "false"}
+                    className={renderedImage ? "block h-auto w-full" : "block h-auto w-full aspect-[8.5/11]"}
+                  />
+                </div>
+              );
+            })}
           </div>
         ) : svg ? (
           sanitizedSvg?.raw === svg && sanitizedSvg.error ? (

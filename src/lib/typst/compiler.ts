@@ -399,22 +399,61 @@ export async function compileTypstToPdf(
 ): Promise<Uint8Array> {
   return defaultCompilerClient.compileTypstToPdf(source, options);
 }
-/** Compile and measure the exact source; optionally render each PDF page for preview. */
-export async function measureTypstDocument(
+export interface TypstMeasurement {
+  source: string;
+  pageCount: number;
+  pdf: Uint8Array;
+}
+
+const inFlightMeasurements = new Map<string, Promise<TypstMeasurement>>();
+
+/** Share one in-flight PDF compile and cheap PDF.js page count per exact source. */
+export function measureTypstPageCount(
   source: string,
-  renderPages = false,
   options?: CompileRequestOptions,
-) {
-  const pdf = await compileTypstToPdf(source, options);
+): Promise<TypstMeasurement> {
+  const existing = inFlightMeasurements.get(source);
+  if (existing) return existing;
+
+  const promise = (async (): Promise<TypstMeasurement> => {
+    const pdf = await compileTypstToPdf(source, options);
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    pdfjs.GlobalWorkerOptions.workerSrc = "/workers/pdf.worker.min.mjs";
+    const task = pdfjs.getDocument({ data: new Uint8Array(pdf) });
+    try {
+      const document = await task.promise;
+      return { source, pageCount: document.numPages, pdf };
+    } finally {
+      await task.destroy();
+    }
+  })().finally(() => {
+    if (inFlightMeasurements.get(source) === promise) {
+      inFlightMeasurements.delete(source);
+    }
+  });
+
+  inFlightMeasurements.set(source, promise);
+  return promise;
+}
+
+/** Rasterize only the requested 1-based PDF pages from existing bytes without recompiling Typst. */
+export async function renderPdfPages(
+  pdf: Uint8Array,
+  pageNumbers: number[],
+): Promise<Record<number, string>> {
+  const uniquePages = Array.from(
+    new Set(pageNumbers.filter((pageNumber) => Number.isInteger(pageNumber) && pageNumber >= 1)),
+  );
+  if (uniquePages.length === 0) return {};
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   pdfjs.GlobalWorkerOptions.workerSrc = "/workers/pdf.worker.min.mjs";
   const task = pdfjs.getDocument({ data: new Uint8Array(pdf) });
   try {
     const document = await task.promise;
-    const pageCount = document.numPages;
-    const pageImages: string[] = [];
-    if (renderPages) for (let index = 1; index <= pageCount; index++) {
-      const page = await document.getPage(index);
+    const rendered: Record<number, string> = {};
+    for (const pageNumber of uniquePages) {
+      if (pageNumber > document.numPages) continue;
+      const page = await document.getPage(pageNumber);
       const viewport = page.getViewport({ scale: 1.5 });
       const canvas = window.document.createElement("canvas");
       canvas.width = Math.ceil(viewport.width);
@@ -422,10 +461,38 @@ export async function measureTypstDocument(
       const context = canvas.getContext("2d");
       if (!context) throw new Error("Could not render document preview.");
       await page.render({ canvas, canvasContext: context, viewport }).promise;
-      pageImages.push(canvas.toDataURL("image/png"));
+      rendered[pageNumber] = canvas.toDataURL("image/png");
     }
-    return { source, pageCount, pdf, pageImages };
-  } finally { await task.destroy(); }
+    return rendered;
+  } finally {
+    await task.destroy();
+  }
+}
+
+/** Compile and measure the exact source; optionally render each PDF page for preview. */
+export async function measureTypstDocument(
+  source: string,
+  renderPages = false,
+  options?: CompileRequestOptions,
+) {
+  const measurement = await measureTypstPageCount(source, options);
+  if (!renderPages) {
+    return {
+      source: measurement.source,
+      pageCount: measurement.pageCount,
+      pdf: measurement.pdf,
+      pageImages: [] as string[],
+    };
+  }
+  const pageNumbers = Array.from({ length: measurement.pageCount }, (_, i) => i + 1);
+  const rendered = await renderPdfPages(measurement.pdf, pageNumbers);
+  const pageImages = pageNumbers.map((pageNumber) => rendered[pageNumber] || "");
+  return {
+    source: measurement.source,
+    pageCount: measurement.pageCount,
+    pdf: measurement.pdf,
+    pageImages,
+  };
 }
 
 /** Render the exact PDF and expose conservative, normalized text-item rectangles. */

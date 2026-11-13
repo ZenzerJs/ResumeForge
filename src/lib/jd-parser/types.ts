@@ -11,6 +11,13 @@ export const JobRequirementsSchema = z.object({
 
 export type JobRequirements = z.infer<typeof JobRequirementsSchema>;
 
+export const ParsedIngestedRequirementsSchema = z.object({
+  requirements: JobRequirementsSchema,
+  geoRemote: z.boolean(),
+});
+
+export type ParsedIngestedRequirements = z.infer<typeof ParsedIngestedRequirementsSchema>;
+
 export const CreateJobSchema = z.object({
   company: z.string().optional(),
   roleTitle: z.string().optional(),

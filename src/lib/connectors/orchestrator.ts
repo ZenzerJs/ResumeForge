@@ -14,7 +14,9 @@ import {
   SourceConnector,
   SyncResult,
 } from "./types";
-import { JobSource as PrismaJobSource, WorkplaceType as PrismaWorkplaceType } from "@prisma/client";
+import { JobSource as PrismaJobSource, Prisma, WorkplaceType as PrismaWorkplaceType } from "@prisma/client";
+import { ParsedIngestedRequirementsSchema } from "@/lib/jd-parser/types";
+import { computeIngestedJobEnrichment } from "./enrichment";
 
 export const CONNECTORS: Record<SourceConnector, ConnectorClient> = {
   greenhouse: new GreenhouseConnector(),
@@ -83,14 +85,38 @@ export async function syncSingleConnector(
 
       const existing = await prisma.ingestedJob.findUnique({
         where: { fingerprint },
-        select: { id: true, postedAt: true, createdAt: true },
+        select: {
+          id: true,
+          postedAt: true,
+          createdAt: true,
+          description: true,
+          location: true,
+          workplaceType: true,
+          parsedRequirements: true,
+        },
       });
+
+      const nextWorkplaceType = mapWorkplaceTypeToPrisma(item.workplaceType);
+      const needsEnrichment =
+        !existing ||
+        existing.description !== item.descriptionPlain ||
+        existing.location !== item.location ||
+        existing.workplaceType !== nextWorkplaceType ||
+        !ParsedIngestedRequirementsSchema.safeParse(existing.parsedRequirements).success;
+
+      const enrichment = needsEnrichment
+        ? computeIngestedJobEnrichment({
+            description: item.descriptionPlain,
+            location: item.location,
+          })
+        : null;
 
       await prisma.ingestedJob.upsert({
         where: { fingerprint },
         update: {
           title: item.title,
           location: item.location,
+          workplaceType: nextWorkplaceType,
           isCanadianEligible: item.isCanadianEligible,
           description: item.descriptionPlain,
           descriptionHtml: item.descriptionHtml,
@@ -103,6 +129,14 @@ export async function syncSingleConnector(
           salaryMax: item.compensation?.max,
           salaryCurrency: item.compensation?.currency || "CAD",
           rawMetadata: (item.metadata || {}) as any,
+          ...(enrichment
+            ? {
+                lat: enrichment.lat,
+                lng: enrichment.lng,
+                cityNorm: enrichment.cityNorm,
+                parsedRequirements: enrichment.parsedRequirements as unknown as Prisma.InputJsonValue,
+              }
+            : {}),
         },
         create: {
           fingerprint,
@@ -111,7 +145,7 @@ export async function syncSingleConnector(
           companyName: item.companyName,
           title: item.title,
           location: item.location,
-          workplaceType: mapWorkplaceTypeToPrisma(item.workplaceType),
+          workplaceType: nextWorkplaceType,
           isCanadianEligible: item.isCanadianEligible,
           description: item.descriptionPlain,
           descriptionHtml: item.descriptionHtml,
@@ -121,6 +155,14 @@ export async function syncSingleConnector(
           salaryMax: item.compensation?.max,
           salaryCurrency: item.compensation?.currency || "CAD",
           rawMetadata: (item.metadata || {}) as any,
+          lat: enrichment?.lat ?? null,
+          lng: enrichment?.lng ?? null,
+          cityNorm: enrichment?.cityNorm ?? null,
+          parsedRequirements: (enrichment ??
+            computeIngestedJobEnrichment({
+              description: item.descriptionPlain,
+              location: item.location,
+            })).parsedRequirements as unknown as Prisma.InputJsonValue,
         },
       });
 

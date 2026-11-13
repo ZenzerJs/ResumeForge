@@ -25,6 +25,19 @@ async function prepare(page: Page) {
     localStorage.setItem("resumeforge_typst_source", source);
     localStorage.setItem("resumeforge_guest_evidence", "[]");
     localStorage.setItem("resumeforge_ai_settings", JSON.stringify({ provider: "ollama" }));
+    const OriginalWorker = window.Worker;
+    (window as unknown as { __pdfCompileCount: number }).__pdfCompileCount = 0;
+    window.Worker = class SpyWorker extends OriginalWorker {
+      postMessage(message: unknown, optionsOrTransfer?: StructuredSerializeOptions | Transferable[]) {
+        if (message && typeof message === "object" && (message as { kind?: string }).kind === "pdf") {
+          (window as unknown as { __pdfCompileCount: number }).__pdfCompileCount += 1;
+        }
+        if (Array.isArray(optionsOrTransfer)) {
+          return super.postMessage(message, optionsOrTransfer);
+        }
+        return super.postMessage(message, optionsOrTransfer);
+      }
+    } as typeof Worker;
   }, base);
   await page.route("**/api/**", async route => {
     const request = route.request();
@@ -57,14 +70,28 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
     await expect(preview.getByRole("button", { name: /Review suggestion 3/ })).toHaveCount(0);
     await expect(preview.getByText(/1 conflicting or invalid suggestion/)).toBeVisible();
     const original = await preview.getByRole("img", { name: "Resume page 1" }).getAttribute("src");
+    const countAfterOriginal = await page.evaluate(() => (window as unknown as { __pdfCompileCount: number }).__pdfCompileCount);
+    expect(countAfterOriginal).toBe(3);
+
     await preview.getByRole("button", { name: "Suggested", exact: true }).click();
+    await expect.poll(async () => preview.getByRole("img", { name: "Resume page 1" }).getAttribute("src"), { timeout: 90000 }).not.toBe(original);
+    await expect(preview.getByRole("button", { name: "Review suggestion 1, pending" })).toBeVisible({ timeout: 90000 });
+    await expect(preview.getByRole("button", { name: "Review suggestion 2, pending" })).toBeAttached({ timeout: 90000 });
+    await expect(preview.getByText(/1 suggestion\(s\) have no verified location/)).toBeVisible({ timeout: 90000 });
+    const countAfterFirstSuggested = await page.evaluate(() => (window as unknown as { __pdfCompileCount: number }).__pdfCompileCount);
+    expect(countAfterFirstSuggested).toBe(6);
+
+    // Switching back and forth reuses cached renders and probes with zero new PDF compiles
     await preview.getByRole("button", { name: "Original", exact: true }).click();
     await preview.getByRole("button", { name: "Suggested", exact: true }).click();
     await preview.getByRole("button", { name: "Original", exact: true }).click();
     await expect.poll(async () => preview.getByRole("img", { name: "Resume page 1" }).getAttribute("src"), { timeout: 90000 }).toBe(original);
     await expect(preview.getByRole("button", { name: "Original", exact: true })).toHaveAttribute("aria-pressed", "true");
+    expect(await page.evaluate(() => (window as unknown as { __pdfCompileCount: number }).__pdfCompileCount)).toBe(countAfterFirstSuggested);
+
     await preview.getByRole("button", { name: "Suggested", exact: true }).click();
     await expect.poll(async () => preview.getByRole("img", { name: "Resume page 1" }).getAttribute("src"), { timeout: 90000 }).not.toBe(original);
+    expect(await page.evaluate(() => (window as unknown as { __pdfCompileCount: number }).__pdfCompileCount)).toBe(countAfterFirstSuggested);
     const geometry = await preview.getByRole("button", { name: "Review suggestion 1, pending" }).evaluate(button => {
       const marker = button.getBoundingClientRect();
       const pageRect = button.parentElement!.getBoundingClientRect();
@@ -83,11 +110,17 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
     await preview.getByRole("button", { name: "Review suggestion 1, pending" }).click();
     await expect(preview.getByText(/Clarify scope/)).toBeVisible();
     await expect(preview.getByText(/evidence-1/)).toBeVisible();
+    expect(await page.evaluate(() => (window as unknown as { __pdfCompileCount: number }).__pdfCompileCount)).toBe(countAfterFirstSuggested);
+
     await preview.getByRole("button", { name: "Accept", exact: true }).click();
     await expect(preview.getByRole("button", { name: "Review suggestion 1, accepted" })).toBeVisible({ timeout: 90000 });
+    expect(await page.evaluate(() => (window as unknown as { __pdfCompileCount: number }).__pdfCompileCount)).toBe(countAfterFirstSuggested);
+
     await preview.getByRole("button", { name: "Reject", exact: true }).click();
     await expect(preview.getByRole("button", { name: "Review suggestion 1, rejected" })).toBeVisible({ timeout: 90000 });
     await expect.poll(async () => preview.getByRole("img", { name: "Resume page 1" }).getAttribute("src"), { timeout: 90000 }).toBe(original);
+    const countAfterReject = await page.evaluate(() => (window as unknown as { __pdfCompileCount: number }).__pdfCompileCount);
+    expect(countAfterReject).toBeGreaterThan(countAfterFirstSuggested);
     expect(await page.evaluate(() => localStorage.getItem("resumeforge_typst_source"))).toBe(base);
     expect(writes).toEqual([]);
     await preview.screenshot({ path: path.join(artifacts, `${viewport.name}-rejected.png`), style: "header { visibility: hidden !important; }" });

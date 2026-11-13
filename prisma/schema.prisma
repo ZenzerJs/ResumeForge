@@ -155,6 +155,7 @@ model IngestedJob {
   lat                Float?
   lng                Float?
   cityNorm           String?
+  parsedRequirements Json?
   normalized         Json?
   formattedJd        Json?
 
@@ -300,6 +301,9 @@ model CoverLetter {
   bodyParagraphs    String         // Stored as JSON array string
   closingParagraph  String
   fullMarkdown      String
+  typstSource       String?
+  tone              String?
+  targetWordCount   Int?
   evidenceCitations String         @default("[]") // Stored as JSON array string of evidenceIds
   status            String         @default("DRAFT") // DRAFT | FINAL
   createdAt         DateTime       @default(now())

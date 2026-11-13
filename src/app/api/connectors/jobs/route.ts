@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Prisma, WorkplaceType } from "@prisma/client";
-import {
-  geocodeCanadianLocation,
-  isWithinRadiusKm,
-  CANADIAN_TECH_HUBS,
-} from "@/lib/geo/geocoding";
+import { JobSource, Prisma, WorkplaceType } from "@prisma/client";
+import { isWithinRadiusKm } from "@/lib/geo/geocoding";
 import { calculateBlendedScore, type ScoreBreakdown } from "@/lib/scoring/blended-sort";
 import {
   calculateJobCompatibility,
   type CompatibilityResult,
 } from "@/lib/scoring/compatibility-engine";
-import { parseJobDescription } from "@/lib/jd-parser/parser";
+import { computeIngestedJobEnrichment } from "@/lib/connectors/enrichment";
+import {
+  ParsedIngestedRequirementsSchema,
+  type ParsedIngestedRequirements,
+} from "@/lib/jd-parser/types";
 import { getRequestUserId } from "@/lib/security/auth-request";
 import { jobMaxAgeDays } from "@/lib/jobs/expiry";
 import { loadScoringEvidence } from "@/lib/scoring/user-evidence";
@@ -77,12 +77,12 @@ export async function GET(req: NextRequest) {
       andConditions.push({ workplaceType: workplace as WorkplaceType });
     }
 
-    const VALID_SOURCES = ["GREENHOUSE", "LEVER", "ASHBY", "USAJOBS", "MANUAL", "PITTCSC", "SIMPLIFY"] as const;
+    const validSources = Object.values(JobSource) as string[];
     if (source && source !== "ALL") {
-      if (!VALID_SOURCES.includes(source as any)) {
+      if (!validSources.includes(source)) {
         return NextResponse.json({ error: "Invalid source parameter" }, { status: 400 });
       }
-      andConditions.push({ source: source as any });
+      andConditions.push({ source: source as JobSource });
     }
 
     if (search) {
@@ -129,15 +129,23 @@ export async function GET(req: NextRequest) {
 
     const where: Prisma.IngestedJobWhereInput = andConditions.length > 0 ? { AND: andConditions } : {};
 
-    // Fetch candidate records to calculate scoring and geo-filtering
-    const rawJobs = await prisma.ingestedJob.findMany({
+    // Pass 1: Fetch only filtering/scoring inputs for the 500-candidate window
+    const candidateJobs = await prisma.ingestedJob.findMany({
       where,
       take: 500,
       orderBy: [{ postedAt: "desc" }, { createdAt: "desc" }],
-      include: {
-        trackedJob: {
-          select: { id: true, status: true },
-        },
+      select: {
+        id: true,
+        location: true,
+        workplaceType: true,
+        postedAt: true,
+        createdAt: true,
+        salaryMin: true,
+        salaryMax: true,
+        lat: true,
+        lng: true,
+        cityNorm: true,
+        parsedRequirements: true,
       },
     });
 
@@ -148,22 +156,63 @@ export async function GET(req: NextRequest) {
     const targetCityKey = city.toLowerCase();
     const hasCityFilter = targetCityKey !== "all" && targetCityKey !== "all canada" && targetCityKey !== "";
 
-    // Score and geo-filter in memory
-    const scoredJobs: ScoredIngestedJob[] = [];
-
-    for (const job of rawJobs) {
-      let jobLat = job.lat;
-      let jobLng = job.lng;
-      let isJobRemote = job.workplaceType === WorkplaceType.REMOTE;
-
-      if (jobLat == null || jobLng == null) {
-        const geo = geocodeCanadianLocation(job.location);
-        if (geo) {
-          jobLat = geo.lat;
-          jobLng = geo.lng;
-          isJobRemote = isJobRemote || geo.isRemote;
-        }
+    const parsedByJobId = new Map<string, ParsedIngestedRequirements>();
+    const unprocessedIds: string[] = [];
+    for (const job of candidateJobs) {
+      const parsed = ParsedIngestedRequirementsSchema.safeParse(job.parsedRequirements);
+      if (parsed.success) {
+        parsedByJobId.set(job.id, parsed.data);
+      } else {
+        unprocessedIds.push(job.id);
       }
+    }
+
+    const fallbackEnrichmentById = new Map<
+      string,
+      ReturnType<typeof computeIngestedJobEnrichment>
+    >();
+    if (unprocessedIds.length > 0) {
+      const legacyRows = await prisma.ingestedJob.findMany({
+        where: { id: { in: unprocessedIds } },
+        select: { id: true, description: true, location: true },
+      });
+      for (const row of legacyRows) {
+        fallbackEnrichmentById.set(
+          row.id,
+          computeIngestedJobEnrichment({
+            description: row.description,
+            location: row.location,
+          }),
+        );
+      }
+    }
+
+    // Score and geo-filter in memory
+    interface ScoredCandidate {
+      id: string;
+      lat: number | null;
+      lng: number | null;
+      postedAt: Date | null;
+      createdAt: Date;
+      salaryMin: number | null;
+      salaryMax: number | null;
+      scoreBreakdown: ScoreBreakdown;
+      blendedScore: number;
+      compatibility: CompatibilityResult;
+    }
+
+    const scoredJobs: ScoredCandidate[] = [];
+
+    for (const job of candidateJobs) {
+      const precomputed = parsedByJobId.get(job.id);
+      const fallback = precomputed ? undefined : fallbackEnrichmentById.get(job.id);
+
+      const jobLat = fallback ? fallback.lat : (job.lat ?? null);
+      const jobLng = fallback ? fallback.lng : (job.lng ?? null);
+      const geoRemote = precomputed
+        ? precomputed.geoRemote
+        : (fallback?.parsedRequirements.geoRemote ?? false);
+      const isJobRemote = job.workplaceType === WorkplaceType.REMOTE || geoRemote;
 
       // Geo-radius filtering
       if (hasCityFilter && !isJobRemote) {
@@ -177,12 +226,9 @@ export async function GET(req: NextRequest) {
         job.location.toLowerCase().includes(targetCityKey)
       );
 
-      let reqs = null;
-      try {
-        reqs = parseJobDescription(job.description);
-      } catch {
-        reqs = null;
-      }
+      const reqs = precomputed
+        ? precomputed.requirements
+        : (fallback?.parsedRequirements.requirements ?? null);
 
       const compatibility = calculateJobCompatibility(
         reqs,
@@ -206,9 +252,13 @@ export async function GET(req: NextRequest) {
       }
 
       scoredJobs.push({
-        ...job,
+        id: job.id,
         lat: jobLat,
         lng: jobLng,
+        postedAt: job.postedAt,
+        createdAt: job.createdAt,
+        salaryMin: job.salaryMin,
+        salaryMax: job.salaryMax,
         scoreBreakdown,
         blendedScore: scoreBreakdown.finalScore,
         compatibility,
@@ -232,7 +282,54 @@ export async function GET(req: NextRequest) {
 
     const total = scoredJobs.length;
     const skip = (page - 1) * limit;
-    const paginated = scoredJobs.slice(skip, skip + limit);
+    const paginatedMeta = scoredJobs.slice(skip, skip + limit);
+
+    // Pass 2: Fetch full response fields only for the selected page
+    const pageIds = paginatedMeta.map((item) => item.id);
+    const pageRows = pageIds.length > 0
+      ? await prisma.ingestedJob.findMany({
+          where: { id: { in: pageIds } },
+          select: {
+            id: true,
+            externalId: true,
+            source: true,
+            companyName: true,
+            title: true,
+            location: true,
+            workplaceType: true,
+            isCanadianEligible: true,
+            description: true,
+            descriptionHtml: true,
+            applyUrl: true,
+            postedAt: true,
+            salaryMin: true,
+            salaryMax: true,
+            salaryCurrency: true,
+            createdAt: true,
+            lat: true,
+            lng: true,
+            cityNorm: true,
+            trackedJob: {
+              select: { id: true, status: true },
+            },
+          },
+        })
+      : [];
+    const rowById = new Map(pageRows.map((row) => [row.id, row]));
+    const paginated: ScoredIngestedJob[] = paginatedMeta
+      .map((meta): ScoredIngestedJob | null => {
+        const row = rowById.get(meta.id);
+        if (!row) return null;
+        return {
+          ...row,
+          lat: meta.lat,
+          lng: meta.lng,
+          scoreBreakdown: meta.scoreBreakdown,
+          blendedScore: meta.blendedScore,
+          compatibility: meta.compatibility,
+        };
+      })
+      .filter((item): item is ScoredIngestedJob => item !== null);
 
     return NextResponse.json({
       success: true,

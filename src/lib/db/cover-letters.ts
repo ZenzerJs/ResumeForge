@@ -17,6 +17,10 @@ export interface CreateCoverLetterInput {
   bodyParagraphs: string[]; // array of strings
   closingParagraph: string;
   fullMarkdown: string;
+  proseMarkdown?: string;
+  typstSource?: string | null;
+  tone?: string | null;
+  targetWordCount?: number | null;
   evidenceCitations?: string[]; // array of evidenceIds
   status?: "DRAFT" | "FINAL";
   userId?: string;
@@ -29,12 +33,16 @@ export interface UpdateCoverLetterInput {
   bodyParagraphs?: string[];
   closingParagraph?: string;
   fullMarkdown?: string;
+  proseMarkdown?: string;
+  typstSource?: string;
+  tone?: string;
+  targetWordCount?: number;
   evidenceCitations?: string[];
   status?: "DRAFT" | "FINAL";
 }
 
 /**
- * Creates a new CoverLetter record in SQLite.
+ * Creates a new CoverLetter record in Postgres.
  */
 export async function createCoverLetter(input: CreateCoverLetterInput) {
   // Verify job exists
@@ -69,7 +77,10 @@ export async function createCoverLetter(input: CreateCoverLetterInput) {
       openingParagraph: input.openingParagraph,
       bodyParagraphs: JSON.stringify(input.bodyParagraphs || []),
       closingParagraph: input.closingParagraph,
-      fullMarkdown: input.fullMarkdown,
+      fullMarkdown: input.proseMarkdown ?? input.fullMarkdown,
+      typstSource: input.typstSource ?? null,
+      tone: input.tone ?? null,
+      targetWordCount: input.targetWordCount ?? null,
       evidenceCitations: JSON.stringify(input.evidenceCitations || []),
       status: input.status || "DRAFT",
     },
@@ -183,16 +194,26 @@ export async function updateCoverLetter(id: string, input: UpdateCoverLetterInpu
     throw new Error(`CoverLetter not found: ${id}`);
   }
 
+  const nextFullMarkdown =
+    input.proseMarkdown !== undefined ? input.proseMarkdown : input.fullMarkdown;
+
   const updated = await prisma.coverLetter.update({
     where: { id },
     data: {
       title: input.title,
       salutation: input.salutation,
       openingParagraph: input.openingParagraph,
-      bodyParagraphs: input.bodyParagraphs ? JSON.stringify(input.bodyParagraphs) : undefined,
+      bodyParagraphs:
+        input.bodyParagraphs !== undefined ? JSON.stringify(input.bodyParagraphs) : undefined,
       closingParagraph: input.closingParagraph,
-      fullMarkdown: input.fullMarkdown,
-      evidenceCitations: input.evidenceCitations ? JSON.stringify(input.evidenceCitations) : undefined,
+      fullMarkdown: nextFullMarkdown,
+      typstSource: input.typstSource,
+      tone: input.tone,
+      targetWordCount: input.targetWordCount,
+      evidenceCitations:
+        input.evidenceCitations !== undefined
+          ? JSON.stringify(input.evidenceCitations)
+          : undefined,
       status: input.status,
     },
     include: {
@@ -250,8 +271,15 @@ function parseCoverLetterJSON<T extends object>(record: T) {
     evidenceCitations = [];
   }
 
+  const fullMarkdown = typeof raw.fullMarkdown === "string" ? raw.fullMarkdown : "";
+
   return {
     ...record,
+    fullMarkdown,
+    proseMarkdown: fullMarkdown,
+    typstSource: typeof raw.typstSource === "string" ? raw.typstSource : null,
+    tone: typeof raw.tone === "string" ? raw.tone : null,
+    targetWordCount: typeof raw.targetWordCount === "number" ? raw.targetWordCount : null,
     bodyParagraphs,
     evidenceCitations,
   };

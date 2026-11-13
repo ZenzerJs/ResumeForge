@@ -68,7 +68,7 @@ export function CoverLetterPanel({
             openingParagraph: draft.openingParagraph,
             bodyParagraphs: Array.isArray(draft.bodyParagraphs) ? draft.bodyParagraphs : [],
             closingParagraph: draft.closingParagraph,
-            fullMarkdown: draft.fullMarkdown,
+            fullMarkdown: draft.fullMarkdown ?? draft.proseMarkdown ?? "",
             evidenceCitations: Array.isArray(draft.evidenceCitations) ? draft.evidenceCitations : [],
             gapsAddressed: [],
           });

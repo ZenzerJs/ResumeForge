@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -94,47 +94,81 @@ export function AtsScorePanel({
   const [isLoadingQualitative, setIsLoadingQualitative] = useState(false);
   const [qualitativeError, setQualitativeError] = useState<string | null>(null);
 
-  const runEvaluation = useCallback(async (profile: RoleProfile) => {
-    if (!useMasterResume && !typstContent.trim()) return;
+  const onEvaluationCompleteRef = useRef(onEvaluationComplete);
+  onEvaluationCompleteRef.current = onEvaluationComplete;
+
+  const evaluationRequestBody =
+    !useMasterResume && !typstContent.trim()
+      ? null
+      : JSON.stringify({
+          typstContent: typstContent || undefined,
+          extractedRequirements: {
+            requiredSkills: extractedRequirements.requiredSkills,
+            preferredSkills: extractedRequirements.preferredSkills,
+            domainTerms: extractedRequirements.domainTerms,
+          },
+          roleTitle,
+          roleProfile: evaluationProfile,
+          useMasterResume,
+          includeEvidenceBank,
+        });
+
+  useEffect(() => {
+    if (!evaluationRequestBody) {
+      setIsEvaluating(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    let active = true;
 
     setIsEvaluating(true);
     setEvalError(null);
     setQualitativeResult(null);
     setQualitativeError(null);
 
-    try {
-      const res = await fetch("/api/ats/evaluate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          typstContent: typstContent || undefined,
-          extractedRequirements,
-          roleTitle,
-          roleProfile: profile,
-          useMasterResume,
-          includeEvidenceBank,
-        }),
-      });
+    (async () => {
+      try {
+        const res = await fetch("/api/ats/evaluate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: evaluationRequestBody,
+          signal: controller.signal,
+        });
 
-      const json = await res.json();
-      if (res.ok && json.success) {
-        setResult(json.data);
-        onEvaluationComplete?.(json.data);
-      } else {
-        setEvalError(json.error || "Failed to calculate ATS evaluation score.");
-        onEvaluationComplete?.(null);
+        const json = await res.json();
+        if (!active || controller.signal.aborted) return;
+
+        if (res.ok && json.success) {
+          setResult(json.data);
+          onEvaluationCompleteRef.current?.(json.data);
+        } else {
+          setEvalError(json.error || "Failed to calculate ATS evaluation score.");
+          onEvaluationCompleteRef.current?.(null);
+        }
+      } catch (err) {
+        if (
+          !active ||
+          controller.signal.aborted ||
+          (err instanceof DOMException && err.name === "AbortError") ||
+          (err instanceof Error && err.name === "AbortError")
+        ) {
+          return;
+        }
+        setEvalError(`Evaluation error: ${err instanceof Error ? err.message : String(err)}`);
+        onEvaluationCompleteRef.current?.(null);
+      } finally {
+        if (active && !controller.signal.aborted) {
+          setIsEvaluating(false);
+        }
       }
-    } catch (err) {
-      setEvalError(`Evaluation error: ${err instanceof Error ? err.message : String(err)}`);
-      onEvaluationComplete?.(null);
-    } finally {
-      setIsEvaluating(false);
-    }
-  }, [typstContent, extractedRequirements, roleTitle, useMasterResume, includeEvidenceBank, onEvaluationComplete]);
+    })();
 
-  useEffect(() => {
-    runEvaluation(evaluationProfile);
-  }, [runEvaluation, evaluationProfile]);
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [evaluationRequestBody]);
 
   const handleFetchQualitativeReview = async () => {
     if (!result) return;
