@@ -39,7 +39,6 @@ try {
   const env = {
     ...process.env,
     DATABASE_URL: isolated.toString(),
-    VITEST_POSTGRES_INTEGRATION: "1",
   };
   const pushCode = await run("npx", ["prisma", "db", "push", "--skip-generate", "--schema", "prisma/schema.prisma"], env);
   if (pushCode !== 0) throw new Error(`Prisma schema setup failed with exit code ${pushCode}.`);

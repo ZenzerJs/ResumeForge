@@ -1,10 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { JobSource, WorkplaceType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { executeServerTool } from "@/lib/ai/tools/executor";
 import { cleanupStalePositions, getJobsList } from "@/lib/db/jobs";
 import { POST as cleanupPOST } from "@/app/api/jobs/cleanup/route";
+import { GET as connectorsJobsGET } from "@/app/api/connectors/jobs/route";
+import { GET as coverLetterGET, PUT as coverLetterPUT, DELETE as coverLetterDELETE } from "@/app/api/cover-letters/[id]/route";
+import { computeIngestedJobEnrichment } from "@/lib/connectors/enrichment";
+import { backfillIngestedJobs } from "@/lib/connectors/backfill-ingested";
+import { ParsedIngestedRequirementsSchema } from "@/lib/jd-parser/types";
+import { createCoverLetter } from "@/lib/db/cover-letters";
 import { NextRequest } from "next/server";
-import { createTestUser } from "../helpers/auth";
+import { createTestUser, authedRequest } from "../helpers/auth";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { createPatchCitations, readPatchCitations } from "@/lib/ai/patch-citations";
@@ -13,11 +20,11 @@ import { PATCH as jobByIdPATCH, DELETE as jobByIdDELETE } from "@/app/api/jobs/[
 import { createProposalBatch, createDiagnosticProposalBatch, applyProposalBatch } from "@/lib/ai/patch-batches";
 import { applyPatchProposals } from "@/lib/ai/patch-application";
 import { getVariantById } from "@/lib/db/variants";
-import { authedRequest } from "../helpers/auth";
 
 describe("real PostgreSQL contracts", () => {
   const userIds: string[] = [];
   const jobIds: string[] = [];
+  const ingestedJobIds: string[] = [];
 
   beforeAll(async () => {
     const expectedSchema = new URL(process.env.DATABASE_URL!).searchParams.get("schema");
@@ -192,6 +199,7 @@ describe("real PostgreSQL contracts", () => {
 
   afterAll(async () => {
     await prisma.patchCitation.deleteMany();
+    await prisma.ingestedJob.deleteMany({ where: { id: { in: ingestedJobIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.job.deleteMany({ where: { id: { in: jobIds } } });
   });
@@ -523,6 +531,361 @@ describe("real PostgreSQL contracts", () => {
     expect(
       await prisma.jobApplication.findFirst({ where: { userId: owner.user.id, jobId: ownedJob.id } })
     ).not.toBeNull();
+  });
+
+  it("validates current/removed JobSource round-trips and feed enrichment/backfill parity", async () => {
+    const suffix = crypto.randomUUID();
+    const description = `Requires TypeScript, PostgreSQL, and Docker in Toronto (${suffix}).`;
+    const location = "Toronto, ON";
+    const recentPostedAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const enriched = computeIngestedJobEnrichment({ description, location });
+
+    const preEnriched = await prisma.ingestedJob.create({
+      data: {
+        fingerprint: `fp-adzuna-${suffix}`,
+        externalId: `ext-adzuna-${suffix}`,
+        source: JobSource.ADZUNA_CA,
+        companyName: `Adzuna Co ${suffix}`,
+        title: "Backend Engineer",
+        location,
+        workplaceType: WorkplaceType.HYBRID,
+        isCanadianEligible: true,
+        description,
+        descriptionHtml: `<p>${description}</p>`,
+        applyUrl: `https://example.invalid/jobs/adzuna-${suffix}`,
+        postedAt: recentPostedAt,
+        lat: enriched.lat,
+        lng: enriched.lng,
+        cityNorm: enriched.cityNorm,
+        parsedRequirements: enriched.parsedRequirements as object,
+      },
+    });
+    const legacyRow = await prisma.ingestedJob.create({
+      data: {
+        fingerprint: `fp-jobicy-${suffix}`,
+        externalId: `ext-jobicy-${suffix}`,
+        source: JobSource.JOBICY,
+        companyName: `Jobicy Co ${suffix}`,
+        title: "Backend Engineer",
+        location,
+        workplaceType: WorkplaceType.HYBRID,
+        isCanadianEligible: true,
+        description,
+        descriptionHtml: `<p>${description}</p>`,
+        applyUrl: `https://example.invalid/jobs/jobicy-${suffix}`,
+        postedAt: recentPostedAt,
+        lat: null,
+        lng: null,
+        cityNorm: null,
+      },
+    });
+    const remotiveRow = await prisma.ingestedJob.create({
+      data: {
+        fingerprint: `fp-remotive-${suffix}`,
+        externalId: `ext-remotive-${suffix}`,
+        source: JobSource.REMOTIVE,
+        companyName: `Remotive Co ${suffix}`,
+        title: "Platform Engineer",
+        location: "Remote",
+        workplaceType: WorkplaceType.REMOTE,
+        isCanadianEligible: true,
+        description,
+        descriptionHtml: `<p>${description}</p>`,
+        applyUrl: `https://example.invalid/jobs/remotive-${suffix}`,
+        postedAt: recentPostedAt,
+        parsedRequirements: computeIngestedJobEnrichment({ description, location: "Remote" }).parsedRequirements as object,
+      },
+    });
+    const remoteokRow = await prisma.ingestedJob.create({
+      data: {
+        fingerprint: `fp-remoteok-${suffix}`,
+        externalId: `ext-remoteok-${suffix}`,
+        source: JobSource.REMOTEOK,
+        companyName: `RemoteOK Co ${suffix}`,
+        title: "Systems Engineer",
+        location: "Remote",
+        workplaceType: WorkplaceType.REMOTE,
+        isCanadianEligible: true,
+        description,
+        descriptionHtml: `<p>${description}</p>`,
+        applyUrl: `https://example.invalid/jobs/remoteok-${suffix}`,
+        postedAt: recentPostedAt,
+        parsedRequirements: computeIngestedJobEnrichment({ description, location: "Remote" }).parsedRequirements as object,
+      },
+    });
+    ingestedJobIds.push(preEnriched.id, legacyRow.id, remotiveRow.id, remoteokRow.id);
+
+    for (const currentSource of ["ADZUNA_CA", "JOBICY", "REMOTIVE", "REMOTEOK"] as const) {
+      const res = await connectorsJobsGET(
+        new NextRequest(`http://localhost:3000/api/connectors/jobs?source=${currentSource}&q=${encodeURIComponent(suffix)}`)
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.data.length).toBeGreaterThanOrEqual(1);
+      expect(body.data.every((item: { source: string }) => item.source === currentSource)).toBe(true);
+    }
+
+    for (const removedSource of ["USAJOBS", "PITTCSC", "SIMPLIFY", "UNKNOWN_SOURCE"]) {
+      const res = await connectorsJobsGET(
+        new NextRequest(`http://localhost:3000/api/connectors/jobs?source=${removedSource}`)
+      );
+      expect(res.status).toBe(400);
+      await expect(
+        prisma.$executeRawUnsafe(`SELECT '${removedSource}'::"JobSource"`)
+      ).rejects.toThrow();
+    }
+
+    const beforeFeedRes = await connectorsJobsGET(
+      new NextRequest(`http://localhost:3000/api/connectors/jobs?q=${encodeURIComponent(suffix)}&city=toronto`)
+    );
+    expect(beforeFeedRes.status).toBe(200);
+    const beforeFeed = await beforeFeedRes.json();
+    const beforeLegacy = beforeFeed.data.find((j: { id: string }) => j.id === legacyRow.id);
+    const beforePre = beforeFeed.data.find((j: { id: string }) => j.id === preEnriched.id);
+    expect(beforeLegacy).toBeDefined();
+    expect(beforePre).toBeDefined();
+    expect(beforeLegacy.blendedScore).toBe(beforePre.blendedScore);
+
+    const drySummary = await backfillIngestedJobs({ prisma, dryRun: true, batchSize: 50 });
+    expect(drySummary.dryRun).toBe(true);
+    expect(drySummary.pending).toBeGreaterThanOrEqual(1);
+    expect(drySummary.updated).toBe(0);
+
+    const backfillSummary = await backfillIngestedJobs({ prisma, dryRun: false, batchSize: 50 });
+    expect(backfillSummary.dryRun).toBe(false);
+    expect(backfillSummary.updated).toBeGreaterThanOrEqual(1);
+    expect(backfillSummary.skippedRace).toBe(0);
+
+    const refreshedLegacy = await prisma.ingestedJob.findUnique({ where: { id: legacyRow.id } });
+    expect(refreshedLegacy?.cityNorm).toBe(enriched.cityNorm);
+    expect(refreshedLegacy?.lat).toBe(enriched.lat);
+    expect(refreshedLegacy?.lng).toBe(enriched.lng);
+    expect(ParsedIngestedRequirementsSchema.safeParse(refreshedLegacy?.parsedRequirements).success).toBe(true);
+
+    const afterFeedRes = await connectorsJobsGET(
+      new NextRequest(`http://localhost:3000/api/connectors/jobs?q=${encodeURIComponent(suffix)}&city=toronto`)
+    );
+    expect(afterFeedRes.status).toBe(200);
+    const afterFeed = await afterFeedRes.json();
+    const afterLegacy = afterFeed.data.find((j: { id: string }) => j.id === legacyRow.id);
+    expect(afterLegacy).toMatchObject({
+      blendedScore: beforeLegacy.blendedScore,
+      scoreBreakdown: beforeLegacy.scoreBreakdown,
+      compatibility: beforeLegacy.compatibility,
+      lat: beforeLegacy.lat,
+      lng: beforeLegacy.lng,
+      cityNorm: enriched.cityNorm,
+    });
+
+    const postDrySummary = await backfillIngestedJobs({ prisma, dryRun: true, batchSize: 50 });
+    expect(postDrySummary.pending).toBe(0);
+  });
+
+  it("persists cover-letter editor columns on PUT/GET and blocks foreign owners", async () => {
+    const suffix = crypto.randomUUID();
+    const owner = await createTestUser(`cl-owner-${suffix}@test.invalid`);
+    const other = await createTestUser(`cl-other-${suffix}@test.invalid`);
+    userIds.push(owner.user.id, other.user.id);
+
+    const job = await prisma.job.create({
+      data: { userId: owner.user.id, company: "Cover Co", roleTitle: "Staff Engineer", rawDescription: "TypeScript & Postgres" },
+    });
+    jobIds.push(job.id);
+    const master = await prisma.resume.create({
+      data: { userId: owner.user.id, title: "CL Master", typstSource: "= Master", isMaster: true },
+    });
+    const variant = await prisma.resumeVariant.create({
+      data: { masterResumeId: master.id, jobId: job.id, variantTitle: "CL Variant", typstContent: "= Variant" },
+    });
+    const created = await createCoverLetter({
+      userId: owner.user.id,
+      jobId: job.id,
+      variantId: variant.id,
+      title: "Initial Cover Letter",
+      openingParagraph: "Opening",
+      bodyParagraphs: ["Body 1"],
+      closingParagraph: "Closing",
+      fullMarkdown: "Initial markdown",
+      typstSource: "= Initial Typst",
+      tone: "FORMAL",
+      targetWordCount: 300,
+    });
+
+    const putRes = await coverLetterPUT(
+      authedRequest(
+        `http://localhost:3000/api/cover-letters/${created.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: "Updated Cover Letter",
+            proseMarkdown: "Persisted prose body",
+            typstSource: "= Persisted Typst",
+            tone: "EXECUTIVE",
+            targetWordCount: 425,
+          }),
+        },
+        owner.cookie
+      ),
+      { params: Promise.resolve({ id: created.id }) }
+    );
+    expect(putRes.status).toBe(200);
+
+    const getRes = await coverLetterGET(
+      authedRequest(`http://localhost:3000/api/cover-letters/${created.id}`, { method: "GET" }, owner.cookie),
+      { params: Promise.resolve({ id: created.id }) }
+    );
+    expect(getRes.status).toBe(200);
+    const getBody = await getRes.json();
+    expect(getBody.data).toMatchObject({
+      title: "Updated Cover Letter",
+      fullMarkdown: "Persisted prose body",
+      proseMarkdown: "Persisted prose body",
+      typstSource: "= Persisted Typst",
+      tone: "EXECUTIVE",
+      targetWordCount: 425,
+    });
+
+    const emptyPutRes = await coverLetterPUT(
+      authedRequest(
+        `http://localhost:3000/api/cover-letters/${created.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ proseMarkdown: "", typstSource: "" }),
+        },
+        owner.cookie
+      ),
+      { params: Promise.resolve({ id: created.id }) }
+    );
+    expect(emptyPutRes.status).toBe(200);
+    const afterEmpty = await coverLetterGET(
+      authedRequest(`http://localhost:3000/api/cover-letters/${created.id}`, { method: "GET" }, owner.cookie),
+      { params: Promise.resolve({ id: created.id }) }
+    );
+    const afterEmptyBody = await afterEmpty.json();
+    expect(afterEmptyBody.data).toMatchObject({
+      fullMarkdown: "",
+      proseMarkdown: "",
+      typstSource: "",
+      tone: "EXECUTIVE",
+      targetWordCount: 425,
+    });
+
+    const foreignGet = await coverLetterGET(
+      authedRequest(`http://localhost:3000/api/cover-letters/${created.id}`, { method: "GET" }, other.cookie),
+      { params: Promise.resolve({ id: created.id }) }
+    );
+    const foreignPut = await coverLetterPUT(
+      authedRequest(
+        `http://localhost:3000/api/cover-letters/${created.id}`,
+        { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Hijacked" }) },
+        other.cookie
+      ),
+      { params: Promise.resolve({ id: created.id }) }
+    );
+    const foreignDelete = await coverLetterDELETE(
+      authedRequest(`http://localhost:3000/api/cover-letters/${created.id}`, { method: "DELETE" }, other.cookie),
+      { params: Promise.resolve({ id: created.id }) }
+    );
+    expect(foreignGet.status).toBe(404);
+    expect(foreignPut.status).toBe(404);
+    expect(foreignDelete.status).toBe(404);
+    expect(await prisma.coverLetter.findUnique({ where: { id: created.id } })).toMatchObject({
+      title: "Updated Cover Letter",
+      tone: "EXECUTIVE",
+    });
+  });
+
+  it("enforces owner-only job mutations and real PatchProposalBatch.jobId Restrict (P2003) rollback", async () => {
+    const suffix = crypto.randomUUID();
+    const owner = await createTestUser(`restrict-owner-${suffix}@test.invalid`);
+    const other = await createTestUser(`restrict-other-${suffix}@test.invalid`);
+    userIds.push(owner.user.id, other.user.id);
+
+    const ownedJob = await prisma.job.create({
+      data: { userId: owner.user.id, company: "Original Co", roleTitle: "Engineer", rawDescription: "Owned job" },
+    });
+    const disposableJob = await prisma.job.create({
+      data: { userId: owner.user.id, company: "Disposable Co", roleTitle: "Engineer", rawDescription: "Removable job" },
+    });
+    jobIds.push(ownedJob.id, disposableJob.id);
+
+    await prisma.jobApplication.create({
+      data: { userId: owner.user.id, jobId: ownedJob.id, status: "SAVED" },
+    });
+    const master = await prisma.resume.create({
+      data: { userId: owner.user.id, title: "Restrict Master", typstSource: "= M", isMaster: true },
+    });
+    const batch = await prisma.patchProposalBatch.create({
+      data: {
+        userId: owner.user.id,
+        masterResumeId: master.id,
+        jobId: ownedJob.id,
+        revisionToken: `tok-restrict-${suffix}`,
+        masterFingerprint: "m",
+        jobFingerprint: "j",
+        citationFingerprint: "c",
+        proposals: [],
+        gaps: [],
+        expiresAt: new Date(Date.now() + 3600_000),
+      },
+    });
+
+    const foreignPatch = await jobByIdPATCH(
+      authedRequest(
+        `http://localhost:3000/api/jobs/${ownedJob.id}`,
+        { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ company: "Stolen Co" }) },
+        other.cookie
+      ),
+      { params: Promise.resolve({ id: ownedJob.id }) }
+    );
+    const foreignDelete = await jobByIdDELETE(
+      authedRequest(`http://localhost:3000/api/jobs/${ownedJob.id}`, { method: "DELETE" }, other.cookie),
+      { params: Promise.resolve({ id: ownedJob.id }) }
+    );
+    expect(foreignPatch.status).toBe(404);
+    expect(foreignDelete.status).toBe(404);
+    expect(await prisma.job.findUnique({ where: { id: ownedJob.id } })).toMatchObject({ company: "Original Co" });
+
+    const ownerPatch = await jobByIdPATCH(
+      authedRequest(
+        `http://localhost:3000/api/jobs/${ownedJob.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ company: "Owner Updated Co", status: "INTERVIEWING" }),
+        },
+        owner.cookie
+      ),
+      { params: Promise.resolve({ id: ownedJob.id }) }
+    );
+    expect(ownerPatch.status).toBe(200);
+    expect(await prisma.job.findUnique({ where: { id: ownedJob.id } })).toMatchObject({ company: "Owner Updated Co" });
+    expect(
+      await prisma.jobApplication.findUnique({ where: { userId_jobId: { userId: owner.user.id, jobId: ownedJob.id } } })
+    ).toMatchObject({ status: "INTERVIEWING" });
+
+    // Exercise real PostgreSQL onDelete: Restrict (P2003) on PatchProposalBatch.jobId and verify tx rollback preserves dependent rows.
+    await expect(
+      prisma.$transaction(async (tx) => {
+        await tx.jobApplication.deleteMany({ where: { jobId: ownedJob.id, userId: owner.user.id } });
+        await tx.job.delete({ where: { id: ownedJob.id } });
+      })
+    ).rejects.toMatchObject({ code: "P2003" });
+
+    expect(await prisma.job.findUnique({ where: { id: ownedJob.id } })).not.toBeNull();
+    expect(await prisma.patchProposalBatch.findUnique({ where: { id: batch.id } })).not.toBeNull();
+    expect(
+      await prisma.jobApplication.findUnique({ where: { userId_jobId: { userId: owner.user.id, jobId: ownedJob.id } } })
+    ).toMatchObject({ status: "INTERVIEWING" });
+
+    const cleanDelete = await jobByIdDELETE(
+      authedRequest(`http://localhost:3000/api/jobs/${disposableJob.id}`, { method: "DELETE" }, owner.cookie),
+      { params: Promise.resolve({ id: disposableJob.id }) }
+    );
+    expect(cleanDelete.status).toBe(200);
+    expect(await prisma.job.findUnique({ where: { id: disposableJob.id } })).toBeNull();
   });
 
 });

@@ -1,84 +1,77 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import { createPrismaMockClient } from "../src/lib/db-mock";
-import { assertValidMockDbEnv } from "../src/lib/prisma";
 
-// Vitest sets NODE_ENV readonly via process.env typing; cast through record.
-const env = process.env as Record<string, string | undefined>;
-
-function setNodeEnv(value: string) {
-  (process as unknown as { env: Record<string, string | undefined> }).env.NODE_ENV = value;
-}
-
-function restoreNodeEnv(value: string | undefined) {
-  if (value === undefined) {
-    delete (process as unknown as { env: Record<string, string | undefined> }).env.NODE_ENV;
-  } else {
-    setNodeEnv(value);
-  }
-}
-
-describe("prisma prod fail-closed gate", () => {
-  it("allows mock fallback outside production", async () => {
-    const prevNodeEnv = env.NODE_ENV;
-    const prevFlag = env.RESUME_FORGE_ALLOW_MOCK_DB;
-    try {
-      setNodeEnv("test");
-      delete env.RESUME_FORGE_ALLOW_MOCK_DB;
-      const { prisma } = await import("../src/lib/prisma");
-      await expect(prisma.systemInfo.count()).resolves.toBeTypeOf("number");
-    } finally {
-      restoreNodeEnv(prevNodeEnv);
-      if (prevFlag === undefined) delete env.RESUME_FORGE_ALLOW_MOCK_DB;
-      else env.RESUME_FORGE_ALLOW_MOCK_DB = prevFlag;
-    }
+describe("runtime Prisma direct Postgres connection (PERF-04)", () => {
+  afterEach(() => {
+    vi.doUnmock("@prisma/client");
+    vi.resetModules();
+    delete (globalThis as { prisma?: unknown }).prisma;
   });
 
-  it("refuses mock fallback in production when DB unreachable", async () => {
-    const prevNodeEnv = env.NODE_ENV;
-    const prevFlag = env.RESUME_FORGE_ALLOW_MOCK_DB;
-    try {
-      setNodeEnv("production");
-      delete env.RESUME_FORGE_ALLOW_MOCK_DB;
-      const { prisma } = await import("../src/lib/prisma");
-      const dbReachable = await (async () => {
-        try {
-          await prisma.systemInfo.count();
-          return true;
-        } catch (err: any) {
-          expect(err?.message).toContain("RESUMEFORGE_DB_UNAVAILABLE");
-          return false;
-        }
-      })();
-      expect(typeof dbReachable).toBe("boolean");
-    } finally {
-      restoreNodeEnv(prevNodeEnv);
-      if (prevFlag === undefined) delete env.RESUME_FORGE_ALLOW_MOCK_DB;
-      else env.RESUME_FORGE_ALLOW_MOCK_DB = prevFlag;
-    }
+  it("exports an HMR-safe PrismaClient singleton directly without db-mock import", async () => {
+    const prismaSource = fs.readFileSync(
+      path.join(process.cwd(), "src", "lib", "prisma.ts"),
+      "utf8"
+    );
+    expect(prismaSource).not.toContain("db-mock");
+    expect(prismaSource).not.toContain("probePostgresPort");
+    expect(prismaSource).not.toContain("new Proxy");
+
+    vi.resetModules();
+    delete (globalThis as { prisma?: unknown }).prisma;
+    const mockedMod = await import("../src/lib/prisma");
+    const mod = await vi.importActual<typeof import("../src/lib/prisma")>("../src/lib/prisma");
+
+    expect(mod.prisma !== mockedMod.prisma).toBe(true);
+    expect(typeof mod.prisma.$extends).toBe("function");
+    expect(typeof mod.prisma.$transaction).toBe("function");
+    expect(typeof mod.prisma.$queryRaw).toBe("function");
+    expect(typeof mod.prisma.$executeRaw).toBe("function");
+    expect((globalThis as { prisma?: unknown }).prisma === mod.prisma).toBe(true);
   });
 
-  it("throws when RESUME_FORGE_ALLOW_MOCK_DB=1 is set in production without RESUME_FORGE_E2E=1", () => {
-    const prevNodeEnv = env.NODE_ENV;
-    const prevFlag = env.RESUME_FORGE_ALLOW_MOCK_DB;
-    const prevE2e = env.RESUME_FORGE_E2E;
-    try {
-      setNodeEnv("production");
-      env.RESUME_FORGE_ALLOW_MOCK_DB = "1";
-      delete env.RESUME_FORGE_E2E;
-      expect(() => assertValidMockDbEnv()).toThrow(/RESUMEFORGE_INVALID_PROD_MOCK_FLAG/);
+  it("propagates transient database failures without false-success fallback and recovers on next query", async () => {
+    const systemInfoCount = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error("Can't reach database server"), { code: "P1001" }))
+      .mockResolvedValue(7);
+    const transactionMock = vi.fn(async (arg: unknown) => {
+      if (typeof arg === "function") return (arg as (tx: unknown) => unknown)({ systemInfo: { count: systemInfoCount } });
+      return Promise.all(arg as Promise<unknown>[]);
+    });
 
-      env.RESUME_FORGE_E2E = "1";
-      expect(() => assertValidMockDbEnv()).not.toThrow();
-    } finally {
-      restoreNodeEnv(prevNodeEnv);
-      if (prevFlag === undefined) delete env.RESUME_FORGE_ALLOW_MOCK_DB;
-      else env.RESUME_FORGE_ALLOW_MOCK_DB = prevFlag;
-      if (prevE2e === undefined) delete env.RESUME_FORGE_E2E;
-      else env.RESUME_FORGE_E2E = prevE2e;
+    class MockPrismaClient {
+      systemInfo = { count: systemInfoCount };
+      $transaction = transactionMock;
+      $queryRaw = vi.fn(async () => [{ ok: 1 }]);
+      $executeRaw = vi.fn(async () => 1);
+      $connect = vi.fn(async () => undefined);
+      $disconnect = vi.fn(async () => undefined);
     }
+
+    vi.resetModules();
+    delete (globalThis as { prisma?: unknown }).prisma;
+    vi.doMock("@prisma/client", () => ({
+      PrismaClient: MockPrismaClient,
+    }));
+
+    const { prisma } = await vi.importActual<typeof import("../src/lib/prisma")>("../src/lib/prisma");
+
+    // Transient failure must reject directly (never return mock 0 / false success)
+    await expect(prisma.systemInfo.count()).rejects.toThrow(/Can't reach database server/);
+
+    // Next query recovers cleanly without sticky fallback state
+    await expect(prisma.systemInfo.count()).resolves.toBe(7);
+
+    // Transaction semantics preserved
+    await expect(
+      prisma.$transaction(async (tx: any) => tx.systemInfo.count())
+    ).resolves.toBe(7);
   });
 
-  it("mock client supports $transaction function form", async () => {
+  it("mock client used in unit setup preserves $transaction function form", async () => {
     const mock = createPrismaMockClient();
     const result = await mock.$transaction(async (tx: any) => {
       return tx.systemInfo.count();

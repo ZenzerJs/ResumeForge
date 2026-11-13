@@ -1,9 +1,12 @@
-import { ProviderConfig, TestConnectionResult, GeneratePatchesResult, ConvertPdfResult } from "../types";
+import {
+  ProviderConfig,
+  TestConnectionResult,
+  TextCompletionMessage,
+  TextCompletionOptions,
+  TextCompletionResult,
+} from "../types";
 import { sanitizeError } from "../redact";
-import { stripCodeFences } from "../utils";
-import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from "../repair-schema";
-import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
-import type { ChatCompletionResult } from "./custom";
+import { completeOpenAICompatibleText, type ChatCompletionResult } from "./custom";
 import { safeFetch } from "@/lib/security/safe-fetch";
 import { resolveProviderCredentialsWithHostPolicy } from "./credentials";
 
@@ -86,14 +89,12 @@ export async function testOpenAIConnection(config: ProviderConfig): Promise<Test
   }
 }
 
-/**
- * Sends a structured chat completion request to OpenAI for patch generation.
- */
-export async function generateOpenAIPatches(
+export async function completeText(
   config: ProviderConfig,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<GeneratePatchesResult> {
+  messages: TextCompletionMessage[],
+  jsonMode: boolean,
+  options?: TextCompletionOptions
+): Promise<TextCompletionResult> {
   const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
@@ -102,321 +103,22 @@ export async function generateOpenAIPatches(
     defaultBaseUrl: "https://api.openai.com",
     officialHosts: ["api.openai.com"],
   });
-  const model = config.model?.trim() || "gpt-4o";
+  const model = config.model?.trim() || options?.defaultModel || "gpt-4o";
 
-  if (!apiKey) {
-    return { success: false, error: "OpenAI API key is missing." };
-  }
-
-  try {
-    const res = await providerFetch(`${baseUrl}/v1/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.3,
-        response_format: { type: "json_object" },
-      }),
-    }, allowLocalhost);
-
-    if (!res.ok) {
-      let errBody = "";
-      try {
-        const json = await res.json();
-        errBody = json.error?.message || JSON.stringify(json);
-      } catch {
-        errBody = res.statusText;
-      }
-      return { success: false, error: sanitizeError(`OpenAI API returned status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const rawJson = data.choices?.[0]?.message?.content;
-
-    if (!rawJson) {
-      return { success: false, error: "OpenAI returned empty content in response." };
-    }
-
-    return { success: true, rawJson };
-  } catch (err) {
-    return { success: false, error: sanitizeError(`OpenAI patch generation failed: ${err instanceof Error ? err.message : String(err)}`) };
-  }
-}
-
-/**
- * Phase 4.3b: Sends a structured chat completion request to OpenAI for qualitative review.
- */
-export async function generateOpenAIQualitativeReview(
-  config: ProviderConfig,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.OPENAI_API_KEY,
-    envBaseUrl: process.env.OPENAI_BASE_URL,
-    defaultBaseUrl: "https://api.openai.com",
-    officialHosts: ["api.openai.com"],
+  return completeOpenAICompatibleText({
+    completionsUrl: `${baseUrl}/v1/chat/completions`,
+    apiKey,
+    requireApiKey: true,
+    missingKeyMessage: options?.missingKeyMessage ?? "OpenAI API key is missing.",
+    model,
+    messages,
+    sendResponseFormatJson: jsonMode,
+    temperature: options?.temperature ?? 0.3,
+    timeoutMs: options?.timeoutMs ?? 130_000,
+    allowLocalhost,
+    providerLabel: "OpenAI API",
+    taskLabel: options?.taskLabel ?? "completion",
   });
-  const model = config.model?.trim() || "gpt-4o";
-
-  if (!apiKey) {
-    return { success: false, error: "OpenAI API key is missing." };
-  }
-
-  try {
-    const res = await providerFetch(`${baseUrl}/v1/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.3,
-        response_format: { type: "json_object" },
-      }),
-    }, allowLocalhost);
-
-    if (!res.ok) {
-      let errBody = "";
-      try {
-        const json = await res.json();
-        errBody = json.error?.message || JSON.stringify(json);
-      } catch {
-        errBody = res.statusText;
-      }
-      return { success: false, error: sanitizeError(`OpenAI API returned status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const rawJson = data.choices?.[0]?.message?.content;
-
-    if (!rawJson) {
-      return { success: false, error: "OpenAI returned empty content in response." };
-    }
-
-    return { success: true, rawJson };
-  } catch (err) {
-    return { success: false, error: sanitizeError(`OpenAI qualitative review failed: ${err instanceof Error ? err.message : String(err)}`) };
-  }
-}
-
-/**
- * Phase 5: Sends a structured chat completion request to OpenAI for cover letter generation.
- */
-export async function generateOpenAICoverLetter(
-  config: ProviderConfig,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.OPENAI_API_KEY,
-    envBaseUrl: process.env.OPENAI_BASE_URL,
-    defaultBaseUrl: "https://api.openai.com",
-    officialHosts: ["api.openai.com"],
-  });
-  const model = config.model?.trim() || "gpt-4o";
-
-  if (!apiKey) {
-    return { success: false, error: "OpenAI API key is missing." };
-  }
-
-  try {
-    const res = await providerFetch(`${baseUrl}/v1/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.4,
-        response_format: { type: "json_object" },
-      }),
-    }, allowLocalhost);
-
-    if (!res.ok) {
-      let errBody = "";
-      try {
-        const json = await res.json();
-        errBody = json.error?.message || JSON.stringify(json);
-      } catch {
-        errBody = res.statusText;
-      }
-      return { success: false, error: sanitizeError(`OpenAI API returned status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const rawJson = data.choices?.[0]?.message?.content;
-
-    if (!rawJson) {
-      return { success: false, error: "OpenAI returned empty content in response." };
-    }
-
-    return { success: true, rawJson };
-  } catch (err) {
-    return { success: false, error: sanitizeError(`OpenAI cover letter generation failed: ${err instanceof Error ? err.message : String(err)}`) };
-  }
-}
-
-/**
- * Task 9.1: Sends a chat completion request to OpenAI for PDF-to-Typst conversion.
- */
-export async function convertOpenAIPdfTextToTypst(
-  config: ProviderConfig,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<ConvertPdfResult> {
-  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.OPENAI_API_KEY,
-    envBaseUrl: process.env.OPENAI_BASE_URL,
-    defaultBaseUrl: "https://api.openai.com",
-    officialHosts: ["api.openai.com"],
-  });
-  const model = config.model?.trim() || "gpt-4o";
-
-  if (!apiKey) {
-    return { success: false, error: "OpenAI API key is missing." };
-  }
-
-  try {
-    const res = await providerFetch(`${baseUrl}/v1/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.2,
-      }),
-      signal: AbortSignal.timeout(30000),
-    }, allowLocalhost);
-
-    if (!res.ok) {
-      let errBody = "";
-      try {
-        const json = await res.json();
-        errBody = json.error?.message || JSON.stringify(json);
-      } catch {
-        errBody = res.statusText;
-      }
-      return { success: false, error: sanitizeError(`OpenAI API returned status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const rawContent = data.choices?.[0]?.message?.content;
-
-    if (!rawContent) {
-      return { success: false, error: "OpenAI returned empty content in response." };
-    }
-
-    const typstSource = stripCodeFences(rawContent);
-    return { success: true, typstSource };
-  } catch (err) {
-    return { success: false, error: sanitizeError(`OpenAI PDF conversion failed: ${err instanceof Error ? err.message : String(err)}`) };
-  }
-}
-
-export async function repairTypstWithOpenAI(
-  config: ProviderConfig,
-  input: TypstRepairInput
-): Promise<{ success: boolean; data?: TypstRepairProposal; error?: string }> {
-  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.OPENAI_API_KEY,
-    envBaseUrl: process.env.OPENAI_BASE_URL,
-    defaultBaseUrl: "https://api.openai.com",
-    officialHosts: ["api.openai.com"],
-  });
-  const model = config.model?.trim() || "gpt-4o";
-
-  if (!apiKey) {
-    return { success: false, error: "OpenAI API key is missing. Please configure your key in Settings." };
-  }
-
-  const systemPrompt = buildTypstRepairSystemPrompt();
-  const userPrompt = buildTypstRepairUserPrompt(input);
-
-  try {
-    const res = await providerFetch(`${baseUrl}/v1/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.1,
-      }),
-      signal: AbortSignal.timeout(30000),
-    }, allowLocalhost);
-
-    if (!res.ok) {
-      let errBody = "";
-      try {
-        const json = await res.json();
-        errBody = json.error?.message || JSON.stringify(json);
-      } catch {
-        errBody = res.statusText;
-      }
-      return { success: false, error: sanitizeError(`OpenAI API status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const rawContent = data.choices?.[0]?.message?.content;
-    if (!rawContent) {
-      return { success: false, error: "OpenAI returned empty content." };
-    }
-
-    const cleaned = stripCodeFences(rawContent);
-    const parsedJson = JSON.parse(cleaned);
-    const validated = TypstRepairProposalSchema.safeParse(parsedJson);
-
-    if (!validated.success) {
-      return {
-        success: false,
-        error: `OpenAI returned invalid repair proposal JSON: ${validated.error.issues.map((i) => i.message).join(", ")}`,
-      };
-    }
-
-    return { success: true, data: validated.data };
-  } catch (err) {
-    return {
-      success: false,
-      error: sanitizeError(`OpenAI repair failed: ${err instanceof Error ? err.message : String(err)}`),
-    };
-  }
 }
 
 /**

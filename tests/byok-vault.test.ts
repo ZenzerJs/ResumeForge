@@ -1,12 +1,139 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { saveKey, getKey, removeKey, getActiveConfig } from "@/lib/byok-vault";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  saveKey,
+  getKey,
+  removeKey,
+  getActiveConfig,
+  __resetByokVaultForTests,
+} from "@/lib/byok-vault";
 import { callByokModel } from "@/lib/ai-provider";
+
+function createMockIndexedDb(options?: { failWriteTx?: boolean }) {
+  const stores: Record<string, Map<string, any>> = {
+    keys: new Map(),
+    secrets: new Map(),
+  };
+  let keyPutCount = 0;
+
+  function makeReq<T>(getter: () => T) {
+    const req: any = {
+      result: undefined,
+      error: null,
+      onsuccess: null,
+      onerror: null,
+    };
+    queueMicrotask(() => {
+      try {
+        req.result = getter();
+        req.onsuccess?.({ target: req });
+      } catch (err) {
+        req.error = err;
+        req.onerror?.({ target: req });
+      }
+    });
+    return req;
+  }
+
+  const fakeDb: any = {
+    objectStoreNames: {
+      contains: (name: string) => name === "keys" || name === "secrets",
+    },
+    createObjectStore: vi.fn(),
+    close: vi.fn(),
+    transaction: (_storeNames: string[], mode: string) => {
+      const tx: any = {
+        error: null,
+        oncomplete: null,
+        onerror: null,
+        onabort: null,
+        objectStore: (storeName: string) => ({
+          get: (key: string) => makeReq(() => stores[storeName].get(key)),
+          getAllKeys: () => makeReq(() => Array.from(stores[storeName].keys())),
+          put: (value: any, key?: string) => {
+            if (mode === "readwrite" && options?.failWriteTx) {
+              throw new Error("Simulated IDB write failure");
+            }
+            const resolvedKey = key ?? value?.provider;
+            if (storeName === "keys") keyPutCount += 1;
+            stores[storeName].set(String(resolvedKey), value);
+            return makeReq(() => resolvedKey);
+          },
+          delete: (key: string) => {
+            stores[storeName].delete(String(key));
+            return makeReq(() => undefined);
+          },
+        }),
+      };
+      setTimeout(() => {
+        tx.oncomplete?.({ target: tx });
+      }, 5);
+      return tx;
+    },
+  };
+
+  const idb = {
+    open: vi.fn(() => {
+      const req: any = {
+        result: fakeDb,
+        error: null,
+        onupgradeneeded: null,
+        onsuccess: null,
+        onerror: null,
+        onblocked: null,
+      };
+      queueMicrotask(() => {
+        req.onupgradeneeded?.({ target: req });
+        req.onsuccess?.({ target: req });
+      });
+      return req;
+    }),
+  };
+
+  return { idb, stores, getKeyPutCount: () => keyPutCount };
+}
+
+async function seedLegacyEncryptedKey(
+  store: Record<string, string>,
+  provider: string,
+  rawKey: string
+) {
+  let masterKey: CryptoKey;
+  if (store["rf_vault_master_key"]) {
+    masterKey = await crypto.subtle.importKey(
+      "jwk",
+      JSON.parse(store["rf_vault_master_key"]),
+      { name: "AES-GCM", length: 256 },
+      true,
+      ["encrypt", "decrypt"]
+    );
+  } else {
+    masterKey = await crypto.subtle.generateKey(
+      { name: "AES-GCM", length: 256 },
+      true,
+      ["encrypt", "decrypt"]
+    );
+    const exported = await crypto.subtle.exportKey("jwk", masterKey);
+    store["rf_vault_master_key"] = JSON.stringify(exported);
+  }
+
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const cipher = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    masterKey,
+    new TextEncoder().encode(rawKey)
+  );
+  const b64 = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64");
+  store[`rf_byok_key_${provider}`] = `${b64(iv)}:${b64(new Uint8Array(cipher))}`;
+}
 
 describe("BYOK Vault & Router (WS6)", () => {
   const store: Record<string, string> = {};
+  let mockIdb: ReturnType<typeof createMockIndexedDb>;
 
   beforeEach(() => {
+    __resetByokVaultForTests();
     Object.keys(store).forEach((k) => delete store[k]);
+    mockIdb = createMockIndexedDb();
 
     const mockStorage = {
       getItem: (key: string) => store[key] ?? null,
@@ -19,67 +146,146 @@ describe("BYOK Vault & Router (WS6)", () => {
       clear: () => {
         Object.keys(store).forEach((k) => delete store[k]);
       },
+      get length() {
+        return Object.keys(store).length;
+      },
+      key: (idx: number) => Object.keys(store)[idx] ?? null,
     };
 
-    (globalThis as any).window = { localStorage: mockStorage };
-    (globalThis as any).localStorage = mockStorage;
+    vi.stubGlobal("window", { localStorage: mockStorage });
+    vi.stubGlobal("localStorage", mockStorage);
+    vi.stubGlobal("indexedDB", mockIdb.idb);
   });
 
-  describe("Web Crypto AES-GCM Vault", () => {
-    it("encrypts and stores API keys without plaintext in localStorage", async () => {
+  afterEach(() => {
+    __resetByokVaultForTests();
+    vi.unstubAllGlobals();
+  });
+
+  describe("Web Crypto AES-GCM IndexedDB Vault", () => {
+    it("encrypts keys in IndexedDB using a non-extractable CryptoKey without touching localStorage", async () => {
       const rawKey = "sk-proj-testsecretkey123456789";
       await saveKey("openai", rawKey);
 
-      // Verify something was stored
-      const stored = store["rf_byok_key_openai"];
-      expect(stored).toBeDefined();
+      expect(store["rf_byok_key_openai"]).toBeUndefined();
+      expect(store["rf_vault_master_key"]).toBeUndefined();
 
-      // Verify the raw key is NEVER stored in plaintext in localStorage
-      expect(stored).not.toContain(rawKey);
-      expect(stored).toContain(":"); // iv:ciphertext format
+      const masterKey = mockIdb.stores.keys.get("master") as CryptoKey;
+      expect(masterKey).toBeDefined();
+      expect(masterKey.extractable).toBe(false);
+      await expect(crypto.subtle.exportKey("jwk", masterKey)).rejects.toThrow();
 
-      // Retrieve and decrypt
+      const storedRecord = mockIdb.stores.secrets.get("openai");
+      expect(storedRecord?.payload).toBeDefined();
+      expect(storedRecord.payload).not.toContain(rawKey);
+      expect(storedRecord.payload).toContain(":");
+
       const decrypted = await getKey("openai");
       expect(decrypted).toBe(rawKey);
     });
 
-    it("removes a key cleanly", async () => {
+    it("removes a key cleanly from IndexedDB", async () => {
       await saveKey("groq", "gsk_secretkey123");
       expect(await getKey("groq")).toBe("gsk_secretkey123");
 
       await removeKey("groq");
       expect(await getKey("groq")).toBeNull();
-      expect(store["rf_byok_key_groq"]).toBeUndefined();
+      expect(mockIdb.stores.secrets.get("groq")).toBeUndefined();
     });
 
-    it("migrates legacy unencrypted settings on getKey", async () => {
-      const legacyKey = "sk-ant-legacysecret";
+    it("migrates all legacy localStorage provider entries (including custom) and clears resumeforge_ai_settings.apiKey only after durable commit", async () => {
+      await seedLegacyEncryptedKey(store, "anthropic", "sk-ant-legacysecret");
+      await seedLegacyEncryptedKey(store, "custom", "sk-custom-secret");
       store["resumeforge_ai_settings"] = JSON.stringify({
-        provider: "anthropic",
-        apiKey: legacyKey,
+        provider: "gemini",
+        model: "gemini-2.5-flash",
+        apiKey: "AIzaSyLegacySettingsKey",
       });
 
-      const retrieved = await getKey("anthropic");
-      expect(retrieved).toBe(legacyKey);
+      expect(await getKey("anthropic")).toBe("sk-ant-legacysecret");
+      expect(await getKey("custom")).toBe("sk-custom-secret");
+      expect(await getKey("gemini")).toBe("AIzaSyLegacySettingsKey");
 
-      // Verify it was migrated to encrypted vault
-      expect(store["rf_byok_key_anthropic"]).toBeDefined();
-      expect(store["rf_byok_key_anthropic"]).not.toContain(legacyKey);
+      expect(store["rf_byok_key_anthropic"]).toBeUndefined();
+      expect(store["rf_byok_key_custom"]).toBeUndefined();
+      expect(store["rf_vault_master_key"]).toBeUndefined();
+
+      const updatedSettings = JSON.parse(store["resumeforge_ai_settings"]);
+      expect(updatedSettings.provider).toBe("gemini");
+      expect(updatedSettings.model).toBe("gemini-2.5-flash");
+      expect(updatedSettings.apiKey).toBeUndefined();
+    });
+
+    it("keeps legacy localStorage ciphertext intact when IndexedDB migration commit fails and falls back to memory-only", async () => {
+      await seedLegacyEncryptedKey(store, "openai", "sk-proj-keepme");
+      store["resumeforge_ai_settings"] = JSON.stringify({
+        provider: "gemini",
+        apiKey: "AIzaSyKeepMe",
+      });
+      const failingIdb = createMockIndexedDb({ failWriteTx: true });
+      vi.stubGlobal("indexedDB", failingIdb.idb);
+
+      expect(await getKey("openai")).toBe("sk-proj-keepme");
+      expect(await getKey("gemini")).toBe("AIzaSyKeepMe");
+      expect(store["rf_vault_master_key"]).toBeDefined();
+      expect(store["rf_byok_key_openai"]).toBeDefined();
+      expect(JSON.parse(store["resumeforge_ai_settings"]).apiKey).toBe("AIzaSyKeepMe");
+    });
+
+    it("serializes concurrent initialization so master key is written once without clobbering writes", async () => {
+      await Promise.all([
+        getKey("gemini"),
+        saveKey("openai", "sk-concurrent-openai"),
+        saveKey("anthropic", "sk-concurrent-anthropic"),
+      ]);
+
+      expect(mockIdb.getKeyPutCount()).toBe(1);
+      expect(await getKey("openai")).toBe("sk-concurrent-openai");
+      expect(await getKey("anthropic")).toBe("sk-concurrent-anthropic");
+    });
+
+    it("falls back to memory-only storage when IndexedDB is unavailable", async () => {
+      vi.stubGlobal("indexedDB", undefined);
+
+      await saveKey("openai", "sk-memory-only");
+      expect(store["rf_byok_key_openai"]).toBeUndefined();
+      expect(store["rf_vault_master_key"]).toBeUndefined();
+      expect(await getKey("openai")).toBe("sk-memory-only");
+
+      await removeKey("openai");
+      expect(await getKey("openai")).toBeNull();
+    });
+
+    it("ensures removeKey clears legacy settings apiKey so a removed credential stays removed across reload", async () => {
+      store["resumeforge_ai_settings"] = JSON.stringify({
+        provider: "gemini",
+        model: "gemini-2.5-flash",
+        apiKey: "AIzaSyShouldBeRemoved",
+      });
+      vi.stubGlobal("indexedDB", undefined);
+
+      expect(await getKey("gemini")).toBe("AIzaSyShouldBeRemoved");
+      await removeKey("gemini");
+      expect(await getKey("gemini")).toBeNull();
+
+      // Simulate reload / re-initialization
+      __resetByokVaultForTests();
+      expect(await getKey("gemini")).toBeNull();
+      const persistedSettings = JSON.parse(store["resumeforge_ai_settings"]);
+      expect(persistedSettings.provider).toBe("gemini");
+      expect(persistedSettings.apiKey).toBeUndefined();
     });
 
     it("reports active config and hasKey accurately", async () => {
-      // Default when empty
       const defaultConfig = await getActiveConfig();
       expect(defaultConfig.provider).toBe("gemini");
       expect(defaultConfig.model).toBe("gemini-2.5-flash");
       expect(defaultConfig.hasKey).toBe(false);
 
-      // Save a key for gemini
       await saveKey("gemini", "AIzaSyTestKey");
       const configured = await getActiveConfig();
       expect(configured.hasKey).toBe(true);
 
-      // Ollama returns hasKey: true by default
       store["resumeforge_ai_settings"] = JSON.stringify({ provider: "ollama" });
       const ollamaConfig = await getActiveConfig();
       expect(ollamaConfig.provider).toBe("ollama");

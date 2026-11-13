@@ -240,7 +240,7 @@ test.describe("T5 Browser Smoke Check", () => {
     await expect(page.getByTestId("duplicate-review-card-guest-merge-candidate")).toHaveCount(0);
   });
 
-  test("4. /tracker Kanban view, drag card to APPLIED, reload persists status", async ({ page, request }) => {
+  test("4. /tracker Kanban view, drag card to APPLIED, reload persists status", async ({ page, request, baseURL }) => {
     setupConsoleListener(page, "/tracker");
 
     // Login via API to get session cookie
@@ -263,7 +263,7 @@ test.describe("T5 Browser Smoke Check", () => {
         {
           name: "rf_session",
           value: sessionMatch[1],
-          domain: "localhost",
+          domain: new URL(baseURL || "http://127.0.0.1:3005").hostname,
           path: "/",
         },
       ]);

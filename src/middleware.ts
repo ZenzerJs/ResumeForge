@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { clientKey, rateLimit } from "@/lib/security/rate-limit";
+import { clientKey, rateLimit, type RateLimitNamespace } from "@/lib/security/rate-limit";
 import { isMutationMethod, isPublicPath, originAllowed } from "@/lib/security/session";
 import { demoAllowsMutation, isDemoMode } from "@/lib/demo-mode";
 
@@ -11,8 +11,16 @@ export const HEAVY_ENDPOINT_LIMITS: Record<string, { limit: number; windowMs: nu
   "/api/connectors/sync": { limit: 5, windowMs: 60_000 },
 };
 
+const HEAVY_ENDPOINT_NAMESPACES: Record<string, RateLimitNamespace> = {
+  "/api/jobs/bulk-import": "heavy:/api/jobs/bulk-import",
+  "/api/jobs/hydrate": "heavy:/api/jobs/hydrate",
+  "/api/resumes/upload-pdf": "heavy:/api/resumes/upload-pdf",
+  "/api/jobs/extract": "heavy:/api/jobs/extract",
+  "/api/connectors/sync": "heavy:/api/connectors/sync",
+};
+
 const FETCH_FULLTEXT_LIMIT = {
-  namespace: "heavy:/api/jobs/[id]/fetch-fulltext",
+  namespace: "heavy:/api/jobs/[id]/fetch-fulltext" as RateLimitNamespace,
   limit: 15,
   windowMs: 60_000,
 };
@@ -68,7 +76,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Too many demo AI requests" }, { status: 429 });
     }
   } else if (heavyConfig) {
-    if (!rateLimit(clientKey(request, `heavy:${pathname}`), heavyConfig.limit, heavyConfig.windowMs)) {
+    const heavyNs = HEAVY_ENDPOINT_NAMESPACES[pathname];
+    if (!rateLimit(clientKey(request, heavyNs), heavyConfig.limit, heavyConfig.windowMs)) {
       return NextResponse.json({ success: false, error: "Too many requests" }, { status: 429 });
     }
   } else if (isFetchFulltextPath(pathname)) {
@@ -82,7 +91,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Too many requests" }, { status: 429 });
     }
   } else if (pathname.startsWith("/api/companies/") && pathname.endsWith("/dossier/generate")) {
-    if (!rateLimit(clientKey(request, "heavy"), 10, 60_000)) {
+    if (!rateLimit(clientKey(request, "heavy:dossier-generate"), 10, 60_000)) {
       return NextResponse.json({ success: false, error: "Too many requests" }, { status: 429 });
     }
   }

@@ -438,7 +438,7 @@ export function SettingsWorkspace() {
                   {hasVaultKey ? (
                     <div className="flex items-center gap-1.5 text-emerald-400">
                       <Lock className="h-4 w-4" />
-                      <span>Key encrypted in local storage (AES-GCM vault)</span>
+                      <span>Key encrypted in browser IndexedDB (AES-GCM vault)</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5 text-slate-400">

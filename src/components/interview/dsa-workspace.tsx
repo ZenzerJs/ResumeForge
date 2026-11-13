@@ -77,6 +77,13 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
   const [isAuditing, setIsAuditing] = useState<boolean>(false);
   const [, startTransition] = useTransition();
   const gutterRef = useRef<HTMLDivElement>(null);
+  const runAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      runAbortRef.current?.abort();
+    };
+  }, []);
 
   // If query parameters arrive after initial mount
   useEffect(() => {
@@ -103,6 +110,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
   const handleSelectProblem = (slug: string) => {
     const next = SANDBOX_PROBLEMS.find((p) => p.slug === slug);
     if (!next) return;
+    runAbortRef.current?.abort();
+    runAbortRef.current = null;
+    setIsRunning(false);
     setSelectedProblem(next);
     setCode(next.starterCode[selectedLanguage]);
     setRevealedHints({});
@@ -114,6 +124,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
   };
 
   const handleLanguageChange = (lang: DsaLanguage) => {
+    runAbortRef.current?.abort();
+    runAbortRef.current = null;
+    setIsRunning(false);
     setSelectedLanguage(lang);
     setCode(selectedProblem.starterCode[lang]);
     setExecutionSummary(null);
@@ -121,6 +134,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
   };
 
   const handleReset = () => {
+    runAbortRef.current?.abort();
+    runAbortRef.current = null;
+    setIsRunning(false);
     setCode(selectedProblem.starterCode[selectedLanguage]);
     setExecutionSummary(null);
     setScorecard(null);
@@ -197,6 +213,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
 
   const handleRun = async () => {
     if (isRunning) return;
+    runAbortRef.current?.abort();
+    const controller = new AbortController();
+    runAbortRef.current = controller;
     setIsRunning(true);
     try {
       const summary = await executeDsaCode({
@@ -204,11 +223,14 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
         language: selectedLanguage,
         code,
         timeoutMs: 2500,
+        signal: controller.signal,
       });
+      if (controller.signal.aborted) return;
       startTransition(() => {
         setExecutionSummary(summary);
       });
     } catch (err: unknown) {
+      if (controller.signal.aborted) return;
       setExecutionSummary({
         status: "Runtime Error",
         passedCount: 0,
@@ -218,7 +240,12 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
         errorMessage: err instanceof Error ? err.message : String(err),
       });
     } finally {
-      setIsRunning(false);
+      if (runAbortRef.current === controller) {
+        runAbortRef.current = null;
+      }
+      if (!controller.signal.aborted) {
+        setIsRunning(false);
+      }
     }
   };
 

@@ -146,4 +146,44 @@ describe("dossier generate guard", () => {
     expect(capturedCreate.referenceNotes).toBe("Engineering blog: remote-first async culture");
     expect(capturedCreate.processNotes).toBe("Pair programming session on PR");
   });
+
+  it("recovers cleanly from P2002 unique constraint race condition", async () => {
+    findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ companySlug: "acme", displayName: "Acme Race Winner" });
+    generateDossier.mockResolvedValue({
+      companyName: "Acme",
+      interviewStyle: {},
+      engineeringCulture: {},
+      recentSignals: "none",
+      llmUsed: false,
+      source: "offline",
+    });
+    upsert.mockRejectedValueOnce({ code: "P2002" });
+
+    const res = await post({ companyName: "Acme" });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.found).toBe(true);
+    expect(body.dossier.displayName).toBe("Acme Race Winner");
+  });
+
+  it("redacts unexpected errors to a generic 500 message without leaking keys or internals", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    findUnique.mockResolvedValue(null);
+    generateDossier.mockRejectedValue(
+      new Error("Upstream failure with sk-proj-supersecret1234567890abcd on 10.0.0.5")
+    );
+
+    const res = await post({ companyName: "Acme" });
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("Failed to synthesize company dossier");
+    expect(JSON.stringify(body)).not.toContain("sk-proj-");
+    expect(JSON.stringify(body)).not.toContain("10.0.0.5");
+
+    expect(consoleSpy).toHaveBeenCalled();
+    expect(consoleSpy.mock.calls[0].join(" ")).not.toContain("sk-proj-supersecret");
+    consoleSpy.mockRestore();
+  });
 });

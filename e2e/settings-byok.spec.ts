@@ -40,7 +40,7 @@ test.describe("Phase 4 BYOK AI Gateway Settings UI", () => {
     expect(pageText).not.toContain(fakeKey);
   });
 
-  test("saves and encrypts Gemini key in localStorage without plaintext leakage", async ({ page }) => {
+  test("saves and encrypts Gemini key in IndexedDB without plaintext leakage", async ({ page }) => {
     const rawGeminiKey = "AIzaSyTestKey1234567890abcdef";
 
     // Select Gemini
@@ -53,13 +53,44 @@ test.describe("Phase 4 BYOK AI Gateway Settings UI", () => {
     // Wait for vault status indicator
     const vaultStatus = page.locator('[data-testid="vault-status"]');
     await expect(vaultStatus).toBeVisible();
-    await expect(vaultStatus).toContainText("Key encrypted in local storage");
+    await expect(vaultStatus).toContainText("Key encrypted in browser IndexedDB");
 
-    // Assert key is encrypted in localStorage under rf_byok_key_gemini
-    const storedVaultVal = await page.evaluate(() => localStorage.getItem("rf_byok_key_gemini"));
-    expect(storedVaultVal).toBeTruthy();
-    expect(storedVaultVal).not.toContain(rawGeminiKey);
-    expect(storedVaultVal).toContain(":"); // iv:ciphertext format
+    // Assert neither raw key nor JWK master key is stored in localStorage
+    const legacyStored = await page.evaluate(() => ({
+      key: localStorage.getItem("rf_byok_key_gemini"),
+      master: localStorage.getItem("rf_vault_master_key"),
+    }));
+    expect(legacyStored.key).toBeNull();
+    expect(legacyStored.master).toBeNull();
+
+    // Assert key is stored encrypted in IndexedDB with a non-extractable CryptoKey
+    const idbRecord = await page.evaluate(async () => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const req = indexedDB.open("resumeforge-byok-vault", 1);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      const tx = db.transaction(["keys", "secrets"], "readonly");
+      const master = await new Promise<CryptoKey | undefined>((resolve, reject) => {
+        const req = tx.objectStore("keys").get("master");
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      const secret = await new Promise<{ payload?: string } | undefined>((resolve, reject) => {
+        const req = tx.objectStore("secrets").get("gemini");
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      db.close();
+      return {
+        extractable: master ? master.extractable : null,
+        payload: secret?.payload ?? null,
+      };
+    });
+    expect(idbRecord.extractable).toBe(false);
+    expect(idbRecord.payload).toBeTruthy();
+    expect(idbRecord.payload).not.toContain(rawGeminiKey);
+    expect(idbRecord.payload).toContain(":");
 
     // Assert raw key is NOT stored in resumeforge_ai_settings
     const settingsRaw = await page.evaluate(() => localStorage.getItem("resumeforge_ai_settings"));
@@ -100,12 +131,29 @@ test.describe("Phase 4 BYOK AI Gateway Settings UI", () => {
     await expect(page.locator("#api-key-input")).toHaveValue("gsk-groqkey888");
   });
 
-  test("deleting key purges the vault entry from localStorage", async ({ page }) => {
+  test("deleting key purges the vault entry from IndexedDB", async ({ page }) => {
     await page.selectOption("#provider-select", "gemini");
     await page.fill("#api-key-input", "AIzaSyDeleteMeKey123");
+    await expect(page.locator('[data-testid="vault-status"]')).toContainText(
+      "Key encrypted in browser IndexedDB"
+    );
 
-    // Verify key exists in vault
-    const beforeVal = await page.evaluate(() => localStorage.getItem("rf_byok_key_gemini"));
+    // Verify key exists in IndexedDB vault
+    const beforeVal = await page.evaluate(async () => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const req = indexedDB.open("resumeforge-byok-vault", 1);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      const rec = await new Promise<unknown>((resolve, reject) => {
+        const tx = db.transaction(["secrets"], "readonly");
+        const req = tx.objectStore("secrets").get("gemini");
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      db.close();
+      return rec ?? null;
+    });
     expect(beforeVal).toBeTruthy();
 
     // Click Clear Key button
@@ -119,8 +167,93 @@ test.describe("Phase 4 BYOK AI Gateway Settings UI", () => {
     // Vault status should reflect no key
     await expect(page.locator('[data-testid="vault-status"]')).toContainText("No encrypted key in vault");
 
-    // Verify localStorage entry is removed
-    const afterVal = await page.evaluate(() => localStorage.getItem("rf_byok_key_gemini"));
-    expect(afterVal).toBeNull();
+    // Verify IndexedDB and localStorage entries are removed
+    await expect
+      .poll(async () => {
+        return page.evaluate(async () => {
+          const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const req = indexedDB.open("resumeforge-byok-vault", 1);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+          });
+          const rec = await new Promise<unknown>((resolve, reject) => {
+            const tx = db.transaction(["secrets"], "readonly");
+            const req = tx.objectStore("secrets").get("gemini");
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+          });
+          db.close();
+          return {
+            idb: rec ?? null,
+            legacy: localStorage.getItem("rf_byok_key_gemini"),
+          };
+        });
+      })
+      .toEqual({ idb: null, legacy: null });
+  });
+
+  test("persists encrypted key in IndexedDB across page reload", async ({ page }) => {
+    const persistedKey = "AIzaSyReloadPersistKey987654";
+    await page.selectOption("#provider-select", "gemini");
+    await page.fill("#api-key-input", persistedKey);
+    await expect(page.locator('[data-testid="vault-status"]')).toContainText(
+      "Key encrypted in browser IndexedDB"
+    );
+
+    await page.reload();
+    await expect(page.locator("#api-key-input")).toHaveValue(persistedKey);
+    await expect(page.locator('[data-testid="vault-status"]')).toContainText(
+      "Key encrypted in browser IndexedDB"
+    );
+  });
+
+  test("migrates legacy localStorage vault entries including custom into IndexedDB on reload", async ({ page }) => {
+    await page.evaluate(async () => {
+      await new Promise<void>((resolve, reject) => {
+        const req = indexedDB.deleteDatabase("resumeforge-byok-vault");
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+        req.onblocked = () => resolve();
+      });
+
+      const master = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, [
+        "encrypt",
+        "decrypt",
+      ]);
+      const jwk = await crypto.subtle.exportKey("jwk", master);
+      localStorage.setItem("rf_vault_master_key", JSON.stringify(jwk));
+
+      const encryptLegacy = async (val: string) => {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const buf = await crypto.subtle.encrypt(
+          { name: "AES-GCM", iv },
+          master,
+          new TextEncoder().encode(val)
+        );
+        const toB64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+        return `${toB64(iv)}:${toB64(new Uint8Array(buf))}`;
+      };
+
+      localStorage.setItem("rf_byok_key_custom", await encryptLegacy("sk-custom-migrated-key"));
+      localStorage.setItem(
+        "resumeforge_ai_settings",
+        JSON.stringify({ provider: "custom", model: "llama3", apiKey: "sk-legacy-settings-key" })
+      );
+    });
+
+    await page.reload();
+    await expect(page.locator("#provider-select")).toHaveValue("custom");
+    await expect(page.locator("#api-key-input")).toHaveValue("sk-custom-migrated-key");
+
+    const postMigration = await page.evaluate(() => ({
+      customLegacy: localStorage.getItem("rf_byok_key_custom"),
+      masterJwk: localStorage.getItem("rf_vault_master_key"),
+      settings: JSON.parse(localStorage.getItem("resumeforge_ai_settings") || "{}"),
+    }));
+    expect(postMigration.customLegacy).toBeNull();
+    expect(postMigration.masterJwk).toBeNull();
+    expect(postMigration.settings.provider).toBe("custom");
+    expect(postMigration.settings.model).toBe("llama3");
+    expect(postMigration.settings.apiKey).toBeUndefined();
   });
 });

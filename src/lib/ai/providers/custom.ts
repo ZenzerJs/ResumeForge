@@ -1,8 +1,11 @@
-import { ProviderConfig, TestConnectionResult, GeneratePatchesResult, ConvertPdfResult } from "../types";
+import {
+  ProviderConfig,
+  TestConnectionResult,
+  TextCompletionMessage,
+  TextCompletionOptions,
+  TextCompletionResult,
+} from "../types";
 import { sanitizeError } from "../redact";
-import { stripCodeFences } from "../utils";
-import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from "../repair-schema";
-import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
 import { safeFetch } from "@/lib/security/safe-fetch";
 import { isServerManagedLocalConfig, resolveProviderCredentialsWithHostPolicy } from "./credentials";
 
@@ -178,101 +181,53 @@ export async function testCustomConnection(config: ProviderConfig): Promise<Test
   }
 }
 
-/**
- * Sends a structured chat completion request to a Custom OpenAI-compatible endpoint.
- */
-export async function generateCustomPatches(
-  config: ProviderConfig,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl, allowLocalhost } = resolveCustomCredentials(config);
-  const model = config.model?.trim() || "default";
-
-  const completionsUrl = baseUrl.endsWith("/v1")
-    ? `${baseUrl}/chat/completions`
-    : `${baseUrl}/v1/chat/completions`;
+export async function completeOpenAICompatibleText(params: {
+  completionsUrl: string;
+  apiKey?: string;
+  requireApiKey: boolean;
+  missingKeyMessage: string;
+  model: string;
+  messages: TextCompletionMessage[];
+  sendResponseFormatJson: boolean;
+  temperature: number;
+  timeoutMs: number;
+  allowLocalhost: boolean;
+  providerLabel: string;
+  taskLabel: string;
+}): Promise<TextCompletionResult> {
+  if (params.requireApiKey && !params.apiKey) {
+    return { success: false, error: params.missingKeyMessage };
+  }
 
   try {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
-    if (apiKey) {
-      headers["Authorization"] = `Bearer ${apiKey}`;
+    if (params.apiKey) {
+      headers["Authorization"] = `Bearer ${params.apiKey}`;
     }
 
-    const res = await customFetch(completionsUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.3,
-      }),
-    }, allowLocalhost);
-
-    if (!res.ok) {
-      let errBody = "";
-      try {
-        const json = await res.json();
-        errBody = json.error?.message || JSON.stringify(json);
-      } catch {
-        errBody = res.statusText;
-      }
-      return { success: false, error: sanitizeError(`Custom endpoint returned status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const rawJson = data.choices?.[0]?.message?.content;
-
-    if (!rawJson) {
-      return { success: false, error: "Custom endpoint returned empty content in response." };
-    }
-
-    return { success: true, rawJson };
-  } catch (err) {
-    return { success: false, error: sanitizeError(`Custom endpoint patch generation failed: ${err instanceof Error ? err.message : String(err)}`) };
-  }
-}
-
-/**
- * Phase 4.3b: Sends a qualitative review request to a Custom OpenAI-compatible endpoint.
- */
-export async function generateCustomQualitativeReview(
-  config: ProviderConfig,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl, allowLocalhost } = resolveCustomCredentials(config);
-  const model = config.model?.trim() || "default";
-
-  const completionsUrl = baseUrl.endsWith("/v1")
-    ? `${baseUrl}/chat/completions`
-    : `${baseUrl}/v1/chat/completions`;
-
-  try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
+    const body: Record<string, unknown> = {
+      model: params.model,
+      messages: params.messages,
+      temperature: params.temperature,
     };
-    if (apiKey) {
-      headers["Authorization"] = `Bearer ${apiKey}`;
+    if (params.sendResponseFormatJson) {
+      body.response_format = { type: "json_object" };
     }
 
-    const res = await customFetch(completionsUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.3,
-      }),
-    }, allowLocalhost);
+    const res = await safeFetch(
+      params.completionsUrl,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      },
+      {
+        allowLocalhost: params.allowLocalhost,
+        timeoutMs: params.timeoutMs,
+      }
+    );
 
     if (!res.ok) {
       let errBody = "";
@@ -282,210 +237,55 @@ export async function generateCustomQualitativeReview(
       } catch {
         errBody = res.statusText;
       }
-      return { success: false, error: sanitizeError(`Custom endpoint returned status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const rawJson = data.choices?.[0]?.message?.content;
-
-    if (!rawJson) {
-      return { success: false, error: "Custom endpoint returned empty content in response." };
-    }
-
-    return { success: true, rawJson };
-  } catch (err) {
-    return { success: false, error: sanitizeError(`Custom endpoint qualitative review failed: ${err instanceof Error ? err.message : String(err)}`) };
-  }
-}
-
-/**
- * Phase 5: Sends a cover letter request to a Custom OpenAI-compatible endpoint.
- */
-export async function generateCustomCoverLetter(
-  config: ProviderConfig,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl, allowLocalhost } = resolveCustomCredentials(config);
-  const model = config.model?.trim() || "default";
-
-  const completionsUrl = baseUrl.endsWith("/v1")
-    ? `${baseUrl}/chat/completions`
-    : `${baseUrl}/v1/chat/completions`;
-
-  try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (apiKey) {
-      headers["Authorization"] = `Bearer ${apiKey}`;
-    }
-
-    const res = await customFetch(completionsUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.4,
-      }),
-    }, allowLocalhost);
-
-    if (!res.ok) {
-      let errBody = "";
-      try {
-        const json = await res.json();
-        errBody = json.error?.message || JSON.stringify(json);
-      } catch {
-        errBody = res.statusText;
-      }
-      return { success: false, error: sanitizeError(`Custom endpoint returned status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const rawJson = data.choices?.[0]?.message?.content;
-
-    if (!rawJson) {
-      return { success: false, error: "Custom endpoint returned empty content in response." };
-    }
-
-    return { success: true, rawJson };
-  } catch (err) {
-    return { success: false, error: sanitizeError(`Custom endpoint cover letter generation failed: ${err instanceof Error ? err.message : String(err)}`) };
-  }
-}
-
-/**
- * Task 9.1: Sends a chat completion request to a Custom OpenAI-compatible endpoint for PDF-to-Typst conversion.
- */
-export async function convertCustomPdfTextToTypst(
-  config: ProviderConfig,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<ConvertPdfResult> {
-  const { apiKey, baseUrl, allowLocalhost } = resolveCustomCredentials(config);
-  const model = config.model?.trim() || "default";
-
-  const completionsUrl = baseUrl.endsWith("/v1")
-    ? `${baseUrl}/chat/completions`
-    : `${baseUrl}/v1/chat/completions`;
-
-  try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (apiKey) {
-      headers["Authorization"] = `Bearer ${apiKey}`;
-    }
-
-    const res = await customFetch(completionsUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.2,
-      }),
-      signal: AbortSignal.timeout(30000),
-    }, allowLocalhost);
-
-    if (!res.ok) {
-      let errBody = "";
-      try {
-        const json = await res.json();
-        errBody = json.error?.message || JSON.stringify(json);
-      } catch {
-        errBody = res.statusText;
-      }
-      return { success: false, error: sanitizeError(`Custom endpoint returned status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const rawContent = data.choices?.[0]?.message?.content;
-
-    if (!rawContent) {
-      return { success: false, error: "Custom endpoint returned empty content in response." };
-    }
-
-    const typstSource = stripCodeFences(rawContent);
-    return { success: true, typstSource };
-  } catch (err) {
-    return { success: false, error: sanitizeError(`Custom endpoint PDF conversion failed: ${err instanceof Error ? err.message : String(err)}`) };
-  }
-}
-
-export async function repairTypstWithCustom(
-  config: ProviderConfig,
-  input: TypstRepairInput
-): Promise<{ success: boolean; data?: TypstRepairProposal; error?: string }> {
-  const { apiKey, baseUrl, allowLocalhost } = resolveCustomCredentials(config);
-  const model = config.model?.trim() || "default";
-
-  const systemPrompt = buildTypstRepairSystemPrompt();
-  const userPrompt = buildTypstRepairUserPrompt(input);
-
-  try {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (apiKey) {
-      headers["Authorization"] = `Bearer ${apiKey}`;
-    }
-
-    const completionsUrl = baseUrl.endsWith("/v1") ? `${baseUrl}/chat/completions` : `${baseUrl}/v1/chat/completions`;
-
-    const res = await customFetch(completionsUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.1,
-      }),
-      signal: AbortSignal.timeout(30000),
-    }, allowLocalhost);
-
-    if (!res.ok) {
-      let errBody = "";
-      try {
-        const json = await res.json();
-        errBody = json.error?.message || JSON.stringify(json);
-      } catch {
-        errBody = res.statusText;
-      }
-      return { success: false, error: sanitizeError(`Custom endpoint returned status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const rawContent = data.choices?.[0]?.message?.content;
-    if (!rawContent) {
-      return { success: false, error: "Custom endpoint returned empty content." };
-    }
-
-    const cleaned = stripCodeFences(rawContent);
-    const parsedJson = JSON.parse(cleaned);
-    const validated = TypstRepairProposalSchema.safeParse(parsedJson);
-
-    if (!validated.success) {
       return {
         success: false,
-        error: `Custom endpoint returned invalid repair proposal JSON: ${validated.error.issues.map((i) => i.message).join(", ")}`,
+        error: sanitizeError(`${params.providerLabel} returned status ${res.status}: ${errBody}`),
       };
     }
 
-    return { success: true, data: validated.data };
+    const data = await res.json();
+    const text = data.choices?.[0]?.message?.content;
+
+    if (!text) {
+      return { success: false, error: `${params.providerLabel} returned empty content in response.` };
+    }
+
+    return { success: true, text };
   } catch (err) {
     return {
       success: false,
-      error: sanitizeError(`Custom endpoint repair failed: ${err instanceof Error ? err.message : String(err)}`),
+      error: sanitizeError(
+        `${params.providerLabel} ${params.taskLabel} failed: ${err instanceof Error ? err.message : String(err)}`
+      ),
     };
   }
+}
+
+export async function completeText(
+  config: ProviderConfig,
+  messages: TextCompletionMessage[],
+  _jsonMode: boolean,
+  options?: TextCompletionOptions
+): Promise<TextCompletionResult> {
+  const { apiKey, baseUrl, allowLocalhost } = resolveCustomCredentials(config);
+  const model = config.model?.trim() || options?.defaultModel || "default";
+  const completionsUrl = baseUrl.endsWith("/v1")
+    ? `${baseUrl}/chat/completions`
+    : `${baseUrl}/v1/chat/completions`;
+
+  return completeOpenAICompatibleText({
+    completionsUrl,
+    apiKey,
+    requireApiKey: false,
+    missingKeyMessage: options?.missingKeyMessage ?? "API key is missing.",
+    model,
+    messages,
+    sendResponseFormatJson: false,
+    temperature: options?.temperature ?? 0.3,
+    timeoutMs: options?.timeoutMs ?? 120_000,
+    allowLocalhost,
+    providerLabel: "Custom endpoint",
+    taskLabel: options?.taskLabel ?? "completion",
+  });
 }
 

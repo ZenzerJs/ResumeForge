@@ -21,10 +21,17 @@ describe("source-backed inline contact links", () => {
     expect(renderer.renderRemaining()).toEqual([]);
   });
   it("keeps unsafe annotation destinations inactive and reports them", () => {
-    const renderer = createInlineRenderer([{ url: "javascript:alert(1)", label: "Portfolio" }, { url: "file:///secret" }]);
-    expect(renderer.render("Portfolio")).toBe("Portfolio");
+    const renderer = createInlineRenderer([
+      { url: "javascript:alert(1)", label: "Portfolio" },
+      { url: "vbscript:msgbox(1)", label: "VB" },
+      { url: "file:///secret" },
+      { url: "https://safe.example/cv", label: "CV" },
+    ]);
+    expect(renderer.render("Portfolio | VB | CV")).toBe(
+      'Portfolio | VB | #link("https://safe.example/cv")[CV]'
+    );
     expect(renderer.renderRemaining()).toEqual(["file:\\/\\/\\/secret"]);
-    expect(renderer.issues).toHaveLength(2);
+    expect(renderer.issues).toHaveLength(3);
   });
   it("escapes candidate markup and only applies explicit validated emphasis spans", () => {
     const renderer = createInlineRenderer();

@@ -5,9 +5,10 @@ import path from "node:path";
 const output = path.join("test-results", "contrast-logos-run", "screenshots");
 const companies = ["Coinbase", "Stripe", "Unknown Widget", "Coinbase"];
 const jobs = companies.map((companyName, i) => ({ id: `synthetic-${i}`, externalId: `e-${i}`, source: "GREENHOUSE", companyName, title: `Engineer ${i}`, location: "Toronto, ON", workplaceType: "REMOTE", isCanadianEligible: true, description: "Synthetic role", descriptionHtml: "", applyUrl: "https://example.com/jobs", postedAt: null, salaryMin: 100000, salaryMax: 140000, salaryCurrency: "CAD", createdAt: "2026-01-01T00:00:00.000Z", trackedJob: null, blendedScore: 74, scoreBreakdown: i === 3 ? undefined : { atsScore: 80, recencyScore: 50, locationScore: 90, salaryScore: 60, finalScore: 74 } }));
-async function mock(page: Page) {
+async function mock(page: Page, baseURL?: string) {
+  const allowedOrigin = baseURL ? new URL(baseURL).origin : "http://127.0.0.1:3006";
   const remoteImages: string[] = [];
-  page.on("request", req => { if (req.resourceType() === "image" && !req.url().startsWith("http://127.0.0.1:3149/")) remoteImages.push(req.url()); });
+  page.on("request", req => { if (req.resourceType() === "image" && !req.url().startsWith(`${allowedOrigin}/`)) remoteImages.push(req.url()); });
   await page.route("**/api/**", async route => {
     const url = new URL(route.request().url()); let data: unknown = { success: false, error: "Synthetic endpoint unavailable" };
     if (url.pathname === "/api/demo-config") data = { demoMode: true };
@@ -20,8 +21,8 @@ async function mock(page: Page) {
 }
 async function shot(page: Page, name: string) { mkdirSync(output, { recursive: true }); await page.screenshot({ path: path.join(output, name), fullPage: false }); }
 
-test("workspace themes, navigation reset, and real local logos", async ({ page }) => {
-  const external = await mock(page); await page.goto("/tracker/feed");
+test("workspace themes, navigation reset, and real local logos", async ({ page, baseURL }) => {
+  const external = await mock(page, baseURL); await page.goto("/tracker/feed");
   const card = page.getByTestId("job-card-synthetic-0"); await expect(card).toBeVisible();
   await expect(page.locator("[data-workspace-theme]")).toHaveCount(1);
   for (const index of [0, 1]) {
@@ -81,9 +82,9 @@ test("score shows weighted factors and accessible popover", async ({ page }) => 
 });
 
 
-test("local logo failure falls back and mobile score opens by touch", async ({ browser }) => {
+test("local logo failure falls back and mobile score opens by touch", async ({ browser, baseURL }) => {
   const context = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
-  const page = await context.newPage(); const external = await mock(page);
+  const page = await context.newPage(); const external = await mock(page, baseURL);
   await page.route("**/company-logos/**", route => route.abort());
   await page.goto("/tracker/feed");
   const card = page.getByTestId("job-card-synthetic-0"); await expect(card).toBeVisible();

@@ -228,6 +228,42 @@ describe("Typst Worker Compiler Client", () => {
     await expect(recovered).resolves.toEqual({ success: true, svg: "<svg>ok</svg>" });
   });
 
+  it("terminates a nonreplying PDF compiler worker at 15s and recovers for the next valid PDF job", async () => {
+    vi.useFakeTimers();
+    const workers: FakeWorker[] = [];
+    const client = createTypstCompilerClient({
+      isBrowser: () => true,
+      createWorker: () => {
+        const w = new FakeWorker();
+        workers.push(w);
+        return w;
+      },
+    });
+
+    const stalledPdf = client.compileTypstToPdf("= #while true {}", { mode: "export" });
+    const stalledAssertion = expect(stalledPdf).rejects.toThrow("timed out");
+    const firstWorker = workers[0];
+    const staleId = firstWorker.posted[0].id;
+
+    await vi.advanceTimersByTimeAsync(15_000);
+    await stalledAssertion;
+    expect(firstWorker.terminated).toBe(true);
+    expect(firstWorker.onmessage).toBeNull();
+
+    firstWorker.emitMessage({ id: staleId, kind: "pdf", ok: true, pdf: new Uint8Array([99]) });
+
+    const nextPdf = client.compileTypstToPdf("= Valid PDF", { mode: "export" });
+    expect(workers).toHaveLength(2);
+    const secondWorker = workers[1];
+    secondWorker.emitMessage({
+      id: secondWorker.posted[0].id,
+      kind: "pdf",
+      ok: true,
+      pdf: new Uint8Array([37, 80, 68, 70]),
+    });
+    await expect(nextPdf).resolves.toEqual(new Uint8Array([37, 80, 68, 70]));
+  });
+
   it("terminates on worker crash, settles affected requests, and spawns a fresh worker next", async () => {
     const workers: FakeWorker[] = [];
     const client = createTypstCompilerClient({

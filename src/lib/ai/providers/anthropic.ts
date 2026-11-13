@@ -1,8 +1,11 @@
-import { ProviderConfig, TestConnectionResult, GeneratePatchesResult, ConvertPdfResult } from "../types";
+import {
+  ProviderConfig,
+  TestConnectionResult,
+  TextCompletionMessage,
+  TextCompletionOptions,
+  TextCompletionResult,
+} from "../types";
 import { sanitizeError } from "../redact";
-import { stripCodeFences } from "../utils";
-import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from "../repair-schema";
-import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
 import type { ChatCompletionResult } from "./custom";
 import { safeFetch } from "@/lib/security/safe-fetch";
 import { resolveProviderCredentialsWithHostPolicy } from "./credentials";
@@ -84,14 +87,12 @@ export async function testAnthropicConnection(config: ProviderConfig): Promise<T
   }
 }
 
-/**
- * Sends a structured message request to Anthropic for patch generation.
- */
-export async function generateAnthropicPatches(
+export async function completeText(
   config: ProviderConfig,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<GeneratePatchesResult> {
+  messages: TextCompletionMessage[],
+  _jsonMode: boolean,
+  options?: TextCompletionOptions
+): Promise<TextCompletionResult> {
   const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
@@ -100,28 +101,47 @@ export async function generateAnthropicPatches(
     defaultBaseUrl: "https://api.anthropic.com",
     officialHosts: ["api.anthropic.com"],
   });
-  const model = config.model?.trim() || "claude-sonnet-4-20250514";
+  const model = config.model?.trim() || options?.defaultModel || "claude-3-5-sonnet-20241022";
 
   if (!apiKey) {
-    return { success: false, error: "Anthropic API key is missing." };
+    return { success: false, error: options?.missingKeyMessage ?? "Anthropic API key is missing." };
+  }
+
+  const systemMsg = messages.find((m) => m.role === "system");
+  const chatMessages = messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({
+      role: m.role === "assistant" ? "assistant" : "user",
+      content: m.content,
+    }));
+
+  const body: Record<string, unknown> = {
+    model,
+    max_tokens: options?.maxTokens ?? 4096,
+    messages: chatMessages,
+    temperature: options?.temperature ?? 0.3,
+  };
+  if (systemMsg) {
+    body.system = systemMsg.content;
   }
 
   try {
-    const res = await providerFetch(`${baseUrl}/v1/messages`, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
+    const res = await safeFetch(
+      `${baseUrl}/v1/messages`,
+      {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify({
-        model,
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-        temperature: 0.3,
-      }),
-    }, allowLocalhost);
+      {
+        timeoutMs: options?.timeoutMs ?? 130_000,
+        allowLocalhost,
+      }
+    );
 
     if (!res.ok) {
       let errBody = "";
@@ -131,291 +151,27 @@ export async function generateAnthropicPatches(
       } catch {
         errBody = res.statusText;
       }
-      return { success: false, error: sanitizeError(`Anthropic API returned status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const textBlock = data.content?.find((c: { type: string }) => c.type === "text");
-    const rawJson = textBlock?.text;
-
-    if (!rawJson) {
-      return { success: false, error: "Anthropic returned empty content in response." };
-    }
-
-    return { success: true, rawJson };
-  } catch (err) {
-    return { success: false, error: sanitizeError(`Anthropic patch generation failed: ${err instanceof Error ? err.message : String(err)}`) };
-  }
-}
-
-/**
- * Phase 4.3b: Sends a structured message request to Anthropic for qualitative review.
- */
-export async function generateAnthropicQualitativeReview(
-  config: ProviderConfig,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.ANTHROPIC_API_KEY,
-    envBaseUrl: process.env.ANTHROPIC_BASE_URL,
-    defaultBaseUrl: "https://api.anthropic.com",
-    officialHosts: ["api.anthropic.com"],
-  });
-  const model = config.model?.trim() || "claude-3-5-sonnet-20241022";
-
-  if (!apiKey) {
-    return { success: false, error: "Anthropic API key is missing." };
-  }
-
-  try {
-    const res = await providerFetch(`${baseUrl}/v1/messages`, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-        temperature: 0.3,
-      }),
-    }, allowLocalhost);
-
-    if (!res.ok) {
-      let errBody = "";
-      try {
-        const json = await res.json();
-        errBody = json.error?.message || JSON.stringify(json);
-      } catch {
-        errBody = res.statusText;
-      }
-      return { success: false, error: sanitizeError(`Anthropic API returned status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const textBlock = data.content?.find((c: { type: string }) => c.type === "text");
-    const rawJson = textBlock?.text;
-
-    if (!rawJson) {
-      return { success: false, error: "Anthropic returned empty content in response." };
-    }
-
-    return { success: true, rawJson };
-  } catch (err) {
-    return { success: false, error: sanitizeError(`Anthropic qualitative review failed: ${err instanceof Error ? err.message : String(err)}`) };
-  }
-}
-
-/**
- * Phase 5: Sends a structured message request to Anthropic for cover letter generation.
- */
-export async function generateAnthropicCoverLetter(
-  config: ProviderConfig,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.ANTHROPIC_API_KEY,
-    envBaseUrl: process.env.ANTHROPIC_BASE_URL,
-    defaultBaseUrl: "https://api.anthropic.com",
-    officialHosts: ["api.anthropic.com"],
-  });
-  const model = config.model?.trim() || "claude-3-5-sonnet-20241022";
-
-  if (!apiKey) {
-    return { success: false, error: "Anthropic API key is missing." };
-  }
-
-  try {
-    const res = await providerFetch(`${baseUrl}/v1/messages`, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-        temperature: 0.4,
-      }),
-    }, allowLocalhost);
-
-    if (!res.ok) {
-      let errBody = "";
-      try {
-        const json = await res.json();
-        errBody = json.error?.message || JSON.stringify(json);
-      } catch {
-        errBody = res.statusText;
-      }
-      return { success: false, error: sanitizeError(`Anthropic API returned status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const textBlock = data.content?.find((c: { type: string }) => c.type === "text");
-    const rawJson = textBlock?.text;
-
-    if (!rawJson) {
-      return { success: false, error: "Anthropic returned empty content in response." };
-    }
-
-    return { success: true, rawJson };
-  } catch (err) {
-    return { success: false, error: sanitizeError(`Anthropic cover letter generation failed: ${err instanceof Error ? err.message : String(err)}`) };
-  }
-}
-
-/**
- * Task 9.1: Sends a message request to Anthropic for PDF-to-Typst conversion.
- */
-export async function convertAnthropicPdfTextToTypst(
-  config: ProviderConfig,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<ConvertPdfResult> {
-  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.ANTHROPIC_API_KEY,
-    envBaseUrl: process.env.ANTHROPIC_BASE_URL,
-    defaultBaseUrl: "https://api.anthropic.com",
-    officialHosts: ["api.anthropic.com"],
-  });
-  const model = config.model?.trim() || "claude-3-5-sonnet-20241022";
-
-  if (!apiKey) {
-    return { success: false, error: "Anthropic API key is missing." };
-  }
-
-  try {
-    const res = await providerFetch(`${baseUrl}/v1/messages`, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-        temperature: 0.2,
-      }),
-      signal: AbortSignal.timeout(30000),
-    }, allowLocalhost);
-
-    if (!res.ok) {
-      let errBody = "";
-      try {
-        const json = await res.json();
-        errBody = json.error?.message || JSON.stringify(json);
-      } catch {
-        errBody = res.statusText;
-      }
-      return { success: false, error: sanitizeError(`Anthropic API returned status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const textBlock = data.content?.find((c: { type: string }) => c.type === "text");
-    const rawContent = textBlock?.text;
-
-    if (!rawContent) {
-      return { success: false, error: "Anthropic returned empty content in response." };
-    }
-
-    const typstSource = stripCodeFences(rawContent);
-    return { success: true, typstSource };
-  } catch (err) {
-    return { success: false, error: sanitizeError(`Anthropic PDF conversion failed: ${err instanceof Error ? err.message : String(err)}`) };
-  }
-}
-
-export async function repairTypstWithAnthropic(
-  config: ProviderConfig,
-  input: TypstRepairInput
-): Promise<{ success: boolean; data?: TypstRepairProposal; error?: string }> {
-  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.ANTHROPIC_API_KEY,
-    envBaseUrl: process.env.ANTHROPIC_BASE_URL,
-    defaultBaseUrl: "https://api.anthropic.com",
-    officialHosts: ["api.anthropic.com"],
-  });
-  const model = config.model?.trim() || "claude-3-5-sonnet-20241022";
-
-  if (!apiKey) {
-    return { success: false, error: "Anthropic API key is missing. Please configure your key in Settings." };
-  }
-
-  const systemPrompt = buildTypstRepairSystemPrompt();
-  const userPrompt = buildTypstRepairUserPrompt(input);
-
-  try {
-    const res = await providerFetch(`${baseUrl}/v1/messages`, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-        temperature: 0.1,
-      }),
-      signal: AbortSignal.timeout(30000),
-    }, allowLocalhost);
-
-    if (!res.ok) {
-      let errBody = "";
-      try {
-        const json = await res.json();
-        errBody = json.error?.message || JSON.stringify(json);
-      } catch {
-        errBody = res.statusText;
-      }
-      return { success: false, error: sanitizeError(`Anthropic API status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const textBlock = data.content?.find((c: { type: string }) => c.type === "text");
-    const rawContent = textBlock?.text;
-
-    if (!rawContent) {
-      return { success: false, error: "Anthropic returned empty content." };
-    }
-
-    const cleaned = stripCodeFences(rawContent);
-    const parsedJson = JSON.parse(cleaned);
-    const validated = TypstRepairProposalSchema.safeParse(parsedJson);
-
-    if (!validated.success) {
       return {
         success: false,
-        error: `Anthropic returned invalid repair proposal JSON: ${validated.error.issues.map((i) => i.message).join(", ")}`,
+        error: sanitizeError(`Anthropic API returned status ${res.status}: ${errBody}`),
       };
     }
 
-    return { success: true, data: validated.data };
+    const data = await res.json();
+    const textBlock = data.content?.find((c: { type: string }) => c.type === "text");
+    const text = textBlock?.text;
+
+    if (!text) {
+      return { success: false, error: "Anthropic returned empty content in response." };
+    }
+
+    return { success: true, text };
   } catch (err) {
     return {
       success: false,
-      error: sanitizeError(`Anthropic repair failed: ${err instanceof Error ? err.message : String(err)}`),
+      error: sanitizeError(
+        `Anthropic ${options?.taskLabel ?? "completion"} failed: ${err instanceof Error ? err.message : String(err)}`
+      ),
     };
   }
 }

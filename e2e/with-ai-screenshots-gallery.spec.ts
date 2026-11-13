@@ -187,7 +187,7 @@ test.describe("ResumeForge Showcase Gallery — With AI Integration", () => {
     const page = await context.newPage();
     await page.setViewportSize({ width: 1440, height: 900 });
 
-    await page.goto("http://127.0.0.1:3000/login");
+    await page.goto("/login");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(1200);
 

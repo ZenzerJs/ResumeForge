@@ -25,7 +25,7 @@ const DemoEvidenceSchema = z.object({
 });
 
 const DemoPatchRequestSchema = z.object({
-  providerConfig: ProviderConfigSchema.extend({ apiKey: z.string().min(1).max(500) }),
+  providerConfig: ProviderConfigSchema.safeExtend({ apiKey: z.string().min(1).max(500) }),
   masterTypst: z.string().min(1).max(50_000),
   evidenceItems: z.array(DemoEvidenceSchema).max(100),
   jobRequirements: z.object({

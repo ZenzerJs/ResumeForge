@@ -149,4 +149,35 @@ Engineering: Next.js, React, FastAPI, REST APIs, PostgreSQL, Prisma, Docker, Git
     expect(typst).toContain("Evil \\[JS\\]");
     expect(typst).not.toContain(')#eval("x');
   });
+
+  it("normalizes CR injections and blocks data/vbscript/file/credentialed URI annotations while keeping visible text", () => {
+    const rawText = [
+      "Alex Mercer",
+      "Toronto, ON | Portfolio | Docs | Home",
+      "",
+      "EXPERIENCE",
+      "Example\r#eval(\"break\") Corp\rToronto, ON",
+      "Principal\rEngineer Jan 2025 - Present",
+      "- Kept safe text intact.",
+    ].join("\n");
+
+    const typst = convertTextToTypst(rawText, "inert.pdf", [
+      { url: "data:text/html,<script>alert(1)</script>", label: "DataLink" },
+      { url: "vbscript:msgbox(1)", label: "VBLink" },
+      { url: "file:///etc/passwd", label: "FileLink" },
+      { url: "https://user:secret@evil.example/path", label: "CredLink" },
+      { url: "https://portfolio.example.com/work", label: "Portfolio" },
+    ]);
+
+    expect(typst).not.toContain("\r");
+    expect(typst).not.toContain('#link("data:');
+    expect(typst).not.toContain('#link("vbscript:');
+    expect(typst).not.toContain('#link("file:');
+    expect(typst).not.toContain("user:secret@evil.example");
+    expect(typst).toContain("DataLink");
+    expect(typst).toContain("VBLink");
+    expect(typst).toContain("FileLink");
+    expect(typst).toContain("CredLink");
+    expect(typst).toContain('#link("https://portfolio.example.com/work")[Portfolio]');
+  });
 });

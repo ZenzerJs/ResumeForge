@@ -7,6 +7,7 @@ import {
 } from "@/lib/practice/practice-curriculum";
 import { prisma } from "@/lib/prisma";
 import { normalizeCompany } from "@/lib/company";
+import { sanitizeError } from "@/lib/ai/redact";
 
 export const dynamic = "force-dynamic";
 
@@ -95,9 +96,9 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (err: any) {
-    console.error("[API practice/problems] Error:", err);
+    console.error("[API practice/problems] Error:", sanitizeError(err));
     return NextResponse.json(
-      { success: false, error: err?.message || "Failed to fetch practice curriculum" },
+      { success: false, error: "Failed to fetch practice curriculum" },
       { status: 500 }
     );
   }

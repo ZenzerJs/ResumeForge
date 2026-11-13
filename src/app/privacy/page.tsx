@@ -50,9 +50,10 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-base font-semibold text-white">AI keys (BYOK)</h2>
             <p className="mt-2">
-              Bring-your-own API keys are stored in this browser’s local storage, not in our database. Keys
-              are sent to your chosen provider only when you run an AI action (extract, tailor, cover letter,
-              ATS review). We do not sell keys or resume content.
+              Bring-your-own API keys are encrypted in this browser’s IndexedDB vault using a
+              non-extractable Web Crypto key, and are never stored in our database. Keys are sent to
+              your chosen provider only when you run an AI action (extract, tailor, cover letter, ATS
+              review). We do not sell keys or resume content.
             </p>
           </section>
 
