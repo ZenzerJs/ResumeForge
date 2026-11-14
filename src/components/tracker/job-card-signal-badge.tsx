@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/popover";
 import type { MatchScoreResult } from "@packages/schema/matchScore";
 import type { CompatibilityResult } from "@/lib/scoring/compatibility-engine";
+import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
 import { cn } from "@/lib/utils";
 
 interface JobCardSignalBadgeProps {
@@ -113,10 +114,10 @@ export function JobCardSignalBadge({
 
   const badgeColorClass =
     score >= 80
-      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+      ? "border-signal/40 bg-signal/15 text-signal hover:bg-signal/25"
       : score >= 60
-      ? "border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25"
-      : "border-slate-700 bg-slate-800/80 text-slate-400 hover:bg-slate-800";
+      ? "border-primary/40 bg-primary/15 text-primary hover:bg-primary/25"
+      : "border-hairline bg-inset text-muted-foreground hover:bg-elevated";
 
   const handleMouseEnter = () => {
     if (timeoutRef.current) {
@@ -170,7 +171,7 @@ export function JobCardSignalBadge({
         </PopoverTrigger>
 
         <PopoverContent
-          className="w-96 rounded-xl border border-slate-700 bg-[#0d1526] p-4 text-slate-200 shadow-2xl font-mono text-xs z-50"
+          className="w-96 rounded-xl border border-hairline bg-panel p-4 text-foreground shadow-2xl font-mono text-xs z-50"
           align="start"
           side="top"
           onMouseEnter={handleMouseEnter}
@@ -178,10 +179,10 @@ export function JobCardSignalBadge({
           data-testid="signal-badge-popover"
         >
           {/* Popover Header */}
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+          <div className="flex items-center justify-between border-b border-hairline pb-2 mb-3">
             <div className="flex items-center gap-2">
-              <Calculator className="h-4 w-4 text-amber-400" />
-              <span className="font-bold text-white tracking-tight">
+              <Calculator className="h-4 w-4 text-primary" />
+              <span className="font-bold text-foreground tracking-tight">
                 Explainable Match Derivation
               </span>
             </div>
@@ -198,22 +199,22 @@ export function JobCardSignalBadge({
           {effectiveScoreResult ? (
             <div className="space-y-3">
               {/* Component breakdown meters */}
-              <div className="space-y-2 rounded-lg bg-slate-900/80 border border-slate-800/80 p-3">
-                <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">
+              <div className="space-y-2 rounded-lg bg-inset border border-hairline p-3">
+                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider block">
                   Weighted Score Components
                 </span>
 
                 {/* Core Stack */}
                 <div className="space-y-1">
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-300">Core Stack (50%)</span>
-                    <span className="text-emerald-400 font-bold">
+                    <span className="text-text-secondary">Core Stack (50%)</span>
+                    <span className="text-signal font-bold">
                       {effectiveScoreResult.breakdown.coreStackScore}%
                     </span>
                   </div>
-                  <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-elevated rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-emerald-400 rounded-full transition-[width] duration-300"
+                      className="h-full bg-signal rounded-full transition-[width] duration-300"
                       style={{ width: `${effectiveScoreResult.breakdown.coreStackScore}%` }}
                     />
                   </div>
@@ -222,14 +223,14 @@ export function JobCardSignalBadge({
                 {/* Seniority */}
                 <div className="space-y-1">
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-300">Seniority &amp; YOE (20%)</span>
-                    <span className="text-amber-400 font-bold">
+                    <span className="text-text-secondary">Seniority &amp; YOE (20%)</span>
+                    <span className="text-primary font-bold">
                       {effectiveScoreResult.breakdown.seniorityScore}%
                     </span>
                   </div>
-                  <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-elevated rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-amber-400 rounded-full transition-[width] duration-300"
+                      className="h-full bg-primary rounded-full transition-[width] duration-300"
                       style={{ width: `${effectiveScoreResult.breakdown.seniorityScore}%` }}
                     />
                   </div>
@@ -238,14 +239,14 @@ export function JobCardSignalBadge({
                 {/* Tools */}
                 <div className="space-y-1">
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-300">Tooling &amp; Infra (15%)</span>
-                    <span className="text-sky-400 font-bold">
+                    <span className="text-text-secondary">Tooling &amp; Infra (15%)</span>
+                    <span className="text-ember font-bold">
                       {effectiveScoreResult.breakdown.toolsScore}%
                     </span>
                   </div>
-                  <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-elevated rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-sky-400 rounded-full transition-[width] duration-300"
+                      className="h-full bg-ember rounded-full transition-[width] duration-300"
                       style={{ width: `${effectiveScoreResult.breakdown.toolsScore}%` }}
                     />
                   </div>
@@ -254,14 +255,14 @@ export function JobCardSignalBadge({
                 {/* Evidence Coverage */}
                 <div className="space-y-1">
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-300">Evidence Coverage (15%)</span>
-                    <span className="text-cyan-400 font-bold">
+                    <span className="text-text-secondary">Evidence Coverage (15%)</span>
+                    <span className="text-foreground font-bold">
                       {effectiveScoreResult.breakdown.evidenceCoverageScore}%
                     </span>
                   </div>
-                  <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-elevated rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-cyan-400 rounded-full transition-[width] duration-300"
+                      className="h-full ombre-bar rounded-full transition-[width] duration-300"
                       style={{ width: `${effectiveScoreResult.breakdown.evidenceCoverageScore}%` }}
                     />
                   </div>
@@ -270,17 +271,18 @@ export function JobCardSignalBadge({
 
               {/* Verified Evidence Gains */}
               {verifiedSkills.length > 0 && (
-                <div className="space-y-1 rounded border border-emerald-500/30 bg-emerald-950/20 p-2.5 text-[11px]">
-                  <span className="font-bold text-emerald-400 block mb-1">
+                <div className="space-y-1 rounded border border-signal/30 bg-signal/[0.07] p-2.5 text-[11px]">
+                  <span className="font-bold text-signal block mb-1">
                     Points Gained from Verified Evidence Bank:
                   </span>
                   <div className="flex flex-wrap gap-1">
                     {verifiedSkills.map((s, idx) => (
                       <span
                         key={idx}
-                        className="inline-flex items-center gap-1 rounded bg-emerald-500/15 border border-emerald-500/40 px-1.5 py-0.5 text-[10px] text-emerald-300 font-mono"
+                        className="inline-flex items-center gap-1 rounded bg-signal/10 border border-signal/35 px-1.5 py-0.5 text-[10px] text-signal font-mono"
                       >
-                        <CheckCircle2 className="h-2.5 w-2.5 text-emerald-400" />
+                        <CheckCircle2 className="h-2.5 w-2.5 text-signal" />
+                        {hasBrandIcon(s.skill) && <BrandIcon name={s.skill} className="h-3 w-3 shrink-0" />}
                         <span>{s.skill}</span>
                       </span>
                     ))}
@@ -301,20 +303,20 @@ export function JobCardSignalBadge({
 
               {/* Point Derivation Log */}
               <div className="space-y-1.5">
-                <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">
+                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider block">
                   Ground Truth Derivation Steps
                 </span>
-                <div className="max-h-36 overflow-y-auto space-y-1 text-[11px] text-slate-300 pr-1">
+                <div className="max-h-36 overflow-y-auto space-y-1 text-[11px] text-text-secondary pr-1">
                   {effectiveScoreResult.explanationDerivation.map((line, idx) => (
                     <div
                       key={idx}
                       className={cn(
                         "rounded p-1.5 leading-tight border",
                         line.startsWith("+")
-                          ? "bg-emerald-950/30 border-emerald-900/40 text-emerald-300"
+                          ? "bg-inset border-hairline border-l-2 border-l-signal text-text-primary"
                           : line.startsWith("Deductions") || line.startsWith("Penalty")
                           ? "bg-amber-950/30 border-amber-900/40 text-amber-300"
-                          : "bg-slate-900/50 border-slate-800 text-slate-400"
+                          : "bg-inset border-hairline text-muted-foreground"
                       )}
                     >
                       {line}
@@ -324,18 +326,18 @@ export function JobCardSignalBadge({
               </div>
             </div>
           ) : (
-            <div className="space-y-2 text-xs text-slate-400">
+            <div className="space-y-2 text-xs text-muted-foreground">
               <p>
                 Deterministic fit calculated against active candidate Master Resume and Evidence Bank.
               </p>
-              <div className="rounded border border-slate-800 bg-slate-900 p-2.5 text-[11px] text-slate-300 font-mono">
+              <div className="rounded border border-hairline bg-inset p-2.5 text-[11px] text-text-secondary font-mono">
                 Formula: 0.50(CoreStack) + 0.20(Seniority) + 0.15(Tools) + 0.15(EvidenceCoverage) = {score}%
               </div>
             </div>
           )}
 
           {/* Popover Footer Info */}
-          <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-500">
+          <div className="mt-3 pt-2 border-t border-hairline flex items-center justify-between text-[10px] text-muted-foreground">
             <span>Zero Hallucination AI Contract</span>
             <span>100% Deterministic</span>
           </div>
@@ -345,7 +347,7 @@ export function JobCardSignalBadge({
       {/* Sub-badge: Funding Stage */}
       {fundingBadge && (
         <span
-          className="inline-flex items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-sky-300 shadow-sm"
+          className="inline-flex items-center gap-1 rounded-full border border-signal/35 bg-signal/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-signal shadow-sm"
           title={`Venture Funding: ${fundingBadge}`}
           data-testid="funding-badge"
         >
@@ -357,7 +359,7 @@ export function JobCardSignalBadge({
       {/* Sub-badge: H1B Status */}
       {h1bBadge && (
         <span
-          className="inline-flex items-center gap-1 rounded-full border border-slate-600 bg-slate-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-300 shadow-sm"
+          className="inline-flex items-center gap-1 rounded-full border border-hairline bg-elevated px-2 py-0.5 font-mono text-[10px] font-semibold text-text-secondary shadow-sm"
           title={`US DOL LCA H1B Sponsorship: ${h1bBadge}`}
           data-testid="h1b-badge"
         >

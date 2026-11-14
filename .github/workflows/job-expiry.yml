@@ -1,0 +1,49 @@
+name: Job board expiry audit
+
+# Switch the daily cron to 20 1 * * 1 for weekly operation.
+on:
+  schedule:
+    - cron: '20 1 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: job-board-expiry
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Audit board expiry
+        env:
+          APP_SYNC_URL: ${{ secrets.APP_SYNC_URL }}
+          JOB_SYNC_SECRET: ${{ secrets.JOB_SYNC_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_SYNC_URL:-}" ] || [ -z "${JOB_SYNC_SECRET:-}" ]; then
+            echo "Expiry audit failed: required configuration is missing." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          response=$(mktemp)
+          trap 'rm -f "$response"' EXIT
+          if ! curl --fail --silent --show-error --retry 3 --retry-delay 5 --retry-all-errors \
+            --connect-timeout 15 --max-time 120 -o "$response" \
+            -X POST "${APP_SYNC_URL%/}/api/jobs/cleanup" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $JOB_SYNC_SECRET" \
+            --data '{"dryRun":true}'; then
+            echo "Expiry audit failed. Check the application logs and retry." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if ! jq -e '.success == true and (.data.expired | type == "object")' "$response" >/dev/null; then
+            echo "Expiry audit returned an invalid response." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          {
+            echo "### Job board expiry audit"
+            echo "Completed at $(date -u +'%Y-%m-%d %H:%M:%S UTC'). No records were deleted."
+            echo '```json'
+            jq '.data' "$response"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

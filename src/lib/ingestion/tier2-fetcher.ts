@@ -15,7 +15,7 @@ import {
   isPlaceholderDescription,
   normalizeLocation,
 } from "@/lib/ingestion/helpers";
-import { isSafeHref, safeFetch, UnsafeUrlError } from "@/lib/security/safe-fetch";
+import { assertSafePublicUrl, isSafeHref, safeFetch, UnsafeUrlError } from "@/lib/security/safe-fetch";
 import {
   formatCanonicalJobDescription,
   convertHtmlToCleanMarkdown,
@@ -113,10 +113,42 @@ export function validateExtractedTextQuality(text: string): boolean {
   return true;
 }
 
+function hostMatchesDomain(hostname: string, domain: string): boolean {
+  const h = hostname.toLowerCase();
+  const d = domain.toLowerCase();
+  return h === d || h.endsWith(`.${d}`);
+}
+
+const KNOWN_PUBLIC_ATS_DOMAINS = [
+  "greenhouse.io",
+  "lever.co",
+  "ashbyhq.com",
+  "myworkdayjobs.com",
+  "workday.com",
+  "smartrecruiters.com",
+  "icims.com",
+  "jobvite.com",
+  "bamboohr.com",
+  "rippling.com",
+  "gem.com",
+  "workable.com",
+  "breezy.hr",
+  "recruitee.com",
+];
+
+function isKnownPublicAtsUrl(rawUrl: string): boolean {
+  try {
+    const parsed = assertSafePublicUrl(rawUrl, { allowLocalhost: false });
+    return KNOWN_PUBLIC_ATS_DOMAINS.some((domain) => hostMatchesDomain(parsed.hostname, domain));
+  } catch {
+    return false;
+  }
+}
+
 export function greenhouseApiUrlFromPosting(pageUrl: string): string | null {
   try {
     const u = new URL(pageUrl);
-    if (!u.hostname.toLowerCase().endsWith("greenhouse.io")) return null;
+    if (!hostMatchesDomain(u.hostname, "greenhouse.io")) return null;
 
     if (u.pathname.includes("/embed/job_app")) {
       const board = u.searchParams.get("for");
@@ -139,7 +171,7 @@ export function greenhouseApiUrlFromPosting(pageUrl: string): string | null {
 export function leverApiUrlFromPosting(pageUrl: string): string | null {
   try {
     const u = new URL(pageUrl);
-    if (!u.hostname.toLowerCase().endsWith("lever.co")) return null;
+    if (!hostMatchesDomain(u.hostname, "lever.co")) return null;
     const pathMatch = u.pathname.match(/^\/([^/]+)\/([0-9a-f-]{8,})/i);
     if (!pathMatch) return null;
     return `https://api.lever.co/v0/postings/${encodeURIComponent(pathMatch[1])}/${pathMatch[2]}`;
@@ -151,7 +183,7 @@ export function leverApiUrlFromPosting(pageUrl: string): string | null {
 export function ashbyApiUrlFromPosting(pageUrl: string): string | null {
   try {
     const u = new URL(pageUrl);
-    if (!u.hostname.toLowerCase().endsWith("ashbyhq.com")) return null;
+    if (!hostMatchesDomain(u.hostname, "ashbyhq.com")) return null;
     const pathMatch = u.pathname.match(/^\/([^/]+)\/([0-9a-f-]{8,})/i);
     if (!pathMatch) return null;
     return `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(pathMatch[1])}/job/${pathMatch[2]}`;
@@ -163,7 +195,7 @@ export function ashbyApiUrlFromPosting(pageUrl: string): string | null {
 export function workdayApiUrlFromPosting(pageUrl: string): string | null {
   try {
     const u = new URL(pageUrl);
-    if (!u.hostname.toLowerCase().includes("myworkdayjobs.com")) return null;
+    if (!hostMatchesDomain(u.hostname, "myworkdayjobs.com")) return null;
     const parts = u.pathname.split("/").filter(Boolean);
     const jobIdx = parts.indexOf("job");
     if (jobIdx < 1 || jobIdx >= parts.length - 1) return null;
@@ -297,7 +329,7 @@ async function fetchJsonOrHtml(
   const res = await safeFetch(
     url,
     { headers: { ...FETCH_HEADERS, Accept: accept } },
-    { followRedirects: true, timeoutMs: 12000 }
+    { followRedirects: true, timeoutMs: 12000, allowLocalhost: false }
   );
   if (!res.ok) {
     return { ok: false, status: res.status };
@@ -526,6 +558,9 @@ async function fetchWithJinaReader(
   url: string,
   meta?: { company?: string; roleTitle?: string }
 ): Promise<ExtractResultSuccess | null> {
+  if (!isKnownPublicAtsUrl(url)) {
+    return null;
+  }
   try {
     const jinaUrl = `https://r.jina.ai/${url}`;
     const res = await safeFetch(
@@ -536,7 +571,7 @@ async function fetchWithJinaReader(
           Accept: "text/markdown",
         },
       },
-      { followRedirects: true, timeoutMs: 15000 }
+      { followRedirects: true, timeoutMs: 15000, allowLocalhost: false }
     );
 
     if (res.ok) {
@@ -692,6 +727,17 @@ export async function extractFullTextFromUrl(
     };
   }
 
+  try {
+    assertSafePublicUrl(url, { allowLocalhost: false });
+  } catch (err) {
+    return {
+      success: false,
+      reason: "BLOCKED_HOST",
+      failureCode: "invalid_url",
+      message: err instanceof Error ? err.message : "Blocked destination URL.",
+    };
+  }
+
   // Check host policy compliance (Indeed / LinkedIn / robots.txt)
   const hostCheck = checkHostPolicy(url);
   if (!hostCheck.allowed) {
@@ -833,15 +879,39 @@ export async function extractFullTextFromUrl(
   }
 }
 
+export interface FetchAndCacheJobOptions {
+  viewerUserId?: string;
+  allowSharedCacheWrite?: boolean;
+}
+
 /**
  * On-demand Tier 2 fetch and database cache handler.
  */
-export async function fetchAndCacheJobFullText(jobId: string) {
+export async function fetchAndCacheJobFullText(
+  jobId: string,
+  options: FetchAndCacheJobOptions = {}
+) {
+  if (!options.allowSharedCacheWrite && !options.viewerUserId) {
+    return {
+      success: false,
+      error: "Authentication required.",
+      cached: false,
+    };
+  }
+
   const job = await prisma.job.findUnique({
     where: { id: jobId },
   });
 
   if (!job) {
+    return {
+      success: false,
+      error: "Job record not found.",
+      cached: false,
+    };
+  }
+
+  if (!options.allowSharedCacheWrite && job.userId != null && job.userId !== options.viewerUserId) {
     return {
       success: false,
       error: "Job record not found.",
@@ -869,16 +939,31 @@ export async function fetchAndCacheJobFullText(jobId: string) {
     };
   }
 
+  const canPersistToDb = Boolean(
+    options.allowSharedCacheWrite || (options.viewerUserId && job.userId === options.viewerUserId)
+  );
+
   const extractRes = await extractFullTextFromUrl(applyUrl, {
     company: job.company ?? undefined,
     roleTitle: job.roleTitle ?? undefined,
   });
 
   if (!extractRes.success) {
-    // Remember the failure so background hydration does not hammer the same dead link.
-    await prisma.job
-      .update({ where: { id: jobId }, data: { extractFailure: extractRes.failureCode } })
-      .catch(() => undefined);
+    // Persist failure markers only for owned rows or trusted maintenance jobs.
+    if (canPersistToDb) {
+      if (options.allowSharedCacheWrite) {
+        await prisma.job
+          .update({ where: { id: jobId }, data: { extractFailure: extractRes.failureCode } })
+          .catch(() => undefined);
+      } else if (options.viewerUserId) {
+        await prisma.job
+          .updateMany({
+            where: { id: jobId, userId: options.viewerUserId },
+            data: { extractFailure: extractRes.failureCode },
+          })
+          .catch(() => undefined);
+      }
+    }
     return {
       success: false,
       error: extractRes.message,
@@ -906,19 +991,58 @@ export async function fetchAndCacheJobFullText(jobId: string) {
     }
   }
 
-  const updatedJob = await prisma.job.update({
-    where: { id: jobId },
-    data: {
-      rawDescription: extractRes.rawDescription,
-      extractedRequirements: JSON.stringify(reqs),
-      notes: updatedNotes,
-      extractFailure: null,
-    },
+  const hydratedFields = {
+    rawDescription: extractRes.rawDescription,
+    extractedRequirements: JSON.stringify(reqs),
+    notes: updatedNotes,
+    extractFailure: null,
+  };
+
+  if (!canPersistToDb) {
+    return {
+      success: true,
+      data: {
+        ...job,
+        ...hydratedFields,
+      },
+      cached: false,
+    };
+  }
+
+  if (options.allowSharedCacheWrite) {
+    const updatedJob = await prisma.job.update({
+      where: { id: jobId },
+      data: hydratedFields,
+    });
+
+    return {
+      success: true,
+      data: updatedJob,
+      cached: false,
+    };
+  }
+
+  const updateResult = await prisma.job.updateMany({
+    where: { id: jobId, userId: options.viewerUserId! },
+    data: hydratedFields,
+  });
+  if (updateResult.count === 0) {
+    return {
+      success: true,
+      data: {
+        ...job,
+        ...hydratedFields,
+      },
+      cached: false,
+    };
+  }
+  const updatedJob = await prisma.job.findFirst({
+    where: { id: jobId, userId: options.viewerUserId! },
   });
 
   return {
     success: true,
-    data: updatedJob,
+    data: updatedJob ?? { ...job, ...hydratedFields },
     cached: false,
   };
 }

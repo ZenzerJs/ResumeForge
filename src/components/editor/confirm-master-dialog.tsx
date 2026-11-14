@@ -49,6 +49,15 @@ export function ConfirmMasterDialog({
 }: ConfirmMasterDialogProps) {
   const [confirmed, setConfirmed] = useState(true);
   const [activeTab, setActiveTab] = useState<"facts" | "diff">("facts");
+  const confirmingRef = React.useRef(false);
+  const [localSaving, setLocalSaving] = useState(false);
+
+  React.useEffect(() => {
+    if (!open) {
+      confirmingRef.current = false;
+      setLocalSaving(false);
+    }
+  }, [open]);
 
   const facts = useMemo(() => {
     if (!typstSource) return null;
@@ -63,26 +72,35 @@ export function ConfirmMasterDialog({
   const isInitialBaseline = !priorSource || priorSource.trim().length === 0;
   const hasNoChanges = priorSource === typstSource;
 
+  const busy = isSaving || localSaving;
+
   const handleConfirm = async () => {
-    if (!confirmed) return;
-    await onConfirm();
-    onOpenChange(false);
+    if (!confirmed || busy || confirmingRef.current) return;
+    confirmingRef.current = true;
+    setLocalSaving(true);
+    try {
+      await onConfirm();
+      onOpenChange(false);
+    } finally {
+      confirmingRef.current = false;
+      setLocalSaving(false);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="save-master-confirm-modal"
-        className="max-w-2xl bg-slate-900 border-slate-800 text-slate-100 shadow-2xl"
+        className="max-w-2xl bg-panel border-hairline text-foreground shadow-2xl"
       >
         <DialogHeader>
           <div className="flex items-center gap-2 text-amber-400">
             <ShieldCheck className="size-5 text-amber-400" />
-            <DialogTitle className="text-lg font-bold text-white">
+            <DialogTitle className="text-lg font-bold text-foreground">
               Confirm &amp; Freeze Master Fact Snapshot
             </DialogTitle>
           </div>
-          <DialogDescription className="text-xs text-slate-300">
+          <DialogDescription className="text-xs text-text-secondary">
             Saving as <strong className="text-amber-300">{title}</strong> will freeze an immutable fact baseline.
             Future AI tailoring and exports will be guarded against these verified claims.
           </DialogDescription>
@@ -92,7 +110,7 @@ export function ConfirmMasterDialog({
         <div
           role="tablist"
           aria-label="Master freeze inspection views"
-          className="flex items-center gap-1.5 border-b border-slate-800 pb-2"
+          className="flex items-center gap-1.5 border-b border-hairline pb-2"
         >
           <button
             type="button"
@@ -105,8 +123,8 @@ export function ConfirmMasterDialog({
             className={cn(
               "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5",
               activeTab === "facts"
-                ? "bg-amber-500 text-slate-950 font-bold"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                ? "bg-amber-500 text-[#121010] font-bold"
+                : "text-text-secondary hover:text-foreground hover:bg-elevated"
             )}
           >
             <ShieldCheck className="size-3.5" />
@@ -123,14 +141,14 @@ export function ConfirmMasterDialog({
             className={cn(
               "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5",
               activeTab === "diff"
-                ? "bg-amber-500 text-slate-950 font-bold"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                ? "bg-amber-500 text-[#121010] font-bold"
+                : "text-text-secondary hover:text-foreground hover:bg-elevated"
             )}
           >
             <GitCompare className="size-3.5" />
             <span>Source Diff Review</span>
             {diff && (diff.stats.addedCount > 0 || diff.stats.deletedCount > 0) && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-950 border border-slate-700">
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-inset border border-hairline">
                 <span className="text-emerald-400 font-bold">+{diff.stats.addedCount}</span>
                 <span className="text-red-400 font-bold">-{diff.stats.deletedCount}</span>
               </span>
@@ -147,46 +165,46 @@ export function ConfirmMasterDialog({
             className="space-y-3.5 max-h-[48vh] overflow-y-auto pr-1 text-xs"
           >
             {/* Employers */}
-            <div className="p-3 bg-slate-950/70 rounded-lg border border-slate-800 space-y-1.5">
-              <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs">
+            <div className="p-3 bg-inset rounded-lg border border-hairline space-y-1.5">
+              <div className="flex items-center gap-1.5 font-semibold text-foreground text-xs">
                 <Briefcase className="size-3.5 text-blue-400" />
                 <span>Extracted Employers ({facts.employers.length})</span>
               </div>
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {facts.employers.length > 0 ? (
                   facts.employers.map((emp, i) => (
-                    <Badge key={i} variant="secondary" className="bg-slate-800 text-slate-200 border-slate-700">
+                    <Badge key={i} variant="secondary" className="bg-elevated text-foreground border-hairline">
                       {emp.raw}
                     </Badge>
                   ))
                 ) : (
-                  <span className="text-slate-500 italic">No employer records detected</span>
+                  <span className="text-muted-foreground italic">No employer records detected</span>
                 )}
               </div>
             </div>
 
             {/* Titles */}
-            <div className="p-3 bg-slate-950/70 rounded-lg border border-slate-800 space-y-1.5">
-              <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs">
+            <div className="p-3 bg-inset rounded-lg border border-hairline space-y-1.5">
+              <div className="flex items-center gap-1.5 font-semibold text-foreground text-xs">
                 <Award className="size-3.5 text-amber-400" />
                 <span>Extracted Job Titles ({facts.titles.length})</span>
               </div>
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {facts.titles.length > 0 ? (
                   facts.titles.map((t, i) => (
-                    <Badge key={i} variant="secondary" className="bg-slate-800 text-slate-200 border-slate-700">
+                    <Badge key={i} variant="secondary" className="bg-elevated text-foreground border-hairline">
                       {t.raw}
                     </Badge>
                   ))
                 ) : (
-                  <span className="text-slate-500 italic">No job title records detected</span>
+                  <span className="text-muted-foreground italic">No job title records detected</span>
                 )}
               </div>
             </div>
 
             {/* Metrics */}
-            <div className="p-3 bg-slate-950/70 rounded-lg border border-slate-800 space-y-1.5">
-              <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs">
+            <div className="p-3 bg-inset rounded-lg border border-hairline space-y-1.5">
+              <div className="flex items-center gap-1.5 font-semibold text-foreground text-xs">
                 <Hash className="size-3.5 text-emerald-400" />
                 <span>Extracted Metrics ({facts.metrics.filter((m) => !m.isTrivial).length} non-trivial)</span>
               </div>
@@ -200,20 +218,20 @@ export function ConfirmMasterDialog({
                       </Badge>
                     ))
                 ) : (
-                  <span className="text-slate-500 italic">No non-trivial metrics detected</span>
+                  <span className="text-muted-foreground italic">No non-trivial metrics detected</span>
                 )}
               </div>
             </div>
 
             {/* Skills */}
-            <div className="p-3 bg-slate-950/70 rounded-lg border border-slate-800 space-y-1.5">
-              <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs">
+            <div className="p-3 bg-inset rounded-lg border border-hairline space-y-1.5">
+              <div className="flex items-center gap-1.5 font-semibold text-foreground text-xs">
                 <Wrench className="size-3.5 text-purple-400" />
                 <span>Extracted Skills ({facts.skills.length})</span>
               </div>
               <div className="flex flex-wrap gap-1 pt-1 max-h-24 overflow-y-auto">
                 {facts.skills.map((s, i) => (
-                  <span key={i} className="px-2 py-0.5 rounded bg-slate-800 text-[11px] text-slate-300 border border-slate-700">
+                  <span key={i} className="px-2 py-0.5 rounded bg-elevated text-[11px] text-text-secondary border border-hairline">
                     {s}
                   </span>
                 ))}
@@ -235,36 +253,36 @@ export function ConfirmMasterDialog({
             {isInitialBaseline ? (
               <div
                 data-testid="master-diff-container"
-                className="p-4 rounded-lg bg-slate-950/70 border border-slate-800 text-xs text-slate-300 space-y-2"
+                className="p-4 rounded-lg bg-inset border border-hairline text-xs text-text-secondary space-y-2"
               >
                 <div className="flex items-center gap-2 text-amber-400 font-semibold">
                   <Info className="size-4" />
                   <span>Initial Master Baseline Creation</span>
                 </div>
-                <p className="text-slate-400 leading-relaxed">
+                <p className="text-muted-foreground leading-relaxed">
                   No prior baseline exists. Freezing this document will create the initial master fact snapshot.
                 </p>
-                <div className="mt-3 p-2.5 rounded bg-slate-900 border border-slate-800 font-mono text-[11px] text-slate-300 max-h-40 overflow-y-auto whitespace-pre-wrap">
+                <div className="mt-3 p-2.5 rounded bg-panel border border-hairline font-mono text-[11px] text-text-secondary max-h-40 overflow-y-auto whitespace-pre-wrap">
                   {typstSource}
                 </div>
               </div>
             ) : hasNoChanges ? (
               <div
                 data-testid="master-diff-container"
-                className="p-4 rounded-lg bg-slate-950/70 border border-slate-800 text-xs text-slate-300 space-y-2"
+                className="p-4 rounded-lg bg-inset border border-hairline text-xs text-text-secondary space-y-2"
               >
                 <div className="flex items-center gap-2 text-emerald-400 font-semibold">
                   <CheckCircle2 className="size-4 text-emerald-400" />
                   <span>No Text Changes Detected</span>
                 </div>
-                <p className="text-slate-400 leading-relaxed">
+                <p className="text-muted-foreground leading-relaxed">
                   The current live editor buffer is identical to the active master baseline.
                 </p>
               </div>
             ) : (
               <div
                 data-testid="master-diff-container"
-                className="font-mono text-[11px] leading-relaxed max-h-[45vh] overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/90 p-2 space-y-0.5"
+                className="font-mono text-[11px] leading-relaxed max-h-[45vh] overflow-y-auto rounded-lg border border-hairline bg-inset p-2 space-y-0.5"
               >
                 {diff?.lines.map((line, idx) => {
                   if (line.type === "add") {
@@ -298,12 +316,12 @@ export function ConfirmMasterDialog({
                   return (
                     <div
                       key={idx}
-                      className="flex items-start gap-2 px-2 py-0.5 text-slate-400 hover:bg-slate-900/50 rounded-sm"
+                      className="flex items-start gap-2 px-2 py-0.5 text-text-secondary hover:bg-panel/50 rounded-sm"
                     >
-                      <span className="w-8 text-right select-none text-slate-600 text-[10px]">
+                      <span className="w-8 text-right select-none text-muted-foreground text-[10px]">
                         {line.lineNew}
                       </span>
-                      <span className="select-none text-slate-700 w-3 text-center"> </span>
+                      <span className="select-none text-muted-foreground w-3 text-center"> </span>
                       <span className="flex-1 whitespace-pre-wrap break-words">{line.text || " "}</span>
                     </div>
                   );
@@ -320,7 +338,7 @@ export function ConfirmMasterDialog({
             checked={confirmed}
             onCheckedChange={(checked) => setConfirmed(Boolean(checked))}
             data-testid="confirm-master-checkbox"
-            className="mt-0.5 border-amber-600 data-[state=checked]:bg-amber-500 data-[state=checked]:text-slate-950"
+            className="mt-0.5 border-amber-600 data-[state=checked]:bg-amber-500 data-[state=checked]:text-[#121010]"
           />
           <label
             htmlFor="confirm-master-checkbox"
@@ -337,18 +355,18 @@ export function ConfirmMasterDialog({
             type="button"
             variant="ghost"
             onClick={() => onOpenChange(false)}
-            className="text-slate-400 hover:text-slate-200 text-xs"
+            className="text-muted-foreground hover:text-foreground text-xs"
           >
             Cancel
           </Button>
           <Button
             type="button"
             onClick={() => handleConfirm()}
-            disabled={!confirmed || isSaving}
+            disabled={!confirmed || busy}
             data-testid="confirm-save-master-btn"
-            className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs gap-1.5 shadow-lg shadow-amber-500/20"
+            className="bg-amber-500 hover:bg-amber-400 text-[#121010] font-semibold text-xs gap-1.5 shadow-lg shadow-amber-500/20"
           >
-            {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
+            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
             Confirm &amp; Freeze Master
           </Button>
         </DialogFooter>

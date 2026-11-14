@@ -1,7 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
-import { X, Plus, Sparkles, Loader2, Database, Check } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { X, Plus, Loader2, Database } from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface QuickAddEvidenceModalProps {
   isOpen: boolean;
@@ -23,7 +31,12 @@ export function QuickAddEvidenceModal({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (isOpen) {
+      setTitle(initialSkill ? `${initialSkill} Experience` : "");
+      setError(null);
+    }
+  }, [isOpen, initialSkill]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,48 +91,48 @@ export function QuickAddEvidenceModal({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
-      data-testid="quick-add-evidence-modal"
-    >
-      <div className="relative w-full max-w-lg rounded-xl border border-slate-700 bg-[#0b1326] p-6 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        hideCloseButton
+        data-testid="quick-add-evidence-modal"
+        className="max-w-lg max-h-[90dvh] overflow-y-auto overscroll-contain border-hairline bg-panel p-6"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-hairline pb-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400">
-              <Database className="h-4 w-4" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-[6px] bg-primary/15 text-primary">
+              <Database className="h-4 w-4" aria-hidden />
             </div>
-            <div>
-              <h2 className="text-sm font-bold text-white">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-sm font-bold text-foreground">
                 Add Evidence for &ldquo;{initialSkill}&rdquo;
-              </h2>
-              <p className="text-[11px] text-slate-400">
+              </DialogTitle>
+              <DialogDescription className="text-[11px] text-muted-foreground">
                 Close the gap by recording your project or work experience
-              </p>
-            </div>
+              </DialogDescription>
+            </DialogHeader>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            data-testid="close-add-evidence-btn"
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
-            aria-label="Close modal"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <DialogClose asChild>
+            <button
+              type="button"
+              data-testid="close-add-evidence-btn"
+              className="rounded-[6px] p-1 text-muted-foreground hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+              aria-label="Close modal"
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          </DialogClose>
         </div>
 
-        <form onSubmit={handleSave} className="mt-4 space-y-4 text-xs">
+        <form onSubmit={handleSave} className="space-y-4 text-xs">
           {error && (
-            <div className="rounded-lg border border-red-800 bg-red-950/80 p-3 text-red-300">
+            <div role="alert" className="rounded-[6px] border border-status-danger/40 bg-status-danger/15 p-3 text-status-danger">
               {error}
             </div>
           )}
 
           <div>
-            <label htmlFor="evidence-title" className="block text-slate-300 mb-1 font-medium">
+            <label htmlFor="evidence-title" className="block text-on-surface-variant mb-1 font-medium">
               Experience / Project Title *
             </label>
             <input
@@ -129,14 +142,14 @@ export function QuickAddEvidenceModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Distributed Task Queue in Go"
-              className="h-10 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-slate-200 placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+              className="h-10 w-full rounded-[6px] border border-control/70 bg-inset px-3 text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
               data-testid="quick-evidence-title-input"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="evidence-org" className="block text-slate-300 mb-1 font-medium">
+              <label htmlFor="evidence-org" className="block text-on-surface-variant mb-1 font-medium">
                 Organization / Context (Optional)
               </label>
               <input
@@ -145,19 +158,19 @@ export function QuickAddEvidenceModal({
                 value={organization}
                 onChange={(e) => setOrganization(e.target.value)}
                 placeholder="e.g. Personal Project, Acme Corp"
-                className="h-10 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-slate-200 placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+                className="h-10 w-full rounded-[6px] border border-control/70 bg-inset px-3 text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
               />
             </div>
 
             <div>
-              <label htmlFor="evidence-category" className="block text-slate-300 mb-1 font-medium">
+              <label htmlFor="evidence-category" className="block text-on-surface-variant mb-1 font-medium">
                 Category
               </label>
               <select
                 id="evidence-category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="h-10 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-slate-200 focus:border-amber-500 focus:outline-none cursor-pointer"
+                className="h-10 w-full rounded-[6px] border border-control/70 bg-inset px-3 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel cursor-pointer"
               >
                 <option value="PROJECT">Project</option>
                 <option value="WORK">Work Experience</option>
@@ -168,7 +181,7 @@ export function QuickAddEvidenceModal({
           </div>
 
           <div>
-            <label htmlFor="evidence-bullet" className="block text-slate-300 mb-1 font-medium">
+            <label htmlFor="evidence-bullet" className="block text-on-surface-variant mb-1 font-medium">
               Verified Achievement Bullet Point
             </label>
             <textarea
@@ -177,16 +190,16 @@ export function QuickAddEvidenceModal({
               value={bulletPoint}
               onChange={(e) => setBulletPoint(e.target.value)}
               placeholder={`e.g. Architected high-throughput services using ${initialSkill}, reducing latency by 45%.`}
-              className="w-full rounded-md border border-slate-700 bg-slate-900 p-3 text-slate-200 placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+              className="w-full rounded-[6px] border border-control/70 bg-inset p-3 text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
               data-testid="quick-evidence-bullet-input"
             />
           </div>
 
-          <div className="flex items-center justify-end gap-2 border-t border-slate-800 pt-4">
+          <div className="flex items-center justify-end gap-2 border-t border-hairline pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700"
+              className="rounded-[6px] border border-control/70 bg-elevated px-3 py-1.5 text-xs text-on-surface-variant hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
             >
               Cancel
             </button>
@@ -194,14 +207,14 @@ export function QuickAddEvidenceModal({
               type="submit"
               disabled={isSaving}
               data-testid="quick-evidence-submit-btn"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-1.5 text-xs font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-[6px] bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
             >
-              {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-              Save & Resolve Gap
+              {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Plus className="h-3.5 w-3.5" aria-hidden />}
+              Save &amp; Resolve Gap
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,4 +1,20 @@
-import { test, expect } from "@playwright/test";
+import crypto from "node:crypto";
+import { test, expect, type Browser } from "@playwright/test";
+
+async function createIsolatedSignedInContext(browser: Browser, baseURL: string | undefined) {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  const suffix = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+  const signup = await page.request.post(`${baseURL}/api/auth/signup`, {
+    data: {
+      email: `e2e-signout-${suffix}@resumeforge.test`,
+      username: `e2e_${suffix}`,
+      password: "playwright-test-secret",
+    },
+  });
+  expect(signup.ok()).toBeTruthy();
+  return { context, page };
+}
 
 test.describe("hosted auth and a11y gates", () => {
   test("guest GET /api/jobs returns the shared catalog", async ({ browser, baseURL }) => {
@@ -273,9 +289,8 @@ test.describe("hosted auth and a11y gates", () => {
     await context.close();
   });
 
-  test("sign out clears the session and returns home", async ({ browser }) => {
-    const context = await browser.newContext({ storageState: "e2e/.auth/user.json" });
-    const page = await context.newPage();
+  test("sign out clears the session and returns home", async ({ browser, baseURL }) => {
+    const { context, page } = await createIsolatedSignedInContext(browser, baseURL);
     await page.goto("/");
     await page.getByRole("button", { name: "Sign Out" }).click();
     await expect(page.getByRole("link", { name: "Sign In" }).first()).toBeVisible({ timeout: 10000 });
@@ -286,9 +301,8 @@ test.describe("hosted auth and a11y gates", () => {
     await context.close();
   });
 
-  test("settings page can sign out the current session", async ({ browser }) => {
-    const context = await browser.newContext({ storageState: "e2e/.auth/user.json" });
-    const page = await context.newPage();
+  test("settings page can sign out the current session", async ({ browser, baseURL }) => {
+    const { context, page } = await createIsolatedSignedInContext(browser, baseURL);
     await page.goto("/settings");
     await expect(page.getByTestId("account-settings")).toBeVisible();
     await expect(page.locator("#settings-username")).toBeVisible();
@@ -309,19 +323,24 @@ test.describe("hosted auth and a11y gates", () => {
     await context.close();
   });
 
-  test("protected master cannot be overwritten via PUT", async ({ request }) => {
-    const save = await request.post("/api/resumes/save-master", {
-      data: {
-        title: "E2E Protected Master",
-        typstSource: "= Protected Master\n",
-        confirmOverwrite: true,
-      },
-    });
-    expect(save.ok()).toBeTruthy();
-    const saved = await save.json();
-    const put = await request.put(`/api/resumes/${saved.data.id}`, {
-      data: { typstSource: "= Hijack\n" },
-    });
-    expect(put.status()).toBe(403);
+  test("protected master cannot be overwritten via PUT", async ({ browser, baseURL }) => {
+    const { context } = await createIsolatedSignedInContext(browser, baseURL);
+    try {
+      const save = await context.request.post("/api/resumes/save-master", {
+        data: {
+          title: "E2E Protected Master",
+          typstSource: "= Protected Master\n",
+          confirmOverwrite: true,
+        },
+      });
+      expect(save.ok()).toBeTruthy();
+      const saved = await save.json();
+      const put = await context.request.put(`/api/resumes/${saved.data.id}`, {
+        data: { typstSource: "= Hijack\n" },
+      });
+      expect(put.status()).toBe(403);
+    } finally {
+      await context.close();
+    }
   });
 });

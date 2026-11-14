@@ -1,3 +1,6 @@
+import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import path from "node:path";
 import { test, expect } from "@playwright/test";
 
 test.describe("Cross-Page Multi-Workspace E2E Journey Tests (Task B2)", () => {
@@ -5,6 +8,20 @@ test.describe("Cross-Page Multi-Workspace E2E Journey Tests (Task B2)", () => {
     page,
     request,
   }) => {
+    // Seed a verified evidence item before Step 1 so the saved Master Resume factSnapshot includes it
+    const evidenceRes = await request.post("/api/evidence", {
+      data: {
+        type: "experience",
+        title: "E2E Cross-Page Verified Impact",
+        verifiedSummary: "Verified engineering work for cross-page patch grounding.",
+        status: "verified",
+        bullets: [{ text: "Engineered distributed workflows cleanly.", verified: true }],
+      },
+    });
+    expect(evidenceRes.ok()).toBeTruthy();
+    const evidenceJson = await evidenceRes.json();
+    const evidenceId = evidenceJson.data.id as string;
+
     // Step 1: Open /editor, verify canonical master/fallback document loading, save master resume
     await page.goto("/editor");
     await page.waitForSelector("[data-testid='document-type-badge']", { timeout: 10000 });
@@ -29,23 +46,91 @@ test.describe("Cross-Page Multi-Workspace E2E Journey Tests (Task B2)", () => {
     await page.waitForSelector("[data-testid='req-skill-PostgreSQL']", { timeout: 5000 });
 
     await page.click("[data-testid='save-job-btn']");
+    await page.waitForSelector("text=Job posting saved successfully!", { timeout: 10000 });
+    await page.click("[data-testid='tailor-tab-3-pane']");
     await page.waitForSelector("[data-testid='ats-score-panel']", { timeout: 5000 });
+    const activeJobId = await page.evaluate(() => sessionStorage.getItem("resumeforge_active_job_id"));
 
-    // Step 3: Create a variant in DB via API to simulate patch application completion
+    // Step 3: Create a verified PatchProposalBatch and apply it via strict POST /api/ai/apply-patches
     const resumesRes = await request.get("/api/resumes");
     const resumesJson = await resumesRes.json();
     const master = resumesJson.data.find((r: { isMaster: boolean }) => r.isMaster) || resumesJson.data[0];
 
-    const jobsRes = await request.get("/api/jobs");
-    const jobsJson = await jobsRes.json();
-    const job = jobsJson.data[0];
+    const job = activeJobId
+      ? (await (await request.get(`/api/jobs/${activeJobId}`)).json()).data
+      : (await (await request.get("/api/jobs")).json()).data[0];
+
+    const typstLines = String(master.typstSource).split(/\r?\n/);
+    const targetLine =
+      typstLines.find((line) => line.trim().startsWith("- ") && master.typstSource.split(line).length === 2) ??
+      typstLines.find((line) => {
+        const trimmed = line.trim();
+        return trimmed.length > 10 && !trimmed.startsWith("//") && !trimmed.startsWith("#") && master.typstSource.split(line).length === 2;
+      });
+    expect(targetLine).toBeTruthy();
+
+    const afterLine = targetLine!.trimEnd().endsWith(".")
+      ? targetLine!.replace(/\.(\s*)$/, " cleanly.$1")
+      : `${targetLine} cleanly`;
+
+    if (!process.env.DATABASE_URL) {
+      try {
+        process.loadEnvFile?.(".env");
+      } catch {
+        // Fallback below when .env is absent
+      }
+      process.env.DATABASE_URL ||= "postgresql://resumeforge:resumeforge@localhost:5432/resumeforge";
+    }
+    const batchInput = JSON.stringify({
+      userId: master.userId,
+      masterResumeId: master.id,
+      jobId: job.id,
+      proposals: [
+        {
+          id: randomUUID(),
+          operation: "MODIFY_BULLET",
+          targetSection: "Experience",
+          before: targetLine!,
+          after: afterLine,
+          evidenceIds: [evidenceId],
+          rationale: "Verified phrasing adjustment for cross-page E2E journey.",
+          confidence: 0.9,
+        },
+      ],
+      gaps: [],
+    });
+    const batchStdout = execFileSync(
+      process.execPath,
+      [
+        path.resolve("node_modules/tsx/dist/cli.mjs"),
+        "-e",
+        [
+          'import fs from "node:fs";',
+          'import { createProposalBatch } from "./src/lib/ai/patch-batches";',
+          'import { prisma } from "./src/lib/prisma";',
+          '(async () => {',
+          '  const input = JSON.parse(fs.readFileSync(0, "utf8"));',
+          '  const res = await createProposalBatch(input);',
+          '  console.log(JSON.stringify(res));',
+          '  await prisma.$disconnect();',
+          '})().catch(async (err) => { console.error(err); await prisma.$disconnect(); process.exit(1); });',
+        ].join(" "),
+      ],
+      {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        input: batchInput,
+      },
+    );
+    const proposalBatch = JSON.parse(batchStdout);
+    expect(proposalBatch.verified).toHaveLength(1);
 
     const applyRes = await request.post("/api/ai/apply-patches", {
       data: {
-        masterResumeId: master.id,
-        jobId: job.id,
+        batchId: proposalBatch.batch.batchId,
+        revisionToken: proposalBatch.batch.revisionToken,
+        acceptedPatchIds: [proposalBatch.verified[0].id],
         variantTitle: "E2E Cross-Page Tailored Variant",
-        mergedTypstContent: `#let resume-section(title) = [ === #title ]\n#resume-section("Experience")\n*Senior E2E Developer* (2026)\n- Engineered cross-page multi-workspace state integration.\n`,
       },
     });
 
@@ -64,7 +149,7 @@ test.describe("Cross-Page Multi-Workspace E2E Journey Tests (Task B2)", () => {
     expect(badgeText).toContain("Tailored Variant");
 
     // Verify preview compiled without error
-    await page.waitForSelector("svg", { timeout: 10000 });
+    await page.waitForSelector(".typst-preview-svg svg", { timeout: 15000 });
 
     // Step 6: Navigate to /library, verify Evidence Bank workspace loads cleanly
     await page.goto("/library");

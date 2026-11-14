@@ -128,7 +128,7 @@ export function GuardrailFeedback({
                   type="button"
                   onClick={onAlignWithMaster}
                   data-testid="guardrail-align-btn"
-                  className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-sm transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-colors cursor-pointer"
                 >
                   <RotateCcw className="size-3.5" />
                   <span>Align with Master Baseline</span>
@@ -155,7 +155,7 @@ export function GuardrailFeedback({
                   type="button"
                   onClick={onAlignWithMaster}
                   data-testid="guardrail-align-btn"
-                  className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-sm transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-colors cursor-pointer"
                 >
                   <RotateCcw className="size-3.5" />
                   <span>Align with Master Baseline</span>

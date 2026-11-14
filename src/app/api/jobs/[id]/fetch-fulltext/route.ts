@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchAndCacheJobFullText } from "@/lib/ingestion/tier2-fetcher";
 import { sanitizeError } from "@/lib/ai/redact";
 import { getJobById } from "@/lib/db/jobs";
-import { getRequestUserId } from "@/lib/security/auth-request";
+import { requireUserId } from "@/lib/security/auth-request";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getRequestUserId(req);
+    const userId = await requireUserId(req);
+    if (userId instanceof NextResponse) return userId;
 
     const { id } = await params;
     if (!id) {
@@ -19,7 +20,7 @@ export async function POST(
       );
     }
 
-    const owned = await getJobById(id);
+    const owned = await getJobById(id, userId);
     if (!owned) {
       return NextResponse.json(
         { success: false, error: "Job posting not found" },
@@ -27,14 +28,7 @@ export async function POST(
       );
     }
 
-    if (owned.userId !== null && owned.userId !== userId) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
-
-    const result = await fetchAndCacheJobFullText(id);
+    const result = await fetchAndCacheJobFullText(id, { viewerUserId: userId });
 
     if (!result.success) {
       return NextResponse.json(

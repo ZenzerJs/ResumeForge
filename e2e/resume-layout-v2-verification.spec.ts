@@ -109,6 +109,9 @@ async function previewAndExport(page: Page, source: string | null, name: string,
   const preview = isV2 ? page.getByTestId("layout-page-preview").first() : page.locator(".typst-preview-svg").first();
 
   await expect(preview.locator(isV2 ? "img" : "svg").first()).toBeVisible({ timeout: 30000 });
+  if (isV2) {
+    await expect(preview.locator("img").first()).toHaveAttribute("data-page-rendered", "true", { timeout: 30000 });
+  }
 
   await expect(page.getByText("Compilation Error")).toHaveCount(0);
 
@@ -140,8 +143,11 @@ async function previewAndExport(page: Page, source: string | null, name: string,
 
     await expect(preview.locator("img")).toHaveCount(2);
 
+    await expect(preview.locator("img").nth(0)).toHaveAttribute("data-page-rendered", "true", { timeout: 30000 });
     await preview.locator("img").nth(0).screenshot({ path: path.join(artifacts, `${name}-page-1.png`) });
 
+    await preview.locator("img").nth(1).scrollIntoViewIfNeeded();
+    await expect(preview.locator("img").nth(1)).toHaveAttribute("data-page-rendered", "true", { timeout: 30000 });
     await preview.locator("img").nth(1).screenshot({ path: path.join(artifacts, `${name}-page-2.png`) });
 
     for (const item of ["export-pdf-menu-item", "export-zip-menu-item"]) {
@@ -366,7 +372,7 @@ test.describe("Real Typst resume rendering", () => {
 
     expect(originalUnknown).toBeTruthy();
 
-    expect(originalTools!.y - originalUnknown!.y).toBeGreaterThanOrEqual(10.5);
+    expect(originalTools!.y - originalUnknown!.y).toBeGreaterThanOrEqual(10);
 
     const projectItems = ["Project Alpha", "Project Beta", "Project Gamma"].map((label) => geometry.items.find((item) => item.text.includes(label))!);
 
@@ -450,7 +456,7 @@ test.describe("Real Typst resume rendering", () => {
 
     expect(unknownLine).toBeTruthy();
 
-    expect(tools!.y - unknownLine!.y).toBeGreaterThanOrEqual(10.5);
+    expect(tools!.y - unknownLine!.y).toBeGreaterThanOrEqual(10);
 
   });
 

@@ -1,6 +1,25 @@
 import { describe, it, expect, vi } from "vitest";
 import { redactKeys, sanitizeError } from "../src/lib/ai/redact";
 
+const mockIngestedJobCount = vi.hoisted(() => vi.fn());
+const mockGetAllProblems = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    ingestedJob: { count: mockIngestedJobCount },
+    connectorSyncLog: { findMany: vi.fn(async () => []) },
+    interviewProblem: { findMany: vi.fn(async () => []) },
+  },
+}));
+
+vi.mock("@/lib/practice/practice-curriculum", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/practice/practice-curriculum")>();
+  return {
+    ...actual,
+    getAllProblems: mockGetAllProblems,
+  };
+});
+
 describe("API Key Redaction Utility", () => {
   it("redacts OpenAI API keys", () => {
     const secretKey = "sk-proj-1234567890abcdefABCDEF1234567890";
@@ -57,6 +76,40 @@ describe("API Key Redaction Utility", () => {
     const loggedMessage = consoleSpy.mock.calls[0][0];
     expect(loggedMessage).not.toContain(secretKey);
     expect(loggedMessage).toContain("[REDACTED_KEY]");
+
+    consoleSpy.mockRestore();
+  });
+});
+
+describe("Public API Error Redaction (SEC-08)", () => {
+  it("returns generic 500 error from /api/connectors/status and /api/practice/problems without leaking exception details", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockIngestedJobCount.mockRejectedValueOnce(
+      new Error("DB connection failed using sk-proj-secretleak1234567890")
+    );
+
+    const { GET: getStatus } = await import("../src/app/api/connectors/status/route");
+    const statusRes = await getStatus();
+    expect(statusRes.status).toBe(500);
+    const statusJson = await statusRes.json();
+    expect(statusJson).toEqual({ success: false, error: "Failed to fetch status" });
+    expect(consoleSpy).toHaveBeenCalled();
+    expect(consoleSpy.mock.calls.flat().join(" ")).not.toContain("sk-proj-secretleak");
+
+    mockGetAllProblems.mockImplementationOnce(() => {
+      throw new Error("Internal leak: postgres://user:pass@10.0.1.2/db sk-ant-secret1234567890");
+    });
+
+    const { GET: getProblems } = await import("../src/app/api/practice/problems/route");
+    const problemsRes = await getProblems(
+      new Request("http://localhost/api/practice/problems") as never
+    );
+    expect(problemsRes.status).toBe(500);
+    const problemsJson = await problemsRes.json();
+    expect(problemsJson).toEqual({
+      success: false,
+      error: "Failed to fetch practice curriculum",
+    });
 
     consoleSpy.mockRestore();
   });

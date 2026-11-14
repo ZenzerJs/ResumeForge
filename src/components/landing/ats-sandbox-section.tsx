@@ -21,6 +21,7 @@ import {
   JobRequirementInput,
 } from "@/lib/matchScore";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
+import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
 
 interface PresetRole {
   id: string;
@@ -185,9 +186,9 @@ const PRESET_DEFAULT_SNIPPETS: Record<string, string> = {
 };
 
 const PRESET_STATIC_SVGS: Record<string, string> = {
-  backend: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">CORE SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">Languages:</tspan> Go, Python, TypeScript, SQL (PostgreSQL)</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">Infrastructure:</tspan> Docker, Kubernetes, Redis, RESTful APIs</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#0f172a"><tspan font-weight="700">Senior Software Engineer</tspan> | Nova Labs</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#64748b" text-anchor="end">2022 – Present</text><circle cx="42" cy="184" r="2" fill="#334155"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Engineered scalable Go microservices processing 12,000 req/sec with PostgreSQL persistence.</text><circle cx="42" cy="206" r="2" fill="#334155"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Automated containerized deployment pipelines using Docker and Kubernetes cluster nodes.</text></svg>`,
-  frontend: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">Frontend:</tspan> React, Next.js, TypeScript, Tailwind CSS, WebAssembly (WASM)</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">Tooling:</tspan> Vitest, Playwright, Docker, Webpack, Turbopack</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#0f172a"><tspan font-weight="700">Frontend Systems Lead</tspan> | WebCraft Systems</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#64748b" text-anchor="end">2021 – Present</text><circle cx="42" cy="184" r="2" fill="#334155"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Architected high-performance Next.js and TypeScript frontend interfaces serving 1.5M monthly users.</text><circle cx="42" cy="206" r="2" fill="#334155"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Reduced initial bundle payloads by 42% utilizing responsive component code splitting.</text></svg>`,
-  "ai-platform": `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">TECHNICAL SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">Languages:</tspan> Python, Go, C++</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">AI/Infra:</tspan> PyTorch, Docker, Kubernetes, Distributed Inference Systems</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#0f172a"><tspan font-weight="700">Infrastructure &amp; Backend Engineer</tspan> | Nova Labs</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#64748b" text-anchor="end">2021 – Present</text><circle cx="42" cy="184" r="2" fill="#334155"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Designed automated distributed training pipeline jobs utilizing Python, Docker, and Kubernetes.</text><circle cx="42" cy="206" r="2" fill="#334155"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Maintained low-latency inference endpoints with 99.98% operational uptime.</text></svg>`,
+  backend: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">CORE SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Languages:</tspan> Go, Python, TypeScript, SQL (PostgreSQL)</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Infrastructure:</tspan> Docker, Kubernetes, Redis, RESTful APIs</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#181412"><tspan font-weight="700">Senior Software Engineer</tspan> | Nova Labs</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#7a6e65" text-anchor="end">2022 – Present</text><circle cx="42" cy="184" r="2" fill="#3a322f"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Engineered scalable Go microservices processing 12,000 req/sec with PostgreSQL persistence.</text><circle cx="42" cy="206" r="2" fill="#3a322f"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Automated containerized deployment pipelines using Docker and Kubernetes cluster nodes.</text></svg>`,
+  frontend: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Frontend:</tspan> React, Next.js, TypeScript, Tailwind CSS, WebAssembly (WASM)</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Tooling:</tspan> Vitest, Playwright, Docker, Webpack, Turbopack</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#181412"><tspan font-weight="700">Frontend Systems Lead</tspan> | WebCraft Systems</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#7a6e65" text-anchor="end">2021 – Present</text><circle cx="42" cy="184" r="2" fill="#3a322f"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Architected high-performance Next.js and TypeScript frontend interfaces serving 1.5M monthly users.</text><circle cx="42" cy="206" r="2" fill="#3a322f"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Reduced initial bundle payloads by 42% utilizing responsive component code splitting.</text></svg>`,
+  "ai-platform": `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">TECHNICAL SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Languages:</tspan> Python, Go, C++</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">AI/Infra:</tspan> PyTorch, Docker, Kubernetes, Distributed Inference Systems</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#181412"><tspan font-weight="700">Infrastructure &amp; Backend Engineer</tspan> | Nova Labs</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#7a6e65" text-anchor="end">2021 – Present</text><circle cx="42" cy="184" r="2" fill="#3a322f"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Designed automated distributed training pipeline jobs utilizing Python, Docker, and Kubernetes.</text><circle cx="42" cy="206" r="2" fill="#3a322f"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Maintained low-latency inference endpoints with 99.98% operational uptime.</text></svg>`,
 };
 
 export function AtsSandboxSection() {
@@ -198,9 +199,34 @@ export function AtsSandboxSection() {
   const [isEditingSnippet, setIsEditingSnippet] = useState<boolean>(false);
   const [previewTab, setPreviewTab] = useState<"svg" | "source">("svg");
   const [svgOutput, setSvgOutput] = useState<string | null>(PRESET_STATIC_SVGS.backend);
+  const [sanitizedSvg, setSanitizedSvg] = useState<{
+    raw: string;
+    clean: string | null;
+    error: string | null;
+  } | null>(null);
   const [isCompiling, setIsCompiling] = useState<boolean>(false);
   const [compileError, setCompileError] = useState<string | null>(null);
   const [showDerivationLog, setShowDerivationLog] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!svgOutput) {
+      setSanitizedSvg(null);
+      return;
+    }
+    let cancelled = false;
+    import("@/lib/typst/svg-sanitize").then(({ sanitizeTypstSvg }) => {
+      if (cancelled) return;
+      const res = sanitizeTypstSvg(svgOutput);
+      setSanitizedSvg(
+        res.ok
+          ? { raw: svgOutput, clean: res.svg, error: null }
+          : { raw: svgOutput, clean: null, error: res.error }
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [svgOutput]);
 
   // Switch presets
   const handleSelectPreset = (preset: PresetRole) => {
@@ -235,9 +261,11 @@ export function AtsSandboxSection() {
 
     const timer = setTimeout(() => {
       import("@/lib/typst/compiler")
-        .then(({ compileTypstToSvg }) => compileTypstToSvg(customSnippet))
+        .then(({ compileTypstToSvg }) =>
+          compileTypstToSvg(customSnippet, { callerId: "ats-sandbox", mode: "live" }),
+        )
         .then((result) => {
-          if (cancelled) return;
+          if (cancelled || ("superseded" in result && result.superseded)) return;
           if (result.success) {
             setSvgOutput(result.svg);
           } else {
@@ -285,34 +313,34 @@ export function AtsSandboxSection() {
 
   const scoreBadgeColor =
     scoreResult.compositeScore >= 80
-      ? "text-emerald-400 border-emerald-500/40 bg-emerald-500/10"
+      ? "text-signal border-signal/40 bg-signal/10"
       : scoreResult.compositeScore >= 60
-      ? "text-amber-400 border-amber-500/40 bg-amber-500/10"
-      : "text-rose-400 border-rose-500/40 bg-rose-500/10";
+      ? "text-status-warning border-status-warning/40 bg-status-warning/10"
+      : "text-status-danger border-status-danger/40 bg-status-danger/10";
 
   return (
     <section
       data-testid="instant-ats-sandbox-section"
-      className="py-20 px-4 md:px-8 max-w-7xl mx-auto w-full border-t border-slate-800/80"
+      className="py-20 px-4 md:px-8 max-w-7xl mx-auto w-full border-t border-outline/70"
     >
       {/* Header */}
       <div className="mb-12 text-center max-w-3xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 text-xs font-mono mb-4">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-signal/40 bg-signal/10 text-signal text-xs font-mono mb-4">
           <ShieldCheck className="h-4 w-4" />
           <span>ZERO-AUTH DETERMINISTIC SANDBOX</span>
         </div>
-        <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white tracking-tight mb-4">
+        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground tracking-tight mb-4">
           Instant ATS &amp; Typst Sandbox
         </h2>
-        <p className="text-slate-300 text-sm md:text-base lg:text-lg leading-relaxed">
+        <p className="text-on-surface-variant text-sm md:text-base lg:text-lg leading-relaxed">
           Test our explainable mathematical ATS evaluator and in-browser Typst WASM compiler right now.
-          Zero network egress, zero tracking, and no signup required.
+          Runs in your browser with no signup required; guest drafts stay local until you sign in.
         </p>
       </div>
 
       {/* Preset Role Selectors */}
       <div className="flex flex-wrap items-center justify-center gap-3 mb-10">
-        <span className="text-xs md:text-sm font-mono text-slate-400 uppercase tracking-wider mr-1 hidden sm:inline">
+        <span className="text-xs md:text-sm font-mono text-muted-foreground uppercase tracking-wider mr-1 hidden sm:inline">
           Sample Roles:
         </span>
         {PRESETS.map((preset) => (
@@ -321,10 +349,10 @@ export function AtsSandboxSection() {
             type="button"
             data-testid={`sandbox-preset-${preset.id}`}
             onClick={() => handleSelectPreset(preset)}
-            className={`px-4 py-2.5 rounded-lg text-xs md:text-sm font-mono font-semibold transition flex items-center gap-2 cursor-pointer ${
+            className={`px-4 py-2.5 rounded-[8px] text-xs md:text-sm font-mono font-semibold transition flex items-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               selectedPresetId === preset.id
-                ? "bg-[#ff8c00] text-slate-950 shadow-[0_0_15px_rgba(255,140,0,0.35)]"
-                : "border border-slate-800 bg-[#060e20] text-slate-300 hover:text-white hover:border-slate-700"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "border border-outline/70 bg-panel text-on-surface-variant hover:text-foreground hover:border-outline"
             }`}
           >
             <Cpu className="h-4 w-4" />
@@ -338,18 +366,18 @@ export function AtsSandboxSection() {
         {/* Left Column: JD Input & Live ATS Mathematical Breakdown (lg:col-span-6) */}
         <div className="lg:col-span-6 flex flex-col gap-6">
           {/* JD Input Panel */}
-          <div className="rounded-2xl p-6 border border-slate-800 bg-[#060e20]/90 shadow-xl">
-            <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-slate-800/80">
+          <div className="rounded-[10px] p-6 surface-raised edge-glow">
+            <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-outline/70">
               <div className="flex items-center gap-2">
-                <Terminal className="h-4 w-4 text-[#ff8c00]" />
-                <span className="font-mono text-xs md:text-sm text-[#ff8c00] font-bold uppercase tracking-wider">
+                <Terminal className="h-4 w-4 text-primary" />
+                <span className="font-mono text-xs md:text-sm text-primary font-semibold uppercase tracking-wider">
                   Target Job Description
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => handleSelectPreset(activePreset)}
-                className="text-slate-400 hover:text-white text-xs md:text-sm font-mono flex items-center gap-1.5 transition cursor-pointer"
+                className="text-muted-foreground hover:text-foreground text-xs md:text-sm font-mono flex items-center gap-1.5 transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
                 title="Reset to preset original"
               >
                 <RotateCcw className="h-3.5 w-3.5" /> Reset
@@ -361,9 +389,9 @@ export function AtsSandboxSection() {
               onChange={(e) => setCustomDescription(e.target.value)}
               rows={8}
               data-testid="sandbox-jd-input"
-              className="w-full bg-[#030712] border border-slate-800 rounded-xl p-3.5 font-mono text-xs md:text-sm text-slate-200 leading-relaxed resize-none focus:outline-none focus:border-amber-500/60"
+              className="w-full bg-inset border border-outline/70 rounded-[8px] p-3.5 font-mono text-xs md:text-sm text-foreground leading-relaxed resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-ring"
             />
-            <div className="mt-2.5 flex items-center justify-between flex-wrap gap-2 text-xs font-mono text-slate-400">
+            <div className="mt-2.5 flex items-center justify-between flex-wrap gap-2 text-xs font-mono text-muted-foreground tabular-nums">
               <span>{customDescription.length} characters</span>
               <span>Candidate: Alex Rivera (6 YOE · Verified Evidence)</span>
             </div>
@@ -372,20 +400,20 @@ export function AtsSandboxSection() {
           {/* Mathematical ATS Score Panel */}
           <div
             data-testid="sandbox-score-panel"
-            className="rounded-2xl p-6 border border-slate-800 bg-[#060e20]/90 space-y-6 shadow-xl"
+            className="rounded-[10px] p-6 surface-raised edge-glow space-y-6"
           >
             {/* Header with Composite Score */}
-            <div className="flex items-center justify-between pb-3.5 border-b border-slate-800/80">
+            <div className="flex items-center justify-between pb-3.5 border-b border-outline/70">
               <div>
-                <span className="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-1">
+                <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider block mb-1">
                   Deterministic Composite Score
                 </span>
-                <span className="text-base md:text-lg font-bold text-white">
+                <span className="text-base md:text-lg font-bold text-foreground">
                   Mathematical Fit Breakdown
                 </span>
               </div>
               <div
-                className={`px-3.5 py-1.5 rounded-full border font-mono font-extrabold text-sm md:text-base flex items-center gap-1.5 ${scoreBadgeColor}`}
+                className={`px-3.5 py-1.5 rounded-full border font-mono font-semibold tabular-nums text-sm md:text-base flex items-center gap-1.5 ${scoreBadgeColor}`}
               >
                 <Sparkles className="h-4 w-4" />
                 <span>{scoreResult.compositeScore}% ATS MATCH</span>
@@ -393,20 +421,20 @@ export function AtsSandboxSection() {
             </div>
 
             {/* 4-Part Component Bars */}
-            <div className="space-y-4 font-mono text-xs md:text-sm">
+            <div className="space-y-4 font-mono text-xs md:text-sm tabular-nums">
               {/* Core Stack */}
               <div>
                 <div className="flex justify-between text-xs md:text-sm mb-1.5">
-                  <span className="text-slate-300 font-medium">
+                  <span className="text-on-surface-variant font-normal">
                     Core Stack (50% weight):
                   </span>
-                  <span className="font-bold text-emerald-400">
+                  <span className="font-semibold text-signal">
                     {scoreResult.breakdown.coreStackScore}%
                   </span>
                 </div>
-                <div className="h-2.5 rounded-full bg-slate-900 border border-slate-800 overflow-hidden">
+                <div className="h-2.5 rounded-full bg-inset border border-outline/70 overflow-hidden">
                   <div
-                    className="h-full bg-emerald-500 transition-all duration-500"
+                    className="h-full bg-signal transition-all duration-500"
                     style={{ width: `${scoreResult.breakdown.coreStackScore}%` }}
                   />
                 </div>
@@ -415,16 +443,16 @@ export function AtsSandboxSection() {
               {/* Seniority */}
               <div>
                 <div className="flex justify-between text-xs md:text-sm mb-1.5">
-                  <span className="text-slate-300 font-medium">
+                  <span className="text-on-surface-variant font-normal">
                     Seniority (20% weight):
                   </span>
-                  <span className="font-bold text-sky-400">
+                  <span className="font-semibold text-primary">
                     {scoreResult.breakdown.seniorityScore}%
                   </span>
                 </div>
-                <div className="h-2.5 rounded-full bg-slate-900 border border-slate-800 overflow-hidden">
+                <div className="h-2.5 rounded-full bg-inset border border-outline/70 overflow-hidden">
                   <div
-                    className="h-full bg-sky-500 transition-all duration-500"
+                    className="h-full bg-primary transition-all duration-500"
                     style={{ width: `${scoreResult.breakdown.seniorityScore}%` }}
                   />
                 </div>
@@ -433,16 +461,16 @@ export function AtsSandboxSection() {
               {/* Tools & Infrastructure */}
               <div>
                 <div className="flex justify-between text-xs md:text-sm mb-1.5">
-                  <span className="text-slate-300 font-medium">
+                  <span className="text-on-surface-variant font-normal">
                     Tools &amp; Infra (15% weight):
                   </span>
-                  <span className="font-bold text-amber-400">
+                  <span className="font-semibold text-ember">
                     {scoreResult.breakdown.toolsScore}%
                   </span>
                 </div>
-                <div className="h-2.5 rounded-full bg-slate-900 border border-slate-800 overflow-hidden">
+                <div className="h-2.5 rounded-full bg-inset border border-outline/70 overflow-hidden">
                   <div
-                    className="h-full bg-amber-500 transition-all duration-500"
+                    className="h-full bg-ember transition-all duration-500"
                     style={{ width: `${scoreResult.breakdown.toolsScore}%` }}
                   />
                 </div>
@@ -451,16 +479,16 @@ export function AtsSandboxSection() {
               {/* Evidence Coverage */}
               <div>
                 <div className="flex justify-between text-xs md:text-sm mb-1.5">
-                  <span className="text-slate-300 font-medium">
+                  <span className="text-on-surface-variant font-normal">
                     Evidence Bank Coverage (15% weight):
                   </span>
-                  <span className="font-bold text-purple-400">
+                  <span className="font-semibold text-foreground">
                     {scoreResult.breakdown.evidenceCoverageScore}%
                   </span>
                 </div>
-                <div className="h-2.5 rounded-full bg-slate-900 border border-slate-800 overflow-hidden">
+                <div className="h-2.5 rounded-full bg-inset border border-outline/70 overflow-hidden">
                   <div
-                    className="h-full bg-purple-500 transition-all duration-500"
+                    className="h-full ombre-bar transition-all duration-500"
                     style={{ width: `${scoreResult.breakdown.evidenceCoverageScore}%` }}
                   />
                 </div>
@@ -468,24 +496,27 @@ export function AtsSandboxSection() {
             </div>
 
             {/* Skill Evidence Links */}
-            <div className="pt-3 border-t border-slate-800/80">
-              <span className="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-2.5">
+            <div className="pt-3 border-t border-outline/70">
+              <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider block mb-2.5">
                 Ground-Truth Skill Evidence Verification:
               </span>
               <div className="flex flex-wrap gap-2">
                 {scoreResult.matchedSkills.map((link) => (
                   <span
                     key={link.skill}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono border ${
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-xs font-mono border ${
                       link.verified
-                        ? "bg-emerald-950/60 border-emerald-800 text-emerald-300"
-                        : "bg-amber-950/60 border-amber-800 text-amber-300"
+                        ? "bg-signal/10 border-signal/35 text-signal"
+                        : "bg-status-warning/10 border-status-warning/35 text-status-warning"
                     }`}
                   >
                     {link.verified ? (
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                      <CheckCircle2 className="h-3.5 w-3.5 text-signal" />
                     ) : (
-                      <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+                      <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
+                    )}
+                    {hasBrandIcon(link.skill) && (
+                      <BrandIcon name={link.skill} className="h-3.5 w-3.5 shrink-0" />
                     )}
                     <span>{link.skill}</span>
                   </span>
@@ -493,21 +524,25 @@ export function AtsSandboxSection() {
                 {scoreResult.missingRequiredSkills.map((skill) => (
                   <span
                     key={skill}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-mono bg-rose-950/40 border border-rose-800/60 text-rose-300"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-xs font-mono bg-status-danger/10 border border-status-danger/35 text-status-danger"
                   >
-                    <span>✗ {skill}</span>
+                    <span aria-hidden="true">✗{" "}</span>
+                    {hasBrandIcon(skill) && (
+                      <BrandIcon name={skill} className="h-3.5 w-3.5 shrink-0" />
+                    )}
+                    <span>{skill}</span>
                   </span>
                 ))}
               </div>
             </div>
 
             {/* Expandable Step-by-Step Derivation Log */}
-            <div className="pt-3 border-t border-slate-800/80">
+            <div className="pt-3 border-t border-outline/70">
               <button
                 type="button"
                 onClick={() => setShowDerivationLog((prev) => !prev)}
                 data-testid="toggle-derivation-log-btn"
-                className="w-full flex items-center justify-between text-xs md:text-sm font-mono text-slate-400 hover:text-amber-400 py-1.5 transition cursor-pointer"
+                className="w-full flex items-center justify-between text-xs md:text-sm font-mono text-muted-foreground hover:text-primary py-1.5 transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
               >
                 <span>Formula Derivation Audit Log</span>
                 {showDerivationLog ? (
@@ -520,11 +555,11 @@ export function AtsSandboxSection() {
               {showDerivationLog && (
                 <div
                   data-testid="sandbox-derivation-log"
-                  className="mt-3 p-4 md:p-5 rounded-xl bg-[#030712] border border-slate-800 space-y-2 font-mono text-xs md:text-sm text-slate-200 leading-relaxed"
+                  className="mt-3 p-4 md:p-5 rounded-[8px] bg-inset border border-outline/70 space-y-2 font-mono text-xs md:text-sm text-foreground leading-relaxed tabular-nums"
                 >
                   {scoreResult.explanationDerivation.map((log, i) => (
                     <div key={i} className="flex items-start gap-2">
-                      <span className="text-amber-400 shrink-0 font-bold">›</span>
+                      <span className="text-primary shrink-0 font-semibold">›</span>
                       <span>{log}</span>
                     </div>
                   ))}
@@ -536,18 +571,18 @@ export function AtsSandboxSection() {
 
         {/* Right Column: Live In-Browser Typst Compilation Preview (lg:col-span-6) */}
         <div className="lg:col-span-6 flex flex-col gap-4">
-          <div className="rounded-2xl p-6 border border-slate-800 bg-[#060e20]/90 flex-1 flex flex-col min-h-[520px] shadow-xl">
+          <div className="rounded-[10px] p-6 surface-raised edge-glow flex-1 flex flex-col min-h-[520px]">
             {/* Tab Controls & Compile Status */}
-            <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-slate-800/80">
+            <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-outline/70">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setPreviewTab("svg")}
                   data-testid="sandbox-tab-svg"
-                  className={`px-3.5 py-1.5 text-xs md:text-sm font-mono font-semibold rounded-lg flex items-center gap-2 transition cursor-pointer ${
+                  className={`px-3.5 py-1.5 text-xs md:text-sm font-mono font-semibold rounded-[6px] flex items-center gap-2 transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                     previewTab === "svg"
-                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                      : "text-slate-400 hover:text-white"
+                      ? "bg-primary/15 text-primary border border-primary/40"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   <Eye className="h-4 w-4" />
@@ -558,10 +593,10 @@ export function AtsSandboxSection() {
                   type="button"
                   onClick={() => setPreviewTab("source")}
                   data-testid="sandbox-tab-source"
-                  className={`px-3.5 py-1.5 text-xs md:text-sm font-mono font-semibold rounded-lg flex items-center gap-2 transition cursor-pointer ${
+                  className={`px-3.5 py-1.5 text-xs md:text-sm font-mono font-semibold rounded-[6px] flex items-center gap-2 transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                     previewTab === "source"
-                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                      : "text-slate-400 hover:text-white"
+                      ? "bg-primary/15 text-primary border border-primary/40"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   <FileCode className="h-4 w-4" />
@@ -571,11 +606,11 @@ export function AtsSandboxSection() {
 
               <div className="flex items-center gap-2">
                 {isCompiling ? (
-                  <span className="text-xs font-mono text-amber-300 flex items-center gap-1.5">
+                  <span className="text-xs font-mono text-primary flex items-center gap-1.5">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" /> Compiling...
                   </span>
                 ) : (
-                  <span className="text-xs font-mono text-emerald-400 flex items-center gap-1.5">
+                  <span className="text-xs font-mono text-signal flex items-center gap-1.5">
                     <CheckCircle2 className="h-3.5 w-3.5" /> Compiled in-browser
                   </span>
                 )}
@@ -587,33 +622,48 @@ export function AtsSandboxSection() {
               {previewTab === "svg" ? (
                 <div
                   data-testid="sandbox-svg-container"
-                  className="flex-1 flex items-start justify-center p-4 md:p-6 bg-[#0a0f1d] rounded-xl border border-slate-800/80 overflow-auto max-h-[620px]"
+                  className="flex-1 flex items-start justify-center p-4 md:p-6 bg-inset rounded-[8px] border border-outline/70 overflow-auto max-h-[620px]"
                 >
                   {isCompiling && !svgOutput ? (
-                    <div className="flex flex-col items-center gap-3 text-slate-400 text-xs md:text-sm font-mono">
-                      <Loader2 className="h-7 w-7 animate-spin text-amber-400" />
+                    <div className="flex flex-col items-center gap-3 text-muted-foreground text-xs md:text-sm font-mono">
+                      <Loader2 className="h-7 w-7 animate-spin text-primary" />
                       <span>Initializing Typst WASM compiler...</span>
                     </div>
                   ) : compileError ? (
-                    <div className="text-xs md:text-sm text-rose-300 font-mono p-4 border border-rose-800 rounded-xl bg-rose-950/40">
+                    <div className="text-xs md:text-sm text-status-danger font-mono p-4 border border-status-danger/40 rounded-[8px] bg-status-danger/10">
                       Error compiling Typst: {compileError}
                     </div>
                   ) : svgOutput ? (
-                    <div
-                      className="w-full bg-white rounded-lg shadow-xl overflow-hidden p-2"
-                      style={{ maxWidth: "580px" }}
-                      dangerouslySetInnerHTML={{ __html: svgOutput }}
-                    />
+                    sanitizedSvg?.raw === svgOutput && sanitizedSvg.error ? (
+                      <div
+                        data-testid="sandbox-svg-error"
+                        role="alert"
+                        className="text-xs md:text-sm text-status-danger font-mono p-4 border border-status-danger/40 rounded-[8px] bg-status-danger/10"
+                      >
+                        {sanitizedSvg.error}
+                      </div>
+                    ) : sanitizedSvg?.raw === svgOutput && sanitizedSvg.clean ? (
+                      <div
+                        className="typst-preview-svg w-full bg-paper text-paper-ink rounded-[6px] border border-[#d8dce0] shadow-xl overflow-hidden p-2 [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-w-full"
+                        style={{ maxWidth: "580px" }}
+                        dangerouslySetInnerHTML={{ __html: sanitizedSvg.clean }}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-3 text-muted-foreground text-xs md:text-sm font-mono">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        <span>Verifying SVG preview...</span>
+                      </div>
+                    )
                   ) : (
-                    <div className="text-xs md:text-sm text-slate-500 font-mono">
+                    <div className="text-xs md:text-sm text-muted-foreground font-mono">
                       Ready to compile. Select a role above.
                     </div>
                   )}
                 </div>
               ) : (
                 <div data-testid="sandbox-typst-source-view" className="flex-1 flex flex-col min-h-0">
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-xs font-mono">
-                    <span className="text-slate-400">
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-outline/70 text-xs font-mono">
+                    <span className="text-muted-foreground">
                       {isEditingSnippet ? "Live Typst editor (on-demand compile):" : "Typst AST Source Preview:"}
                     </span>
                     <div className="flex items-center gap-2">
@@ -621,7 +671,7 @@ export function AtsSandboxSection() {
                         type="button"
                         data-testid="sandbox-edit-snippet-btn"
                         onClick={() => setIsEditingSnippet((prev) => !prev)}
-                        className="px-2.5 py-1 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 text-xs font-semibold cursor-pointer transition"
+                        className="px-2.5 py-1 rounded-[4px] bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 text-xs font-semibold cursor-pointer transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         {isEditingSnippet ? "Done Editing" : "Edit Snippet"}
                       </button>
@@ -632,7 +682,7 @@ export function AtsSandboxSection() {
                             setCustomSnippet(activePreset.typstSnippet);
                             setIsEditingSnippet(false);
                           }}
-                          className="text-slate-400 hover:text-white flex items-center gap-1 text-xs cursor-pointer"
+                          className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
                         >
                           <RotateCcw className="h-3 w-3" /> Reset
                         </button>
@@ -645,14 +695,14 @@ export function AtsSandboxSection() {
                       value={customSnippet}
                       onChange={(e) => setCustomSnippet(e.target.value)}
                       rows={14}
-                      className="w-full flex-1 p-4 bg-[#030712] border border-slate-800 rounded-xl font-mono text-xs md:text-sm text-slate-200 leading-relaxed resize-none focus:outline-none focus:border-amber-500/60"
+                      className="w-full flex-1 p-4 bg-inset border border-outline/70 rounded-[8px] font-mono text-xs md:text-sm text-foreground leading-relaxed resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-ring"
                       spellCheck={false}
                     />
                   ) : (
                     <pre
                       onClick={() => setIsEditingSnippet(true)}
                       title="Click to edit snippet"
-                      className="flex-1 p-4 md:p-6 bg-[#030712] border border-slate-800 rounded-xl font-mono text-xs md:text-sm text-slate-300 leading-relaxed overflow-auto max-h-[620px] whitespace-pre-wrap selection:bg-amber-500/30 cursor-pointer hover:border-slate-700 transition-colors"
+                      className="flex-1 p-4 md:p-6 bg-inset border border-outline/70 rounded-[8px] font-mono text-xs md:text-sm text-on-surface-variant leading-relaxed overflow-auto max-h-[620px] whitespace-pre-wrap selection:bg-primary/30 cursor-pointer hover:border-outline transition-colors"
                     >
                       {customSnippet}
                     </pre>

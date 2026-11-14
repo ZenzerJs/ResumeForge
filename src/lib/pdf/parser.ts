@@ -1,6 +1,8 @@
 // Compatible with both pdf-parse v1 function & pdf-parse v2 PDFParse class
 const pdfParseModule = require("pdf-parse");
 import { normalizeSectionTitle, canonicalSectionRank } from "@/lib/typst/section-order";
+import { safeDestination } from "@/lib/typst/inline-content";
+import { typstContent, typstString } from "@/lib/typst/resume-document";
 
 export interface ExtractedPdfLink {
   label?: string;
@@ -329,7 +331,7 @@ export function convertTextToTypst(
 ): string {
   // 4. Rejoin hyphenated line wraps ("idempo-\ntent" -> "idempotent")
   const dehyphenated = rawText
-    .replace(/\r\n/g, "\n")
+    .replace(/\r\n?/g, "\n")
     .replace(/([a-zA-Z])-\n\s*([a-z])/g, "$1$2")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -337,16 +339,6 @@ export function convertTextToTypst(
   const lines = dehyphenated.split("\n").map((l) => l.trim()).filter(Boolean);
   const titleLine = lines[0] || fileName || "Imported Resume";
   const restLines = lines.slice(1);
-
-  const sanitizeForTypst = (text: string) =>
-    text
-      .replace(/\\/g, "\\\\")
-      .replace(/#/g, "\\#")
-      .replace(/\$/g, "\\$")
-      .replace(/@/g, "\\@");
-
-  const escapeTypstStr = (text: string) =>
-    sanitizeForTypst(text).replace(/"/g, '\\"');
 
   // 2. Whitelist known section names or ALL-CAPS lines so entry headers like "Career Education Council Remote" are never promoted
   const isSectionHeader = (line: string) => {
@@ -387,9 +379,9 @@ export function convertTextToTypst(
   const formatBodyLine = (line: string) => {
     if (BULLET_LINE_REGEX.test(line)) {
       const bulletText = line.replace(BULLET_LINE_REGEX, "");
-      return `- ${sanitizeForTypst(bulletText)}`;
+      return `- ${typstContent(bulletText)}`;
     }
-    return sanitizeForTypst(line);
+    return typstContent(line);
   };
 
   // 5. Emit `#entry(title:, role:, location:, date:, details:)` in Experience/Projects/Education
@@ -439,7 +431,7 @@ export function convertTextToTypst(
     for (const entry of entries) {
       if (entry.headerLines.length === 0) {
         for (const b of entry.bullets) {
-          out.push(`- ${sanitizeForTypst(b)}`);
+          out.push(`- ${typstContent(b)}`);
         }
         continue;
       }
@@ -486,11 +478,11 @@ export function convertTextToTypst(
         }
       }
 
-      const bulletLines = entry.bullets.map((b) => `    - ${sanitizeForTypst(b)}`).join("\n");
+      const bulletLines = entry.bullets.map((b) => `    - ${typstContent(b)}`).join("\n");
       const detailsPart = bulletLines ? `\n  details: [\n${bulletLines}\n  ]` : "";
 
       out.push(
-        `#entry(\n  title: "${escapeTypstStr(title)}",\n  role: "${escapeTypstStr(role)}",\n  location: "${escapeTypstStr(location)}",\n  date: "${escapeTypstStr(date)}",${detailsPart}\n)`
+        `#entry(\n  title: ${typstString(title)},\n  role: ${typstString(role)},\n  location: ${typstString(location)},\n  date: ${typstString(date)},${detailsPart}\n)`
       );
     }
 
@@ -500,18 +492,30 @@ export function convertTextToTypst(
   const bodyContent = [
     ...preamble.map(formatBodyLine),
     ...sections.flatMap((sec) => [
-      `\n== ${sanitizeForTypst(sec.title)}\n`,
+      `\n== ${typstContent(sec.title)}\n`,
       ...formatStructuredSection(sec),
     ]),
   ].join("\n");
 
+  const seenDestinations = new Set<string>();
+  const renderedLinkItems: string[] = [];
+  for (const l of links) {
+    if (!l.url) continue;
+    const safeUrl = safeDestination(l.url);
+    const label = typstContent(l.label || l.url);
+    if (!safeUrl) {
+      if (label) renderedLinkItems.push(label);
+      continue;
+    }
+    const key = safeUrl.toLowerCase();
+    if (seenDestinations.has(key)) continue;
+    seenDestinations.add(key);
+    renderedLinkItems.push(`#link(${typstString(safeUrl)})[${label}]`);
+  }
+
   const renderedLinks =
-    links.length > 0
-      ? "\n#v(2pt)\n" +
-        links
-          .map((l) => `#link("${l.url}")[${sanitizeForTypst(l.label || l.url)}]`)
-          .join(" #sym.dot ") +
-        "\n"
+    renderedLinkItems.length > 0
+      ? `\n#v(2pt)\n${renderedLinkItems.join(" #sym.dot ")}\n`
       : "";
 
   return `#set page(paper: "us-letter", margin: (x: 1.5cm, y: 1.35cm))
@@ -546,7 +550,7 @@ export function convertTextToTypst(
   ]
 }
 
-= ${sanitizeForTypst(titleLine)}
+= ${typstContent(titleLine)}
 ${renderedLinks}
 #v(3pt)
 

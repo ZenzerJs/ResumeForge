@@ -128,8 +128,9 @@ function matchCondition(itemVal: any, condVal: any): boolean {
     }
     return hasKnownOp;
   }
-  if (itemVal instanceof Date && condVal instanceof Date) {
-    return itemVal.getTime() === condVal.getTime();
+  if (itemVal instanceof Date && (condVal instanceof Date || typeof condVal === "string")) {
+    const condDate = condVal instanceof Date ? condVal : new Date(condVal);
+    return !Number.isNaN(condDate.getTime()) && itemVal.getTime() === condDate.getTime();
   }
   return itemVal === condVal;
 }
@@ -235,7 +236,16 @@ function resolveIncludes(table: string, item: any, include?: any) {
     result.masterResume = activeStore.resume.find((r) => r.id === item.masterResumeId) ?? null;
   }
   if (include.trackedJob && (table === "ingestedJob" || table === "IngestedJob")) {
-    result.trackedJob = activeStore.job.find((j) => j.id === item.trackedJobId) ?? null;
+    const tracked = activeStore.job.find((j) => j.id === item.trackedJobId) ?? null;
+    if (tracked && typeof include.trackedJob === "object" && include.trackedJob.select) {
+      const projected: Record<string, any> = {};
+      for (const [k, v] of Object.entries(include.trackedJob.select)) {
+        if (v) projected[k] = tracked[k];
+      }
+      result.trackedJob = projected;
+    } else {
+      result.trackedJob = tracked;
+    }
   }
   if (include.dossier && (table === "job" || table === "Job")) {
     result.dossier = activeStore.companyDossier.find((d) => d.id === item.dossierId) ?? null;
@@ -264,6 +274,7 @@ function normalizeTableName(name: string): string {
 function applyWriteData(existing: Record<string, unknown>, data: Record<string, unknown>) {
   const next: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(data)) {
+    if (value === undefined) continue;
     if (value && typeof value === "object" && "increment" in (value as object)) {
       next[key] = (Number(existing[key]) || 0) + Number((value as { increment: number }).increment);
     } else if (value && typeof value === "object" && "decrement" in (value as object)) {
@@ -331,7 +342,10 @@ export function createModelMock(modelName: string) {
       if (typeof args?.take === "number") {
         filtered = filtered.slice(0, args.take);
       }
-      return filtered.map((row) => resolveIncludes(tableKey, JSON.parse(JSON.stringify(row)), args?.include));
+      const effectiveInclude = args?.include ?? args?.select;
+      return filtered.map((row) =>
+        resolveIncludes(tableKey, JSON.parse(JSON.stringify(row)), effectiveInclude),
+      );
     },
 
     async create(args: { data: any; select?: any; include?: any }) {

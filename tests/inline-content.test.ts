@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createInlineRenderer, renderInlineContent } from "@/lib/typst/inline-content";
+import { createInlineRenderer, renderInlineContent, safeDestination } from "@/lib/typst/inline-content";
 
 describe("source-backed inline contact links", () => {
   it("links combined contact fields without losing phone, location, or separators", () => {
@@ -21,15 +21,32 @@ describe("source-backed inline contact links", () => {
     expect(renderer.renderRemaining()).toEqual([]);
   });
   it("keeps unsafe annotation destinations inactive and reports them", () => {
-    const renderer = createInlineRenderer([{ url: "javascript:alert(1)", label: "Portfolio" }, { url: "file:///secret" }]);
-    expect(renderer.render("Portfolio")).toBe("Portfolio");
+    const renderer = createInlineRenderer([
+      { url: "javascript:alert(1)", label: "Portfolio" },
+      { url: "vbscript:msgbox(1)", label: "VB" },
+      { url: "file:///secret" },
+      { url: "https://safe.example/cv", label: "CV" },
+    ]);
+    expect(renderer.render("Portfolio | VB | CV")).toBe(
+      'Portfolio | VB | #link("https://safe.example/cv")[CV]'
+    );
     expect(renderer.renderRemaining()).toEqual(["file:\\/\\/\\/secret"]);
-    expect(renderer.issues).toHaveLength(2);
+    expect(renderer.issues).toHaveLength(3);
   });
   it("escapes candidate markup and only applies explicit validated emphasis spans", () => {
     const renderer = createInlineRenderer();
     expect(renderer.render('Hi #eval("danger") [x] *text*')).toBe('Hi \\#eval("danger") \\[x\\] \\*text\\*');
     expect(renderer.render("Strong text", [{ start: 0, end: 6, kind: "bold" }])).toBe("#strong[Strong] text");
     expect(() => renderer.render("short", [{ start: 0, end: 100, kind: "bold" }])).toThrow();
+  });
+
+  it("validates only safe HTTP(S) and mailto destinations via safeDestination", () => {
+    expect(safeDestination("https://example.com")).toBe("https://example.com/");
+    expect(safeDestination("mailto:alex@example.com")).toBe("mailto:alex@example.com");
+    expect(safeDestination("javascript:alert(1)")).toBeNull();
+    expect(safeDestination("data:text/html,<script>alert(1)</script>")).toBeNull();
+    expect(safeDestination("file:///etc/passwd")).toBeNull();
+    expect(safeDestination("https://user:pass@example.com/")).toBeNull();
+    expect(safeDestination("https://example.com/\r\ninjected")).toBeNull();
   });
 });

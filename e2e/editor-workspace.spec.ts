@@ -22,6 +22,26 @@ test.describe("Typst Live-Preview Workspace E2E Tests", () => {
     const svgHtml = await page.locator(".typst-preview-svg").innerHTML();
     expect(svgHtml.length).toBeGreaterThan(100);
     expect(svgHtml).toContain("<svg");
+    const svgSecurity = await page.locator(".typst-preview-svg svg").evaluate((svg) => ({
+      unsafeTags: svg.querySelectorAll("script, style, foreignObject").length,
+      unsafeEventAttrs: Array.from(svg.querySelectorAll("*")).some((el) =>
+        Array.from(el.attributes).some((attr) => /^on/i.test(attr.name))
+      ),
+      unsafeLinks: Array.from(svg.querySelectorAll("a")).filter((a) => {
+        const href = a.getAttribute("href") ?? a.getAttribute("xlink:href") ?? "";
+        return /^(?:javascript|data|vbscript|file):/i.test(href);
+      }).length,
+      unsafeExternalRefs: Array.from(svg.querySelectorAll("use, image")).filter((el) => {
+        const href = el.getAttribute("href") ?? el.getAttribute("xlink:href") ?? "";
+        return href.length > 0 && !href.startsWith("#");
+      }).length,
+    }));
+    expect(svgSecurity).toEqual({
+      unsafeTags: 0,
+      unsafeEventAttrs: false,
+      unsafeLinks: 0,
+      unsafeExternalRefs: 0,
+    });
   });
 
   test("2. Edits source via CodeMirror, asserts preview updates with zero console errors", async ({ page }) => {

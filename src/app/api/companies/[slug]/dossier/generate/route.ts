@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { generateDossier } from "@/lib/company-dossier";
 import { requireUserId } from "@/lib/security/auth-request";
 import { ProviderConfigSchema } from "@/lib/ai/types";
+import { sanitizeError } from "@/lib/ai/redact";
 
 const DOSSIER_REGEN_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
@@ -97,8 +98,9 @@ export async function POST(
       return NextResponse.json({ found: true, dossier, stale: false });
     }
 
+    console.error("[API dossier/generate] Error:", sanitizeError(err));
     return NextResponse.json(
-      { found: false, error: err instanceof Error ? err.message : "Failed to synthesize company dossier" },
+      { found: false, error: "Failed to synthesize company dossier" },
       { status: 500 }
     );
   }

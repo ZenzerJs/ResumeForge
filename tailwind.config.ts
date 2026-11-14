@@ -24,39 +24,23 @@ const config: Config = {
   			'margin-mobile': '16px',
   			'panel-padding': '20px'
   		},
-  		fontFamily: {
-  			'page-title': [
-  				'Hanken Grotesk',
-  				'sans-serif'
-  			],
-  			'page-title-mobile': [
-  				'Hanken Grotesk',
-  				'sans-serif'
-  			],
-  			'body-regular': [
-  				'Hanken Grotesk',
-  				'sans-serif'
-  			],
-  			'body-dense': [
-  				'Hanken Grotesk',
-  				'sans-serif'
-  			],
-  			'section-label': [
-  				'JetBrains Mono',
-  				'monospace'
-  			],
-  			'mono-data': [
-  				'JetBrains Mono',
-  				'monospace'
-  			]
-  		},
+      fontFamily: {
+        sans: ['var(--font-hanken)', 'sans-serif'],
+        mono: ['var(--font-mono)', 'monospace'],
+        'page-title': ['var(--font-hanken)', 'sans-serif'],
+        'page-title-mobile': ['var(--font-hanken)', 'sans-serif'],
+        'body-regular': ['var(--font-hanken)', 'sans-serif'],
+        'body-dense': ['var(--font-hanken)', 'sans-serif'],
+        'section-label': ['var(--font-mono)', 'monospace'],
+        'mono-data': ['var(--font-mono)', 'monospace']
+      },
   		fontSize: {
   			'page-title': [
   				'40px',
   				{
   					lineHeight: '1.2',
   					letterSpacing: '-0.02em',
-  					fontWeight: '800'
+  					fontWeight: '700'
   				}
   			],
   			'page-title-mobile': [
@@ -64,7 +48,7 @@ const config: Config = {
   				{
   					lineHeight: '1.2',
   					letterSpacing: '-0.02em',
-  					fontWeight: '800'
+  					fontWeight: '700'
   				}
   			],
   			'heading-xl': [
@@ -128,72 +112,112 @@ const config: Config = {
   			]
   		},
   		colors: {
-  			background: '#0b1326',
-  			foreground: '#dae2fd',
-  			surface: '#0b1326',
-  			'surface-dim': '#0b1326',
-  			'surface-bright': '#31394d',
-  			'surface-container-lowest': '#060e20',
-  			'surface-container-low': '#131b2e',
-  			'surface-container': '#171f33',
-  			'surface-container-high': '#222a3d',
-  			'surface-container-highest': '#2d3449',
-  			'surface-variant': '#2d3449',
-  			'on-background': '#dae2fd',
-  			'on-surface': '#dae2fd',
-  			'on-surface-variant': '#a3afc4',
-  			'inverse-surface': '#dae2fd',
-  			'inverse-on-surface': '#283044',
-  			primary: '#ff8c00',
-  			'on-primary': '#4d2600',
-  			'primary-container': '#ff8c00',
-  			'on-primary-container': '#623200',
-  			'primary-fixed': '#ffdcc3',
-  			'primary-fixed-dim': '#ffb77d',
-  			'inverse-primary': '#904d00',
-  			secondary: '#4edea3',
-  			'on-secondary': '#003824',
-  			'secondary-container': '#00a572',
-  			'on-secondary-container': '#00311f',
-  			'secondary-fixed': '#6ffbbe',
-  			'secondary-fixed-dim': '#4edea3',
-  			tertiary: '#ffb3ad',
-  			'on-tertiary': '#68000a',
-  			'tertiary-container': '#ff8780',
-  			'on-tertiary-container': '#830010',
-  			error: '#ffb4ab',
-  			'on-error': '#690005',
-  			'error-container': '#93000a',
-  			'on-error-container': '#ffdad6',
-  			border: 'rgba(148, 163, 184, 0.2)',
-  			outline: '#475569',
-  			'outline-variant': '#2b3550',
-  			/* shadcn semantic tokens (were undefined, so bg-card / bg-muted rendered transparent) */
-  			card: '#171f33',
-  			'card-foreground': '#dae2fd',
-  			popover: '#171f33',
-  			'popover-foreground': '#dae2fd',
-  			muted: '#222a3d',
-  			'muted-foreground': '#94a3b8',
-  			accent: '#222a3d',
-  			'accent-foreground': '#dae2fd',
-  			'primary-foreground': '#1a0e00',
-  			'secondary-foreground': '#003824',
-  			destructive: '#f87171',
-  			'destructive-foreground': '#0b1326',
-  			input: '#2b3550',
-  			ring: '#ff8c00',
-  			rf: {
-  				bg: 'var(--rf-bg)',
-  				surface: 'var(--rf-surface)',
-  				elevated: 'var(--rf-surface-elevated)',
-  				cloud: 'var(--rf-cloud)',
-  				body: 'var(--rf-body)',
-  				meta: 'var(--rf-meta)',
-  				border: 'var(--rf-border)',
-  				amber: 'var(--rf-amber)',
-  				emerald: 'var(--rf-emerald)'
-  			}
+        deep: 'rgb(var(--surface-deep) / <alpha-value>)',
+        canvas: 'rgb(var(--surface-canvas) / <alpha-value>)',
+        panel: 'rgb(var(--surface-panel) / <alpha-value>)',
+        elevated: 'rgb(var(--surface-elevated) / <alpha-value>)',
+        inset: 'rgb(var(--surface-inset) / <alpha-value>)',
+        paper: 'rgb(var(--paper-sheet) / <alpha-value>)',
+        'paper-ink': 'rgb(var(--paper-ink) / <alpha-value>)',
+        'text-primary': 'rgb(var(--text-primary) / <alpha-value>)',
+        'text-secondary': 'rgb(var(--text-secondary) / <alpha-value>)',
+        'text-muted': 'rgb(var(--text-muted) / <alpha-value>)',
+        hairline: 'rgb(var(--border-hairline) / <alpha-value>)',
+        control: 'rgb(var(--border-control) / <alpha-value>)',
+        'accent-secondary': 'rgb(var(--accent-secondary) / <alpha-value>)',
+        ember: 'rgb(var(--accent-secondary) / <alpha-value>)',
+        'accent-contrast': 'rgb(var(--accent-contrast) / <alpha-value>)',
+        signal: 'rgb(var(--accent-contrast) / <alpha-value>)',
+        'accent-ink': 'rgb(var(--accent-ink) / <alpha-value>)',
+        'contrast-ink': 'rgb(var(--contrast-ink) / <alpha-value>)',
+        'status-success': 'rgb(var(--status-success) / <alpha-value>)',
+        'status-warning': 'rgb(var(--status-warning) / <alpha-value>)',
+        'status-danger': 'rgb(var(--status-danger) / <alpha-value>)',
+        'status-info': 'rgb(var(--status-info) / <alpha-value>)',
+
+        background: 'rgb(var(--surface-canvas) / <alpha-value>)',
+        foreground: 'rgb(var(--text-primary) / <alpha-value>)',
+        surface: 'rgb(var(--surface-canvas) / <alpha-value>)',
+        'surface-dim': 'rgb(var(--surface-canvas) / <alpha-value>)',
+        'surface-bright': 'rgb(var(--surface-elevated) / <alpha-value>)',
+        'surface-container-lowest': 'rgb(var(--surface-inset) / <alpha-value>)',
+        'surface-container-low': 'rgb(var(--surface-canvas) / <alpha-value>)',
+        'surface-container': 'rgb(var(--surface-panel) / <alpha-value>)',
+        'surface-container-high': 'rgb(var(--surface-elevated) / <alpha-value>)',
+        'surface-container-highest': 'rgb(var(--surface-elevated) / <alpha-value>)',
+        'surface-variant': 'rgb(var(--surface-elevated) / <alpha-value>)',
+        'on-background': 'rgb(var(--text-primary) / <alpha-value>)',
+        'on-surface': 'rgb(var(--text-primary) / <alpha-value>)',
+        'on-surface-variant': 'rgb(var(--text-secondary) / <alpha-value>)',
+        'inverse-surface': 'rgb(var(--paper-sheet) / <alpha-value>)',
+        'inverse-on-surface': 'rgb(var(--paper-ink) / <alpha-value>)',
+        primary: 'rgb(var(--accent-action) / <alpha-value>)',
+        'on-primary': 'rgb(var(--accent-ink) / <alpha-value>)',
+        'primary-container': 'rgb(var(--accent-action) / <alpha-value>)',
+        'on-primary-container': 'rgb(var(--accent-ink) / <alpha-value>)',
+        'primary-fixed': 'rgb(var(--accent-action) / <alpha-value>)',
+        'primary-fixed-dim': 'rgb(var(--accent-action) / <alpha-value>)',
+        'inverse-primary': 'rgb(var(--accent-ink) / <alpha-value>)',
+        secondary: 'rgb(var(--status-success) / <alpha-value>)',
+        'on-secondary': 'rgb(var(--accent-ink) / <alpha-value>)',
+        'secondary-container': 'rgb(var(--status-success) / <alpha-value>)',
+        'on-secondary-container': 'rgb(var(--accent-ink) / <alpha-value>)',
+        'secondary-fixed': 'rgb(var(--status-success) / <alpha-value>)',
+        'secondary-fixed-dim': 'rgb(var(--status-success) / <alpha-value>)',
+        tertiary: 'rgb(var(--status-danger) / <alpha-value>)',
+        'on-tertiary': 'rgb(var(--accent-ink) / <alpha-value>)',
+        'tertiary-container': 'rgb(var(--status-danger) / <alpha-value>)',
+        'on-tertiary-container': 'rgb(var(--accent-ink) / <alpha-value>)',
+        error: 'rgb(var(--status-danger) / <alpha-value>)',
+        'on-error': 'rgb(var(--accent-ink) / <alpha-value>)',
+        'error-container': 'rgb(var(--status-danger) / <alpha-value>)',
+        'on-error-container': 'rgb(var(--text-primary) / <alpha-value>)',
+        border: 'rgb(var(--border-hairline) / <alpha-value>)',
+        outline: 'rgb(var(--border-control) / <alpha-value>)',
+        'outline-variant': 'rgb(var(--border-hairline) / <alpha-value>)',
+
+        /* shadcn semantic tokens */
+        card: 'rgb(var(--surface-panel) / <alpha-value>)',
+        'card-foreground': 'rgb(var(--text-primary) / <alpha-value>)',
+        popover: 'rgb(var(--surface-elevated) / <alpha-value>)',
+        'popover-foreground': 'rgb(var(--text-primary) / <alpha-value>)',
+        muted: 'rgb(var(--surface-elevated) / <alpha-value>)',
+        'muted-foreground': 'rgb(var(--text-muted) / <alpha-value>)',
+        accent: 'rgb(var(--surface-elevated) / <alpha-value>)',
+        'accent-foreground': 'rgb(var(--text-primary) / <alpha-value>)',
+        'primary-foreground': 'rgb(var(--accent-ink) / <alpha-value>)',
+        'secondary-foreground': 'rgb(var(--accent-ink) / <alpha-value>)',
+        destructive: 'rgb(var(--status-danger) / <alpha-value>)',
+        'destructive-foreground': 'rgb(var(--accent-ink) / <alpha-value>)',
+        input: 'rgb(var(--surface-inset) / <alpha-value>)',
+        ring: 'rgb(var(--focus-ring) / <alpha-value>)',
+
+        /* Legacy rf.* aliases mapped to Section 0 tokens */
+        rf: {
+          bg: 'rgb(var(--surface-canvas) / <alpha-value>)',
+          surface: 'rgb(var(--surface-panel) / <alpha-value>)',
+          elevated: 'rgb(var(--surface-elevated) / <alpha-value>)',
+          cloud: 'rgb(var(--text-primary) / <alpha-value>)',
+          body: 'rgb(var(--text-primary) / <alpha-value>)',
+          meta: 'rgb(var(--text-muted) / <alpha-value>)',
+          border: 'rgb(var(--border-hairline) / <alpha-value>)',
+          amber: 'rgb(var(--accent-action) / <alpha-value>)',
+          emerald: 'rgb(var(--status-success) / <alpha-value>)'
+        },
+        /* Alias slate to warm Ember Ink stone/espresso so zero cool navy/blue-gray leaks */
+        slate: {
+          50: '#f4eee7',
+          100: '#f4eee7',
+          200: '#e6ddd3',
+          300: '#d0c5b9',
+          400: '#9e9287',
+          500: '#7a6e65',
+          600: '#5c514a',
+          700: '#3a322f',
+          800: '#272120',
+          900: '#1b1716',
+          950: '#151211',
+        }
   		},
   		keyframes: {
   			'accordion-down': {

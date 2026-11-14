@@ -11,12 +11,20 @@ export const JobRequirementsSchema = z.object({
 
 export type JobRequirements = z.infer<typeof JobRequirementsSchema>;
 
+export const ParsedIngestedRequirementsSchema = z.object({
+  requirements: JobRequirementsSchema,
+  geoRemote: z.boolean(),
+});
+
+export type ParsedIngestedRequirements = z.infer<typeof ParsedIngestedRequirementsSchema>;
+
 export const CreateJobSchema = z.object({
   company: z.string().optional(),
   roleTitle: z.string().optional(),
   rawDescription: z.string().min(1, "Job description cannot be empty").max(200_000),
   source: z.enum(["pasted", "manual", "simplify-jobs"]).default("pasted"),
   extractedRequirements: JobRequirementsSchema.optional(),
+  personal: z.boolean().optional(),
 });
 
 export type CreateJobInput = z.infer<typeof CreateJobSchema>;

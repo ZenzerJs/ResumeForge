@@ -1,113 +1,129 @@
 "use client";
 
 import React, { useState } from "react";
-import { motion } from "framer-motion";
-import { FileCode, ShieldCheck, Database, Sparkles } from "lucide-react";
-import TextType from "@/components/ui/text-type";
+import Link from "next/link";
+import { BrandIcon } from "@/components/design-system/brand-icon";
 
-interface ProductProofCardProps {
-  shouldReduceMotion?: boolean;
-}
+const MATCHED_SKILLS = ["Go", "PostgreSQL", "gRPC", "Kafka"] as const;
+const GAP_SKILLS = ["Terraform", "PCI-DSS"] as const;
 
-export function ProductProofCard({ shouldReduceMotion = false }: ProductProofCardProps) {
-  const [rotateX, setRotateX] = useState(0);
-  const [rotateY, setRotateY] = useState(0);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (shouldReduceMotion) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left - rect.width / 2;
-    const y = e.clientY - rect.top - rect.height / 2;
-    setRotateX(-y / 40);
-    setRotateY(x / 40);
-  };
-
-  const handleMouseLeave = () => {
-    setRotateX(0);
-    setRotateY(0);
-  };
+export function ProductProofCard() {
+  const [decision, setDecision] = useState<"pending" | "accepted" | "rejected">("pending");
 
   return (
-    <motion.div
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      animate={{ rotateX, rotateY }}
-      transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      style={{ transformStyle: "preserve-3d" }}
-      className="w-full bg-slate-950/90 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4 backdrop-blur-md relative overflow-hidden"
+    <div
+      className="w-full rounded-[14px] border surface-glass p-5 sm:p-[22px] space-y-4"
       data-testid="product-proof-card"
     >
-      <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-        <div className="flex items-center gap-2">
-          <div className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-400">
-            WORKSPACE PREVIEW
+      {/* Top header row matching palette-lab.html#ember .proof-top */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <BrandIcon name="stripe" className="h-3.5 w-3.5 shrink-0" />
+            ATS match · Stripe, Backend Eng.
           </span>
+          <span className="sr-only">Sample Workspace Layout · Protected Master</span>
         </div>
-        <span className="text-xs font-mono text-slate-400 italic">
-          Illustrative interface — sample layout only
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-signal/40 bg-signal/10 px-2.5 py-0.5 text-xs font-semibold text-signal">
+          <span className="h-1.5 w-1.5 rounded-full bg-signal" aria-hidden />
+          Live
         </span>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 font-mono text-xs">
-        <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
-            <FileCode className="h-4 w-4 text-amber-400" />
-            <span className="text-white font-semibold text-xs md:text-sm">master-resume.typ</span>
-            <span className="text-xs text-amber-400/90 bg-amber-950/50 border border-amber-800/50 px-2.5 py-0.5 rounded font-mono">
-              Protected Master
-            </span>
+      {/* Conic-gradient Electric Blue score ring + Strong match copy */}
+      <div className="flex items-center gap-4">
+        <div
+          className="relative grid h-[84px] w-[84px] shrink-0 place-items-center rounded-full"
+          style={{
+            background:
+              "conic-gradient(rgb(var(--accent-contrast)) 86%, rgb(214 196 176 / 0.14) 0)",
+            filter: "drop-shadow(0 0 14px rgb(var(--accent-contrast) / 0.35))",
+          }}
+          aria-label="ATS match score 86"
+        >
+          <div className="grid h-[68px] w-[68px] place-items-center rounded-full bg-panel font-sans text-[26px] font-bold tracking-[-0.03em] tabular-nums text-foreground">
+            86
           </div>
-          <span className="text-slate-400 text-xs font-mono">WASM Compiled</span>
         </div>
-
-        <div className="bg-slate-950 border border-slate-800/80 rounded-lg p-3.5 min-h-[140px] text-xs text-slate-300 overflow-x-auto">
-          {shouldReduceMotion ? (
-            <div className="space-y-1.5 leading-relaxed">
-              <div className="text-amber-300/90">#let section(title) = block(width: 100%)[ ... ]</div>
-              <div className="text-slate-300">#section(&quot;Technical Experience&quot;)</div>
-            </div>
-          ) : (
-            <TextType
-              text={[
-                '#let master = import("resume.pdf")',
-                '#set section(title) = block(width: 100%) [ ... ]\n\n#section("Technical Experience")\n#entry(title: "Senior Software Engineer", company: "TechCorp") [\n  - Architected high-throughput microservices using Go and gRPC.\n]',
-              ]}
-              typingSpeed={35}
-              pauseDuration={3000}
-              loop={true}
-              showCursor={true}
-              cursorCharacter="█"
-              cursorClassName="text-[#ff8c00] font-bold"
-              className="font-mono text-xs text-amber-200/90 leading-relaxed"
-            />
-          )}
+        <div className="min-w-0">
+          <strong className="block text-base font-semibold text-foreground">
+            Strong match
+          </strong>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            14 of 17 requirements backed by evidence
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex items-center gap-2.5 text-xs">
-          <ShieldCheck className="h-4 w-4 text-amber-400 shrink-0" />
-          <div>
-            <span className="text-xs text-slate-400 font-mono uppercase block">Constraint</span>
-            <span className="font-semibold text-slate-200 text-xs md:text-sm">Protected Master</span>
-          </div>
+      {/* Keyword chips: matched in Electric Blue (--c), gaps in Warm Gold (--p) */}
+      <div className="flex flex-wrap gap-1.5" aria-label="Matched and gap keywords">
+        {MATCHED_SKILLS.map((skill) => (
+          <span
+            key={skill}
+            className="inline-flex items-center gap-1.5 rounded-[6px] border border-signal/35 bg-signal/10 px-2.5 py-1 text-xs font-semibold text-signal"
+          >
+            <BrandIcon name={skill} className="h-3 w-3 shrink-0" />
+            <span>{skill}</span>
+          </span>
+        ))}
+        {GAP_SKILLS.map((skill) => (
+          <span
+            key={skill}
+            className="inline-flex items-center gap-1.5 rounded-[6px] border border-primary/35 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary"
+          >
+            <BrandIcon name={skill} className="h-3 w-3 shrink-0" />
+            <span>{skill}</span>
+          </span>
+        ))}
+      </div>
+
+      {/* Atomic diff block with citation footer */}
+      <div className="overflow-hidden rounded-[8px] border border-hairline font-mono text-[12.5px] leading-[1.6]">
+        <div
+          className="px-3 py-[7px]"
+          style={{
+            backgroundColor: "rgb(255 138 128 / 0.09)",
+            color: "#ffb3ab",
+          }}
+        >
+          − Worked on payment services and databases.
         </div>
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex items-center gap-2.5 text-xs">
-          <Database className="h-4 w-4 text-emerald-400 shrink-0" />
-          <div>
-            <span className="text-xs text-slate-400 font-mono uppercase block">Grounding</span>
-            <span className="font-semibold text-slate-200 text-xs md:text-sm">Evidence ID: exp-01</span>
-          </div>
+        <div className="bg-signal/10 px-3 py-[7px] text-signal">
+          + Cut p99 settlement latency 38% by sharding PostgreSQL ledgers in Go.
         </div>
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex items-center gap-2.5 text-xs">
-          <Sparkles className="h-4 w-4 text-purple-400 shrink-0" />
-          <div>
-            <span className="text-xs text-slate-400 font-mono uppercase block">ATS Rubric</span>
-            <span className="font-semibold text-slate-200 text-xs md:text-sm">100-Point Audit</span>
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-inset px-3 py-[7px] text-xs text-muted-foreground">
+          <span>cites ev_0142 · ev_0157</span>
+          <span>bullet 3 · Protected Master</span>
         </div>
       </div>
-    </motion.div>
+
+      {/* Action row + illustrative workspace label */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-0.5">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setDecision("accepted")}
+            aria-pressed={decision === "accepted"}
+            className="inline-flex h-9 items-center justify-center rounded-[8px] bg-primary px-3.5 text-[13px] font-semibold text-primary-foreground btn-glow transition-transform active:scale-[0.98]"
+          >
+            {decision === "accepted" ? "Accepted ✓" : "Accept"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setDecision("rejected")}
+            aria-pressed={decision === "rejected"}
+            className="inline-flex h-9 items-center justify-center rounded-[8px] border border-control/60 bg-white/[0.04] px-3.5 text-[13px] font-semibold text-foreground backdrop-blur-sm transition-colors hover:border-control"
+          >
+            {decision === "rejected" ? "Rejected" : "Reject"}
+          </button>
+        </div>
+        <Link
+          href="/tailor"
+          className="font-mono text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Sample Workspace Layout →
+        </Link>
+      </div>
+    </div>
   );
 }

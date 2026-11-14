@@ -6,6 +6,7 @@ import {
   isPostedWithinParam,
   type PostedWithin,
 } from "@/lib/jobs/posted-within";
+import { isBoardEligible } from "@/lib/jobs/expiry";
 import { sanitizeError } from "@/lib/ai/redact";
 
 export async function GET(req: Request) {
@@ -24,34 +25,34 @@ export async function GET(req: Request) {
       where.isClosed = true;
     }
 
-    // SQLite `contains` is case-sensitive — pull candidates then filter in JS.
-    const jobs = await prisma.discoveredJob.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      take: 500,
-    });
-
-    const q = search.toLowerCase();
-    const searched = q
-      ? jobs.filter(
-          (j) =>
-            j.company.toLowerCase().includes(q) ||
-            j.roleTitle.toLowerCase().includes(q) ||
-            (j.location || "").toLowerCase().includes(q),
-        )
-      : jobs;
-
-    const filtered = filterByPostedWithin(
-      searched,
-      postedWithin,
-      (j) => {
-        const raw = (j.datePosted || "").trim();
-        // Guard bad column parses like "Apply"
-        if (!raw || /^apply$/i.test(raw)) return null;
-        return raw;
-      },
-      (j) => j.createdAt,
-    ).slice(0, 200);
+    if (search) {
+      where.OR = [
+        { company: { contains: search, mode: "insensitive" } },
+        { roleTitle: { contains: search, mode: "insensitive" } },
+        { location: { contains: search, mode: "insensitive" } },
+      ];
+    }
+    const filtered: Awaited<ReturnType<typeof prisma.discoveredJob.findMany>> = [];
+    const now = new Date();
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await prisma.discoveredJob.findMany({
+        where,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        take: 500,
+      });
+      filtered.push(...filterByPostedWithin(
+        page.filter(j => isBoardEligible(j.datePosted, j.createdAt, now)),
+        postedWithin,
+        j => j.datePosted,
+        j => j.createdAt,
+        now,
+      ));
+      if (filtered.length >= 200 || page.length < 500) break;
+      cursor = page[page.length - 1].id;
+    }
+    filtered.splice(200);
 
     return NextResponse.json({
       success: true,

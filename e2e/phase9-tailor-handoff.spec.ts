@@ -21,17 +21,17 @@ test.describe("Task 9.6 — Tailor AI Feedback -> Editor Handoff E2E Tests", () 
       });
     });
 
-    // Navigate to /tailor
-    await page.goto("/tailor");
-    await page.waitForLoadState("networkidle");
-
-    // Configure mock AI settings in localStorage
-    await page.evaluate(() => {
+    // Configure mock AI settings before page load so BYOK vault migration picks it up cleanly
+    await page.addInitScript(() => {
       localStorage.setItem(
         "resumeforge_ai_settings",
         JSON.stringify({ provider: "openai", apiKey: "sk-test-mock-key" })
       );
     });
+
+    // Navigate to /tailor
+    await page.goto("/tailor");
+    await page.waitForLoadState("networkidle");
 
     // Fill job description text to enable Extract Requirements button
     const jdTextarea = page.locator("textarea").first();
@@ -40,10 +40,20 @@ test.describe("Task 9.6 — Tailor AI Feedback -> Editor Handoff E2E Tests", () 
       "Senior Software Engineer role requiring TypeScript, Node.js, PostgreSQL, Docker, and microservices architecture experience."
     );
 
-    // Click Extract Requirements button
+    // Click Extract Requirements button and await extraction, then open Workspace tab for ATS evaluation
     const extractBtn = page.locator('[data-testid="extract-reqs-btn"]');
     await expect(extractBtn).toBeEnabled();
+    const extractResponse = page.waitForResponse(
+      (res) => res.url().includes("/api/jobs/extract") && res.request().method() === "POST"
+    );
     await extractBtn.click();
+    await extractResponse;
+
+    const evalResponse = page.waitForResponse(
+      (res) => res.url().includes("/api/ats/evaluate") && res.request().method() === "POST"
+    );
+    await page.locator('[data-testid="tailor-tab-3-pane"]').click();
+    await evalResponse;
 
     // Click Get AI Feedback button in ATS Score Panel
     const getFeedbackBtn = page.locator('[data-testid="get-ai-feedback-btn"]');

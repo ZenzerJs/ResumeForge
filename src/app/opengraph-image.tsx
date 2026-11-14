@@ -15,7 +15,7 @@ export default async function Image() {
     (
       <div
         style={{
-          background: "#020617",
+          background: "#121010",
           width: "100%",
           height: "100%",
           display: "flex",
@@ -25,7 +25,7 @@ export default async function Image() {
           padding: "80px",
           fontFamily: "sans-serif",
           position: "relative",
-          border: "2px solid #1e293b",
+          border: "2px solid #3a322f",
         }}
       >
         {/* Glow backdrop */}
@@ -36,7 +36,7 @@ export default async function Image() {
             right: "-100px",
             width: "500px",
             height: "500px",
-            background: "radial-gradient(circle, rgba(245, 158, 11, 0.15) 0%, rgba(2, 6, 23, 0) 70%)",
+            background: "radial-gradient(circle, rgba(247, 189, 63, 0.16) 0%, rgba(18, 16, 16, 0) 70%)",
             borderRadius: "50%",
           }}
         />
@@ -47,13 +47,13 @@ export default async function Image() {
             style={{
               width: "54px",
               height: "54px",
-              background: "#0f172a",
-              border: "2px solid #f59e0b",
+              background: "#1b1716",
+              border: "2px solid #f7bd3f",
               borderRadius: "14px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#f59e0b",
+              color: "#f7bd3f",
               fontWeight: 900,
               fontSize: "28px",
             }}
@@ -62,7 +62,7 @@ export default async function Image() {
           </div>
           <span
             style={{
-              color: "#f8fafc",
+              color: "#f4eee7",
               fontSize: "32px",
               fontWeight: 800,
               letterSpacing: "-0.03em",
@@ -78,7 +78,7 @@ export default async function Image() {
             style={{
               fontSize: "58px",
               fontWeight: 900,
-              color: "#ffffff",
+              color: "#f4eee7",
               lineHeight: 1.15,
               letterSpacing: "-0.04em",
             }}
@@ -88,7 +88,7 @@ export default async function Image() {
           <div
             style={{
               fontSize: "24px",
-              color: "#94a3b8",
+              color: "#c8bdb0",
               lineHeight: 1.5,
               fontWeight: 400,
             }}
@@ -101,11 +101,11 @@ export default async function Image() {
         <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
           <div
             style={{
-              background: "#0f172a",
-              border: "1px solid #334155",
+              background: "#1b1716",
+              border: "1px solid #3a322f",
               padding: "10px 20px",
               borderRadius: "9999px",
-              color: "#f59e0b",
+              color: "#f7bd3f",
               fontSize: "16px",
               fontWeight: 700,
             }}
@@ -114,11 +114,11 @@ export default async function Image() {
           </div>
           <div
             style={{
-              background: "#0f172a",
-              border: "1px solid #334155",
+              background: "#1b1716",
+              border: "1px solid #3a322f",
               padding: "10px 20px",
               borderRadius: "9999px",
-              color: "#38bdf8",
+              color: "#4f8fff",
               fontSize: "16px",
               fontWeight: 700,
             }}
@@ -127,11 +127,11 @@ export default async function Image() {
           </div>
           <div
             style={{
-              background: "#0f172a",
-              border: "1px solid #334155",
+              background: "#1b1716",
+              border: "1px solid #3a322f",
               padding: "10px 20px",
               borderRadius: "9999px",
-              color: "#10b981",
+              color: "#6bd69a",
               fontSize: "16px",
               fontWeight: 700,
             }}

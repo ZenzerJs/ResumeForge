@@ -23,14 +23,15 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-4 border-b border-slate-800/80 pb-6 md:flex-row md:items-center md:justify-between",
+        "enter-once relative flex flex-col gap-4 rounded-xl surface-raised edge-glow p-5 sm:p-6 md:flex-row md:items-center md:justify-between",
         className,
       )}
     >
-      <div className="space-y-1">
+      <div className="space-y-1.5 border-l-2 border-primary pl-3 sm:pl-4">
         {eyebrow ? (
-          <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-400">
-            {eyebrow}
+          <div className="inline-flex w-fit items-center gap-2 rounded-full border border-hairline bg-inset/80 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
+            <span>{eyebrow}</span>
           </div>
         ) : null}
         <div className="flex items-center gap-3">

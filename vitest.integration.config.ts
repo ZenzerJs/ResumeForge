@@ -1,5 +1,5 @@
-import { defineConfig } from "vitest/config";
-import path from "path";
+import { configDefaults, defineConfig } from "vitest/config";
+import path from "node:path";
 
 const disposableSchemaPattern = /^rf_it_[0-9]+_[a-f0-9]{32}$/;
 let configuredSchema = "";
@@ -16,9 +16,9 @@ if (!disposableSchemaPattern.test(configuredSchema)) {
 export default defineConfig({
   test: {
     include: ["tests/integration/**/*.test.ts"],
+    exclude: [...configDefaults.exclude, ".next/**", "dist/**"],
     fileParallelism: false,
     env: {
-      VITEST_POSTGRES_INTEGRATION: "1",
       APP_ACCESS_SECRET: process.env.APP_ACCESS_SECRET || "integration-local-secret",
       JOB_SYNC_SECRET: process.env.JOB_SYNC_SECRET || "integration-sync-secret",
     },

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { CheckCircle2, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
+import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
 import { cn } from "@/lib/utils";
 
 export interface TechDiffItem {
@@ -81,11 +82,12 @@ export function TechDiffPillList({
   return (
     <div className={cn("flex flex-wrap items-center gap-1.5", className)} data-testid="tech-diff-pill-list">
       {displayedItems.map((item, index) => {
+        const showBrand = hasBrandIcon(item.skill);
         if (item.verified) {
           return (
             <span
               key={`${item.skill}-${index}`}
-              className="inline-flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 font-mono text-[11px] font-medium text-emerald-300 transition-colors hover:bg-emerald-500/25"
+              className="inline-flex items-center gap-1 rounded border border-signal/35 bg-signal/10 px-2 py-0.5 font-mono text-[11px] font-medium text-signal transition-colors hover:bg-signal/20"
               title={
                 item.evidenceTitle
                   ? `Verified via Evidence Bank: ${item.evidenceTitle}`
@@ -95,7 +97,8 @@ export function TechDiffPillList({
               }
               data-testid={`tech-pill-verified-${item.skill}`}
             >
-              <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-400" />
+              <CheckCircle2 className="h-3 w-3 shrink-0 text-signal" />
+              {showBrand && <BrandIcon name={item.skill} className="h-3.5 w-3.5 shrink-0" />}
               <span>{item.skill}</span>
             </span>
           );
@@ -109,6 +112,7 @@ export function TechDiffPillList({
             data-testid={`tech-pill-missing-${item.skill}`}
           >
             <AlertTriangle className="h-3 w-3 shrink-0 text-amber-400" />
+            {showBrand && <BrandIcon name={item.skill} className="h-3.5 w-3.5 shrink-0" />}
             <span>{item.skill}</span>
           </span>
         );
@@ -118,7 +122,7 @@ export function TechDiffPillList({
         <button
           type="button"
           onClick={() => setIsExpanded((prev) => !prev)}
-          className="inline-flex items-center gap-0.5 rounded border border-slate-700 bg-slate-800/80 px-1.5 py-0.5 font-mono text-[10px] text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+          className="inline-flex items-center gap-0.5 rounded border border-hairline bg-inset px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:bg-elevated hover:text-foreground transition-colors"
           data-testid="tech-diff-expand-btn"
         >
           {isExpanded ? (

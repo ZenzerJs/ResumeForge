@@ -6,6 +6,10 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
   }) => {
     await page.goto("/");
 
+    // Verify Ember Ink landing atmosphere and AsciiWaves canvas
+    await expect(page.getByTestId("landing-atmosphere")).toBeVisible();
+    await expect(page.getByTestId("ascii-waves-canvas")).toBeVisible();
+
     // Verify Instant ATS Sandbox Section
     const sandboxSection = page.getByTestId("instant-ats-sandbox-section");
     await expect(sandboxSection).toBeVisible();
@@ -59,6 +63,27 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
 
     const svgContainer = page.getByTestId("sandbox-svg-container");
     await expect(svgContainer).toBeVisible();
+    await expect(svgContainer.locator("svg")).toBeVisible({ timeout: 15000 });
+    const sandboxSvgSecurity = await svgContainer.locator("svg").first().evaluate((svg) => ({
+      unsafeTags: svg.querySelectorAll("script, style, foreignObject").length,
+      unsafeEventAttrs: Array.from(svg.querySelectorAll("*")).some((el) =>
+        Array.from(el.attributes).some((attr) => /^on/i.test(attr.name))
+      ),
+      unsafeLinks: Array.from(svg.querySelectorAll("a")).filter((a) => {
+        const href = a.getAttribute("href") ?? a.getAttribute("xlink:href") ?? "";
+        return /^(?:javascript|data|vbscript|file):/i.test(href);
+      }).length,
+      unsafeExternalRefs: Array.from(svg.querySelectorAll("use, image")).filter((el) => {
+        const href = el.getAttribute("href") ?? el.getAttribute("xlink:href") ?? "";
+        return href.length > 0 && !href.startsWith("#");
+      }).length,
+    }));
+    expect(sandboxSvgSecurity).toEqual({
+      unsafeTags: 0,
+      unsafeEventAttrs: false,
+      unsafeLinks: 0,
+      unsafeExternalRefs: 0,
+    });
 
     // Verify Competitive Matrix Section
     const matrixSection = page.getByTestId("competitive-matrix-section");
@@ -72,7 +97,7 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
     await expect(matrixSection).toContainText("Document Quality & Layout");
     await expect(matrixSection).toContainText("ATS Evaluation Engine");
 
-    await expect(matrixSection).toContainText("ResumeForge (Local)");
+    await expect(matrixSection).toContainText("ResumeForge (Guest / Postgres)");
     await expect(matrixSection).toContainText("Competitors");
     await expect(matrixSection).toContainText("Teal");
     await expect(matrixSection).toContainText("Simplify");

@@ -142,7 +142,7 @@ export function AiProgress({
         "rounded-lg border p-3.5 shadow-sm transition-all",
         isDone && "bg-emerald-950/40 border-emerald-800/60 text-emerald-100",
         isError && "bg-red-950/50 border-red-800/80 text-red-200",
-        !isDone && !isError && "bg-slate-900/90 border-slate-800 text-slate-200",
+        !isDone && !isError && "bg-inset border-hairline text-foreground",
         className
       )}
     >
@@ -164,11 +164,11 @@ export function AiProgress({
           )}
 
           <div className="min-w-0">
-            <p className="text-xs font-semibold tracking-tight text-white truncate">
+            <p className="text-xs font-semibold tracking-tight text-foreground truncate">
               {message}
             </p>
             {!isError && !isDone && (
-              <p className="text-[11px] text-slate-400 capitalize">
+              <p className="text-[11px] text-muted-foreground capitalize">
                 Stage {currentStageIndex >= 0 ? currentStageIndex + 1 : 1} of {stages.length}: {stage}
               </p>
             )}
@@ -197,7 +197,7 @@ export function AiProgress({
             <button
               type="button"
               onClick={() => setShowDetails((prev) => !prev)}
-              className="text-slate-400 hover:text-white transition p-1"
+              className="text-muted-foreground hover:text-foreground transition p-1"
               aria-label="Toggle error details"
             >
               {showDetails ? (
@@ -212,7 +212,7 @@ export function AiProgress({
 
       {/* Stage Progress Stepper */}
       {!isError && stages.length > 1 && (
-        <div className="mt-3 pt-2.5 border-t border-slate-800/70">
+        <div className="mt-3 pt-2.5 border-t border-hairline">
           <div className="flex items-center justify-between gap-1">
             {stages.map((stg, idx) => {
               const isPast = currentStageIndex > idx || isDone;
@@ -229,7 +229,7 @@ export function AiProgress({
                       "h-1.5 w-full rounded-full transition-all duration-300",
                       isPast && "bg-emerald-500",
                       isCurrent && "bg-amber-400 animate-pulse",
-                      !isPast && !isCurrent && "bg-slate-800"
+                      !isPast && !isCurrent && "bg-elevated"
                     )}
                   />
                   <span
@@ -237,7 +237,7 @@ export function AiProgress({
                       "text-[9px] font-mono capitalize transition-colors hidden sm:block truncate max-w-full text-center",
                       isPast && "text-emerald-400 font-medium",
                       isCurrent && "text-amber-300 font-bold",
-                      !isPast && !isCurrent && "text-slate-600"
+                      !isPast && !isCurrent && "text-muted-foreground"
                     )}
                   >
                     {stg}

@@ -21,15 +21,15 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <Surface
-      variant="flat"
+      variant="raised"
       className={cn(
-        "flex flex-col items-center justify-center gap-3 px-6 py-12 text-center",
+        "flex flex-col items-center justify-center gap-3 border-dashed border-hairline px-6 py-12 text-center",
         className,
       )}
       data-testid="empty-state"
     >
       {icon ? (
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-800 bg-rf-surface text-amber-400">
+        <div className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-primary/25 bg-inset text-primary shadow-[0_0_24px_rgb(var(--accent-action)/0.16)]">
           {icon}
         </div>
       ) : null}

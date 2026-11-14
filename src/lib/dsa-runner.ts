@@ -19,31 +19,79 @@ export interface DsaExecutionSummary {
   errorMessage?: string;
 }
 
+export const DSA_MAX_STDOUT_CHARS = 4096;
+export const DSA_MAX_ERROR_CHARS = 2048;
+
+export const DSA_SANDBOX_CSP =
+  "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; worker-src blob:; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none';";
+
+const IDENTIFIER_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+const SAFE_TOKEN_RE = /^[A-Za-z0-9-]+$/;
+
+const VALID_STATUSES = new Set<DsaExecutionSummary['status']>([
+  'Accepted',
+  'Wrong Answer',
+  'Time Limit Exceeded',
+  'Runtime Error',
+  'Syntax Error',
+]);
+
+function clampText(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+  const suffix = '\n...[truncated]';
+  if (maxChars <= suffix.length) return value.slice(0, maxChars);
+  return `${value.slice(0, maxChars - suffix.length)}${suffix}`;
+}
+
+function unsupportedSummary(totalCount: number, errorMessage: string): DsaExecutionSummary {
+  return {
+    status: 'Runtime Error',
+    passedCount: 0,
+    totalCount,
+    totalTimeMs: 0,
+    results: [],
+    errorMessage: clampText(errorMessage, DSA_MAX_ERROR_CHARS),
+  };
+}
+
+function generateRandomToken(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
 /**
- * Deep equality checker for test case outputs.
- * Supports primitives, arrays (including permuted primitive arrays), and nested objects.
+ * Deep equality check supporting nested arrays, unordered 2D arrays (common in groupAnagrams, subsets, etc.),
+ * objects, primitives, null, and undefined.
  */
 export function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
-  if (typeof a === 'number' && typeof b === 'number' && isNaN(a) && isNaN(b)) return true;
+
+  if (typeof a === 'number' && typeof b === 'number' && Number.isNaN(a) && Number.isNaN(b)) {
+    return true;
+  }
+
+  if (a === null || b === null || a === undefined || b === undefined) {
+    return a === b;
+  }
+
   if (typeof a !== typeof b) return false;
-  if (a === null || b === null || a === undefined || b === undefined) return a === b;
 
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false;
-    const exactMatch = a.every((val, idx) => deepEqual(val, b[idx]));
+    const exactMatch = a.every((item, i) => deepEqual(item, b[i]));
     if (exactMatch) return true;
-    if (a.length > 0 && a.every(Array.isArray) && b.every(Array.isArray)) {
+
+    if (a.length > 0 && a.every((x) => Array.isArray(x)) && b.every((x) => Array.isArray(x))) {
       const sortInner = (arr: unknown[]) =>
-        [...arr].sort((x, y) =>
-          typeof x === 'number' && typeof y === 'number'
-            ? x - y
-            : String(x).localeCompare(String(y))
-        );
-      const serializeRow = (row: unknown[]) => JSON.stringify(sortInner(row));
-      const sortedA = a.map(serializeRow).sort();
-      const sortedB = b.map(serializeRow).sort();
-      return sortedA.every((val, idx) => val === sortedB[idx]);
+        [...arr].sort((x, y) => {
+          if (typeof x === 'number' && typeof y === 'number') return x - y;
+          return String(x).localeCompare(String(y));
+        });
+      const serializedA = a.map((row) => JSON.stringify(sortInner(row as unknown[]))).sort();
+      const serializedB = b.map((row) => JSON.stringify(sortInner(row as unknown[]))).sort();
+      return serializedA.every((val, i) => val === serializedB[i]);
     }
     return false;
   }
@@ -51,697 +99,692 @@ export function deepEqual(a: unknown, b: unknown): boolean {
   if (Array.isArray(a) !== Array.isArray(b)) return false;
 
   if (typeof a === 'object' && typeof b === 'object') {
-    const keysA = Object.keys(a as Record<string, unknown>);
-    const keysB = Object.keys(b as Record<string, unknown>);
+    const objA = a as Record<string, unknown>;
+    const objB = b as Record<string, unknown>;
+    const keysA = Object.keys(objA);
+    const keysB = Object.keys(objB);
     if (keysA.length !== keysB.length) return false;
-    for (const key of keysA) {
-      if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
-      if (!deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])) {
-        return false;
-      }
-    }
-    return true;
+    return keysA.every(
+      (k) => Object.prototype.hasOwnProperty.call(objB, k) && deepEqual(objA[k], objB[k])
+    );
   }
 
   return false;
 }
 
 /**
- * Strips basic TypeScript type annotations so code can run directly in JS engines.
+ * Lightweight regex-based TypeScript stripper for browser/worker DSA execution.
+ * Removes type annotations, interfaces, type aliases, generics, and `as` assertions
+ * so pure JS runtimes can evaluate TypeScript LeetCode-style starter code.
  */
 export function sanitizeTypeScriptCode(code: string): string {
-  let cleaned = code;
-  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
-  cleaned = cleaned.replace(/(^|[^:])\/\/.*$/gm, '$1');
-  cleaned = cleaned.replace(/^\s*import\s+.*$/gm, '');
-  cleaned = cleaned.replace(/^\s*export\s+(?:default\s+)?/gm, '');
-  cleaned = cleaned.replace(/^\s*(?:type|interface)\s+[A-Za-z0-9_$]+[\s\S]*?(?:;|\})\s*$/gm, '');
-  cleaned = cleaned.replace(/\s+as\s+[A-Za-z0-9_<>\[\]| ]+/g, '');
-  cleaned = cleaned.replace(/([a-zA-Z0-9_\]\)])!(?=[,\s\.;\)=])/g, '$1');
-  cleaned = cleaned.replace(/\)\s*:\s*[A-Za-z0-9_<>\[\]|,\s]+(\s*\{|\s*=>)/g, ')$1');
-  cleaned = cleaned.replace(/<[A-Za-z0-9_\[\],\s|]+>(?=\s*\()/g, '');
-  cleaned = cleaned.replace(/(const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*[^=;]+(?=[=;])/g, '$1 $2');
-  cleaned = cleaned.replace(/:\s*(?:number|string|boolean|any|unknown|void|never|object|Record<[^>]+>|Array<[^>]+>|Map<[^>]+>|Set<[^>]+>|ListNode|TreeNode|Node|[A-Z][A-Za-z0-9_<>]*)(?:\[\])*(?:\s*\|\s*(?:number|string|boolean|null|undefined|[A-Z][A-Za-z0-9_<>]*)(?:\[\])*)*(?=\s*[,)=])/g, '');
-  return cleaned;
+  let js = code;
+  js = js.replace(/\/\*[\s\S]*?\*\//g, '');
+  js = js.replace(/(^|[^:])\/\/.*$/gm, '$1');
+  js = js.replace(/^\s*import\s+.*$/gm, '');
+  js = js.replace(/^\s*export\s+(?:default\s+)?/gm, '');
+  js = js.replace(/^\s*(?:interface|type)\s+\w+[\s\S]*?(?:\n\}|;)\s*$/gm, '');
+  js = js.replace(/\s+as\s+(?:const|[A-Za-z_]\w*(?:<[^>]+>)?(?:\[\])*)/g, '');
+  js = js.replace(/:\s*(?:[A-Za-z_]\w*(?:<[^>]+>)?(?:\[\])*|\{[^}]+\}|\[[^\]]+\])(?=\s*(?:[,)=]))/g, '');
+  js = js.replace(/\)\s*:\s*[A-Za-z_]\w*(?:<[^>]+>)?(?:\[\])*(?:\s*\|\s*[A-Za-z_]\w*(?:<[^>]+>)?(?:\[\])*)*(?=\s*(?:\{|=>))/g, ')');
+  js = js.replace(/<[A-Za-z0-9_,\s\[\]|]+>(?=\s*\()/g, '');
+  js = js.replace(/(const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*[^=;]+(?=[=;])/g, '$1 $2');
+  js = js.replace(/([a-zA-Z0-9_\]\)])!(?=[,\s.;)=])/g, '$1');
+  return js;
 }
 
-function getNodeModule<T = unknown>(name: string): T | null {
-  if (typeof window !== 'undefined') return null;
+export function buildSandboxWorkerSource(): string {
+  return `
+(function () {
+"use strict";
+const postWorkerMessage = self.postMessage.bind(self);
+const MAX_STDOUT_CHARS = ${DSA_MAX_STDOUT_CHARS};
+const MAX_ERROR_CHARS = ${DSA_MAX_ERROR_CHARS};
+const IDENTIFIER_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+function clamp(text, maxChars) {
+  if (typeof text !== "string") text = String(text);
+  if (text.length <= maxChars) return text;
+  const suffix = "\\n...[truncated]";
+  if (maxChars <= suffix.length) return text.slice(0, maxChars);
+  return text.slice(0, maxChars - suffix.length) + suffix;
+}
+
+function formatLogArg(arg) {
+  if (typeof arg === "string") return arg;
+  if (arg === undefined) return "undefined";
+  if (arg === null) return "null";
+  if (typeof arg === "object") {
+    try { return JSON.stringify(arg); } catch { return String(arg); }
+  }
+  return String(arg);
+}
+
+function toCloneableValue(val) {
+  if (
+    val === undefined ||
+    val === null ||
+    typeof val === "boolean" ||
+    typeof val === "number" ||
+    typeof val === "string"
+  ) {
+    return val;
+  }
+  if (typeof val === "bigint" || typeof val === "symbol" || typeof val === "function") {
+    return String(val);
+  }
   try {
-    const customReq = (globalThis as unknown as { __non_webpack_require__?: (mod: string) => unknown }).__non_webpack_require__;
-    const req = typeof customReq === 'function' ? customReq : eval('require');
-    return req(name) as T;
+    return JSON.parse(JSON.stringify(val));
   } catch {
-    return null;
+    return String(val);
   }
 }
 
-/**
- * Executes JS/TS code inside an isolated inline Web Worker (browser) with hard timeout termination.
- */
-function runInBrowserWorker(
-  sanitizedCode: string,
-  entryFunctionName: string,
-  parameterNames: string[],
-  testCases: DsaTestCase[],
-  timeoutMs: number
-): Promise<DsaExecutionSummary> {
-  return new Promise((resolve) => {
-    const workerScript = `
-      self.onmessage = function(e) {
-        const { code, entryFunctionName, parameterNames, testCases } = e.data;
-        const results = [];
-        let passedCount = 0;
-        let hasRuntimeError = false;
-        let runtimeErrorMessage = null;
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a === "number" && typeof b === "number" && Number.isNaN(a) && Number.isNaN(b)) {
+    return true;
+  }
+  if (a === null || b === null || a === undefined || b === undefined) {
+    return a === b;
+  }
+  if (typeof a !== typeof b) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    if (a.every((item, i) => deepEqual(item, b[i]))) return true;
+    if (a.length > 0 && a.every((x) => Array.isArray(x)) && b.every((x) => Array.isArray(x))) {
+      const sortInner = (arr) =>
+        [...arr].sort((x, y) =>
+          typeof x === "number" && typeof y === "number"
+            ? x - y
+            : String(x).localeCompare(String(y))
+        );
+      const sA = a.map((row) => JSON.stringify(sortInner(row))).sort();
+      const sB = b.map((row) => JSON.stringify(sortInner(row))).sort();
+      return sA.every((val, i) => val === sB[i]);
+    }
+    return false;
+  }
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (typeof a === "object" && typeof b === "object") {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    return keysA.every(
+      (k) => Object.prototype.hasOwnProperty.call(b, k) && deepEqual(a[k], b[k])
+    );
+  }
+  return false;
+}
 
-        let logs = [];
-        const customConsole = {
-          log: (...args) => logs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')),
-          info: (...args) => logs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')),
-          warn: (...args) => logs.push('[warn] ' + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')),
-          error: (...args) => logs.push('[error] ' + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '))
-        };
+function extractEntryFunctionName(code) {
+  const fnMatch = code.match(/function\\s+([a-zA-Z0-9_$]+)\\s*\\(/);
+  if (fnMatch) return fnMatch[1];
+  const arrowMatch = code.match(/(?:const|let|var)\\s+([a-zA-Z0-9_$]+)\\s*=\\s*(?:\\([^)]*\\)|[a-zA-Z0-9_$]+)\\s*=>/);
+  if (arrowMatch) return arrowMatch[1];
+  return "";
+}
 
-        function deepEqual(a, b) {
-          if (a === b) return true;
-          if (typeof a === 'number' && typeof b === 'number' && isNaN(a) && isNaN(b)) return true;
-          if (typeof a !== typeof b) return false;
-          if (a === null || b === null || a === undefined || b === undefined) return a === b;
-          if (Array.isArray(a) && Array.isArray(b)) {
-            if (a.length !== b.length) return false;
-            const exact = a.every((v, i) => deepEqual(v, b[i]));
-            if (exact) return true;
-            if (a.length > 0 && a.every(Array.isArray) && b.every(Array.isArray)) {
-              const sortInner = (arr) =>
-                [...arr].sort((x, y) =>
-                  typeof x === 'number' && typeof y === 'number'
-                    ? x - y
-                    : String(x).localeCompare(String(y))
-                );
-              const serializeRow = (row) => JSON.stringify(sortInner(row));
-              const sa = a.map(serializeRow).sort();
-              const sb = b.map(serializeRow).sort();
-              return sa.every((v, i) => v === sb[i]);
-            }
-            return false;
-          }
-          if (Array.isArray(a) !== Array.isArray(b)) return false;
-          if (typeof a === 'object' && typeof b === 'object') {
-            const ka = Object.keys(a);
-            const kb = Object.keys(b);
-            if (ka.length !== kb.length) return false;
-            for (const k of ka) {
-              if (!Object.prototype.hasOwnProperty.call(b, k)) return false;
-              if (!deepEqual(a[k], b[k])) return false;
-            }
-            return true;
-          }
-          return false;
-        }
+self.onmessage = function (e) {
+  const payload = e.data || {};
+  const runId = payload.runId;
+  const sanitizedCode = typeof payload.sanitizedCode === "string" ? payload.sanitizedCode : "";
+  const requestedFn = typeof payload.entryFunctionName === "string" ? payload.entryFunctionName.trim() : "";
+  const parameterNames = Array.isArray(payload.parameterNames) ? payload.parameterNames : [];
+  const testCases = Array.isArray(payload.testCases) ? payload.testCases : [];
+  const runStart = performance.now();
 
-        try {
-          const fnFactory = new Function('console', '"use strict"; ' + code + '; return (typeof ' + entryFunctionName + ' === "function" ? ' + entryFunctionName + ' : null);');
-          const targetFn = fnFactory(customConsole);
-          if (!targetFn) {
-            self.postMessage({
-              status: 'Runtime Error',
-              passedCount: 0,
-              totalCount: testCases.length,
-              totalTimeMs: 0,
-              results: [],
-              errorMessage: "Function '" + entryFunctionName + "' is not defined."
-            });
-            return;
-          }
-
-          const startTotal = Date.now();
-          for (const tc of testCases) {
-            logs = [];
-            const caseStart = Date.now();
-            const args = parameterNames.map(p => {
-              const val = tc.input[p];
-              return val !== undefined ? JSON.parse(JSON.stringify(val)) : undefined;
-            });
-
-            try {
-              const actual = targetFn(...args);
-              const duration = Date.now() - caseStart;
-              const passed = deepEqual(actual, tc.expected);
-              if (passed) passedCount++;
-
-              results.push({
-                testCaseId: tc.id,
-                passed,
-                actual,
-                expected: tc.expected,
-                executionTimeMs: duration,
-                stdout: logs.join('\\n')
-              });
-            } catch (err) {
-              hasRuntimeError = true;
-              runtimeErrorMessage = err && err.message ? err.message : String(err);
-              results.push({
-                testCaseId: tc.id,
-                passed: false,
-                actual: 'Runtime Error',
-                expected: tc.expected,
-                executionTimeMs: Date.now() - caseStart,
-                stdout: logs.join('\\n'),
-                error: runtimeErrorMessage
-              });
-            }
-          }
-
-          const totalTimeMs = Date.now() - startTotal;
-          let status = 'Accepted';
-          if (hasRuntimeError) {
-            status = 'Runtime Error';
-          } else if (passedCount !== testCases.length) {
-            status = 'Wrong Answer';
-          }
-
-          self.postMessage({
-            status,
-            passedCount,
-            totalCount: testCases.length,
-            totalTimeMs,
-            results,
-            errorMessage: runtimeErrorMessage || undefined
-          });
-        } catch (err) {
-          const isSyntax = err instanceof SyntaxError || (err && err.name === 'SyntaxError');
-          self.postMessage({
-            status: isSyntax ? 'Syntax Error' : 'Runtime Error',
-            passedCount: 0,
-            totalCount: testCases.length,
-            totalTimeMs: 0,
-            results: [],
-            errorMessage: err && err.message ? err.message : String(err)
-          });
-        }
-      };
-    `;
-
-    let settled = false;
-    const blob = new Blob([workerScript], { type: 'application/javascript' });
-    const url = URL.createObjectURL(blob);
-    const worker = new Worker(url);
-
-    const cleanup = () => {
-      URL.revokeObjectURL(url);
-      worker.terminate();
-    };
-
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve({
-        status: 'Time Limit Exceeded',
-        passedCount: 0,
-        totalCount: testCases.length,
-        totalTimeMs: timeoutMs,
-        results: testCases.map((tc) => ({
-          testCaseId: tc.id,
-          passed: false,
-          actual: 'Time Limit Exceeded',
-          expected: tc.expected,
-          executionTimeMs: timeoutMs,
-          stdout: '',
-          error: `Execution timed out after ${timeoutMs}ms.`,
-        })),
-        errorMessage: `Execution timed out after ${timeoutMs}ms.`,
-      });
-    }, timeoutMs);
-
-    worker.onmessage = (e: MessageEvent<DsaExecutionSummary>) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      cleanup();
-      resolve(e.data);
-    };
-
-    worker.onerror = (e: ErrorEvent) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      cleanup();
-      resolve({
-        status: 'Runtime Error',
+  let targetFnName = requestedFn || extractEntryFunctionName(sanitizedCode);
+  if (!targetFnName) {
+    postWorkerMessage({
+      runId,
+      summary: {
+        status: "Runtime Error",
         passedCount: 0,
         totalCount: testCases.length,
         totalTimeMs: 0,
         results: [],
-        errorMessage: e.message || 'Worker execution error',
-      });
-    };
-
-    worker.postMessage({
-      code: sanitizedCode,
-      entryFunctionName,
-      parameterNames,
-      testCases,
+        errorMessage: "Could not find a valid entry function. Please define a function (e.g. function twoSum(...) { ... }).",
+      },
     });
-  });
-}
-
-/**
- * Executes JS/TS code inside Node.js VM context with timeout guard.
- */
-function runInNodeVm(
-  sanitizedCode: string,
-  entryFunctionName: string,
-  parameterNames: string[],
-  testCases: DsaTestCase[],
-  timeoutMs: number
-): DsaExecutionSummary {
-  const startTime = Date.now();
-  const vm: any = getNodeModule('node:vm');
-  if (!vm) {
-    throw new Error('Node vm module unavailable');
+    return;
   }
 
-  // Pre-compile script to catch syntax errors
-  let script: any;
+  if (!IDENTIFIER_RE.test(targetFnName)) {
+    postWorkerMessage({
+      runId,
+      summary: {
+        status: "Runtime Error",
+        passedCount: 0,
+        totalCount: testCases.length,
+        totalTimeMs: 0,
+        results: [],
+        errorMessage: "Invalid entry function name.",
+      },
+    });
+    return;
+  }
+
+  let factory;
   try {
-    script = new vm.Script(sanitizedCode, { filename: 'user_code.js' });
-  } catch (err: any) {
-    return {
-      status: 'Syntax Error',
-      passedCount: 0,
-      totalCount: testCases.length,
-      totalTimeMs: 0,
-      results: [],
-      errorMessage: err?.message || String(err),
-    };
+    factory = new Function(
+      "process",
+      "require",
+      "module",
+      "exports",
+      "global",
+      "importScripts",
+      "window",
+      "document",
+      "parent",
+      "top",
+      '"use strict";\\n' +
+        sanitizedCode +
+        '\\nif (typeof ' + targetFnName + ' !== "function") { throw new Error("Function \\'' + targetFnName + '\\' is not defined."); }' +
+        '\\nreturn ' + targetFnName + ';'
+    );
+  } catch (err) {
+    const isSyntax = err && (err.name === "SyntaxError" || String(err).includes("SyntaxError"));
+    postWorkerMessage({
+      runId,
+      summary: {
+        status: isSyntax ? "Syntax Error" : "Runtime Error",
+        passedCount: 0,
+        totalCount: testCases.length,
+        totalTimeMs: Math.round((performance.now() - runStart) * 100) / 100,
+        results: [],
+        errorMessage: clamp(err && err.message ? err.message : String(err), MAX_ERROR_CHARS),
+      },
+    });
+    return;
   }
 
-  let currentLogs: string[] = [];
-  const customConsole = {
-    log: (...args: unknown[]) => {
-      currentLogs.push(args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
-    },
-    info: (...args: unknown[]) => {
-      currentLogs.push(args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
-    },
-    warn: (...args: unknown[]) => {
-      currentLogs.push('[warn] ' + args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
-    },
-    error: (...args: unknown[]) => {
-      currentLogs.push('[error] ' + args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
-    },
-  };
-
-  const sandbox: Record<string, any> = {
-    console: customConsole,
-    Math,
-    Date,
-    Array,
-    Object,
-    String,
-    Number,
-    Boolean,
-    Set,
-    Map,
-    RegExp,
-    JSON,
-    parseInt,
-    parseFloat,
-    isNaN,
-    isFinite,
-  };
-
-  const context = vm.createContext(sandbox);
-
+  let fn;
   try {
-    script.runInContext(context, { timeout: timeoutMs });
-  } catch (err: any) {
-    const isTimeout =
-      err?.code === 'ERR_SCRIPT_EXECUTION_TIMEOUT' ||
-      (err?.message && err.message.toLowerCase().includes('timed out'));
-    return {
-      status: isTimeout ? 'Time Limit Exceeded' : 'Runtime Error',
-      passedCount: 0,
-      totalCount: testCases.length,
-      totalTimeMs: Date.now() - startTime,
-      results: [],
-      errorMessage: err?.message || String(err),
-    };
+    fn = factory(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined);
+  } catch (err) {
+    const isSyntax = err && (err.name === "SyntaxError" || String(err).includes("SyntaxError"));
+    postWorkerMessage({
+      runId,
+      summary: {
+        status: isSyntax ? "Syntax Error" : "Runtime Error",
+        passedCount: 0,
+        totalCount: testCases.length,
+        totalTimeMs: Math.round((performance.now() - runStart) * 100) / 100,
+        results: [],
+        errorMessage: clamp(err && err.message ? err.message : String(err), MAX_ERROR_CHARS),
+      },
+    });
+    return;
   }
 
-  const targetFn = sandbox[entryFunctionName];
-  if (typeof targetFn !== 'function') {
-    return {
-      status: 'Runtime Error',
-      passedCount: 0,
-      totalCount: testCases.length,
-      totalTimeMs: Date.now() - startTime,
-      results: [],
-      errorMessage: `Function '${entryFunctionName}' is not defined.`,
-    };
-  }
-
-  const results: DsaTestResult[] = [];
+  const results = [];
   let passedCount = 0;
-  let hasTimeout = false;
-  let runtimeErrorMessage: string | undefined;
 
-  for (const tc of testCases) {
-    currentLogs = [];
-    const caseStart = Date.now();
-    const args = parameterNames.map((param) => {
-      const val = tc.input[param];
-      return val !== undefined ? JSON.parse(JSON.stringify(val)) : undefined;
-    });
+  const origLog = console.log;
+  const origInfo = console.info;
+  const origWarn = console.warn;
+  const origDebug = console.debug;
 
+  for (let i = 0; i < testCases.length; i++) {
+    const tc = testCases[i];
+    const logs = [];
+    let logChars = 0;
+    let truncated = false;
+
+    const capture = function () {
+      if (truncated) return;
+      const line = Array.prototype.slice.call(arguments).map(formatLogArg).join(" ");
+      const marker = "...[stdout truncated]";
+      if (logChars + line.length + 1 > MAX_STDOUT_CHARS) {
+        const remaining = Math.max(0, MAX_STDOUT_CHARS - logChars - marker.length - 2);
+        if (remaining > 0) logs.push(line.slice(0, remaining));
+        logs.push(marker);
+        truncated = true;
+        return;
+      }
+      logs.push(line);
+      logChars += line.length + 1;
+    };
+
+    console.log = capture;
+    console.info = capture;
+    console.warn = capture;
+    console.debug = capture;
+
+    const caseStart = performance.now();
     try {
-      const caseCode = `__targetFn__(...__args__)`;
-      const caseContext = vm.createContext({
-        __targetFn__: targetFn,
-        __args__: args,
-        console: customConsole,
-        Math,
-        Date,
-        Array,
-        Object,
-        String,
-        Number,
-        Boolean,
-        Set,
-        Map,
-        RegExp,
-        JSON,
-        parseInt,
-        parseFloat,
-        isNaN,
-        isFinite,
+      const args = parameterNames.map((name) => {
+        const raw = tc && tc.input ? tc.input[name] : undefined;
+        return raw === undefined ? undefined : JSON.parse(JSON.stringify(raw));
       });
-
-      const caseScript = new vm.Script(caseCode);
-      const actual = caseScript.runInContext(caseContext, { timeout: timeoutMs });
-      const duration = Date.now() - caseStart;
+      const actual = fn.apply(undefined, args);
+      const duration = Math.round((performance.now() - caseStart) * 100) / 100;
       const passed = deepEqual(actual, tc.expected);
       if (passed) passedCount++;
-
       results.push({
         testCaseId: tc.id,
         passed,
-        actual,
+        actual: toCloneableValue(actual),
         expected: tc.expected,
         executionTimeMs: duration,
-        stdout: currentLogs.join('\n'),
+        stdout: clamp(logs.join("\\n"), MAX_STDOUT_CHARS),
       });
-    } catch (err: any) {
-      const duration = Date.now() - caseStart;
-      const isTimeout =
-        err?.code === 'ERR_SCRIPT_EXECUTION_TIMEOUT' ||
-        (err?.message && err.message.toLowerCase().includes('timed out'));
-
-      if (isTimeout) {
-        hasTimeout = true;
-        results.push({
-          testCaseId: tc.id,
-          passed: false,
-          actual: 'Time Limit Exceeded',
-          expected: tc.expected,
-          executionTimeMs: duration,
-          stdout: currentLogs.join('\n'),
-          error: 'Time limit exceeded',
-        });
-        break;
-      } else {
-        runtimeErrorMessage = err?.message || String(err);
-        results.push({
-          testCaseId: tc.id,
-          passed: false,
-          actual: 'Runtime Error',
-          expected: tc.expected,
-          executionTimeMs: duration,
-          stdout: currentLogs.join('\n'),
-          error: runtimeErrorMessage,
-        });
-      }
-    }
-  }
-
-  const totalTimeMs = Date.now() - startTime;
-  let status: DsaExecutionSummary['status'] = 'Accepted';
-  if (hasTimeout) {
-    status = 'Time Limit Exceeded';
-  } else if (results.some((r) => r.error)) {
-    status = 'Runtime Error';
-  } else if (passedCount !== testCases.length) {
-    status = 'Wrong Answer';
-  }
-
-  return {
-    status,
-    passedCount,
-    totalCount: testCases.length,
-    totalTimeMs,
-    results,
-    errorMessage: hasTimeout ? `Execution timed out after ${timeoutMs}ms.` : runtimeErrorMessage,
-  };
-}
-
-/**
- * Executes Python code via system Python in Node/Vitest environments.
- */
-async function runPythonCode(
-  code: string,
-  entryFunctionName: string,
-  parameterNames: string[],
-  testCases: DsaTestCase[],
-  timeoutMs: number
-): Promise<DsaExecutionSummary> {
-  const cp: any = getNodeModule('node:child_process');
-  if (!cp) {
-    // If running in browser without Pyodide worker, return clean unsupported summary
-    return {
-      status: 'Runtime Error',
-      passedCount: 0,
-      totalCount: testCases.length,
-      totalTimeMs: 0,
-      results: [],
-      errorMessage: 'Python runner requires Python runtime or Pyodide environment.',
-    };
-  }
-
-  const harnessScript = `
-import sys, json, time, io
-
-${code}
-
-test_cases = json.loads(${JSON.stringify(JSON.stringify(testCases))})
-param_names = json.loads(${JSON.stringify(JSON.stringify(parameterNames))})
-entry_name = ${JSON.stringify(entryFunctionName)}
-
-fn = globals().get(entry_name)
-if not callable(fn):
-    print("ENTRY_NOT_FOUND:" + entry_name)
-    sys.exit(0)
-
-results = []
-passed_count = 0
-total_start = time.perf_counter()
-
-for tc in test_cases:
-    t_id = tc["id"]
-    t_input = tc["input"]
-    expected = tc["expected"]
-    args = [t_input.get(p) for p in param_names]
-    
-    old_stdout = sys.stdout
-    buf = io.StringIO()
-    sys.stdout = buf
-    start_t = time.perf_counter()
-    passed = False
-    actual = None
-    err_str = None
-    
-    try:
-        actual = fn(*args)
-        duration_ms = (time.perf_counter() - start_t) * 1000
-        passed = (actual == expected)
-        if not passed and isinstance(actual, (list, tuple)) and isinstance(expected, (list, tuple)):
-            if len(actual) == len(expected) and len(actual) > 0 and all(isinstance(x, (list, tuple)) for x in actual) and all(isinstance(x, (list, tuple)) for x in expected):
-                try:
-                    def sort_key(v):
-                        return (0, v) if isinstance(v, (int, float)) else (1, str(v))
-                    norm_a = sorted([json.dumps(sorted(list(row), key=sort_key)) for row in actual])
-                    norm_b = sorted([json.dumps(sorted(list(row), key=sort_key)) for row in expected])
-                    passed = (norm_a == norm_b)
-                except Exception:
-                    pass
-    except Exception as e:
-        duration_ms = (time.perf_counter() - start_t) * 1000
-        err_str = str(e)
-    finally:
-        sys.stdout = old_stdout
-        
-    if passed:
-        passed_count += 1
-        
-    results.append({
-        "testCaseId": t_id,
-        "passed": passed,
-        "actual": actual if err_str is None else "Runtime Error",
-        "expected": expected,
-        "executionTimeMs": round(duration_ms, 2),
-        "stdout": buf.getvalue(),
-        "error": err_str
-    })
-
-print("---DSA_RESULT_START---")
-print(json.dumps({
-    "passedCount": passed_count,
-    "totalTimeMs": round((time.perf_counter() - total_start) * 1000, 2),
-    "results": results
-}))
-`;
-
-  // Try python, python3, or py
-  const commands = ['python', 'python3', 'py'];
-  let proc: any = null;
-
-  for (const cmd of commands) {
-    try {
-      proc = cp.spawnSync(cmd, ['-'], {
-        input: harnessScript,
-        encoding: 'utf8',
-        timeout: timeoutMs,
-      });
-      if (proc && !proc.error) break;
-      if (proc?.error?.code === 'ETIMEDOUT') break;
-    } catch {
-      // try next
-    }
-  }
-
-  if (!proc) {
-    return {
-      status: 'Runtime Error',
-      passedCount: 0,
-      totalCount: testCases.length,
-      totalTimeMs: 0,
-      results: [],
-      errorMessage: 'Could not find a Python runtime executable (python, python3, py).',
-    };
-  }
-
-  if (proc.error?.code === 'ETIMEDOUT' || proc.signal === 'SIGTERM') {
-    return {
-      status: 'Time Limit Exceeded',
-      passedCount: 0,
-      totalCount: testCases.length,
-      totalTimeMs: timeoutMs,
-      results: testCases.map((tc) => ({
+    } catch (err) {
+      results.push({
         testCaseId: tc.id,
         passed: false,
-        actual: 'Time Limit Exceeded',
+        actual: undefined,
         expected: tc.expected,
-        executionTimeMs: timeoutMs,
-        stdout: '',
-        error: `Execution timed out after ${timeoutMs}ms.`,
-      })),
-      errorMessage: `Execution timed out after ${timeoutMs}ms.`,
-    };
-  }
-
-  if (proc.status !== 0 && proc.stderr) {
-    const isSyntax = proc.stderr.includes('SyntaxError');
-    return {
-      status: isSyntax ? 'Syntax Error' : 'Runtime Error',
-      passedCount: 0,
-      totalCount: testCases.length,
-      totalTimeMs: 0,
-      results: [],
-      errorMessage: proc.stderr.trim(),
-    };
-  }
-
-  const stdout = proc.stdout || '';
-  if (stdout.includes('ENTRY_NOT_FOUND:')) {
-    return {
-      status: 'Runtime Error',
-      passedCount: 0,
-      totalCount: testCases.length,
-      totalTimeMs: 0,
-      results: [],
-      errorMessage: `Function '${entryFunctionName}' is not defined.`,
-    };
-  }
-
-  const marker = '---DSA_RESULT_START---';
-  const markerIdx = stdout.indexOf(marker);
-  if (markerIdx === -1) {
-    return {
-      status: 'Runtime Error',
-      passedCount: 0,
-      totalCount: testCases.length,
-      totalTimeMs: 0,
-      results: [],
-      errorMessage: proc.stderr || stdout || 'Unknown Python execution error',
-    };
-  }
-
-  try {
-    const payload = JSON.parse(stdout.slice(markerIdx + marker.length).trim());
-    const results: DsaTestResult[] = payload.results || [];
-    const passedCount = payload.passedCount ?? 0;
-    const totalTimeMs = payload.totalTimeMs ?? 0;
-
-    let status: DsaExecutionSummary['status'] = 'Accepted';
-    if (results.some((r) => r.error)) {
-      status = 'Runtime Error';
-    } else if (passedCount !== testCases.length) {
-      status = 'Wrong Answer';
+        executionTimeMs: Math.round((performance.now() - caseStart) * 100) / 100,
+        stdout: clamp(logs.join("\\n"), MAX_STDOUT_CHARS),
+        error: clamp(err && err.message ? err.message : String(err), MAX_ERROR_CHARS),
+      });
+    } finally {
+      console.log = origLog;
+      console.info = origInfo;
+      console.warn = origWarn;
+      console.debug = origDebug;
     }
+  }
 
-    return {
+  const totalTimeMs = Math.round((performance.now() - runStart) * 100) / 100;
+  const hasRuntimeError = results.some((r) => Boolean(r.error));
+  const status = hasRuntimeError
+    ? "Runtime Error"
+    : passedCount === testCases.length
+      ? "Accepted"
+      : "Wrong Answer";
+
+  postWorkerMessage({
+    runId,
+    summary: {
       status,
       passedCount,
       totalCount: testCases.length,
       totalTimeMs,
       results,
-    };
-  } catch (err: any) {
-    return {
-      status: 'Runtime Error',
-      passedCount: 0,
-      totalCount: testCases.length,
-      totalTimeMs: 0,
-      results: [],
-      errorMessage: `Failed to parse Python test output: ${err.message}`,
-    };
+      errorMessage: hasRuntimeError ? results.find((r) => r.error)?.error : undefined,
+    },
+  });
+};
+})();
+`;
+}
+
+export function buildSandboxSrcdoc(bootstrapToken: string): string {
+  if (!SAFE_TOKEN_RE.test(bootstrapToken)) {
+    throw new Error('Invalid sandbox bootstrap token');
   }
+  const workerSourceLiteral = JSON.stringify(buildSandboxWorkerSource()).replace(/</g, '\\u003c');
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="${DSA_SANDBOX_CSP}">
+</head>
+<body>
+<script>
+(function () {
+  "use strict";
+  var WORKER_SOURCE = ${workerSourceLiteral};
+  var BOOTSTRAP_TOKEN = ${JSON.stringify(bootstrapToken)};
+  var started = false;
+  var activeWorker = null;
+  var activeBlobUrl = null;
+  var activePort = null;
+
+  function teardown() {
+    if (activeWorker) {
+      try { activeWorker.terminate(); } catch (_) {}
+      activeWorker = null;
+    }
+    if (activeBlobUrl) {
+      try { URL.revokeObjectURL(activeBlobUrl); } catch (_) {}
+      activeBlobUrl = null;
+    }
+    if (activePort) {
+      try { activePort.close(); } catch (_) {}
+      activePort = null;
+    }
+  }
+
+  window.addEventListener("message", function (event) {
+    if (event.source !== window.parent) return;
+    if (started) return;
+    var data = event.data;
+    if (!data || data.type !== "dsa:execute" || typeof data.runId !== "string") return;
+    var port = event.ports && event.ports[0];
+    if (!port) return;
+
+    started = true;
+    activePort = port;
+    var runId = data.runId;
+    var payload = data.payload || {};
+    var totalCount = Array.isArray(payload.testCases) ? payload.testCases.length : 0;
+
+    port.onmessage = function (portEvent) {
+      var msg = portEvent.data;
+      if (msg && msg.type === "dsa:abort" && msg.runId === runId) {
+        teardown();
+      }
+    };
+
+    try {
+      var blob = new Blob([WORKER_SOURCE], { type: "application/javascript" });
+      activeBlobUrl = URL.createObjectURL(blob);
+      activeWorker = new Worker(activeBlobUrl);
+    } catch (err) {
+      try {
+        port.postMessage({
+          type: "dsa:result",
+          runId: runId,
+          summary: {
+            status: "Runtime Error",
+            passedCount: 0,
+            totalCount: totalCount,
+            totalTimeMs: 0,
+            results: [],
+            errorMessage: err && err.message ? err.message : "Failed to start sandbox worker.",
+          },
+        });
+      } catch (_) {}
+      teardown();
+      return;
+    }
+
+    activeWorker.onmessage = function (workerEvent) {
+      var msg = workerEvent.data;
+      if (!msg || msg.runId !== runId || !msg.summary) return;
+      try {
+        port.postMessage({
+          type: "dsa:result",
+          runId: runId,
+          summary: msg.summary,
+        });
+      } catch (_) {}
+      teardown();
+    };
+
+    activeWorker.onerror = function (err) {
+      try {
+        port.postMessage({
+          type: "dsa:result",
+          runId: runId,
+          summary: {
+            status: "Runtime Error",
+            passedCount: 0,
+            totalCount: totalCount,
+            totalTimeMs: 0,
+            results: [],
+            errorMessage: (err && err.message) || "Worker execution error",
+          },
+        });
+      } catch (_) {}
+      teardown();
+    };
+
+    activeWorker.postMessage({
+      runId: runId,
+      sanitizedCode: payload.sanitizedCode,
+      entryFunctionName: payload.entryFunctionName,
+      parameterNames: payload.parameterNames,
+      testCases: payload.testCases,
+    });
+  });
+
+  window.parent.postMessage({ type: "dsa:ready", bootstrapToken: BOOTSTRAP_TOKEN }, "*");
+})();
+</script>
+</body>
+</html>`;
+}
+
+function normalizeSummary(raw: unknown, expectedTotalCount: number): DsaExecutionSummary | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const candidate = raw as Record<string, unknown>;
+  if (typeof candidate.status !== 'string' || !VALID_STATUSES.has(candidate.status as DsaExecutionSummary['status'])) {
+    return null;
+  }
+  if (
+    typeof candidate.passedCount !== 'number' ||
+    !Number.isFinite(candidate.passedCount) ||
+    typeof candidate.totalCount !== 'number' ||
+    !Number.isFinite(candidate.totalCount) ||
+    typeof candidate.totalTimeMs !== 'number' ||
+    !Number.isFinite(candidate.totalTimeMs) ||
+    !Array.isArray(candidate.results)
+  ) {
+    return null;
+  }
+
+  const results: DsaTestResult[] = [];
+  for (const item of candidate.results) {
+    if (!item || typeof item !== 'object') return null;
+    const r = item as Record<string, unknown>;
+    if (
+      typeof r.testCaseId !== 'string' ||
+      typeof r.passed !== 'boolean' ||
+      typeof r.executionTimeMs !== 'number' ||
+      !Number.isFinite(r.executionTimeMs)
+    ) {
+      return null;
+    }
+    results.push({
+      testCaseId: r.testCaseId,
+      passed: r.passed,
+      actual: r.actual,
+      expected: r.expected,
+      executionTimeMs: r.executionTimeMs,
+      stdout: clampText(typeof r.stdout === 'string' ? r.stdout : '', DSA_MAX_STDOUT_CHARS),
+      ...(typeof r.error === 'string' ? { error: clampText(r.error, DSA_MAX_ERROR_CHARS) } : {}),
+    });
+  }
+
+  return {
+    status: candidate.status as DsaExecutionSummary['status'],
+    passedCount: Math.max(0, Math.min(expectedTotalCount, Math.trunc(candidate.passedCount))),
+    totalCount: expectedTotalCount,
+    totalTimeMs: Math.max(0, candidate.totalTimeMs),
+    results,
+    ...(typeof candidate.errorMessage === 'string'
+      ? { errorMessage: clampText(candidate.errorMessage, DSA_MAX_ERROR_CHARS) }
+      : {}),
+  };
+}
+
+async function runInSandboxedIframe(
+  sanitizedCode: string,
+  entryFunctionName: string,
+  parameterNames: string[],
+  testCases: DsaTestCase[],
+  timeoutMs: number,
+  signal?: AbortSignal
+): Promise<DsaExecutionSummary> {
+  if (
+    typeof window === 'undefined' ||
+    typeof document === 'undefined' ||
+    typeof MessageChannel === 'undefined'
+  ) {
+    return unsupportedSummary(testCases.length, 'Browser sandbox is required for DSA execution.');
+  }
+
+  if (signal?.aborted) {
+    return unsupportedSummary(testCases.length, 'Execution cancelled.');
+  }
+
+  const container = document.body || document.documentElement;
+  if (!container) {
+    return unsupportedSummary(testCases.length, 'Document root is unavailable for DSA sandbox.');
+  }
+
+  return new Promise<DsaExecutionSummary>((resolve) => {
+    const runId = generateRandomToken();
+    const bootstrapToken = generateRandomToken();
+    const channel = new MessageChannel();
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('sandbox', 'allow-scripts');
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.tabIndex = -1;
+    iframe.style.display = 'none';
+    iframe.srcdoc = buildSandboxSrcdoc(bootstrapToken);
+
+    let settled = false;
+    let dispatched = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const cleanup = () => {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
+      window.removeEventListener('message', onWindowMessage);
+      iframe.removeEventListener('load', onIframeLoad);
+      signal?.removeEventListener('abort', onAbort);
+      channel.port1.onmessage = null;
+      try {
+        channel.port1.close();
+      } catch {
+        // Ignore already-closed port
+      }
+      try {
+        channel.port2.close();
+      } catch {
+        // Ignore already-closed port
+      }
+      try {
+        iframe.remove();
+      } catch {
+        // Ignore detached element
+      }
+    };
+
+    const finish = (summary: DsaExecutionSummary) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(summary);
+    };
+
+    const dispatchExecution = () => {
+      if (settled || dispatched) return;
+      const targetWindow = iframe.contentWindow;
+      if (!targetWindow) {
+        finish(unsupportedSummary(testCases.length, 'Sandbox iframe window unavailable.'));
+        return;
+      }
+      dispatched = true;
+      targetWindow.postMessage(
+        {
+          type: 'dsa:execute',
+          runId,
+          payload: {
+            sanitizedCode,
+            entryFunctionName,
+            parameterNames,
+            testCases,
+          },
+        },
+        '*',
+        [channel.port2]
+      );
+    };
+
+    const onWindowMessage = (event: MessageEvent) => {
+      if (settled || dispatched) return;
+      if (event.source !== iframe.contentWindow) return;
+      const data = event.data as Record<string, unknown> | null;
+      if (
+        data &&
+        data.type === 'dsa:ready' &&
+        data.bootstrapToken === bootstrapToken
+      ) {
+        dispatchExecution();
+      }
+    };
+
+    const onIframeLoad = () => {
+      if (!settled && !dispatched) {
+        dispatchExecution();
+      }
+    };
+
+    const onAbort = () => {
+      try {
+        channel.port1.postMessage({ type: 'dsa:abort', runId });
+      } catch {
+        // Ignore if channel already closed
+      }
+      finish(unsupportedSummary(testCases.length, 'Execution cancelled.'));
+    };
+
+    channel.port1.onmessage = (event: MessageEvent) => {
+      if (settled) return;
+      const data = event.data as Record<string, unknown> | null;
+      if (!data || data.type !== 'dsa:result' || data.runId !== runId) {
+        return;
+      }
+      const normalized = normalizeSummary(data.summary, testCases.length);
+      if (!normalized) {
+        finish(unsupportedSummary(testCases.length, 'Received invalid execution summary from sandbox.'));
+        return;
+      }
+      finish(normalized);
+    };
+
+    timer = setTimeout(() => {
+      try {
+        channel.port1.postMessage({ type: 'dsa:abort', runId });
+      } catch {
+        // Ignore if channel already closed
+      }
+      finish({
+        status: 'Time Limit Exceeded',
+        passedCount: 0,
+        totalCount: testCases.length,
+        totalTimeMs: timeoutMs,
+        results: [],
+        errorMessage: `Execution timed out after ${timeoutMs}ms (possible infinite loop).`,
+      });
+    }, timeoutMs);
+
+    window.addEventListener('message', onWindowMessage);
+    iframe.addEventListener('load', onIframeLoad);
+    signal?.addEventListener('abort', onAbort, { once: true });
+    container.appendChild(iframe);
+  });
 }
 
 /**
- * Universal DSA code execution engine.
- * Supports JavaScript, TypeScript, and Python with sandboxing, timeout guards, and captured stdout.
+ * Main entrypoint for DSA workspace code execution.
+ * Runs JavaScript/TypeScript inside an opaque-origin sandboxed iframe + Worker,
+ * returning explicit unsupported summaries for Python or non-browser environments.
  */
 export async function executeDsaCode(request: {
   problem: DsaProblem;
   language: DsaLanguage;
   code: string;
   timeoutMs?: number;
+  signal?: AbortSignal;
 }): Promise<DsaExecutionSummary> {
-  const timeoutMs = request.timeoutMs ?? 2000;
-  const { problem, language, code } = request;
+  const { problem, language, code, timeoutMs = 2500, signal } = request;
 
   if (language === 'python') {
-    return runPythonCode(code, problem.entryFunctionName, problem.parameterNames, problem.testCases, timeoutMs);
+    return unsupportedSummary(
+      problem.testCases.length,
+      'Python runner requires Python runtime or Pyodide environment.'
+    );
   }
 
-  const sanitized = sanitizeTypeScriptCode(code);
+  const sanitizedCode = language === 'typescript' ? sanitizeTypeScriptCode(code) : code;
 
-  const canUseBrowserWorker = typeof window !== 'undefined' && typeof Worker !== 'undefined';
-  if (canUseBrowserWorker) {
-    return runInBrowserWorker(sanitized, problem.entryFunctionName, problem.parameterNames, problem.testCases, timeoutMs);
-  }
-
-  return Promise.resolve(runInNodeVm(sanitized, problem.entryFunctionName, problem.parameterNames, problem.testCases, timeoutMs));
+  return runInSandboxedIframe(
+    sanitizedCode,
+    problem.entryFunctionName,
+    problem.parameterNames,
+    problem.testCases,
+    timeoutMs,
+    signal
+  );
 }

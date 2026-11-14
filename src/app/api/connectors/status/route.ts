@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { CONNECTORS } from "@/lib/connectors/orchestrator";
 import { SourceConnector } from "@/lib/connectors/types";
+import { sanitizeError } from "@/lib/ai/redact";
 
 export const dynamic = "force-dynamic";
 
@@ -54,9 +55,9 @@ export async function GET() {
       },
     });
   } catch (err: any) {
-    console.error("[API connectors/status] Error:", err);
+    console.error("[API connectors/status] Error:", sanitizeError(err));
     return NextResponse.json(
-      { success: false, error: err?.message || "Failed to fetch status" },
+      { success: false, error: "Failed to fetch status" },
       { status: 500 }
     );
   }

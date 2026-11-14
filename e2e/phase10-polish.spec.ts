@@ -5,7 +5,7 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
     await page.goto("/non-existent-route-xyz");
     await page.waitForLoadState("networkidle");
 
-    const header = page.locator("h1", { hasText: "Document Node Missing" });
+    const header = page.locator("h1", { hasText: "Document Not Found" });
     await expect(header).toBeVisible();
 
     const returnBtn = page.locator('a:has-text("Return to Dashboard")');
@@ -26,7 +26,7 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
     await expect(twitterCard).toHaveAttribute("content", "summary_large_image");
 
     const themeColor = page.locator('meta[name="theme-color"]');
-    await expect(themeColor).toHaveAttribute("content", "#ff8c00");
+    await expect(themeColor).toHaveAttribute("content", "#f7bd3f");
   });
 
   test("3. Manifest and Icon routes serve valid 200 HTTP responses", async ({ request }) => {
@@ -43,15 +43,11 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
-    const previewLabel = page.locator("text=WORKSPACE PREVIEW");
-    await expect(previewLabel).toBeVisible();
-
-    const disclaimerText = page.locator("text=Illustrative interface — sample layout only");
-    await expect(disclaimerText).toBeVisible();
-
-    // Verify proof card contains structural shapes, no fabricated scores (e.g. 87/100)
     const proofCard = page.locator('[data-testid="product-proof-card"]');
     await expect(proofCard).toBeVisible();
+    await expect(proofCard).toContainText("Sample Workspace Layout");
+    await expect(proofCard).toContainText("Protected Master");
+    await expect(proofCard).not.toContainText("87/100");
   });
 
   test("5. Interactive 5-step workflow timeline supports step switching and keyboard navigation", async ({ page }) => {

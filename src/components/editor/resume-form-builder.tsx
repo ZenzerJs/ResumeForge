@@ -69,35 +69,67 @@ export function parseTypstToStructuredModel(source: string): StructuredResumeMod
     marginPreset = "spacious";
   }
 
+  const headerStart = source.indexOf("// HEADER");
+  const headerSearchOffset = headerStart >= 0 ? headerStart : 0;
+  const firstSectionMatch = source
+    .slice(headerSearchOffset)
+    .match(/(?:\/\/\s*(?:SUMMARY|EXPERIENCE|EDUCATION|PROJECTS|SKILLS)\b|#section\(|^==\s)/m);
+  const headerBlock =
+    firstSectionMatch?.index !== undefined
+      ? source.slice(headerSearchOffset, headerSearchOffset + firstSectionMatch.index)
+      : source.slice(headerSearchOffset);
+
   // Name extraction
   let fullName = "";
   const headerNameMatch =
-    source.match(/#text\([\s\S]*?size:\s*(?:1[4-9]|2[0-9])pt[\s\S]*?\)\s*\[([^\]]+)\]/) ||
-    source.match(/^=\s+(.+)$/m);
+    headerBlock.match(/#text\([\s\S]*?size:\s*(?:1[4-9]|2[0-9])pt[\s\S]*?\)\s*\[([^\]]+)\]/) ||
+    headerBlock.match(/^=\s+(.+)$/m);
   if (headerNameMatch?.[1]) {
     fullName = decodeTypstContent(headerNameMatch[1].trim());
   }
 
-  const emailMatch = source.match(/mailto:([^\s"\]]+)/) || source.match(/([\w.+-]+@[\w-]+\.[\w.-]+)/);
+  const emailMatch = headerBlock.match(/mailto:([^\s"\]]+)/) || headerBlock.match(/([\w.+-]+@[\w-]+\.[\w.-]+)/);
   const email = emailMatch?.[1]?.replace(/\\@/g, "@") || "";
 
-  const phoneMatch =
-    source.match(/#sym\.dot\s*(\+?[\d\s().-]{7,25})\s*#sym\.dot/) ||
-    source.match(/(\+?\d[\d\s().-]{7,}\d)/);
-  const phone = phoneMatch?.[1]?.trim() || "";
-
-  const githubMatch = source.match(/github\.com\/([A-Za-z0-9_.-]+)/i);
+  const githubMatch = headerBlock.match(/github\.com\/([A-Za-z0-9_.-]+)/i);
   const github = githubMatch?.[1] ? `github.com/${githubMatch[1]}` : "";
 
-  const linkedinMatch = source.match(/linkedin\.com\/in\/([A-Za-z0-9_.-]+)/i);
+  const linkedinMatch = headerBlock.match(/linkedin\.com\/in\/([A-Za-z0-9_.-]+)/i);
   const linkedin = linkedinMatch?.[1] ? `linkedin.com/in/${linkedinMatch[1]}` : "";
 
   let location = "";
-  const locMatch =
-    source.match(/#text\([^)]*size:\s*9pt[^)]*\)\[\s*([^#\n]+?)\s*#sym\.dot/) ||
-    source.match(/\[\s*([^#\n\[\]]+?)\s*#sym\.dot/);
-  if (locMatch?.[1]) {
-    location = locMatch[1].trim();
+  let phone = "";
+  const contactLineMatch =
+    headerBlock.match(/#text\([^\n]*?size:\s*9pt[^\n]*?\)\[\r?\n([\s\S]*?)\r?\n\s*\]/) ||
+    headerBlock.match(/#text\([^\n]*?size:\s*9pt[^\n]*?\)\[([^\r\n]*)\]/);
+  if (contactLineMatch?.[1]) {
+    const contactParts = contactLineMatch[1]
+      .split(/\s*#sym\.dot\s*/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    for (const part of contactParts) {
+      if (part.startsWith("#link(")) continue;
+      const isPhonePart =
+        part.replace(/\D/g, "").length >= 7 &&
+        /^(?:\\?\+?\s*[\d(][\d\s().\\-]{5,}\d)$/.test(part);
+      if (!phone && isPhonePart) {
+        phone = decodeTypstContent(part);
+      } else if (!location && !part.includes("#")) {
+        location = decodeTypstContent(part);
+      }
+    }
+  } else {
+    const phoneMatch =
+      headerBlock.match(/#sym\.dot\s*(\\?\+?[\d\s().\\-]{7,25})\s*#sym\.dot/) ||
+      headerBlock.match(/(\\?\+?\d[\d\s().\\-]{7,}\d)/);
+    phone = decodeTypstContent(phoneMatch?.[1]?.trim() || "");
+
+    const locMatch =
+      headerBlock.match(/#text\([^\n]*?size:\s*9pt[^\n]*?\)\[\s*([^#\n]+?)\s*#sym\.dot/) ||
+      headerBlock.match(/\[\s*([^#\n\[\]]+?)\s*#sym\.dot/);
+    if (locMatch?.[1]) {
+      location = decodeTypstContent(locMatch[1].trim());
+    }
   }
 
   // Helper to split by #section("...") or == Section
@@ -181,9 +213,11 @@ export function parseTypstToStructuredModel(source: string): StructuredResumeMod
     const secContent = sectionSplits[i + 2] || "";
 
     if (secName.includes("summary") || secName.includes("profile")) {
-      summary = secContent
-        .replace(/\/\/.*$/gm, "")
-        .trim();
+      summary = decodeTypstContent(
+        secContent
+          .replace(/\/\/.*$/gm, "")
+          .trim()
+      );
     } else if (secName.includes("experience") || secName.includes("work")) {
       experience = parseEntriesInBlock(secContent, "exp");
     } else if (secName.includes("education")) {
@@ -204,14 +238,14 @@ export function parseTypstToStructuredModel(source: string): StructuredResumeMod
         if (catMatch) {
           return {
             id: makeId("skill", sIdx),
-            category: catMatch[1].replace(/^\*+|\*+$/g, "").replace(/:$/, "").trim(),
-            items: catMatch[2].trim(),
+            category: decodeTypstContent(catMatch[1].replace(/^\*+|\*+$/g, "").replace(/:$/, "").trim()),
+            items: decodeTypstContent(catMatch[2].trim()),
           };
         }
         return {
           id: makeId("skill", sIdx),
           category: "",
-          items: clean,
+          items: decodeTypstContent(clean),
         };
       });
     }
@@ -412,6 +446,22 @@ interface ResumeFormBuilderProps {
   onChange: (newTypst: string) => void;
 }
 
+export function isResumeSourceSafeForForm(source: string): boolean {
+  const normalizeForSafeCheck = (src: string) =>
+    src
+      .replace(
+        /^\/\/ (?:Link styling matching LaTeX linkblue \(#1155CC\)|Section heading helper|Header\/entry helper for aligned roles & dates|Compact list styling)\r?\n/gm,
+        ""
+      )
+      .replace(/\\([/+-])/g, "$1")
+      .trim();
+
+  return (
+    normalizeForSafeCheck(serializeStructuredModelToTypst(parseTypstToStructuredModel(source))) ===
+    normalizeForSafeCheck(source)
+  );
+}
+
 export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
   const [model, setModel] = useState<StructuredResumeModel>(() =>
     parseTypstToStructuredModel(value)
@@ -430,7 +480,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
     });
   }, [value]);
 
-  const safeToEdit = serializeStructuredModelToTypst(parseTypstToStructuredModel(value)).trim() === value.trim();
+  const safeToEdit = isResumeSourceSafeForForm(value);
   const commitModel = (next: StructuredResumeModel) => {
     if (!safeToEdit) return;
     setModel(next);
@@ -502,7 +552,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
   };
 
   if (!safeToEdit) return (
-    <div data-testid="resume-form-builder-unavailable" className="p-6 text-sm text-slate-200" role="status">
+    <div data-testid="resume-form-builder-unavailable" className="p-6 text-sm text-foreground" role="status">
       This source cannot be safely edited in the form without losing content. Use Typst Code to edit it.
     </div>
   );
@@ -510,16 +560,16 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
   return (
     <div
       data-testid="resume-form-builder"
-      className="flex h-full flex-col overflow-hidden bg-slate-900 text-slate-100"
+      className="flex h-full flex-col overflow-hidden bg-panel text-foreground"
     >
       {/* Formatting Quick Controls Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-slate-950/90 px-4 py-2 text-xs">
-        <div className="flex items-center gap-2 text-slate-300 font-medium">
-          <SlidersHorizontal className="h-3.5 w-3.5 text-[#ff8c00]" />
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-outline/70 bg-canvas px-4 py-2 text-xs">
+        <div className="flex items-center gap-2 text-text-secondary font-semibold">
+          <SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
           <span>Formatting:</span>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-1.5 text-[11px] text-slate-400 font-mono">
+          <label className="flex items-center gap-1.5 text-[11px] text-text-muted font-mono">
             <span>Font Size</span>
             <select
               value={model.fontSize}
@@ -530,7 +580,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                 })
               }
               data-testid="form-builder-font-size"
-              className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-slate-200 focus:border-[#ff8c00] focus:outline-none"
+              className="rounded border border-outline/70 bg-inset px-2 py-0.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="8.5pt">8.5 pt (Dense)</option>
               <option value="9pt">9.0 pt (Default)</option>
@@ -540,7 +590,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
             </select>
           </label>
 
-          <label className="flex items-center gap-1.5 text-[11px] text-slate-400 font-mono">
+          <label className="flex items-center gap-1.5 text-[11px] text-text-muted font-mono">
             <span>Margins</span>
             <select
               value={model.marginPreset}
@@ -551,7 +601,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                 })
               }
               data-testid="form-builder-margins"
-              className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-slate-200 focus:border-[#ff8c00] focus:outline-none"
+              className="rounded border border-outline/70 bg-inset px-2 py-0.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="compact">Compact (1.0 cm)</option>
               <option value="balanced">Balanced (1.25 cm)</option>
@@ -562,7 +612,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
       </div>
 
       {/* Section Navigation Pills */}
-      <div className="flex items-center gap-1.5 overflow-x-auto border-b border-slate-800 bg-slate-900/80 px-4 py-2 no-scrollbar">
+      <div className="flex items-center gap-1.5 overflow-x-auto border-b border-outline/70 bg-panel px-4 py-2 no-scrollbar">
         {[
           { id: "contact", label: "Contact & Summary", icon: User },
           { id: "experience", label: `Experience (${model.experience.length})`, icon: Briefcase },
@@ -578,10 +628,10 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
               type="button"
               onClick={() => setActiveSection(tab.id as typeof activeSection)}
               data-testid={`form-builder-tab-${tab.id}`}
-              className={`flex items-center gap-1.5 shrink-0 rounded-md px-2.5 py-1.5 text-xs font-mono font-medium transition ${
+              className={`flex items-center gap-1.5 shrink-0 rounded px-2.5 py-1.5 text-xs font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 active
-                  ? "bg-[#ff8c00]/15 border border-[#ff8c00]/40 text-amber-300"
-                  : "border border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                  ? "bg-primary/15 border border-primary/50 text-primary"
+                  : "border border-transparent text-text-secondary hover:bg-elevated hover:text-foreground"
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -595,78 +645,78 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {activeSection === "contact" && (
           <div className="space-y-4" data-testid="form-section-contact">
-            <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-4 space-y-3">
-              <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#ff8c00]">
+            <div className="rounded-[10px] border border-outline/70 bg-canvas/50 p-4 space-y-3">
+              <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-primary">
                 Candidate Header &amp; Contact Info
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-mono text-slate-400 mb-1">Full Name</label>
+                  <label className="block text-[11px] font-mono text-text-muted mb-1">Full Name</label>
                   <input
                     type="text"
                     value={model.fullName}
                     onChange={(e) => commitModel({ ...model, fullName: e.target.value })}
                     data-testid="form-input-fullname"
-                    className="w-full rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-[#ff8c00] focus:outline-none"
+                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-mono text-slate-400 mb-1">Location</label>
+                  <label className="block text-[11px] font-mono text-text-muted mb-1">Location</label>
                   <input
                     type="text"
                     value={model.location}
                     onChange={(e) => commitModel({ ...model, location: e.target.value })}
                     data-testid="form-input-location"
-                    className="w-full rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-[#ff8c00] focus:outline-none"
+                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-mono text-slate-400 mb-1">Email</label>
+                  <label className="block text-[11px] font-mono text-text-muted mb-1">Email</label>
                   <input
                     type="email"
                     value={model.email}
                     onChange={(e) => commitModel({ ...model, email: e.target.value })}
                     data-testid="form-input-email"
-                    className="w-full rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-[#ff8c00] focus:outline-none"
+                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-mono text-slate-400 mb-1">Phone</label>
+                  <label className="block text-[11px] font-mono text-text-muted mb-1">Phone</label>
                   <input
                     type="text"
                     value={model.phone}
                     onChange={(e) => commitModel({ ...model, phone: e.target.value })}
                     data-testid="form-input-phone"
-                    className="w-full rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-[#ff8c00] focus:outline-none"
+                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-mono text-slate-400 mb-1">GitHub URL</label>
+                  <label className="block text-[11px] font-mono text-text-muted mb-1">GitHub URL</label>
                   <input
                     type="text"
                     value={model.github}
                     onChange={(e) => commitModel({ ...model, github: e.target.value })}
-                    className="w-full rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-[#ff8c00] focus:outline-none"
+                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-mono text-slate-400 mb-1">LinkedIn URL</label>
+                  <label className="block text-[11px] font-mono text-text-muted mb-1">LinkedIn URL</label>
                   <input
                     type="text"
                     value={model.linkedin}
                     onChange={(e) => commitModel({ ...model, linkedin: e.target.value })}
-                    className="w-full rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-[#ff8c00] focus:outline-none"
+                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-4 space-y-2">
+            <div className="rounded-[10px] border border-outline/70 bg-canvas/50 p-4 space-y-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#ff8c00]">
+                <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-primary">
                   Professional Summary (Optional)
                 </h3>
-                <span className="text-[10px] font-mono text-slate-500">Renders above Experience</span>
+                <span className="text-[10px] font-mono text-text-muted">Renders above Experience</span>
               </div>
               <textarea
                 rows={3}
@@ -674,7 +724,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                 onChange={(e) => commitModel({ ...model, summary: e.target.value })}
                 placeholder="e.g. Senior Full-Stack Engineer with 5+ years building distributed cloud systems..."
                 data-testid="form-input-summary"
-                className="w-full rounded border border-slate-700 bg-slate-900 p-2.5 text-xs text-white focus:border-[#ff8c00] focus:outline-none leading-relaxed"
+                className="w-full rounded border border-outline/70 bg-inset p-2.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background leading-relaxed"
               />
             </div>
           </div>
@@ -685,7 +735,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
           activeSection === "projects") && (
           <div className="space-y-4" data-testid={`form-section-${activeSection}`}>
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#ff8c00]">
+              <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-primary">
                 {activeSection === "experience"
                   ? "Work Experience"
                   : activeSection === "education"
@@ -696,7 +746,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                 type="button"
                 onClick={() => addEntry(activeSection)}
                 data-testid={`add-${activeSection}-entry-btn`}
-                className="flex items-center gap-1 rounded bg-[#ff8c00] px-2.5 py-1 text-xs font-mono font-bold text-slate-950 hover:bg-amber-400 transition"
+                className="flex items-center gap-1 rounded bg-primary px-2.5 py-1 text-xs font-mono font-semibold text-primary-foreground hover:bg-primary/90 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Add{" "}
@@ -711,17 +761,17 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
             {model[activeSection].map((entry, idx) => (
               <div
                 key={entry.id}
-                className="rounded-lg border border-slate-800 bg-slate-950/60 p-4 space-y-3"
+                className="rounded-[10px] border border-outline/70 bg-canvas/50 p-4 space-y-3"
               >
-                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-                  <span className="font-mono text-xs font-semibold text-slate-300">
+                <div className="flex items-center justify-between border-b border-outline/60 pb-2">
+                  <span className="font-mono text-xs font-semibold text-text-secondary">
                     #{idx + 1} · {entry.title || "Untitled"}
                   </span>
                   {model[activeSection].length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeEntry(activeSection, entry.id)}
-                      className="text-slate-500 hover:text-red-400 transition p-1"
+                      className="text-text-muted hover:text-status-danger transition p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                       title="Remove entry"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -731,7 +781,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-[10px] font-mono text-slate-400 mb-1">
+                    <label className="block text-[10px] font-mono text-text-muted mb-1">
                       {activeSection === "education"
                         ? "University / Institution"
                         : activeSection === "projects"
@@ -744,11 +794,11 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                       onChange={(e) =>
                         updateEntryField(activeSection, entry.id, "title", e.target.value)
                       }
-                      className="w-full rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-[#ff8c00] focus:outline-none"
+                      className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-mono text-slate-400 mb-1">
+                    <label className="block text-[10px] font-mono text-text-muted mb-1">
                       {activeSection === "education" ? "Degree / Program" : "Role / Title"}
                     </label>
                     <input
@@ -757,11 +807,11 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                       onChange={(e) =>
                         updateEntryField(activeSection, entry.id, "role", e.target.value)
                       }
-                      className="w-full rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-[#ff8c00] focus:outline-none"
+                      className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-mono text-slate-400 mb-1">
+                    <label className="block text-[10px] font-mono text-text-muted mb-1">
                       Location
                     </label>
                     <input
@@ -770,11 +820,11 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                       onChange={(e) =>
                         updateEntryField(activeSection, entry.id, "location", e.target.value)
                       }
-                      className="w-full rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-[#ff8c00] focus:outline-none"
+                      className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-mono text-slate-400 mb-1">
+                    <label className="block text-[10px] font-mono text-text-muted mb-1">
                       Date Range
                     </label>
                     <input
@@ -783,40 +833,40 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                       onChange={(e) =>
                         updateEntryField(activeSection, entry.id, "date", e.target.value)
                       }
-                      className="w-full rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-[#ff8c00] focus:outline-none"
+                      className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2 pt-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
                       Impact Bullets ({entry.bullets.length})
                     </span>
                     <button
                       type="button"
                       onClick={() => addEntryBullet(activeSection, entry.id)}
-                      className="text-[11px] font-mono text-[#ff8c00] hover:underline flex items-center gap-1"
+                      className="text-[11px] font-mono text-primary hover:underline flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                     >
                       <Plus className="h-3 w-3" /> Add Bullet
                     </button>
                   </div>
                   {entry.bullets.map((bullet, bIdx) => (
                     <div key={bIdx} className="flex items-start gap-2">
-                      <span className="mt-2 text-xs text-[#ff8c00]">•</span>
+                      <span className="mt-2 text-xs text-primary">•</span>
                       <textarea
                         rows={2}
                         value={bullet}
                         onChange={(e) =>
                           updateEntryBullet(activeSection, entry.id, bIdx, e.target.value)
                         }
-                        className="flex-1 rounded border border-slate-700 bg-slate-900 p-2 text-xs text-slate-100 focus:border-[#ff8c00] focus:outline-none leading-relaxed"
+                        className="flex-1 rounded border border-outline/70 bg-inset p-2 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background leading-relaxed"
                       />
                       {entry.bullets.length > 1 && (
                         <button
                           type="button"
                           onClick={() => removeEntryBullet(activeSection, entry.id, bIdx)}
-                          className="mt-1.5 text-slate-500 hover:text-red-400 p-1"
+                          className="mt-1.5 text-text-muted hover:text-status-danger p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                           title="Delete bullet"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -833,7 +883,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
         {activeSection === "skills" && (
           <div className="space-y-4" data-testid="form-section-skills">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#ff8c00]">
+              <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-primary">
                 Skills &amp; Technical Inventory
               </h3>
               <button
@@ -852,7 +902,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                   })
                 }
                 data-testid="add-skill-category-btn"
-                className="flex items-center gap-1 rounded bg-[#ff8c00] px-2.5 py-1 text-xs font-mono font-bold text-slate-950 hover:bg-amber-400 transition"
+                className="flex items-center gap-1 rounded bg-primary px-2.5 py-1 text-xs font-mono font-semibold text-primary-foreground hover:bg-primary/90 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Add Category
@@ -863,7 +913,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
               {model.skills.map((skill) => (
                 <div
                   key={skill.id}
-                  className="rounded-lg border border-slate-800 bg-slate-950/60 p-3 flex flex-col sm:flex-row items-start sm:items-center gap-2.5"
+                  className="rounded-[10px] border border-outline/70 bg-canvas/50 p-3 flex flex-col sm:flex-row items-start sm:items-center gap-2.5"
                 >
                   <input
                     type="text"
@@ -875,7 +925,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                       commitModel({ ...model, skills: next });
                     }}
                     placeholder="Category (e.g. Languages)"
-                    className="w-full sm:w-44 shrink-0 rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-amber-300 focus:border-[#ff8c00] focus:outline-none"
+                    className="w-full sm:w-44 shrink-0 rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs font-semibold text-primary focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                   <input
                     type="text"
@@ -887,7 +937,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                       commitModel({ ...model, skills: next });
                     }}
                     placeholder="Comma-separated skills (e.g. TypeScript, Python, Go, PostgreSQL)"
-                    className="flex-1 w-full rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-[#ff8c00] focus:outline-none"
+                    className="flex-1 w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                   {model.skills.length > 1 && (
                     <button
@@ -896,7 +946,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                         const next = model.skills.filter((s) => s.id !== skill.id);
                         commitModel({ ...model, skills: next });
                       }}
-                      className="text-slate-500 hover:text-red-400 p-1"
+                      className="text-text-muted hover:text-status-danger p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                       title="Remove skill category"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -910,8 +960,8 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
       </div>
 
       {/* Footer Sync Indicator */}
-      <div className="flex items-center justify-between border-t border-slate-800 bg-slate-950 px-4 py-2 text-[11px] text-slate-400 font-mono">
-        <span className="flex items-center gap-1.5 text-emerald-400">
+      <div className="flex items-center justify-between border-t border-outline/70 bg-canvas px-4 py-2 text-[11px] text-text-muted font-mono">
+        <span className="flex items-center gap-1.5 text-status-success">
           <Sparkles className="h-3 w-3" />
           Live-synced with Typst WASM Preview
         </span>

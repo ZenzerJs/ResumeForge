@@ -11,7 +11,7 @@ function escapeContent(value: string): string {
 function escapeString(value: string): string {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r/g, "\\r").replace(/\n/g, "\\n")}"`;
 }
-function safeDestination(value: string): string | null {
+export function safeDestination(value: string): string | null {
   try {
     const url = new URL(value);
     if (!["http:", "https:", "mailto:"].includes(url.protocol.toLowerCase()) || /[\r\n\u0000-\u001f]/.test(value)) return null;
@@ -84,7 +84,7 @@ export function createInlineRenderer(links: InlineLink[] = [], source?: string) 
       const canonical = token.href ? safeDestination(token.href) : null;
       if (canonical && !used.has(canonical)) {
         used.add(canonical);
-        output += `#link(${escapeString(token.href!)})[${label}]`;
+        output += `#link(${escapeString(token.href!.trim())})[${label}]`;
       } else if (token.emphasis) {
         output += token.emphasis === "bold" ? `#strong[${label}]` : `#emph[${label}]`;
       } else output += label;
@@ -105,7 +105,7 @@ export function createInlineRenderer(links: InlineLink[] = [], source?: string) 
       const label = escapeContent(link.label || link.url);
       if (canonical && !used.has(canonical)) {
         used.add(canonical);
-        result.push(`#link(${escapeString(link.url)})[${label}]`);
+        result.push(`#link(${escapeString(link.url.trim())})[${label}]`);
       } else result.push(label);
     });
     return result;

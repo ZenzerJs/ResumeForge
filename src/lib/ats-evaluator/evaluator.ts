@@ -413,13 +413,22 @@ function parseTypstSections(typstContent: string): {
   let inSkillsSection = false;
 
   for (const line of lines) {
+    const trimmed = line.trim();
+    const isCommentOrDefinition =
+      trimmed.startsWith("//") || /^#let\b/.test(trimmed);
+    const sectionCallMatch = !isCommentOrDefinition
+      ? trimmed.match(/^#section\s*\(\s*"((?:\\.|[^"\\])*)"(?:\s*,|\s*\))/)
+      : null;
+
     const isHeader =
+      Boolean(sectionCallMatch) ||
       line.includes("resume-section") ||
       line.includes("#heading") ||
       /^(=+)\s+/i.test(line);
 
     if (isHeader) {
-      if (/skills|technologies|tools/i.test(line)) {
+      const headingText = sectionCallMatch ? sectionCallMatch[1] : line;
+      if (/skills|technologies|tools/i.test(headingText)) {
         inSkillsSection = true;
       } else {
         inSkillsSection = false;

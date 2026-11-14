@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useLayoutEffect } from "react";
 import Link from "next/link";
 import {
   X,
@@ -23,7 +23,7 @@ import {
   Building2,
   Search,
 } from "lucide-react";
-import { isSafeHref } from "@/lib/security/safe-fetch";
+import { isSafeHref } from "@/lib/security/safe-url";
 import {
   synthesizeStarInterviewPrep,
   formatStarStoryForClipboard,
@@ -32,6 +32,14 @@ import {
   EvidenceGrounding,
 } from "@/lib/prep/star-synthesizer";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { CompanyIntelDossierPanel } from "./company-intel-dossier-panel";
 
@@ -112,6 +120,19 @@ export function ApplyPrepSheetModal({
       setActiveTab(initialTab);
     }
   }, [isOpen, initialTab]);
+
+  // Ensure Escape closes this modal before any outer Sheet/Dialog DismissableLayer intercepts it.
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () => document.removeEventListener("keydown", handleKeyDown, { capture: true });
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -220,8 +241,6 @@ export function ApplyPrepSheetModal({
     ].join("\n");
   }, [job, oaProblems, matchedHighlights]);
 
-  if (!isOpen) return null;
-
   const copyToClipboard = async (key: string, text: string) => {
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
@@ -278,40 +297,47 @@ export function ApplyPrepSheetModal({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
-      data-testid="apply-prep-sheet-modal"
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
     >
-      <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border border-slate-700 bg-[#0b1326] shadow-2xl overflow-hidden">
+      <DialogContent
+        hideCloseButton
+        data-testid="apply-prep-sheet-modal"
+        className="flex max-h-[90dvh] w-full max-w-3xl flex-col gap-0 overflow-hidden rounded-[10px] border-hairline bg-panel p-0 text-foreground shadow-2xl"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-900/60">
+        <DialogHeader className="flex flex-row items-center justify-between space-y-0 border-b border-hairline bg-elevated/60 px-6 py-4 text-left">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[6px] bg-primary/15 text-primary">
               <ClipboardList className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white">
+              <DialogTitle className="text-sm font-bold text-foreground">
                 Application &amp; Interview Prep — {job.company}
-              </h2>
-              <p className="text-xs text-slate-400">{job.title}</p>
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
+                {job.title}
+              </DialogDescription>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            data-testid="close-prep-sheet-btn"
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"
-            aria-label="Close prep sheet"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+          <DialogClose asChild>
+            <button
+              type="button"
+              data-testid="close-prep-sheet-btn"
+              className="rounded-[6px] p-1.5 text-muted-foreground hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              aria-label="Close prep sheet"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </DialogClose>
+        </DialogHeader>
 
         {/* Segmented Navigation Tabs */}
-        <div className="flex items-center gap-1 border-b border-slate-800 px-6 pt-3 pb-2 bg-slate-900/30 overflow-x-auto">
+        <div className="flex items-center gap-1 border-b border-hairline px-6 pt-3 pb-2 bg-inset/70 overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab("oa-mock")}
@@ -319,14 +345,14 @@ export function ApplyPrepSheetModal({
             className={cn(
               "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 shrink-0",
               activeTab === "oa-mock"
-                ? "bg-amber-500 text-slate-950 font-bold"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                ? "bg-primary text-primary-foreground font-bold"
+                : "text-muted-foreground hover:text-foreground hover:bg-elevated"
             )}
           >
             <Code2 className="size-3.5" />
             <span>Technical Interview &amp; Practice Problems</span>
             {oaProblems.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-900 text-amber-300 font-mono">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-panel text-primary font-mono">
                 {oaProblems.length}
               </span>
             )}
@@ -338,14 +364,14 @@ export function ApplyPrepSheetModal({
             className={cn(
               "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 shrink-0",
               activeTab === "star"
-                ? "bg-amber-500 text-slate-950 font-bold"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                ? "bg-primary text-primary-foreground font-bold"
+                : "text-muted-foreground hover:text-foreground hover:bg-elevated"
             )}
           >
             <Sparkles className="size-3.5" />
             <span>STAR Behavioral Stories</span>
             {starPrep.stories.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-900 text-amber-300 font-mono">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-panel text-primary font-mono">
                 {starPrep.stories.length}
               </span>
             )}
@@ -357,8 +383,8 @@ export function ApplyPrepSheetModal({
             className={cn(
               "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 shrink-0",
               activeTab === "intel"
-                ? "bg-emerald-500 text-slate-950 font-bold"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                ? "bg-emerald-500 text-primary-foreground font-bold"
+                : "text-muted-foreground hover:text-foreground hover:bg-elevated"
             )}
           >
             <Building2 className="size-3.5" />
@@ -371,8 +397,8 @@ export function ApplyPrepSheetModal({
             className={cn(
               "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 shrink-0",
               activeTab === "form"
-                ? "bg-amber-500 text-slate-950 font-bold"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                ? "bg-primary text-primary-foreground font-bold"
+                : "text-muted-foreground hover:text-foreground hover:bg-elevated"
             )}
           >
             <User className="size-3.5" />
@@ -385,8 +411,8 @@ export function ApplyPrepSheetModal({
             className={cn(
               "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 shrink-0",
               activeTab === "cover"
-                ? "bg-amber-500 text-slate-950 font-bold"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                ? "bg-primary text-primary-foreground font-bold"
+                : "text-muted-foreground hover:text-foreground hover:bg-elevated"
             )}
           >
             <FileText className="size-3.5" />
@@ -409,7 +435,7 @@ export function ApplyPrepSheetModal({
                 <button
                   type="button"
                   onClick={() => setFallbackText(null)}
-                  className="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-900"
+                  className="text-muted-foreground hover:text-foreground text-xs px-1.5 py-0.5 rounded bg-inset"
                 >
                   Dismiss
                 </button>
@@ -418,7 +444,7 @@ export function ApplyPrepSheetModal({
                 readOnly
                 value={fallbackText}
                 data-testid="clipboard-fallback-textarea"
-                className="w-full h-24 p-2 bg-slate-900 border border-slate-700 rounded text-slate-200 font-mono text-[11px] select-all focus:outline-none"
+                className="w-full h-24 p-2 bg-inset border border-control/70 rounded-[6px] text-foreground font-mono text-[11px] select-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
                 onFocus={(e) => e.target.select()}
               />
             </div>
@@ -433,18 +459,18 @@ export function ApplyPrepSheetModal({
                   "p-3.5 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs",
                   oaMatched && oaProblems.length > 0
                     ? "bg-emerald-950/40 border-emerald-800/60 text-emerald-300"
-                    : "bg-slate-900/80 border-slate-800 text-slate-300"
+                    : "bg-inset/80 border-hairline text-text-secondary"
                 )}
               >
                 <div className="flex items-start gap-2.5">
-                  <Code2 className="size-4 shrink-0 text-amber-400 mt-0.5" />
+                  <Code2 className="size-4 shrink-0 text-primary mt-0.5" />
                   <div>
-                    <span className="font-bold text-slate-100 block">
+                    <span className="font-bold text-foreground block">
                       {oaMatched && oaProblems.length > 0
                         ? `Real Interview & OA Problems for ${job.company}`
                         : `Technical Interview Practice Problems`}
                     </span>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-[11px] text-muted-foreground">
                       {oaMatched && oaProblems.length > 0
                         ? `Loaded ${oaProblems.length} verified assessment problems pulled directly from the Tech OA repository for ${job.company}.`
                         : `Showing curated technical interview questions from our 1,929+ problem repository.`}
@@ -466,7 +492,7 @@ export function ApplyPrepSheetModal({
                       ✓ Verified {job.company} Bank ({oaProblems.length})
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className="border-slate-700 bg-slate-800/80 text-slate-300 text-[10px] shrink-0">
+                    <Badge variant="outline" className="border-hairline bg-elevated text-text-secondary text-[10px] shrink-0">
                       Curated Tech Repository
                     </Badge>
                   )}
@@ -476,19 +502,19 @@ export function ApplyPrepSheetModal({
               {/* Search & Category Filter Controls */}
               <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-2.5 size-3.5 text-slate-400" />
+                  <Search className="absolute left-3 top-2.5 size-3.5 text-muted-foreground" />
                   <input
                     type="text"
                     value={problemSearch}
                     onChange={(e) => setProblemSearch(e.target.value)}
                     placeholder="Search practice problems by title, topic, or tag (e.g. DP, array, graph)..."
-                    className="w-full bg-slate-900/90 border border-slate-800 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                    className="w-full bg-inset border border-control/70 rounded-[6px] pl-9 pr-8 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel focus-visible:border-ring"
                   />
                   {problemSearch && (
                     <button
                       type="button"
                       onClick={() => setProblemSearch("")}
-                      className="absolute right-2.5 top-2 text-slate-400 hover:text-white"
+                      className="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground"
                     >
                       <X className="size-3.5" />
                     </button>
@@ -505,7 +531,7 @@ export function ApplyPrepSheetModal({
                         "px-2.5 py-1 rounded text-[11px] font-mono transition-colors",
                         categoryFilter === cat
                           ? "bg-amber-500/20 border border-amber-500/60 text-amber-300 font-bold"
-                          : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200"
+                          : "bg-inset border border-hairline text-muted-foreground hover:text-foreground"
                       )}
                     >
                       {cat === "ALL" ? "All Types" : cat}
@@ -517,7 +543,7 @@ export function ApplyPrepSheetModal({
               {/* List of Recent Leaked / Observed Problems */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                  <h3 className="font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
                     <Terminal className="h-3.5 w-3.5" /> Practice Problems ({filteredProblems.length})
                   </h3>
                   {filteredProblems.length > 0 && (
@@ -531,7 +557,7 @@ export function ApplyPrepSheetModal({
                             .join("\n")
                         )
                       }
-                      className="text-[11px] text-amber-400 hover:underline flex items-center gap-1"
+                      className="text-[11px] text-primary hover:underline flex items-center gap-1"
                     >
                       {copiedKey === "all-oa-questions" ? <Check className="size-3" /> : <Copy className="size-3" />}
                       Copy Problems List
@@ -540,7 +566,7 @@ export function ApplyPrepSheetModal({
                 </div>
 
                 {isFetchingOa ? (
-                  <div className="p-8 text-center text-slate-400">
+                  <div className="p-8 text-center text-muted-foreground">
                     <p>Loading real interview problems from repository...</p>
                   </div>
                 ) : filteredProblems.length > 0 ? (
@@ -558,12 +584,12 @@ export function ApplyPrepSheetModal({
                         <div
                           key={prob.id || idx}
                           data-testid="oa-problem-card"
-                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition"
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-lg bg-inset/80 border border-hairline hover:border-control transition"
                         >
                           <div className="min-w-0 flex-1 space-y-1.5">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-bold text-slate-100 text-xs">{prob.title}</span>
-                              <Badge variant="secondary" className="bg-slate-800 text-slate-300 text-[10px]">
+                              <span className="font-bold text-foreground text-xs">{prob.title}</span>
+                              <Badge variant="secondary" className="bg-elevated text-text-secondary border border-hairline text-[10px]">
                                 {prob.category || "OA"}
                               </Badge>
                               {prob.difficulty && (
@@ -582,14 +608,14 @@ export function ApplyPrepSheetModal({
                               )}
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
+                            <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
                               {dateStr && (
-                                <span className="font-mono text-slate-500">Observed: {dateStr}</span>
+                                <span className="font-mono text-muted-foreground">Observed: {dateStr}</span>
                               )}
                               {prob.tags && prob.tags.length > 0 && (
                                 <div className="flex flex-wrap gap-1">
                                   {prob.tags.map((t, i) => (
-                                    <span key={i} className="px-1.5 py-0.2 rounded bg-slate-800/80 text-[10px] text-slate-400 font-mono">
+                                    <span key={i} className="px-1.5 py-0.2 rounded bg-elevated text-[10px] text-muted-foreground font-mono">
                                       #{t}
                                     </span>
                                   ))}
@@ -612,7 +638,7 @@ export function ApplyPrepSheetModal({
                             <button
                               type="button"
                               onClick={() => copyToClipboard(`prob-${prob.id || idx}`, prob.title)}
-                              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300 transition"
+                              className="p-1 rounded bg-elevated hover:bg-control/30 text-text-secondary hover:text-primary transition"
                               title="Copy problem title"
                             >
                               {copiedKey === `prob-${prob.id || idx}` ? (
@@ -627,7 +653,7 @@ export function ApplyPrepSheetModal({
                     })}
                   </div>
                 ) : (
-                  <div className="p-6 rounded-lg bg-slate-900/40 border border-slate-800 text-center text-slate-400 space-y-2">
+                  <div className="p-6 rounded-lg bg-inset/60 border border-hairline text-center text-muted-foreground space-y-2">
                     <p>No practice problems matching &quot;{problemSearch}&quot;.</p>
                     <button
                       type="button"
@@ -635,7 +661,7 @@ export function ApplyPrepSheetModal({
                         setProblemSearch("");
                         setCategoryFilter("ALL");
                       }}
-                      className="text-xs text-amber-400 hover:underline"
+                      className="text-xs text-primary hover:underline"
                     >
                       Clear search &amp; filters
                     </button>
@@ -646,22 +672,22 @@ export function ApplyPrepSheetModal({
               {/* Section 2: Mock Interviewer Prompt Simulator */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                  <h3 className="font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5" /> Mock Interviewer Copilot Simulator Prompt
                   </h3>
                   <button
                     type="button"
                     onClick={() => copyToClipboard("mock-prompt", mockInterviewerPrompt)}
-                    className="text-[11px] text-amber-400 hover:underline flex items-center gap-1"
+                    className="text-[11px] text-primary hover:underline flex items-center gap-1"
                   >
                     {copiedKey === "mock-prompt" ? <Check className="size-3" /> : <Copy className="size-3" />}
                     Copy Full Prompt
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-muted-foreground">
                   Copy this prompt into ChatGPT, Claude, or Gemini to run a realistic technical mock interview tailored to {job.company}&apos;s real assessment problems and your resume highlights.
                 </p>
-                <div className="max-h-72 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/90 p-3.5 font-mono text-[11px] text-slate-300 whitespace-pre-wrap leading-relaxed">
+                <div className="max-h-72 overflow-y-auto rounded-lg border border-hairline bg-inset p-3.5 font-mono text-[11px] text-text-secondary whitespace-pre-wrap leading-relaxed">
                   {mockInterviewerPrompt}
                 </div>
               </div>
@@ -674,10 +700,10 @@ export function ApplyPrepSheetModal({
               {/* Section 1: STAR Stories */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                  <h3 className="font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5" /> Verified STAR Stories &amp; Mitigations
                   </h3>
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] text-muted-foreground">
                     Grounded strictly in verified Evidence Bank items
                   </span>
                 </div>
@@ -688,18 +714,18 @@ export function ApplyPrepSheetModal({
                       <div
                         key={idx}
                         data-testid="star-story-card"
-                        className="rounded-lg border border-slate-800 bg-slate-900/70 p-4 space-y-3"
+                        className="rounded-lg border border-hairline bg-inset/70 p-4 space-y-3"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="space-y-1">
                             <div className="flex flex-wrap items-center gap-2">
                               {renderGroundingBadge(story.grounding)}
-                              <span className="font-bold text-sm text-white">{story.requirement}</span>
+                              <span className="font-bold text-sm text-foreground">{story.requirement}</span>
                             </div>
-                            <p className="text-[11px] text-slate-400 font-medium">
+                            <p className="text-[11px] text-muted-foreground font-medium">
                               Source: {story.evidenceTitle}
                               {story.evidenceIds.length > 0 && (
-                                <span className="ml-1 font-mono text-[10px] text-slate-500">
+                                <span className="ml-1 font-mono text-[10px] text-muted-foreground">
                                   ({story.evidenceIds.join(", ")})
                                 </span>
                               )}
@@ -712,7 +738,7 @@ export function ApplyPrepSheetModal({
                               copyToClipboard(`star-${idx}`, formatStarStoryForClipboard(story))
                             }
                             data-testid="copy-star-story-btn"
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] transition-colors shrink-0"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-elevated hover:bg-control/30 text-foreground border border-hairline text-[11px] transition-colors shrink-0"
                             title="Copy formatted story/mitigation to clipboard"
                           >
                             {copiedKey === `star-${idx}` ? (
@@ -722,7 +748,7 @@ export function ApplyPrepSheetModal({
                               </>
                             ) : (
                               <>
-                                <Copy className="size-3.5 text-amber-400" />
+                                <Copy className="size-3.5 text-primary" />
                                 <span>Copy Text</span>
                               </>
                             )}
@@ -735,39 +761,39 @@ export function ApplyPrepSheetModal({
                             <span className="font-bold text-red-300 uppercase tracking-wide text-[10px] block">
                               Honest Gap Mitigation Strategy
                             </span>
-                            <p className="text-slate-300 leading-relaxed text-xs">
+                            <p className="text-text-secondary leading-relaxed text-xs">
                               {story.mitigationPlan}
                             </p>
                           </div>
                         ) : (
                           /* If DIRECT or TRANSFERABLE: Render STAR Grid */
                           <div className="grid grid-cols-1 gap-2 pt-1 font-sans text-xs">
-                            <div className="p-2.5 rounded bg-slate-950/60 border border-slate-800/80">
-                              <span className="font-bold text-amber-400 uppercase tracking-wide text-[10px] block mb-0.5">
+                            <div className="p-2.5 rounded bg-panel border border-hairline">
+                              <span className="font-bold text-primary uppercase tracking-wide text-[10px] block mb-0.5">
                                 S — Situation
                               </span>
-                              <p className="text-slate-300 leading-relaxed">{story.situation}</p>
+                              <p className="text-text-secondary leading-relaxed">{story.situation}</p>
                             </div>
 
-                            <div className="p-2.5 rounded bg-slate-950/60 border border-slate-800/80">
-                              <span className="font-bold text-blue-400 uppercase tracking-wide text-[10px] block mb-0.5">
+                            <div className="p-2.5 rounded bg-panel border border-hairline">
+                              <span className="font-bold text-signal uppercase tracking-wide text-[10px] block mb-0.5">
                                 T — Task
                               </span>
-                              <p className="text-slate-300 leading-relaxed">{story.task}</p>
+                              <p className="text-text-secondary leading-relaxed">{story.task}</p>
                             </div>
 
-                            <div className="p-2.5 rounded bg-slate-950/60 border border-slate-800/80">
-                              <span className="font-bold text-indigo-400 uppercase tracking-wide text-[10px] block mb-0.5">
+                            <div className="p-2.5 rounded bg-panel border border-hairline">
+                              <span className="font-bold text-ember uppercase tracking-wide text-[10px] block mb-0.5">
                                 A — Action
                               </span>
-                              <p className="text-slate-300 leading-relaxed">{story.action}</p>
+                              <p className="text-text-secondary leading-relaxed">{story.action}</p>
                             </div>
 
-                            <div className="p-2.5 rounded bg-slate-950/60 border border-slate-800/80">
+                            <div className="p-2.5 rounded bg-panel border border-hairline">
                               <span className="font-bold text-emerald-400 uppercase tracking-wide text-[10px] block mb-0.5">
                                 R — Result
                               </span>
-                              <p className="text-slate-300 leading-relaxed">{story.result}</p>
+                              <p className="text-text-secondary leading-relaxed">{story.result}</p>
                             </div>
 
                             {story.mitigationPlan && (
@@ -787,7 +813,7 @@ export function ApplyPrepSheetModal({
                             {story.technologies.map((t, i) => (
                               <span
                                 key={i}
-                                className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 border border-slate-700"
+                                className="px-2 py-0.5 rounded bg-elevated text-[10px] text-text-secondary border border-hairline"
                               >
                                 {t}
                               </span>
@@ -798,7 +824,7 @@ export function ApplyPrepSheetModal({
                     ))}
                   </div>
                 ) : (
-                  <div className="p-4 rounded-lg bg-slate-900/40 border border-slate-800 text-center text-slate-400">
+                  <div className="p-4 rounded-lg bg-inset/60 border border-hairline text-center text-muted-foreground">
                     <p>No verified evidence items loaded yet. Add items to Evidence Bank in Library.</p>
                   </div>
                 )}
@@ -807,8 +833,8 @@ export function ApplyPrepSheetModal({
               {/* Section 2: Gap Mitigations */}
               {starPrep.gapMitigations.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                    <AlertTriangle className="h-3.5 w-3.5 text-amber-400" /> Gap Mitigation Strategies
+                  <h3 className="font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 text-primary" /> Gap Mitigation Strategies
                   </h3>
                   <div className="space-y-2">
                     {starPrep.gapMitigations.map((gap, idx) => (
@@ -820,12 +846,12 @@ export function ApplyPrepSheetModal({
                         <div className="flex items-center justify-between">
                           <span className="font-semibold text-amber-300">Missing: {gap.requirement}</span>
                           {gap.transferableSkills.length > 0 && (
-                            <span className="text-[10px] text-slate-400">
+                            <span className="text-[10px] text-muted-foreground">
                               Transferable: {gap.transferableSkills.join(", ")}
                             </span>
                           )}
                         </div>
-                        <p className="text-slate-300 leading-relaxed text-xs">{gap.mitigationStrategy}</p>
+                        <p className="text-text-secondary leading-relaxed text-xs">{gap.mitigationStrategy}</p>
                       </div>
                     ))}
                   </div>
@@ -836,7 +862,7 @@ export function ApplyPrepSheetModal({
               {starPrep.talkingPoints.length > 0 && (
                 <div className="space-y-3" data-testid="talking-points-container">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                    <h3 className="font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
                       <ShieldCheck className="h-3.5 w-3.5" /> Key Verified Talking Points
                     </h3>
                     <button
@@ -844,16 +870,16 @@ export function ApplyPrepSheetModal({
                       onClick={() =>
                         copyToClipboard("talking-points", starPrep.talkingPoints.join("\n- "))
                       }
-                      className="text-[11px] text-amber-400 hover:underline flex items-center gap-1"
+                      className="text-[11px] text-primary hover:underline flex items-center gap-1"
                     >
                       {copiedKey === "talking-points" ? <Check className="size-3" /> : <Copy className="size-3" />}
                       Copy All Points
                     </button>
                   </div>
-                  <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 space-y-2">
+                  <div className="rounded-lg border border-hairline bg-inset/70 p-3 space-y-2">
                     {starPrep.talkingPoints.map((tp, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-slate-300 leading-relaxed">
-                        <ChevronRight className="size-3.5 text-amber-400 shrink-0 mt-0.5" />
+                      <div key={idx} className="flex items-start gap-2 text-text-secondary leading-relaxed">
+                        <ChevronRight className="size-3.5 text-primary shrink-0 mt-0.5" />
                         <span>{tp}</span>
                       </div>
                     ))}
@@ -875,26 +901,26 @@ export function ApplyPrepSheetModal({
             <div className="space-y-5">
               {/* Contact Info */}
               <div className="space-y-2">
-                <span className="font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                <span className="font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
                   <User className="h-3.5 w-3.5" /> Candidate Information
                 </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-hairline bg-inset/70 p-3">
                   {Object.entries(candidateInfo).map(([key, val]) => {
                     if (!val) return null;
                     const isCopied = copiedKey === `contact-${key}`;
                     return (
                       <div
                         key={key}
-                        className="flex items-center justify-between gap-2 rounded bg-slate-800/60 px-2.5 py-1.5"
+                        className="flex items-center justify-between gap-2 rounded bg-elevated px-2.5 py-1.5"
                       >
                         <div className="min-w-0 flex-1">
-                          <span className="text-[10px] uppercase text-slate-500 block">{key}</span>
-                          <span className="truncate text-slate-200 block">{val}</span>
+                          <span className="text-[10px] uppercase text-muted-foreground block">{key}</span>
+                          <span className="truncate text-foreground block">{val}</span>
                         </div>
                         <button
                           type="button"
                           onClick={() => copyToClipboard(`contact-${key}`, val)}
-                          className="shrink-0 p-1 text-slate-400 hover:text-amber-400 transition-colors"
+                          className="shrink-0 p-1 text-muted-foreground hover:text-primary transition-colors"
                           title={`Copy ${key}`}
                         >
                           {isCopied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
@@ -909,7 +935,7 @@ export function ApplyPrepSheetModal({
               {matchedHighlights.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                    <span className="font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
                       <Sparkles className="h-3.5 w-3.5" /> Top Evidence Highlights for Form Answers
                     </span>
                     <button
@@ -917,23 +943,23 @@ export function ApplyPrepSheetModal({
                       onClick={() =>
                         copyToClipboard("all-highlights", matchedHighlights.join("\n\n"))
                       }
-                      className="text-[11px] text-amber-400 hover:underline flex items-center gap-1"
+                      className="text-[11px] text-primary hover:underline flex items-center gap-1"
                     >
                       {copiedKey === "all-highlights" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                       Copy All Bullets
                     </button>
                   </div>
-                  <div className="space-y-1.5 rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+                  <div className="space-y-1.5 rounded-lg border border-hairline bg-inset/70 p-3">
                     {matchedHighlights.map((hl, idx) => (
                       <div
                         key={idx}
-                        className="flex items-start justify-between gap-2 rounded bg-slate-800/40 p-2 text-slate-300"
+                        className="flex items-start justify-between gap-2 rounded bg-elevated p-2 text-text-secondary"
                       >
                         <span className="flex-1 leading-relaxed">• {hl}</span>
                         <button
                           type="button"
                           onClick={() => copyToClipboard(`hl-${idx}`, hl)}
-                          className="shrink-0 p-1 text-slate-400 hover:text-amber-400"
+                          className="shrink-0 p-1 text-muted-foreground hover:text-primary"
                           title="Copy bullet point"
                         >
                           {copiedKey === `hl-${idx}` ? (
@@ -954,14 +980,14 @@ export function ApplyPrepSheetModal({
           {activeTab === "cover" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                <span className="font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
                   <FileText className="h-3.5 w-3.5" /> Tailored Cover Letter Draft
                 </span>
                 {coverLetter && (
                   <button
                     type="button"
                     onClick={() => copyToClipboard("cover-letter", coverLetter)}
-                    className="text-[11px] text-amber-400 hover:underline flex items-center gap-1"
+                    className="text-[11px] text-primary hover:underline flex items-center gap-1"
                   >
                     {copiedKey === "cover-letter" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                     Copy Full Letter
@@ -970,11 +996,11 @@ export function ApplyPrepSheetModal({
               </div>
 
               {coverLetter ? (
-                <div className="max-h-80 overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/60 p-4 text-slate-300 whitespace-pre-wrap leading-relaxed">
+                <div className="max-h-80 overflow-y-auto rounded-lg border border-hairline bg-inset/70 p-4 text-text-secondary whitespace-pre-wrap leading-relaxed">
                   {coverLetter}
                 </div>
               ) : (
-                <div className="p-6 rounded-lg bg-slate-900/40 border border-slate-800 text-center text-slate-400">
+                <div className="p-6 rounded-lg bg-inset/60 border border-hairline text-center text-muted-foreground">
                   <p>No cover letter draft generated for this job application yet.</p>
                 </div>
               )}
@@ -983,8 +1009,8 @@ export function ApplyPrepSheetModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-slate-800 px-6 py-3 bg-slate-900/60">
-          <span className="text-[11px] text-slate-500">Ready to submit application</span>
+        <div className="flex items-center justify-between border-t border-hairline px-6 py-3 bg-inset/70">
+          <span className="text-[11px] text-muted-foreground">Ready to submit application</span>
           <div className="flex items-center gap-2">
             {job.applyUrl && isSafeHref(job.applyUrl) && (
               <a
@@ -992,22 +1018,15 @@ export function ApplyPrepSheetModal({
                 target="_blank"
                 rel="noopener noreferrer"
                 data-testid="prep-sheet-open-portal-btn"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-amber-400 shadow-sm"
+                className="inline-flex items-center gap-1.5 rounded-[6px] bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
                 Open Job Portal
               </a>
             )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-700"
-            >
-              Done
-            </button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

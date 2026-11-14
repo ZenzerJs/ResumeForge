@@ -19,17 +19,26 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/design-system/app-shell";
+import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ExtractedPdfEvidence } from "@/lib/evidence/pdfExtractor";
 import { convertExtractedPdfToEvidenceItems, type CreateEvidencePayload } from "@/lib/evidence/evidence-transform";
 import { initializeDemoSamples } from "@/lib/demo-client";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const BulkPdfDropzone = dynamic(
   () => import("@/components/evidence/bulk-pdf-dropzone").then((mod) => mod.BulkPdfDropzone),
   {
     loading: () => (
-      <div className="h-32 rounded-xl border border-dashed border-slate-800 bg-slate-900/40 p-4 animate-pulse flex items-center justify-center text-xs text-slate-500 font-mono">
+      <div className="h-32 rounded-xl border border-dashed border-hairline bg-inset/60 p-4 animate-pulse flex items-center justify-center text-xs text-muted-foreground font-mono">
         Loading PDF dropzone...
       </div>
     ),
@@ -79,6 +88,9 @@ export function LibraryWorkspace() {
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modalOpenerRef = useRef<HTMLElement | null>(null);
+  const tabListRef = useRef<HTMLDivElement>(null);
+  const [tabIndicator, setTabIndicator] = useState<{ left: number; width: number } | null>(null);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -176,6 +188,14 @@ export function LibraryWorkspace() {
     fetchItems();
   }, [fetchItems]);
 
+  useEffect(() => {
+    const container = tabListRef.current;
+    if (!container) return;
+    const activeEl = container.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!activeEl) return;
+    setTabIndicator({ left: activeEl.offsetLeft, width: activeEl.offsetWidth });
+  }, [activeTab, items]);
+
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
   };
@@ -190,7 +210,13 @@ export function LibraryWorkspace() {
     return matchTitle || matchOrg || matchSummary || matchTags;
   });
 
-  const openCreateModal = () => {
+  const openCreateModal = (opener?: HTMLElement | null) => {
+    modalOpenerRef.current =
+      opener instanceof HTMLElement
+        ? opener
+        : document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
     setEditingItem(null);
     setFormData({
       type: "experience",
@@ -205,7 +231,13 @@ export function LibraryWorkspace() {
     setIsModalOpen(true);
   };
 
-  const openEditModal = (item: EvidenceItem) => {
+  const openEditModal = (item: EvidenceItem, opener?: HTMLElement | null) => {
+    modalOpenerRef.current =
+      opener instanceof HTMLElement
+        ? opener
+        : document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
     setEditingItem(item);
     setFormData({
       type: item.type,
@@ -567,19 +599,19 @@ export function LibraryWorkspace() {
             type="button"
             disabled={isImporting}
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded border border-slate-700 bg-slate-800/80 text-xs font-mono text-slate-300 hover:bg-slate-700/80 transition-colors"
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-[6px] border border-hairline bg-elevated text-xs font-mono text-text-secondary hover:bg-muted hover:text-foreground transition-colors"
           >
             {isImporting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
             ) : (
-              <Upload className="h-3.5 w-3.5 text-slate-300" />
+              <Upload className="h-3.5 w-3.5 text-primary" />
             )}
             Import JSON
           </button>
           <button
             type="button"
-            onClick={openCreateModal}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded border border-[#ff8c00]/40 bg-[#ff8c00]/10 text-[#ff8c00] hover:bg-[#ff8c00]/20 font-bold text-xs transition-colors"
+            onClick={(e) => openCreateModal(e.currentTarget)}
+            className="flex items-center gap-1.5 rounded-[6px] border border-primary/40 bg-primary/10 px-3.5 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <Plus className="h-3.5 w-3.5" />
             Add Evidence Item
@@ -590,10 +622,14 @@ export function LibraryWorkspace() {
       {/* Main Content Area with Header Margin Clearance matching preview (1).webp */}
       <div className="mx-auto max-w-5xl w-full px-6 pt-8 pb-16 flex-1 flex flex-col gap-8">
         {/* Page Title Header */}
-        <div>
-          <h1 className="text-3xl font-extrabold text-white tracking-[-0.03em] mb-4">
-            Verified Evidence Bank Inventory
-          </h1>
+        <div className="space-y-6">
+          <div className="enter-once rounded-xl surface-raised edge-glow p-5 sm:p-6">
+            <div className="border-l-2 border-primary pl-3 sm:pl-4">
+              <h1 className="text-3xl font-bold text-foreground tracking-[-0.03em]">
+                Verified Evidence Bank Inventory
+              </h1>
+            </div>
+          </div>
           <BulkPdfDropzone onComplete={handlePdfIngestComplete} />
         </div>
 
@@ -622,7 +658,7 @@ export function LibraryWorkspace() {
                 type="button"
                 aria-label="Dismiss notification"
                 onClick={() => setNotification(null)}
-                className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-white focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <X className="h-4 w-4" aria-hidden />
               </button>
@@ -631,20 +667,41 @@ export function LibraryWorkspace() {
         </AnimatePresence>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-800">
+        <div
+          ref={tabListRef}
+          role="tablist"
+          aria-label="Evidence views"
+          className="relative flex border-b border-hairline"
+        >
+          <span
+            aria-hidden="true"
+            data-testid="library-tab-indicator"
+            className="pointer-events-none absolute bottom-0 left-0 h-[2px] w-px origin-left rounded-full ombre-bar transition-transform duration-200 ease-out motion-reduce:transition-none"
+            style={
+              tabIndicator
+                ? { transform: `translateX(${tabIndicator.left}px) scaleX(${tabIndicator.width})`, opacity: 1 }
+                : { opacity: 0 }
+            }
+          />
           <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "library"}
             onClick={() => setActiveTab("library")}
-            className={`px-4 py-2 text-sm font-medium ${activeTab === "library" ? "text-[#ff8c00] border-b-2 border-[#ff8c00]" : "text-slate-400 hover:text-white"}`}
+            className={`px-4 py-2 text-sm font-semibold transition-colors ${activeTab === "library" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
           >
             Library
           </button>
           <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "review"}
             onClick={() => setActiveTab("review")}
-            className={`px-4 py-2 text-sm font-medium ${activeTab === "review" ? "text-[#ff8c00] border-b-2 border-[#ff8c00]" : "text-slate-400 hover:text-white"} flex items-center gap-2`}
+            className={`px-4 py-2 text-sm font-semibold transition-colors ${activeTab === "review" ? "text-primary" : "text-muted-foreground hover:text-foreground"} flex items-center gap-2`}
           >
             Review Queue
             {items.filter(i => i.needsReview).length > 0 && (
-              <span className="bg-[#ff8c00] text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums">
                 {items.filter(i => i.needsReview).length}
               </span>
             )}
@@ -654,13 +711,13 @@ export function LibraryWorkspace() {
         {activeTab === "library" ? (
         <>
         {/* Search Input Bar + Status Select Dropdown + Item Count Bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border glass-bar px-4 py-3">
           {/* Search Input Box */}
           <div className="relative flex-1 w-full max-w-md">
             <label htmlFor="evidence-search" className="sr-only">
               Search evidence by title, org, summary, or tags
             </label>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" aria-hidden />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
             <input
               id="evidence-search"
               type="search"
@@ -669,20 +726,20 @@ export function LibraryWorkspace() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search evidence by title, org, summary, or tags…"
-              className="w-full h-11 pl-9 pr-4 rounded bg-slate-900/90 border border-slate-700/80 text-slate-100 placeholder:text-slate-500 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00] text-xs font-mono"
+              className="w-full h-11 pl-9 pr-4 rounded-[6px] bg-inset border border-hairline text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring text-xs font-mono"
             />
           </div>
 
           {/* Status Dropdown + Item Counter */}
           <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-slate-400">Status:</span>
+              <span className="text-xs font-mono text-muted-foreground">Status:</span>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
                 data-testid="evidence-status-filter"
                 aria-label="Filter evidence by status"
-                className="bg-[#121929] border border-slate-700 text-slate-200 rounded px-3 py-1.5 text-xs font-mono outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00]"
+                className="bg-inset border border-hairline text-foreground rounded-[6px] px-3 py-1.5 text-xs font-mono outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="all">All, Verified, Draft, Archived</option>
                 <option value="verified">Verified Only</option>
@@ -691,7 +748,7 @@ export function LibraryWorkspace() {
               </select>
             </div>
 
-            <span className="text-xs font-mono text-slate-400">
+            <span className="text-xs font-mono tabular-nums text-muted-foreground">
               {filteredItems.length} items
             </span>
           </div>
@@ -701,18 +758,35 @@ export function LibraryWorkspace() {
         {isLoading ? (
           <div className="grid gap-4">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="rounded-xl border border-slate-800 bg-[#121929] p-5">
-                <Skeleton className="h-4 w-48 mb-3" />
-                <Skeleton className="h-3 w-full mb-2" />
-                <Skeleton className="h-3 w-3/4" />
+              <div key={i} className="rounded-xl surface-raised edge-glow p-5 space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <Skeleton className="h-9 w-9 rounded-lg shrink-0" />
+                    <div className="space-y-2 flex-1 min-w-0">
+                      <Skeleton className="h-4 w-52 max-w-full" />
+                      <Skeleton className="h-3 w-32" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-5 w-20 rounded-md shrink-0" />
+                </div>
+                <div className="space-y-2 pl-12">
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-11/12" />
+                  <Skeleton className="h-3 w-3/4" />
+                </div>
+                <div className="flex flex-wrap gap-2 pl-12">
+                  <Skeleton className="h-5 w-16 rounded-[6px]" />
+                  <Skeleton className="h-5 w-20 rounded-[6px]" />
+                  <Skeleton className="h-5 w-14 rounded-[6px]" />
+                </div>
               </div>
             ))}
           </div>
         ) : filteredItems.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-800 bg-[#121929]/50 p-12 text-center">
-            <FileJson className="mx-auto h-8 w-8 text-slate-600 mb-2" />
-            <h3 className="text-sm font-semibold text-slate-300">No evidence items found</h3>
-            <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
+          <div className="rounded-xl border-dashed surface-raised p-12 text-center">
+            <FileJson className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+            <h3 className="text-sm font-semibold text-foreground">No evidence items found</h3>
+            <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
               {searchQuery
                 ? `No evidence items matching search "${searchQuery}".`
                 : `No evidence items matching status filter "${filterStatus}".`}
@@ -722,11 +796,24 @@ export function LibraryWorkspace() {
           <div className="grid gap-4">
             {filteredItems.map((item) => {
               const isExpanded = expandedIds[item.id] ?? false;
+              const typeLower = (item.type || "").toLowerCase();
+              const isEducation = typeLower === "education" || typeLower === "award";
+              const isSkill = typeLower === "skill" || typeLower === "metric";
+              const typeBadgeClass = isEducation
+                ? "bg-signal/10 border-signal/35 text-signal"
+                : isSkill
+                  ? "bg-ember/10 border-ember/35 text-ember"
+                  : "bg-primary/10 border-primary/35 text-primary";
+              const typeEdgeClass = isEducation
+                ? "border-l-[3px] border-l-signal hover:border-l-signal"
+                : isSkill
+                  ? "border-l-[3px] border-l-ember hover:border-l-ember"
+                  : "border-l-[3px] border-l-primary hover:border-l-primary";
               return (
                 <div
                   key={item.id}
                   data-testid="evidence-item-card"
-                  className="rounded-xl border border-slate-800 bg-[#121929]/90 hover:border-slate-700 transition-colors p-5 overflow-hidden"
+                  className={`rounded-xl surface-raised card-lift ${typeEdgeClass} p-5 overflow-hidden`}
                 >
                   {/* Card Header Row */}
                   <div className="flex items-start justify-between gap-4">
@@ -734,7 +821,7 @@ export function LibraryWorkspace() {
                       <button
                         type="button"
                         onClick={() => toggleExpand(item.id)}
-                        className="text-slate-400 hover:text-white mt-1 transition-colors"
+                        className="text-muted-foreground hover:text-foreground mt-1 transition-colors"
                       >
                         {isExpanded ? (
                           <ChevronDown className="h-4 w-4" />
@@ -745,15 +832,15 @@ export function LibraryWorkspace() {
 
                       <div>
                         <div className="flex items-center gap-3 flex-wrap">
-                          <span className="rounded bg-[#172033] border border-slate-700 px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
+                          <span className={`rounded-[5px] border px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider ${typeBadgeClass}`}>
                             {item.type}
                           </span>
-                          <h2 className="text-base font-bold text-white tracking-tight">
+                          <h2 className="text-base font-bold text-foreground tracking-tight">
                             {item.title}
                             {item.organization ? ` @ ${item.organization}` : ""}
                           </h2>
                         </div>
-                        <p className="mt-2 text-xs text-slate-300 leading-relaxed max-w-3xl">
+                        <p className="mt-2 text-xs text-text-secondary leading-relaxed max-w-3xl">
                           {item.verifiedSummary}
                         </p>
                       </div>
@@ -761,23 +848,23 @@ export function LibraryWorkspace() {
 
                     <div className="flex items-center gap-3 shrink-0">
                       <span
-                        className={`rounded px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider ${
+                        className={`rounded-[5px] px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider ${
                           item.status === "verified"
-                            ? "bg-[#062c24] border border-[#065f46] text-[#34d399]"
-                            : "bg-[#172033] border border-slate-700 text-slate-400"
+                            ? "bg-status-success/10 border border-status-success/35 text-status-success"
+                            : "bg-inset border border-hairline text-muted-foreground"
                         }`}
                       >
                         {item.status === "verified" ? "✓ VERIFIED" : item.status}
                       </span>
                       {item.dates && (
-                        <span className="text-xs font-mono text-slate-400">
+                        <span className="text-xs font-mono text-muted-foreground">
                           {item.dates}
                         </span>
                       )}
                       <button
                         type="button"
-                        onClick={() => openEditModal(item)}
-                        className="text-slate-500 hover:text-white p-2 rounded hover:bg-slate-800 transition-colors ml-1 min-h-11 min-w-11 inline-flex items-center justify-center"
+                        onClick={(e) => openEditModal(item, e.currentTarget)}
+                        className="ml-1 inline-flex min-h-11 min-w-11 items-center justify-center rounded-[6px] p-2 text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                         title="Edit Item"
                         aria-label="Edit Item"
                       >
@@ -786,7 +873,7 @@ export function LibraryWorkspace() {
                       <button
                         type="button"
                         onClick={() => void handleArchiveItem(item.id)}
-                        className="text-slate-500 hover:text-red-300 p-2 rounded hover:bg-slate-800 transition-colors min-h-11 min-w-11 inline-flex items-center justify-center"
+                        className="text-muted-foreground hover:text-status-danger p-2 rounded-[6px] hover:bg-elevated transition-colors min-h-11 min-w-11 inline-flex items-center justify-center"
                         title="Archive Item"
                         aria-label="Archive Item"
                       >
@@ -801,9 +888,10 @@ export function LibraryWorkspace() {
                       {item.tags.map((t, idx) => (
                         <span
                           key={idx}
-                          className="rounded bg-[#172033] border border-slate-700 px-2.5 py-1 text-[11px] font-mono text-slate-300"
+                          className="inline-flex items-center gap-1.5 rounded-[6px] bg-inset border border-hairline px-2.5 py-1 text-[11px] font-mono text-text-secondary"
                         >
-                          {t}
+                          {hasBrandIcon(t) && <BrandIcon name={t} className="h-3 w-3 shrink-0" />}
+                          <span>{t}</span>
                         </span>
                       ))}
                     </div>
@@ -816,9 +904,9 @@ export function LibraryWorkspace() {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="mt-4 pt-4 border-t border-slate-800/80 pl-7"
+                        className="mt-4 pt-4 border-t border-hairline pl-7"
                       >
-                        <ul className="space-y-2 text-xs text-slate-300 list-disc pl-4 font-sans">
+                        <ul className="space-y-2 text-xs text-text-secondary list-disc pl-4 font-sans">
                           {item.bullets.map((b, idx) => (
                             <li key={b.id || idx} className="leading-relaxed">
                               {b.text}
@@ -837,7 +925,7 @@ export function LibraryWorkspace() {
         ) : (
           <div className="grid gap-4" data-testid="duplicate-review-queue">
             {items.filter((item) => item.needsReview).length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-800 bg-[#121929]/50 text-center p-10 text-slate-400 text-xs font-mono">
+              <div className="rounded-xl border-dashed surface-raised text-center p-10 text-muted-foreground text-xs font-mono">
                 No duplicate or overlapping evidence items need review.
               </div>
             ) : (
@@ -847,40 +935,40 @@ export function LibraryWorkspace() {
                   <div
                     key={item.id}
                     data-testid={`duplicate-review-card-${item.id}`}
-                    className="rounded-xl border border-slate-800 bg-[#121929]/90 p-5"
+                    className="rounded-xl surface-raised card-lift p-5"
                   >
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-base font-bold text-white">
+                      <h3 className="text-base font-bold text-foreground">
                         Review Potential Duplicate · {item.title}
                       </h3>
-                      <span className="text-xs font-mono text-slate-400">
+                      <span className="text-xs font-mono text-muted-foreground">
                         {item.organization || "Personal"}
                       </span>
                     </div>
                     <div className="flex flex-col md:flex-row gap-4 mb-4">
-                      <div className="flex-1 p-4 rounded-lg bg-[#0b1326] border border-slate-800">
-                        <div className="text-[11px] text-amber-300 mb-1 font-mono uppercase">
+                      <div className="flex-1 p-4 rounded-lg bg-inset border border-hairline">
+                        <div className="text-[11px] text-primary mb-1 font-mono uppercase">
                           Candidate Bullet
                         </div>
-                        <p className="text-xs text-slate-200 leading-relaxed">
+                        <p className="text-xs text-text-secondary leading-relaxed">
                           {item.candidateBullet || item.verifiedSummary || "N/A"}
                         </p>
                       </div>
                       <div className="flex items-center justify-center px-2">
                         <div className="text-center">
-                          <div className="text-[#ff8c00] font-bold text-lg font-mono">
+                          <div className="text-ember font-bold text-lg font-mono tabular-nums">
                             {Math.round((item.similarityScore || 0.75) * 100)}%
                           </div>
-                          <div className="text-[10px] text-slate-500 uppercase font-mono">
+                          <div className="text-[10px] text-muted-foreground uppercase font-mono">
                             Similarity
                           </div>
                         </div>
                       </div>
-                      <div className="flex-1 p-4 rounded-lg bg-[#0b1326] border border-slate-800">
-                        <div className="text-[11px] text-emerald-300 mb-1 font-mono uppercase">
+                      <div className="flex-1 p-4 rounded-lg bg-inset border border-hairline">
+                        <div className="text-[11px] text-signal mb-1 font-mono uppercase">
                           Existing Bullet
                         </div>
-                        <p className="text-xs text-slate-200 leading-relaxed">
+                        <p className="text-xs text-text-secondary leading-relaxed">
                           {item.existingBullet || "N/A"}
                         </p>
                       </div>
@@ -931,7 +1019,7 @@ export function LibraryWorkspace() {
                           });
                         }}
                         variant="outline"
-                        className="border-slate-700 text-slate-300 text-xs"
+                        className="border-hairline bg-inset text-text-secondary hover:text-foreground text-xs"
                       >
                         Keep Both
                       </Button>
@@ -1029,7 +1117,7 @@ export function LibraryWorkspace() {
                             message: `Merged "${item.title}" bullets into primary Evidence Bank record.`,
                           });
                         }}
-                        className="bg-[#ff8c00] text-black font-bold text-xs hover:bg-amber-400"
+                        className="bg-primary text-primary-foreground font-bold text-xs hover:opacity-90"
                       >
                         Merge
                       </Button>
@@ -1042,122 +1130,156 @@ export function LibraryWorkspace() {
       </div>
 
       {/* Modal Dialog for Create/Edit */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-xl border border-slate-800 bg-[#121929] p-6 shadow-2xl">
-            <h2 className="text-base font-bold text-white mb-4">
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent
+          className="max-w-lg max-h-[90dvh] overflow-y-auto overscroll-contain border-hairline bg-panel p-6"
+          onCloseAutoFocus={(event) => {
+            const opener = modalOpenerRef.current;
+            modalOpenerRef.current = null;
+            if (opener && opener.isConnected) {
+              event.preventDefault();
+              opener.focus();
+            }
+          }}
+        >
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-base font-bold text-foreground">
               {editingItem ? "Edit Evidence Item" : "Create Evidence Item"}
-            </h2>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Add or update verified experience, project, or skill evidence.
+            </DialogDescription>
+          </DialogHeader>
 
-            <form onSubmit={handleSaveItem} className="space-y-4">
-              <div>
-                <label className="block text-xs font-mono text-slate-300 mb-1">Type</label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00]"
-                >
-                  <option value="experience">Experience</option>
-                  <option value="project">Project</option>
-                  <option value="skill">Skill</option>
-                  <option value="education">Education</option>
-                  <option value="award">Award</option>
-                  <option value="metric">Metric</option>
-                </select>
-              </div>
+          <form onSubmit={handleSaveItem} className="space-y-4">
+            <div>
+              <label htmlFor="evidence-item-type" className="block text-xs font-mono text-on-surface-variant mb-1">
+                Type
+              </label>
+              <select
+                id="evidence-item-type"
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                className="w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+              >
+                <option value="experience">Experience</option>
+                <option value="project">Project</option>
+                <option value="skill">Skill</option>
+                <option value="education">Education</option>
+                <option value="award">Award</option>
+                <option value="metric">Metric</option>
+              </select>
+            </div>
 
+            <div>
+              <label htmlFor="evidence-item-title" className="block text-xs font-mono text-on-surface-variant mb-1">
+                Title
+              </label>
+              <input
+                id="evidence-item-title"
+                type="text"
+                required
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                className="w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+                placeholder="e.g. Software Engineer Intern"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-mono text-slate-300 mb-1">Title</label>
+                <label htmlFor="evidence-item-org" className="block text-xs font-mono text-on-surface-variant mb-1">
+                  Organization
+                </label>
                 <input
+                  id="evidence-item-org"
                   type="text"
-                  required
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00]"
-                  placeholder="e.g. Software Engineer Intern"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1">Organization</label>
-                  <input
-                    type="text"
-                    value={formData.organization}
-                    onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
-                    className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00]"
-                    placeholder="e.g. Stripe"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1">Dates</label>
-                  <input
-                    type="text"
-                    value={formData.dates}
-                    onChange={(e) => setFormData({ ...formData, dates: e.target.value })}
-                    className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00]"
-                    placeholder="e.g. Jun 29, 2023"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-mono text-slate-300 mb-1">Verified Summary</label>
-                <textarea
-                  required
-                  rows={3}
-                  value={formData.verifiedSummary}
-                  onChange={(e) => setFormData({ ...formData, verifiedSummary: e.target.value })}
-                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00]"
-                  placeholder="Detailed summary of verified accomplishment claim..."
+                  value={formData.organization}
+                  onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
+                  className="w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+                  placeholder="e.g. Stripe"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-slate-300 mb-1">Tags (Comma-separated)</label>
+                <label htmlFor="evidence-item-dates" className="block text-xs font-mono text-on-surface-variant mb-1">
+                  Dates
+                </label>
                 <input
+                  id="evidence-item-dates"
                   type="text"
-                  value={formData.tagsInput}
-                  onChange={(e) => setFormData({ ...formData, tagsInput: e.target.value })}
-                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00] font-mono"
-                  placeholder="TypeScript, React, Node.js"
+                  value={formData.dates}
+                  onChange={(e) => setFormData({ ...formData, dates: e.target.value })}
+                  className="w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+                  placeholder="e.g. Jun 29, 2023"
                 />
               </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-mono text-slate-300 mb-1">Bullets (One per line)</label>
-                <textarea
-                  rows={3}
-                  value={formData.bulletsInput.join("\n")}
-                  onChange={(e) => setFormData({ ...formData, bulletsInput: e.target.value.split("\n") })}
-                  className="w-full rounded border border-slate-800 bg-[#0b1326] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-[#ff8c00] font-mono"
-                  placeholder="Developed high-throughput API endpoints..."
-                />
-              </div>
+            <div>
+              <label htmlFor="evidence-item-summary" className="block text-xs font-mono text-on-surface-variant mb-1">
+                Verified Summary
+              </label>
+              <textarea
+                id="evidence-item-summary"
+                required
+                rows={3}
+                value={formData.verifiedSummary}
+                onChange={(e) => setFormData({ ...formData, verifiedSummary: e.target.value })}
+                className="w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+                placeholder="Detailed summary of verified accomplishment claim..."
+              />
+            </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsModalOpen(false)}
-                  className="border-slate-800 bg-[#0b1326] text-slate-400 hover:text-white text-xs"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  size="sm"
-                  className="bg-[#ff8c00] text-black font-bold text-xs"
-                >
-                  Save Item
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            <div>
+              <label htmlFor="evidence-item-tags" className="block text-xs font-mono text-on-surface-variant mb-1">
+                Tags (Comma-separated)
+              </label>
+              <input
+                id="evidence-item-tags"
+                type="text"
+                value={formData.tagsInput}
+                onChange={(e) => setFormData({ ...formData, tagsInput: e.target.value })}
+                className="w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel font-mono"
+                placeholder="TypeScript, React, Node.js"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="evidence-item-bullets" className="block text-xs font-mono text-on-surface-variant mb-1">
+                Bullets (One per line)
+              </label>
+              <textarea
+                id="evidence-item-bullets"
+                rows={3}
+                value={formData.bulletsInput.join("\n")}
+                onChange={(e) => setFormData({ ...formData, bulletsInput: e.target.value.split("\n") })}
+                className="w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel font-mono"
+                placeholder="Developed high-throughput API endpoints..."
+              />
+            </div>
+
+            <DialogFooter className="pt-3 border-t border-hairline gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsModalOpen(false)}
+                className="border-control/70 bg-inset text-on-surface-variant hover:text-foreground text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                className="bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90"
+              >
+                Save Item
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }

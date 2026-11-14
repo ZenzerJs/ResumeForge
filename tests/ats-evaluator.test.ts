@@ -104,4 +104,70 @@ describe("ATS Deterministic Evaluator Engine", () => {
         res.roleEvidence.score
     );
   });
+
+  it("recognizes #section headings, exits skills bucket at next heading, and excludes definitions/comments", () => {
+    const templateResume = `
+#let section(title) = [ == #title ]
+// #section("Skills") — commented out heading
+#let helper-skills = "skills: Kubernetes"
+
+#section("Skills")
+Languages & Tools: GraphQL, Redis
+
+#section("Experience")
+*Platform Engineer* | Beta Corp (2024 - Present)
+- Built low-latency APIs with Node.js and PostgreSQL.
+`;
+
+    const reqs: JobRequirements = {
+      requiredSkills: ["Node.js", "GraphQL"],
+      preferredSkills: ["Kubernetes"],
+      domainTerms: [],
+    };
+
+    const res = evaluateAtsScore(templateResume, reqs, "Backend");
+    const nodeEval = res.skillEvaluations.find((s) => s.skill === "Node.js");
+    const graphqlEval = res.skillEvaluations.find((s) => s.skill === "GraphQL");
+    const k8sEval = res.skillEvaluations.find((s) => s.skill === "Kubernetes");
+
+    // Node.js is in #section("Experience") (body bucket), not stuck in Skills
+    expect(nodeEval?.status).toBe("DEMONSTRATED_IN_EXPERIENCE");
+    // GraphQL is only in #section("Skills")
+    expect(graphqlEval?.status).toBe("LISTED_IN_SKILLS_ONLY");
+    // Ensure GraphQL scored differently from Experience-bucket Node.js
+    expect(nodeEval!.score).toBeGreaterThan(graphqlEval!.score);
+    // #let definition mentioning Kubernetes should NOT mistakenly open a Skills bucket; wait, Kubernetes appears in bodyText because #let helper-skills wasn't stripped — check comment/definition didn't mark Redis/K8s as Skills-only if in body, verify #let section("Skills") didn't put Node.js into skills!
+    expect(k8sEval?.status).not.toBe("LISTED_IN_SKILLS_ONLY");
+
+    // Verify comment-only / definition #section("Skills") without an active #section("Skills") does NOT activate skills bucket
+    const commentOnlySkills = `
+// #section("Skills")
+#let section(title) = [ == #title ]
+#let helper() = #section("Skills")
+- Built GraphQL and Node.js services.
+`;
+    const commentRes = evaluateAtsScore(commentOnlySkills, reqs, "Backend");
+    expect(commentRes.skillEvaluations.find((s) => s.skill === "GraphQL")?.status).toBe(
+      "DEMONSTRATED_IN_EXPERIENCE"
+    );
+    expect(commentRes.skillEvaluations.find((s) => s.skill === "Node.js")?.status).toBe(
+      "DEMONSTRATED_IN_EXPERIENCE"
+    );
+  });
+
+  it("preserves empty-requirements scoring contract", () => {
+    const res = evaluateAtsScore(
+      SAMPLE_TYPST_RESUME,
+      {
+        requiredSkills: [],
+        preferredSkills: [],
+        domainTerms: [],
+      },
+      "Backend"
+    );
+    expect(res.requiredMatch.percentage).toBe(100);
+    expect(res.requiredMatch.score).toBe(res.requiredMatch.maxScore);
+    expect(res.preferredMatch.percentage).toBe(100);
+    expect(res.preferredMatch.score).toBe(res.preferredMatch.maxScore);
+  });
 });

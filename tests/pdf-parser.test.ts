@@ -19,7 +19,7 @@ B.S. Computer Science — UC Berkeley
     const typst = convertTextToTypst(sampleText);
     expect(typst).toContain("= Alex Mercer");
     expect(typst).toContain("== Experience");
-    expect(typst).toContain("- Built high-throughput");
+    expect(typst).toContain("- Built high\\-throughput");
     expect(typst).toContain("== Education");
   });
 
@@ -89,9 +89,9 @@ Engineering: Next.js, React, FastAPI, REST APIs, PostgreSQL, Prisma, Docker, Git
     expect(typst).toContain("Ontario, Canada | alex.rivera\\@example.com");
 
     // 3. Hyphenated wrap rejoined ("idempo-\ntent" -> "idempotent") and continuation lines merged into bullet
-    expect(typst).toContain("idempotent webhook ingestion across 1,000+ licenses and 45% faster processing.");
+    expect(typst).toContain("idempotent webhook ingestion across 1,000\\+ licenses and 45% faster processing.");
     expect(typst).toContain(
-      "- Maintained data-center asset, rack, and cabinet documentation using Sunbird dcTrack and monitored infrastructure health through Power IQ."
+      "- Maintained data\\-center asset, rack, and cabinet documentation using Sunbird dcTrack and monitored infrastructure health through Power IQ."
     );
 
     // 4. Bullets using en-dash ("–") rendered as Typst list items ("- ")
@@ -119,5 +119,65 @@ Engineering: Next.js, React, FastAPI, REST APIs, PostgreSQL, Prisma, Docker, Git
     for (const m of facts.metrics) {
       expect(forbiddenLayoutNums.has(m.value)).toBe(false);
     }
+  });
+
+  it("escapes Typst markup in headers, entries, bullets, and deduplicates or disarms unsafe links", () => {
+    const injected = [
+      'Alex #eval("pwn") [Mercer]',
+      'alex@example.com | #import("evil")',
+      "",
+      "EXPERIENCE",
+      'Acme "Quoted" #read("/etc/passwd") Corp Toronto, ON',
+      'Lead #eval("role") May 2024 - Present',
+      '- Built [fast] #eval("bullet") APIs with *SQL* and _Go_',
+    ].join("\n");
+
+    const typst = convertTextToTypst(injected, "bad.pdf", [
+      { url: "https://example.com", label: "Site [1]" },
+      { url: "https://example.com/", label: "Duplicate Site" },
+      { url: "javascript:alert(1)", label: "Evil [JS]" },
+      { url: 'https://evil.example/")#eval("x', label: "Broken" },
+    ]);
+
+    expect(typst).toContain('= Alex \\#eval("pwn") \\[Mercer\\]');
+    expect(typst).toContain('title: "Acme \\"Quoted\\" #read(\\"/etc/passwd\\") Corp"');
+    expect(typst).toContain('role: "Lead #eval(\\"role\\")');
+    expect(typst).toContain('- Built \\[fast\\] \\#eval("bullet") APIs with \\*SQL\\* and \\_Go\\_');
+    expect(typst).toContain('#link("https://example.com/")[Site \\[1\\]]');
+    expect(typst).not.toContain("Duplicate Site");
+    expect(typst).not.toContain('#link("javascript:');
+    expect(typst).toContain("Evil \\[JS\\]");
+    expect(typst).not.toContain(')#eval("x');
+  });
+
+  it("normalizes CR injections and blocks data/vbscript/file/credentialed URI annotations while keeping visible text", () => {
+    const rawText = [
+      "Alex Mercer",
+      "Toronto, ON | Portfolio | Docs | Home",
+      "",
+      "EXPERIENCE",
+      "Example\r#eval(\"break\") Corp\rToronto, ON",
+      "Principal\rEngineer Jan 2025 - Present",
+      "- Kept safe text intact.",
+    ].join("\n");
+
+    const typst = convertTextToTypst(rawText, "inert.pdf", [
+      { url: "data:text/html,<script>alert(1)</script>", label: "DataLink" },
+      { url: "vbscript:msgbox(1)", label: "VBLink" },
+      { url: "file:///etc/passwd", label: "FileLink" },
+      { url: "https://user:secret@evil.example/path", label: "CredLink" },
+      { url: "https://portfolio.example.com/work", label: "Portfolio" },
+    ]);
+
+    expect(typst).not.toContain("\r");
+    expect(typst).not.toContain('#link("data:');
+    expect(typst).not.toContain('#link("vbscript:');
+    expect(typst).not.toContain('#link("file:');
+    expect(typst).not.toContain("user:secret@evil.example");
+    expect(typst).toContain("DataLink");
+    expect(typst).toContain("VBLink");
+    expect(typst).toContain("FileLink");
+    expect(typst).toContain("CredLink");
+    expect(typst).toContain('#link("https://portfolio.example.com/work")[Portfolio]');
   });
 });

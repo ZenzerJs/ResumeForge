@@ -20,8 +20,9 @@ import {
   isPlaceholderDescription,
 } from "@/lib/ingestion/helpers";
 import type { JobItem } from "@/components/tracker/job-types";
-import { isSafeHref } from "@/lib/security/safe-fetch";
+import { isSafeHref } from "@/lib/security/safe-url";
 import { cn } from "@/lib/utils";
+import { CompanyAvatar } from "@/components/tracker/company-avatar";
 
 const STATUS_LABELS: Record<JobStatus, string> = {
   SAVED: "Saved",
@@ -32,11 +33,16 @@ const STATUS_LABELS: Record<JobStatus, string> = {
   ARCHIVED: "Archived",
 };
 
-const ALL_STATUSES = Object.keys(STATUS_LABELS) as JobStatus[];
+const STATUS_BADGE_CLASSES: Record<JobStatus, string> = {
+  INTERVIEWING: "border-signal/40 bg-signal/10 text-signal",
+  APPLIED: "border-ember/40 bg-ember/10 text-ember",
+  OFFER: "border-primary/45 bg-primary/12 text-primary",
+  SAVED: "border-outline/70 bg-popover text-on-surface-variant",
+  REJECTED: "border-status-danger/40 bg-status-danger/10 text-status-danger",
+  ARCHIVED: "border-hairline bg-inset text-text-muted",
+};
 
-export function companyAvatarClass(_company?: string | null): string {
-  return "border border-slate-700 bg-slate-800 text-slate-200";
-}
+const ALL_STATUSES = Object.keys(STATUS_LABELS) as JobStatus[];
 
 interface JobListRowProps {
   job: JobItem;
@@ -69,9 +75,11 @@ export function JobListRow({
   const location = extractLocationFromNotes(job.notes);
   const applyUrl = extractApplyUrlFromNotes(job.notes);
   const datePosted = extractPostingDateFromNotes(job.notes);
-  const salary = extractSalaryFromNotes(job.notes, job.rawDescription);
+  const salary =
+    job.salaryLabel !== undefined
+      ? job.salaryLabel
+      : extractSalaryFromNotes(job.notes, job.rawDescription);
   const isPlaceholder = job.isPlaceholder ?? isPlaceholderDescription(job.rawDescription);
-  const companyInitial = job.company ? job.company[0].toUpperCase() : "J";
   const hasCoverLetter = Boolean(job.coverLetters && job.coverLetters.length > 0);
 
   useEffect(() => {
@@ -89,61 +97,66 @@ export function JobListRow({
     <div
       ref={rowRef}
       data-testid={`tracker-job-card-${job.id}`}
-      role="button"
-      tabIndex={0}
-      onClick={() => onSelect(job.id)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect(job.id);
-        }
-      }}
-      className={cn(
-        "flex gap-3 border-b border-slate-800/80 px-4 py-3.5 cursor-pointer transition-colors duration-150",
+      style={
         isSelected
-          ? "bg-rf-surface shadow-[inset_3px_0_0_#f59e0b]"
-          : "bg-rf-bg hover:bg-[#0e1219]",
+          ? {
+              backgroundImage:
+                "linear-gradient(90deg, rgb(var(--accent-action) / 0.09), transparent 60%)",
+              boxShadow: "inset 3px 0 0 rgb(var(--accent-action)), var(--shadow-2)",
+            }
+          : undefined
+      }
+      className={cn(
+        "relative flex gap-3 border-b border-border px-4 py-3.5 card-lift hover:z-10",
+        isSelected
+          ? "bg-card shadow-[var(--shadow-2)]"
+          : "bg-panel/60 hover:bg-panel",
       )}
     >
-      <div
-        className={cn(
-          "flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg text-sm font-bold",
-          companyAvatarClass(job.company),
-        )}
-      >
-        {companyInitial}
-      </div>
+      <CompanyAvatar company={job.company} className="relative z-10 pointer-events-none h-[34px] w-[34px]" />
 
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="text-[13.5px] font-semibold leading-snug text-rf-cloud">
-              {job.roleTitle || "Untitled Role"}
-            </h3>
-            <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-rf-meta">
-              <span>{job.company || "Unknown Company"}</span>
-              {location ? <span>· {location}</span> : null}
-              {datePosted ? (
-                <span className="inline-flex items-center gap-1">
-                  · <Clock className="h-3 w-3 shrink-0" aria-hidden /> {datePosted}
-                </span>
-              ) : null}
-            </p>
-          </div>
+          <button
+            type="button"
+            data-testid={`job-select-btn-${job.id}`}
+            aria-pressed={isSelected}
+            aria-label={`${job.roleTitle || "Untitled Role"} at ${job.company || "Unknown Company"}`}
+            onClick={() => onSelect(job.id)}
+            className="min-w-0 flex-1 rounded-[6px] text-left after:absolute after:inset-0 after:z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            <span className="relative z-[1] block min-w-0">
+              <h3 className="text-[13.5px] font-semibold leading-snug text-foreground">
+                {job.roleTitle || "Untitled Role"}
+              </h3>
+              <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+                <span>{job.company || "Unknown Company"}</span>
+                {location ? <span>· {location}</span> : null}
+                {datePosted ? (
+                  <span className="inline-flex items-center gap-1">
+                    · <Clock className="h-3 w-3 shrink-0" aria-hidden /> {datePosted}
+                  </span>
+                ) : null}
+              </p>
+            </span>
+          </button>
 
           <div
-            className="shrink-0"
+            className="relative z-10 shrink-0"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
           >
             {isUpdatingStatus ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-rf-meta" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
             ) : (
               <select
                 value={job.status}
                 data-testid={`job-status-select-${job.id}`}
                 onChange={(e) => onStatusChange(job.id, e.target.value as JobStatus)}
-                className="appearance-none rounded-full border border-slate-700 bg-rf-elevated px-2.5 py-1 pr-6 text-[11px] text-rf-meta transition-colors duration-150 focus:border-amber-500/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 cursor-pointer"
+                className={cn(
+                  "appearance-none rounded-full border px-2.5 py-1 pr-6 text-[11px] font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer",
+                  STATUS_BADGE_CLASSES[job.status] ?? STATUS_BADGE_CLASSES.SAVED,
+                )}
                 aria-label="Job status"
               >
                 {ALL_STATUSES.map((s) => (
@@ -158,19 +171,19 @@ export function JobListRow({
 
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {salary ? (
-            <span className="rounded border border-emerald-800/60 bg-emerald-950/50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-400">
+            <span className="rounded border border-secondary/40 bg-secondary/10 px-1.5 py-0.5 text-[11px] font-semibold text-secondary">
               {salary}
             </span>
           ) : (
-            <span className="py-0.5 text-[11px] italic text-slate-500">No salary</span>
+            <span className="py-0.5 text-[11px] italic text-muted-foreground">No salary</span>
           )}
           {isPlaceholder && (
-            <span className="text-[11px] text-slate-500">Needs description</span>
+            <span className="text-[11px] text-muted-foreground">Needs description</span>
           )}
         </div>
 
         <div
-          className="relative mt-2.5 flex items-center gap-1.5"
+          className="relative z-10 mt-2.5 flex items-center gap-1.5"
           onClick={(e) => e.stopPropagation()}
         >
           <Link
@@ -180,10 +193,10 @@ export function JobListRow({
               sessionStorage.setItem("resumeforge_active_job_id", job.id);
             }}
             className={cn(
-              "rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors duration-150",
+              "rounded-[6px] px-2.5 py-1.5 text-xs font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               isSelected
-                ? "bg-amber-500 text-rf-bg hover:bg-amber-400"
-                : "border border-slate-600 text-slate-200 hover:border-slate-400 hover:text-white"
+                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                : "border border-outline text-foreground hover:border-foreground"
             )}
           >
             Tailor Resume
@@ -196,7 +209,7 @@ export function JobListRow({
               rel="noopener noreferrer"
               data-testid={`open-original-btn-${job.id}`}
               title="Open posting"
-              className="rounded-md border border-slate-700 p-1.5 text-rf-meta transition-colors duration-150 hover:text-rf-cloud"
+              className="rounded-[6px] border border-outline/70 p-1.5 text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
@@ -206,7 +219,7 @@ export function JobListRow({
               disabled
               data-testid={`open-original-btn-disabled-${job.id}`}
               title="No external apply link"
-              className="cursor-not-allowed rounded-md border border-slate-800 p-1.5 text-slate-600 opacity-60"
+              className="cursor-not-allowed rounded-[6px] border border-border p-1.5 text-muted-foreground opacity-60"
             >
               <ExternalLink className="h-3.5 w-3.5" />
             </button>
@@ -217,22 +230,22 @@ export function JobListRow({
               type="button"
               aria-label="More actions"
               onClick={() => setMenuOpen((o) => !o)}
-              className="rounded-md p-1.5 text-slate-500 transition-colors duration-150 hover:bg-rf-elevated hover:text-rf-cloud"
+              className="rounded-[6px] p-1.5 text-muted-foreground transition-colors duration-150 hover:bg-popover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <MoreHorizontal className="h-4 w-4" />
             </button>
 
             {menuOpen && (
-              <div className="absolute right-0 z-20 mt-1 w-52 overflow-hidden rounded-lg border border-slate-700 bg-rf-elevated shadow-xl">
+              <div className="absolute right-0 z-20 mt-1 w-52 overflow-hidden rounded-[10px] border border-outline/70 bg-popover shadow-xl">
                 <Link
                   href={`/tailor?jobId=${job.id}&tab=cover-letter`}
                   onClick={() => {
                     sessionStorage.setItem("resumeforge_active_job_id", job.id);
                     setMenuOpen(false);
                   }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-rf-cloud transition-colors duration-150 hover:bg-slate-800"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-popover-foreground transition-colors duration-150 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                 >
-                  <FileText className="h-3.5 w-3.5 text-slate-400" />
+                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
                   {hasCoverLetter ? "Open Cover Letter" : "Cover Letter"}
                 </Link>
 
@@ -244,12 +257,12 @@ export function JobListRow({
                       onFetchFullText(job.id);
                       setMenuOpen(false);
                     }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-rf-cloud transition-colors duration-150 hover:bg-slate-800 disabled:opacity-50"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-popover-foreground transition-colors duration-150 hover:bg-card disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                   >
                     {isFetchingFullText ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <DownloadCloud className="h-3.5 w-3.5 text-slate-400" />
+                      <DownloadCloud className="h-3.5 w-3.5 text-muted-foreground" />
                     )}
                     Pull Full Description
                   </button>
@@ -262,7 +275,7 @@ export function JobListRow({
                     onToggleNotes(job.id);
                     setMenuOpen(false);
                   }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-rf-cloud transition-colors duration-150 hover:bg-slate-800"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-popover-foreground transition-colors duration-150 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                 >
                   <FileText className="h-3.5 w-3.5" />
                   Notes
@@ -275,7 +288,7 @@ export function JobListRow({
                     onDelete(job.id);
                     setMenuOpen(false);
                   }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-400 transition-colors duration-150 hover:bg-red-950/40"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-destructive transition-colors duration-150 hover:bg-destructive/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Delete

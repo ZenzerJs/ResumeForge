@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { PATCH } from "@/app/api/jobs/[id]/route";
-import { createJob, deleteJob, getJobsList } from "@/lib/db/jobs";
+import { createJob, getJobsList } from "@/lib/db/jobs";
 import { createResume } from "@/lib/db/resumes";
 import { createVariant } from "@/lib/db/variants";
 import { getDashboardStats, getOutcomeStats } from "@/lib/db/stats";
@@ -12,8 +12,10 @@ describe("per-user application outcomes", () => {
   const jobIds: string[] = [];
 
   afterAll(async () => {
+    await prisma.jobApplication.deleteMany({ where: { jobId: { in: jobIds } } });
+    await prisma.coverLetter.deleteMany({ where: { jobId: { in: jobIds } } });
     await prisma.resumeVariant.deleteMany({ where: { jobId: { in: jobIds } } });
-    await Promise.all(jobIds.map((id) => deleteJob(id).catch(() => null)));
+    await prisma.job.deleteMany({ where: { id: { in: jobIds } } });
     if (userIds.length > 0) {
       await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     }

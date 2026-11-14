@@ -7,6 +7,7 @@ test.describe("Task 8.3 & Task 8.6: Tracker Card Click-Zone & Unified Actions E2
         company: "Playwright E2E Corp",
         roleTitle: "Senior Automation Engineer",
         rawDescription: "TypeScript, Playwright, CI/CD, Next.js",
+        personal: true,
       },
     });
     expect(created.ok()).toBeTruthy();
@@ -94,5 +95,41 @@ test.describe("Task 8.3 & Task 8.6: Tracker Card Click-Zone & Unified Actions E2
     await page.waitForURL(/\/tailor\?jobId=/, { timeout: 10000 });
     expect(page.url()).toContain("jobId=");
     await expect(page.locator("[data-testid='active-job-header-banner']")).toBeVisible();
+  });
+
+  test("5. UI-08: JobListRow uses dedicated selection button and TrackerFeed location filter exposes ARIA combobox", async ({
+    page,
+  }) => {
+    const firstCard = page.locator("[data-testid^='tracker-job-card-']").first();
+    // Card container must NOT carry role="button" wrapping sibling interactive controls
+    await expect(firstCard).not.toHaveAttribute("role", "button");
+
+    const selectBtn = firstCard.locator("[data-testid^='job-select-btn-']").first();
+    await expect(selectBtn).toBeVisible();
+    await selectBtn.focus();
+    await page.keyboard.press("Enter");
+    await expect(selectBtn).toHaveAttribute("aria-pressed", "true");
+
+    // Sibling controls remain directly reachable as siblings
+    await expect(firstCard.locator("[data-testid^='job-status-select-']")).toBeVisible();
+    await expect(firstCard.locator("[data-testid^='tailor-resume-btn-']")).toBeVisible();
+
+    // Location combobox ARIA attributes & keyboard selection
+    const locationInput = page.locator("[data-testid='tracker-location-filter']");
+    await expect(locationInput).toHaveAttribute("role", "combobox");
+    await locationInput.focus();
+    await expect(locationInput).toHaveAttribute("aria-expanded", "true");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("ArrowDown");
+    await expect(locationInput).toHaveAttribute("aria-activedescendant", /tracker-location-listbox-option-1/);
+    await page.keyboard.press("Enter");
+    await expect(locationInput).toHaveAttribute("aria-expanded", "false");
+    expect((await locationInput.inputValue()).length).toBeGreaterThan(0);
+
+    // Escape closes opened listbox cleanly (ArrowDown reopens while already focused)
+    await page.keyboard.press("ArrowDown");
+    await expect(locationInput).toHaveAttribute("aria-expanded", "true");
+    await page.keyboard.press("Escape");
+    await expect(locationInput).toHaveAttribute("aria-expanded", "false");
   });
 });

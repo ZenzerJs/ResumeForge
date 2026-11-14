@@ -2,11 +2,149 @@
 
 import React, { useRef, useState, useCallback, useEffect } from "react";
 import CodeMirror, { ReactCodeMirrorRef } from "@uiw/react-codemirror";
-import { EditorView } from "@codemirror/view";
-import { ShieldCheck, LayoutList, Code2, Plus } from "lucide-react";
+import { RangeSetBuilder } from "@codemirror/state";
+import {
+  EditorView,
+  Decoration,
+  DecorationSet,
+  ViewPlugin,
+  ViewUpdate,
+} from "@codemirror/view";
+import { ShieldCheck, LayoutList, Code2, Plus, X } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ResumeFormBuilder, legacyFormToResumeDocument, parseTypstToStructuredModel, serializeStructuredModelToTypst } from "./resume-form-builder";
 import { ManagedResumeForm } from "./managed-resume-form";
 import { isResumeLayoutV2Enabled, parseManagedResume, renderResumeDocument } from "@/lib/typst/resume-document";
+
+const emberInkEditorTheme = EditorView.theme(
+  {
+    "&": {
+      backgroundColor: "#151211",
+      color: "#d0c5b9",
+      fontFamily: '"JetBrains Mono", ui-monospace, monospace',
+      fontSize: "13px",
+    },
+    ".cm-scroller": {
+      fontFamily: '"JetBrains Mono", ui-monospace, monospace',
+      lineHeight: "1.75",
+    },
+    ".cm-content": {
+      caretColor: "#f7bd3f",
+      padding: "14px 0",
+    },
+    ".cm-line": {
+      padding: "0 16px",
+    },
+    ".cm-cursor, .cm-dropCursor": {
+      borderLeftColor: "#f7bd3f",
+      borderLeftWidth: "2px",
+    },
+    "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
+      backgroundColor: "rgba(247, 189, 63, 0.18) !important",
+    },
+    ".cm-activeLine": {
+      backgroundColor: "rgba(247, 189, 63, 0.06)",
+      boxShadow: "inset 2px 0 #f7bd3f",
+    },
+    ".cm-gutters": {
+      backgroundColor: "#151211",
+      color: "rgba(214, 196, 176, 0.45)",
+      border: "none",
+      paddingLeft: "6px",
+    },
+    ".cm-activeLineGutter": {
+      backgroundColor: "rgba(247, 189, 63, 0.06)",
+      color: "#f7bd3f",
+    },
+    ".cm-typst-comment": {
+      color: "#9e9287",
+      fontStyle: "italic",
+    },
+    ".cm-typst-keyword": {
+      color: "#ff8b3d",
+      fontWeight: "600",
+    },
+    ".cm-typst-fn": {
+      color: "#f7bd3f",
+      fontWeight: "600",
+    },
+    ".cm-typst-string": {
+      color: "#4f8fff",
+    },
+  },
+  { dark: true }
+);
+
+const commentMark = Decoration.mark({ class: "cm-typst-comment" });
+const keywordMark = Decoration.mark({ class: "cm-typst-keyword" });
+const fnMark = Decoration.mark({ class: "cm-typst-fn" });
+const stringMark = Decoration.mark({ class: "cm-typst-string" });
+
+const TYPST_TOKEN_REGEX =
+  /(\/\/[^\n]*)|("(?:[^"\\]|\\.)*")|(#[a-zA-Z_][a-zA-Z0-9_-]*)|(\b(?:resume|with)\b)|(\b\d+(?:\.\d+)?(?:%|M|k|x|ms|s)\b|\$\d+(?:\.\d+)?[MKBmkb]?)/g;
+
+const KEYWORD_DIRECTIVES = new Set([
+  "#import",
+  "#show",
+  "#let",
+  "#set",
+  "#section",
+  "#include",
+  "#if",
+  "#else",
+  "#for",
+  "#while",
+]);
+
+function buildTypstDecorations(view: EditorView): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>();
+  for (const { from, to } of view.visibleRanges) {
+    const text = view.state.doc.sliceString(from, to);
+    TYPST_TOKEN_REGEX.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = TYPST_TOKEN_REGEX.exec(text)) !== null) {
+      const start = from + match.index;
+      const end = start + match[0].length;
+      if (match[1]) {
+        builder.add(start, end, commentMark);
+      } else if (match[2] || match[5]) {
+        builder.add(start, end, stringMark);
+      } else if (match[3]) {
+        if (KEYWORD_DIRECTIVES.has(match[3])) {
+          builder.add(start, end, keywordMark);
+        } else {
+          builder.add(start, end, fnMark);
+        }
+      } else if (match[4]) {
+        builder.add(start, end, fnMark);
+      }
+    }
+  }
+  return builder.finish();
+}
+
+const typstHighlightPlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = buildTypstDecorations(view);
+    }
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.viewportChanged) {
+        this.decorations = buildTypstDecorations(update.view);
+      }
+    }
+  },
+  {
+    decorations: (v) => v.decorations,
+  }
+);
+
+const EDITOR_EXTENSIONS = [
+  EditorView.lineWrapping,
+  emberInkEditorTheme,
+  typstHighlightPlugin,
+];
 
 interface CodeEditorProps {
   value: string;
@@ -17,6 +155,16 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
   const editorRef = useRef<ReactCodeMirrorRef>(null);
   const [markedCount, setMarkedCount] = useState(0);
   const [editorMode, setEditorMode] = useState<"code" | "visual">("code");
+  const [reformatAlert, setReformatAlert] = useState<string | null>(null);
+  const [pendingReformat, setPendingReformat] = useState<{
+    sourceSnapshot: string;
+    formattedSource: string;
+    description: string;
+  } | null>(null);
+
+  useEffect(() => {
+    setReformatAlert(null);
+  }, [value]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -57,22 +205,34 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
   }, []);
 
   const handleReformat = async () => {
-    const managed = parseManagedResume(value);
+    setReformatAlert(null);
+    const snapshot = value;
+    const managed = parseManagedResume(snapshot);
     if (managed) {
-      if (window.confirm("Reformat this managed resume as a draft?")) onChange(managed.prefix + renderResumeDocument(managed.document, "comfortable", managed.links));
+      setPendingReformat({
+        sourceSnapshot: snapshot,
+        formattedSource: managed.prefix + renderResumeDocument(managed.document, "comfortable", managed.links),
+        description: "Reformat this managed resume as a draft? Existing layout formatting will be normalized.",
+      });
       return;
     }
     try {
       const response = await fetch("/templates/starter-resume.typ");
       const starter = await response.text();
-      const model = parseTypstToStructuredModel(value);
-      const canonical = serializeStructuredModelToTypst(model).trim() === value.trim();
-      if (!response.ok || (value.trim() !== starter.trim() && !canonical)) {
-        window.alert("This source cannot be reformatted safely. Continue editing it in Typst Code.");
+      const model = parseTypstToStructuredModel(snapshot);
+      const canonical = serializeStructuredModelToTypst(model).trim() === snapshot.trim();
+      if (!response.ok || (snapshot.trim() !== starter.trim() && !canonical)) {
+        setReformatAlert("This source cannot be reformatted safely. Continue editing it in Typst Code.");
         return;
       }
-      if (window.confirm("Reformat this resume as a draft? Review the result before saving.")) onChange(renderResumeDocument(legacyFormToResumeDocument(model)));
-    } catch { window.alert("Could not verify this source for reformatting."); }
+      setPendingReformat({
+        sourceSnapshot: snapshot,
+        formattedSource: renderResumeDocument(legacyFormToResumeDocument(model)),
+        description: "Reformat this resume as a draft? Review the result before saving.",
+      });
+    } catch {
+      setReformatAlert("Could not verify this source for reformatting.");
+    }
   };
 
   const handleInsertEntrySnippet = useCallback(() => {
@@ -88,10 +248,10 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
   }, [value, onChange]);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-md border border-slate-800/80 bg-slate-900 text-slate-100 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-slate-950 px-3 py-2 text-xs font-medium text-slate-400">
+    <div className="flex h-full flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-panel text-foreground">
+      <div className="flex min-h-8 flex-wrap items-center justify-between gap-2 border-b border-outline/70 bg-panel px-2.5 py-0.5 text-xs text-text-secondary md:h-8 md:flex-nowrap">
         <div
-          className="flex items-center gap-1 rounded-md border border-slate-800 bg-slate-900 p-0.5"
+          className="flex items-center gap-0.5 rounded border border-outline/70 bg-inset p-0.5"
           role="tablist"
           aria-label="Editor input mode"
         >
@@ -101,13 +261,13 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
             aria-selected={editorMode === "visual"}
             onClick={() => setEditorMode("visual")}
             data-testid="editor-mode-visual"
-            className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-mono font-semibold transition ${
+            className={`flex items-center gap-1 rounded-[4px] px-2.5 py-0.5 text-[11px] font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               editorMode === "visual"
-                ? "bg-[#ff8c00] text-slate-950 shadow-sm"
-                : "text-slate-400 hover:text-white"
+                ? "bg-elevated text-foreground shadow-xs"
+                : "text-text-secondary hover:text-foreground"
             }`}
           >
-            <LayoutList className="h-3 w-3" />
+            <LayoutList className="h-3 w-3 text-primary" />
             <span>Visual Form</span>
           </button>
           <button
@@ -116,18 +276,18 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
             aria-selected={editorMode === "code"}
             onClick={() => setEditorMode("code")}
             data-testid="editor-mode-code"
-            className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-mono font-semibold transition ${
+            className={`flex items-center gap-1 rounded-[4px] px-2.5 py-0.5 text-[11px] font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               editorMode === "code"
-                ? "bg-[#ff8c00] text-slate-950 shadow-sm"
-                : "text-slate-400 hover:text-white"
+                ? "bg-elevated text-foreground shadow-xs"
+                : "text-text-secondary hover:text-foreground"
             }`}
           >
-            <Code2 className="h-3 w-3" />
+            <Code2 className="h-3 w-3 text-ember" />
             <span>Typst Source</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {editorMode === "code" && (
             <>
               <button
@@ -135,13 +295,13 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
                 onClick={handleInsertEntrySnippet}
                 data-testid="insert-entry-snippet-btn"
                 title="Insert a new Experience/Project entry block"
-                className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-[10px] font-mono font-semibold transition"
+                className="flex items-center gap-1 px-2 py-0.5 rounded bg-elevated hover:bg-muted border border-outline/70 text-foreground text-[11px] font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <Plus className="h-3 w-3 text-[#ff8c00]" />
+                <Plus className="h-3 w-3 text-primary" />
                 Entry
               </button>
               {markedCount > 0 && (
-                <span className="text-[10px] font-mono text-emerald-500">
+                <span className="text-[10px] font-mono tabular-nums text-status-success">
                   {markedCount} mark{markedCount !== 1 ? "s" : ""}
                 </span>
               )}
@@ -149,21 +309,39 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
                 type="button"
                 onClick={handleMarkVerified}
                 title="Mark selected text as verified (Task 7.7)"
-                className="flex items-center gap-1 px-2 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/20 text-emerald-400 text-[10px] font-semibold transition"
+                className="flex items-center gap-1 px-2 py-0.5 rounded bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-status-success text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <ShieldCheck className="h-3 w-3" />
                 Mark
               </button>
             </>
           )}
-          {isResumeLayoutV2Enabled() && <button type="button" onClick={() => void handleReformat()} className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">Reformat draft</button>}
-          <span className="hidden sm:inline font-mono text-[10px] text-slate-500">
-            {editorMode === "visual" ? "Guided Mode" : "CodeMirror 6"}
+          {isResumeLayoutV2Enabled() && <button type="button" onClick={() => void handleReformat()} className="rounded border border-outline/70 bg-elevated px-2 py-0.5 text-[11px] font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Reformat draft</button>}
+          <span className="hidden xl:inline font-mono text-[11px] text-text-muted">
+            {editorMode === "visual" ? "Guided" : "resume.typ"}
           </span>
         </div>
       </div>
 
-      <div className="relative flex-1 overflow-auto">
+      {reformatAlert && (
+        <div
+          role="alert"
+          data-testid="reformat-error-alert"
+          className="flex items-center justify-between gap-2 border-b border-status-danger/40 bg-status-danger/10 px-3 py-2 text-xs text-status-danger"
+        >
+          <span>{reformatAlert}</span>
+          <button
+            type="button"
+            onClick={() => setReformatAlert(null)}
+            aria-label="Dismiss reformat notice"
+            className="rounded-[4px] p-0.5 text-status-danger hover:bg-status-danger/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        </div>
+      )}
+
+      <div className="relative flex-1 overflow-auto bg-inset">
         {editorMode === "visual" ? (
           parseManagedResume(value) ? <ManagedResumeForm value={value} onChange={onChange} /> : <ResumeFormBuilder value={value} onChange={onChange} />
         ) : (
@@ -171,13 +349,36 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
             ref={editorRef}
             value={value}
             height="100%"
-            theme="dark"
-            extensions={[EditorView.lineWrapping]}
+            theme={emberInkEditorTheme}
+            extensions={EDITOR_EXTENSIONS}
             onChange={onChange}
-            className="h-full text-sm font-mono"
+            className="h-full text-sm font-mono bg-inset"
           />
         )}
       </div>
+
+      <ConfirmDialog
+        open={Boolean(pendingReformat)}
+        onOpenChange={(open) => {
+          if (!open) setPendingReformat(null);
+        }}
+        title="Reformat Resume Draft"
+        description={pendingReformat?.description ?? ""}
+        confirmLabel="Reformat Draft"
+        dialogTestId="reformat-confirm-modal"
+        confirmTestId="confirm-reformat-btn"
+        cancelTestId="cancel-reformat-btn"
+        onConfirm={() => {
+          if (!pendingReformat) return;
+          if (pendingReformat.sourceSnapshot !== value) {
+            setPendingReformat(null);
+            setReformatAlert("Resume source changed while confirmation was open. Reformat canceled.");
+            return;
+          }
+          onChange(pendingReformat.formattedSource);
+          setPendingReformat(null);
+        }}
+      />
     </div>
   );
 }

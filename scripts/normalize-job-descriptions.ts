@@ -48,7 +48,7 @@ export async function normalizeAllJobsInDb() {
     // 1. Re-fetch if placeholder or broken Jina shell
     if (isPlaceholder || isBrokenJina || raw.length < 250) {
       console.log(`Fetching fulltext for [${job.company}] - ${job.roleTitle}...`);
-      const fetchRes = await fetchAndCacheJobFullText(job.id);
+      const fetchRes = await fetchAndCacheJobFullText(job.id, { allowSharedCacheWrite: true });
       if (fetchRes.success && fetchRes.data) {
         raw = fetchRes.data.rawDescription;
         fetchedCount++;

@@ -1,17 +1,25 @@
-import { ProviderConfig, TestConnectionResult, GeneratePatchesResult, ConvertPdfResult } from "../types";
+import {
+  ProviderConfig,
+  TestConnectionResult,
+  TextCompletionMessage,
+  TextCompletionOptions,
+  TextCompletionResult,
+  isValidGeminiModelSegment,
+} from "../types";
 import { sanitizeError } from "../redact";
-import { stripCodeFences } from "../utils";
-import { TypstRepairInput, TypstRepairProposal, TypstRepairProposalSchema } from "../repair-schema";
-import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "../repair-prompt";
 import type { ChatCompletionResult } from "./custom";
 import { safeFetch } from "@/lib/security/safe-fetch";
-import { resolveProviderCredentials } from "./credentials";
+import { resolveProviderCredentialsWithHostPolicy } from "./credentials";
 
-function providerFetch(url: string, init?: RequestInit): Promise<Response> {
+function providerFetch(url: string, init?: RequestInit, allowLocalhost = false): Promise<Response> {
   return safeFetch(url, init ?? {}, {
     timeoutMs: 130_000,
-    allowLocalhost: process.env.NODE_ENV !== "production",
+    allowLocalhost,
   });
+}
+
+function scopedProviderFetch(allowLocalhost: boolean) {
+  return (url: string, init?: RequestInit) => providerFetch(url, init, allowLocalhost);
 }
 
 function geminiHeaders(apiKey: string): HeadersInit {
@@ -22,15 +30,30 @@ function geminiHeaders(apiKey: string): HeadersInit {
 }
 
 function resolveGeminiModel(model: string | undefined, fallback = "gemini-2.5-flash"): string {
-  const trimmed = model?.trim();
-  if (!trimmed || trimmed === "gemini-3.8-flash") {
+  if (model === undefined) {
+    return fallback;
+  }
+  const trimmed = model.trim();
+  if (!isValidGeminiModelSegment(trimmed)) {
+    throw new Error("Invalid Gemini model identifier.");
+  }
+  if (trimmed === "gemini-3.8-flash") {
     return fallback;
   }
   return trimmed;
 }
 
+function buildGeminiGenerateContentUrl(
+  baseUrl: string,
+  model: string | undefined,
+  fallback = "gemini-2.5-flash"
+): string {
+  const resolved = resolveGeminiModel(model, fallback);
+  return `${baseUrl}/v1beta/models/${encodeURIComponent(resolved)}:generateContent`;
+}
+
 export async function testGeminiConnection(config: ProviderConfig): Promise<TestConnectionResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.GEMINI_API_KEY,
@@ -47,9 +70,21 @@ export async function testGeminiConnection(config: ProviderConfig): Promise<Test
     };
   }
 
+  if (config.model !== undefined) {
+    try {
+      resolveGeminiModel(config.model);
+    } catch (err) {
+      return {
+        success: false,
+        provider: "gemini",
+        message: err instanceof Error ? err.message : "Invalid Gemini model identifier.",
+      };
+    }
+  }
+
   const startTime = Date.now();
   try {
-    const res = await providerFetch(`${baseUrl}/v1beta/models`, {
+  const res = await scopedProviderFetch(allowLocalhost)(`${baseUrl}/v1beta/models`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -97,15 +132,13 @@ export async function testGeminiConnection(config: ProviderConfig): Promise<Test
   }
 }
 
-/**
- * Sends a structured generateContent request to Gemini for patch generation.
- */
-export async function generateGeminiPatches(
+export async function completeText(
   config: ProviderConfig,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  messages: TextCompletionMessage[],
+  jsonMode: boolean,
+  options?: TextCompletionOptions
+): Promise<TextCompletionResult> {
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.GEMINI_API_KEY,
@@ -113,26 +146,49 @@ export async function generateGeminiPatches(
     defaultBaseUrl: "https://generativelanguage.googleapis.com",
     officialHosts: ["generativelanguage.googleapis.com"],
   });
-  const model = resolveGeminiModel(config.model, "gemini-2.5-flash");
 
   if (!apiKey) {
-    return { success: false, error: "Gemini API key is missing." };
+    return { success: false, error: options?.missingKeyMessage ?? "Gemini API key is missing." };
+  }
+
+  const systemMsg = messages.find((m) => m.role === "system");
+  const contents = messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
+
+  const generationConfig: Record<string, unknown> = {
+    temperature: options?.temperature ?? 0.3,
+  };
+  if (jsonMode) {
+    generationConfig.responseMimeType = "application/json";
+  }
+  if (options?.thinkingBudget !== undefined) {
+    generationConfig.thinkingConfig = { thinkingBudget: options.thinkingBudget };
+  }
+
+  const body: Record<string, unknown> = {
+    contents,
+    generationConfig,
+  };
+  if (systemMsg) {
+    body.system_instruction = { parts: [{ text: systemMsg.content }] };
   }
 
   try {
-    const res = await providerFetch(
-      `${baseUrl}/v1beta/models/${model}:generateContent`,
+    const url = buildGeminiGenerateContentUrl(baseUrl, config.model, options?.defaultModel ?? "gemini-2.5-flash");
+    const res = await safeFetch(
+      url,
       {
         method: "POST",
         headers: geminiHeaders(apiKey),
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ parts: [{ text: userPrompt }] }],
-          generationConfig: {
-            temperature: 0.3,
-            responseMimeType: "application/json",
-          },
-        }),
+        body: JSON.stringify(body),
+      },
+      {
+        timeoutMs: options?.timeoutMs ?? 130_000,
+        allowLocalhost,
       }
     );
 
@@ -144,286 +200,26 @@ export async function generateGeminiPatches(
       } catch {
         errBody = res.statusText;
       }
-      return { success: false, error: sanitizeError(`Gemini API returned status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawJson) {
-      return { success: false, error: "Gemini returned empty content in response." };
-    }
-
-    return { success: true, rawJson };
-  } catch (err) {
-    return { success: false, error: sanitizeError(`Gemini patch generation failed: ${err instanceof Error ? err.message : String(err)}`) };
-  }
-}
-
-/**
- * Phase 4.3b: Sends a structured generateContent request to Gemini for qualitative review.
- */
-export async function generateGeminiQualitativeReview(
-  config: ProviderConfig,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.GEMINI_API_KEY,
-    envBaseUrl: process.env.GEMINI_BASE_URL,
-    defaultBaseUrl: "https://generativelanguage.googleapis.com",
-    officialHosts: ["generativelanguage.googleapis.com"],
-  });
-  const model = resolveGeminiModel(config.model, "gemini-2.5-flash");
-
-  if (!apiKey) {
-    return { success: false, error: "Gemini API key is missing." };
-  }
-
-  try {
-    const res = await providerFetch(
-      `${baseUrl}/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: geminiHeaders(apiKey),
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ parts: [{ text: userPrompt }] }],
-          generationConfig: {
-            temperature: 0.3,
-            responseMimeType: "application/json",
-          },
-        }),
-      }
-    );
-
-    if (!res.ok) {
-      let errBody = "";
-      try {
-        const json = await res.json();
-        errBody = json.error?.message || JSON.stringify(json);
-      } catch {
-        errBody = res.statusText;
-      }
-      return { success: false, error: sanitizeError(`Gemini API returned status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawJson) {
-      return { success: false, error: "Gemini returned empty content in response." };
-    }
-
-    return { success: true, rawJson };
-  } catch (err) {
-    return { success: false, error: sanitizeError(`Gemini qualitative review failed: ${err instanceof Error ? err.message : String(err)}`) };
-  }
-}
-
-/**
- * Phase 5: Sends a structured generateContent request to Gemini for cover letter generation.
- */
-export async function generateGeminiCoverLetter(
-  config: ProviderConfig,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<GeneratePatchesResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.GEMINI_API_KEY,
-    envBaseUrl: process.env.GEMINI_BASE_URL,
-    defaultBaseUrl: "https://generativelanguage.googleapis.com",
-    officialHosts: ["generativelanguage.googleapis.com"],
-  });
-  const model = resolveGeminiModel(config.model, "gemini-2.5-flash");
-
-  if (!apiKey) {
-    return { success: false, error: "Gemini API key is missing." };
-  }
-
-  try {
-    const res = await providerFetch(
-      `${baseUrl}/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: geminiHeaders(apiKey),
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ parts: [{ text: userPrompt }] }],
-          generationConfig: {
-            temperature: 0.4,
-            responseMimeType: "application/json",
-          },
-        }),
-      }
-    );
-
-    if (!res.ok) {
-      let errBody = "";
-      try {
-        const json = await res.json();
-        errBody = json.error?.message || JSON.stringify(json);
-      } catch {
-        errBody = res.statusText;
-      }
-      return { success: false, error: sanitizeError(`Gemini API returned status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawJson) {
-      return { success: false, error: "Gemini returned empty content in response." };
-    }
-
-    return { success: true, rawJson };
-  } catch (err) {
-    return { success: false, error: sanitizeError(`Gemini cover letter generation failed: ${err instanceof Error ? err.message : String(err)}`) };
-  }
-}
-
-/**
- * Task 9.1: Sends a generateContent request to Gemini for PDF-to-Typst conversion.
- */
-export async function convertGeminiPdfTextToTypst(
-  config: ProviderConfig,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<ConvertPdfResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.GEMINI_API_KEY,
-    envBaseUrl: process.env.GEMINI_BASE_URL,
-    defaultBaseUrl: "https://generativelanguage.googleapis.com",
-    officialHosts: ["generativelanguage.googleapis.com"],
-  });
-  const model = resolveGeminiModel(config.model, "gemini-2.5-flash");
-
-  if (!apiKey) {
-    return { success: false, error: "Gemini API key is missing." };
-  }
-
-  try {
-    const res = await providerFetch(
-      `${baseUrl}/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: geminiHeaders(apiKey),
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ parts: [{ text: userPrompt }] }],
-          generationConfig: {
-            temperature: 0.1,
-            thinkingConfig: { thinkingBudget: 1024 },
-          },
-        }),
-        signal: AbortSignal.timeout(30000),
-      }
-    );
-
-    if (!res.ok) {
-      let errBody = "";
-      try {
-        const json = await res.json();
-        errBody = json.error?.message || JSON.stringify(json);
-      } catch {
-        errBody = res.statusText;
-      }
-      return { success: false, error: sanitizeError(`Gemini API returned status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawContent) {
-      return { success: false, error: "Gemini returned empty content in response." };
-    }
-
-    const typstSource = stripCodeFences(rawContent);
-    return { success: true, typstSource };
-  } catch (err) {
-    return { success: false, error: sanitizeError(`Gemini PDF conversion failed: ${err instanceof Error ? err.message : String(err)}`) };
-  }
-}
-
-export async function repairTypstWithGemini(
-  config: ProviderConfig,
-  input: TypstRepairInput
-): Promise<{ success: boolean; data?: TypstRepairProposal; error?: string }> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
-    configApiKey: config.apiKey,
-    configBaseUrl: config.baseUrl,
-    envApiKey: process.env.GEMINI_API_KEY,
-    envBaseUrl: process.env.GEMINI_BASE_URL,
-    defaultBaseUrl: "https://generativelanguage.googleapis.com",
-    officialHosts: ["generativelanguage.googleapis.com"],
-  });
-  const model = resolveGeminiModel(config.model, "gemini-1.5-pro");
-
-  if (!apiKey) {
-    return { success: false, error: "Gemini API key is missing. Please configure your key in Settings." };
-  }
-
-  const systemPrompt = buildTypstRepairSystemPrompt();
-  const userPrompt = buildTypstRepairUserPrompt(input);
-
-  try {
-    const res = await providerFetch(
-      `${baseUrl}/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: geminiHeaders(apiKey),
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ parts: [{ text: userPrompt }] }],
-          generationConfig: {
-            temperature: 0.1,
-            responseMimeType: "application/json",
-          },
-        }),
-        signal: AbortSignal.timeout(30000),
-      }
-    );
-
-    if (!res.ok) {
-      let errBody = "";
-      try {
-        const json = await res.json();
-        errBody = json.error?.message || JSON.stringify(json);
-      } catch {
-        errBody = res.statusText;
-      }
-      return { success: false, error: sanitizeError(`Gemini API status ${res.status}: ${errBody}`) };
-    }
-
-    const data = await res.json();
-    const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawContent) {
-      return { success: false, error: "Gemini returned empty content." };
-    }
-
-    const cleaned = stripCodeFences(rawContent);
-    const parsedJson = JSON.parse(cleaned);
-    const validated = TypstRepairProposalSchema.safeParse(parsedJson);
-
-    if (!validated.success) {
       return {
         success: false,
-        error: `Gemini returned invalid repair proposal JSON: ${validated.error.issues.map((i) => i.message).join(", ")}`,
+        error: sanitizeError(`Gemini API returned status ${res.status}: ${errBody}`),
       };
     }
 
-    return { success: true, data: validated.data };
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!text) {
+      return { success: false, error: "Gemini returned empty content in response." };
+    }
+
+    return { success: true, text };
   } catch (err) {
     return {
       success: false,
-      error: sanitizeError(`Gemini repair failed: ${err instanceof Error ? err.message : String(err)}`),
+      error: sanitizeError(
+        `Gemini ${options?.taskLabel ?? "completion"} failed: ${err instanceof Error ? err.message : String(err)}`
+      ),
     };
   }
 }
@@ -436,7 +232,7 @@ export async function chatGemini(
   messages: Array<{ role: string; content: string }>,
   tools: any[],
 ): Promise<ChatCompletionResult> {
-  const { apiKey, baseUrl } = resolveProviderCredentials({
+  const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
     configApiKey: config.apiKey,
     configBaseUrl: config.baseUrl,
     envApiKey: process.env.GEMINI_API_KEY,
@@ -444,11 +240,11 @@ export async function chatGemini(
     defaultBaseUrl: "https://generativelanguage.googleapis.com",
     officialHosts: ["generativelanguage.googleapis.com"],
   });
-  const model = resolveGeminiModel(config.model, "gemini-2.5-flash");
-
   if (!apiKey) {
     throw new Error("Gemini API key is missing.");
   }
+
+  const url = buildGeminiGenerateContentUrl(baseUrl, config.model, "gemini-2.5-flash");
 
   // Extract system message and convert to Gemini contents format
   const systemMsg = messages.find((m) => m.role === "system");
@@ -474,8 +270,8 @@ export async function chatGemini(
     body.tools = [{ functionDeclarations }];
   }
 
-  const res = await providerFetch(
-    `${baseUrl}/v1beta/models/${model}:generateContent`,
+  const res = await scopedProviderFetch(allowLocalhost)(
+    url,
     {
       method: "POST",
       headers: geminiHeaders(apiKey),

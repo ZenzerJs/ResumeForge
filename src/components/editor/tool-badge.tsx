@@ -49,15 +49,15 @@ export const ToolBadge = React.memo(function ToolBadge({
 
       {summary && (
         <>
-          <span className="text-slate-600 font-mono text-[10px]">•</span>
-          <span className="text-slate-200 font-medium text-xs truncate max-w-xs">
+          <span className="text-muted-foreground font-mono text-[10px]">•</span>
+          <span className="text-foreground font-medium text-xs truncate max-w-xs">
             {summary}
           </span>
         </>
       )}
 
       {typeof durationMs === "number" && (
-        <span className="ml-auto font-mono text-[10px] text-slate-500">
+        <span className="ml-auto font-mono text-[10px] text-muted-foreground">
           {durationMs}ms
         </span>
       )}

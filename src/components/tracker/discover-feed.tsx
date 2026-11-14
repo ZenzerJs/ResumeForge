@@ -17,18 +17,20 @@ import {
   ChevronRight,
   DollarSign,
   Globe2,
+  Compass,
+  SlidersHorizontal,
 } from "lucide-react";
 import { AppShell } from "@/components/design-system/app-shell";
-import { PageHeader } from "@/components/design-system/page-header";
-import { StatusPill } from "@/components/design-system/status-pill";
 import { CommandButton } from "@/components/design-system/command-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrackerSubNav } from "@/components/tracker/tracker-sub-nav";
-import { isSafeHref } from "@/lib/security/safe-fetch";
+import { isSafeHref } from "@/lib/security/safe-url";
 import { type PostedWithin } from "@/lib/jobs/posted-within";
 import type { ScoreBreakdown } from "@/lib/scoring/blended-sort";
+import { displayScore } from "@/lib/scoring/blended-display";
 import type { CompatibilityResult } from "@/lib/scoring/compatibility-engine";
 import { JobCardSignalBadge } from "@/components/tracker/job-card-signal-badge";
+import { CompanyAvatar } from "@/components/tracker/company-avatar";
 import { FitPercentageDial } from "@/components/tracker/fit-percentage-dial";
 import { TechDiffPillList } from "@/components/tracker/tech-diff-pill-list";
 import { normalizeCompanyIntel, formatFundingBadge, formatH1BBadge } from "@/lib/companyIntel";
@@ -147,7 +149,7 @@ const CURATED_COMPANIES: { label: string; query: string }[] = [
 ];
 
 const FILTER_CONTROL =
-  "min-h-11 rounded-md border border-slate-700 bg-rf-elevated px-2.5 text-[12.5px] text-rf-cloud placeholder-slate-500 transition-colors duration-150 focus:border-amber-500/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60";
+  "min-h-11 rounded-md border border-hairline bg-rf-elevated px-2.5 text-sm text-rf-cloud placeholder:text-muted-foreground transition-colors duration-150 focus:border-primary/60";
 
 export function DiscoverFeed() {
   const [jobs, setJobs] = useState<IngestedJobItem[]>([]);
@@ -357,7 +359,7 @@ export function DiscoverFeed() {
   };
 
   return (
-    <AppShell variant="tracker">
+    <AppShell variant="tracker" layout="page">
       <TrackerSubNav
         actions={
           <CommandButton
@@ -365,6 +367,7 @@ export function DiscoverFeed() {
             size="sm"
             disabled={isSyncing}
             onClick={handleSyncPublicFeeds}
+            aria-label={isSyncing ? "Syncing public feeds" : "Sync public feeds"}
             data-testid="sync-connectors-btn"
           >
             {isSyncing ? (
@@ -378,18 +381,36 @@ export function DiscoverFeed() {
       />
 
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 md:p-8">
-        <PageHeader
-          eyebrow="Browse live listings"
-          title="Discovered Jobs"
-          description="Live tech listings ingested from Greenhouse, Lever, Ashby, Adzuna, Jobicy, Remotive, and RemoteOK. Save roles directly into your application tracker."
-          statusBadge={<StatusPill status="slate" label={`${totalJobs} Ingested`} />}
-        />
+        <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl surface-raised edge-glow p-5 sm:p-6">
+          <div className="flex min-w-0 items-start gap-3 border-l-2 border-primary pl-3 sm:gap-4 sm:pl-4">
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary sm:h-12 sm:w-12"
+              aria-hidden="true"
+            >
+              <Compass className="h-6 w-6" />
+            </div>
+            <div className="min-w-0 space-y-1">
+              <p className="font-mono text-[11px] font-semibold uppercase tracking-wider text-primary">
+                Find your next role
+              </p>
+              <h2 className="text-2xl font-bold tracking-tight text-rf-cloud md:text-3xl">
+                Discovered Jobs
+              </h2>
+              <p className="max-w-2xl text-sm text-text-secondary">
+                Explore roles from public job boards and save the ones you want to pursue.
+              </p>
+            </div>
+          </div>
+          <span className="rounded-full border glass-bar px-3 py-1.5 text-xs font-semibold tabular-nums text-rf-cloud">
+            {totalJobs} {totalJobs === 1 ? "role" : "roles"}
+          </span>
+        </header>
 
         {notification ? (
           <div
             role="status"
             aria-live="polite"
-            className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-medium text-emerald-400"
+            className="flex items-center justify-between rounded-lg border border-signal/35 bg-signal/10 p-3 text-xs font-medium text-signal"
           >
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
@@ -399,7 +420,7 @@ export function DiscoverFeed() {
               type="button"
               aria-label="Dismiss notification"
               onClick={() => setNotification(null)}
-              className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-white focus-visible:ring-2 focus-visible:ring-amber-500/60"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
               <X className="h-4 w-4" aria-hidden />
             </button>
@@ -408,10 +429,10 @@ export function DiscoverFeed() {
 
         {/* Curated Company Quick-Filter Chips */}
         <div
-          className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-800/80 bg-rf-surface/60 px-4 py-2.5"
+          className="flex flex-wrap items-center gap-2 rounded-xl border glass-bar px-4 py-2.5"
           data-testid="curated-company-chips"
         >
-          <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 mr-1">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mr-1">
             Featured Boards:
           </span>
           {CURATED_COMPANIES.map((company) => {
@@ -421,11 +442,12 @@ export function DiscoverFeed() {
                 key={company.label}
                 type="button"
                 onClick={() => setSearchQuery(isActive && company.query !== "" ? "" : company.query)}
+                aria-pressed={isActive}
                 data-testid={`curated-chip-${(company.query || "all").toLowerCase()}`}
                 className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
                   isActive
-                    ? "border border-amber-500/50 bg-amber-500/15 text-amber-300"
-                    : "border border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700 hover:text-white"
+                    ? "border border-primary/50 bg-primary/15 text-primary"
+                    : "border border-hairline bg-inset text-text-secondary hover:border-control hover:text-foreground"
                 }`}
               >
                 <span>{company.label}</span>
@@ -435,19 +457,23 @@ export function DiscoverFeed() {
         </div>
 
         {/* Filter Toolbar */}
-        <div className="flex flex-col gap-3 rounded-xl border border-slate-800/80 bg-rf-surface p-4">
+        <div className="flex flex-col gap-3 rounded-xl surface-raised p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-rf-cloud">
+            <SlidersHorizontal className="h-4 w-4 text-primary" aria-hidden="true" />
+            Search and filters
+          </div>
           <div className="relative w-full">
             <label htmlFor="discover-search-input" className="sr-only">
               Search company, role, or keywords
             </label>
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <input
               id="discover-search-input"
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search company, title, keywords…"
-              className="h-11 w-full rounded-md border border-slate-800 bg-rf-bg pl-9 pr-3 text-xs text-rf-cloud placeholder:text-slate-500 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+              className="h-11 w-full rounded-md border border-hairline bg-inset pl-9 pr-3 text-sm text-rf-cloud placeholder:text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"
               data-testid="discover-search-input"
             />
           </div>
@@ -588,9 +614,10 @@ export function DiscoverFeed() {
                 onClick={() => setCanadianOnly((prev) => !prev)}
                 className={`flex min-h-11 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors ${
                   canadianOnly
-                    ? "border-slate-500 bg-slate-700 text-white"
-                    : "border-slate-700 bg-rf-elevated text-slate-400 hover:text-white"
+                    ? "border-primary/50 bg-primary/15 text-primary"
+                    : "border-hairline bg-rf-elevated text-text-secondary hover:text-foreground"
                 }`}
+                aria-pressed={canadianOnly}
                 data-testid="discover-canadian-toggle"
               >
                 <Globe2 className="h-3.5 w-3.5" />
@@ -598,7 +625,7 @@ export function DiscoverFeed() {
               </button>
             </div>
 
-          <div className="flex flex-wrap items-center gap-2 border-t border-slate-800/80 pt-3">
+          <div className="flex flex-wrap items-center gap-2 border-t border-hairline pt-3">
             <span className="text-[11px] font-mono uppercase tracking-wider text-rf-meta">
               Posted:
             </span>
@@ -609,9 +636,10 @@ export function DiscoverFeed() {
                 onClick={() => setPostedWithin(opt.value)}
                 className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
                   postedWithin === opt.value
-                    ? "border border-slate-500 bg-slate-700 text-white"
-                    : "border border-transparent text-slate-400 hover:bg-slate-800 hover:text-white"
+                    ? "border border-primary/50 bg-primary/15 text-primary"
+                    : "border border-transparent text-muted-foreground hover:bg-elevated hover:text-foreground"
                 }`}
+                aria-pressed={postedWithin === opt.value}
                 data-testid={`posted-within-${opt.value}`}
               >
                 {opt.label}
@@ -622,30 +650,52 @@ export function DiscoverFeed() {
 
         {/* Listings Grid */}
         {isLoading ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {[...Array(6)].map((_, i) => (
               <div
                 key={i}
-                className="flex flex-col gap-3 rounded-xl border border-slate-800/80 bg-rf-surface p-4"
+                className="flex flex-col justify-between gap-4 rounded-xl surface-raised edge-glow p-5"
               >
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-6 w-48" />
-                <Skeleton className="h-4 w-24" />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <Skeleton className="h-9 w-9 rounded-lg shrink-0" />
+                    <div className="space-y-2 flex-1 min-w-0">
+                      <Skeleton className="h-4 w-44 max-w-full" />
+                      <Skeleton className="h-3 w-28" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-11 w-11 rounded-full shrink-0" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-4/5" />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Skeleton className="h-5 w-24 rounded-md" />
+                  <Skeleton className="h-5 w-28 rounded-md" />
+                </div>
+                <div className="flex items-center justify-between gap-2 border-t border-hairline pt-3">
+                  <div className="flex gap-1.5">
+                    <Skeleton className="h-5 w-14 rounded-md" />
+                    <Skeleton className="h-5 w-16 rounded-md" />
+                  </div>
+                  <Skeleton className="h-9 w-28 rounded-md shrink-0" />
+                </div>
               </div>
             ))}
           </div>
         ) : jobs.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-slate-800 bg-rf-surface/40 p-12 text-center">
-            <Building2 className="h-10 w-10 text-slate-600" />
-            <h3 className="text-sm font-semibold text-slate-300">No jobs match your filters</h3>
-            <p className="max-w-sm text-xs text-slate-500">
+          <div className="flex flex-col items-center gap-3 rounded-xl border-dashed surface-raised p-12 text-center">
+            <Building2 className="h-10 w-10 text-muted-foreground" />
+            <h3 className="text-sm font-semibold text-foreground">No jobs match your filters</h3>
+            <p className="max-w-sm text-xs text-muted-foreground">
               Try adjusting your city, radius, salary, or workplace filters, or click &quot;Sync Feeds Now&quot; to fetch new roles.
             </p>
             <button
               type="button"
               onClick={handleSyncPublicFeeds}
               disabled={isSyncing}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-amber-400 disabled:opacity-50"
+              className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
             >
               {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
               Sync Feeds Now
@@ -656,27 +706,31 @@ export function DiscoverFeed() {
             {jobs.map((j) => {
               const salaryStr = formatSalary(j);
               const isAlreadyTracked = Boolean(j.trackedJob);
-              const matchScore = typeof j.blendedScore === "number" ? j.blendedScore : null;
+              const matchScore = displayScore(j.blendedScore);
               const requiredCount = j.compatibility?.totalRequiredCount ?? 0;
 
               return (
                 <div
                   key={j.id}
-                  className="flex flex-col justify-between gap-4 rounded-xl border border-slate-800/80 bg-rf-surface p-4 transition-colors duration-200 hover:border-slate-600"
+                  className="flex flex-col justify-between gap-4 rounded-xl surface-raised card-lift p-4"
                   data-testid={`job-card-${j.id}`}
                 >
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
-                        <Building2 className="h-3.5 w-3.5 text-slate-400" />
-                        {j.companyName}
+                      <span className="flex min-w-0 items-center gap-2.5 text-sm font-semibold text-text-secondary">
+                        <CompanyAvatar company={j.companyName} />
+                        <span className="break-words">{j.companyName}</span>
                       </span>
                       <div className="flex items-center gap-1.5">
-                        <span className="rounded border border-slate-700 bg-slate-800/80 px-1.5 py-0.5 font-mono text-[10px] text-slate-300 uppercase">
+                        <span className="rounded border border-hairline bg-inset px-1.5 py-0.5 font-mono text-[10px] text-text-secondary uppercase">
                           {j.source}
                         </span>
                       </div>
                     </div>
+
+                    <h3 className="break-words text-base font-bold leading-snug tracking-tight text-foreground">
+                      {j.title}
+                    </h3>
 
                     {/* Signal Badge Pill with Popover, Funding & H1B Sub-Badges */}
                     {(() => {
@@ -701,22 +755,21 @@ export function DiscoverFeed() {
                           : null;
                       return (
                         <div className="flex flex-wrap items-center gap-2 my-0.5">
-                          {hasEvidence && matchScore !== null ? (
-                            <div className="flex items-center gap-2">
+                          {hasEvidence ? (
+                            <div className="flex items-center gap-2 [&_svg]:[filter:drop-shadow(0_0_10px_rgb(var(--accent-contrast)/0.45))]">
                               <FitPercentageDial
                                 compositeScore={matchScore}
-                                breakdown={j.scoreBreakdown as any}
+                                breakdown={j.scoreBreakdown}
                                 size={28}
                                 showLabel={false}
                               />
-                              <span className="font-mono text-xs text-slate-200">{matchScore}%</span>
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
                               {clientSkillPct !== null && matchedClientSkills.length > 0 && (
                                 <span
                                   data-testid="discover-skill-match-badge"
-                                  className="rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-emerald-300"
+                                  className="rounded border border-signal/35 bg-signal/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-signal"
                                   title={`Matched skills: ${matchedClientSkills.slice(0, 5).join(", ")}`}
                                 >
                                   {clientSkillPct}% Skill Match
@@ -724,7 +777,7 @@ export function DiscoverFeed() {
                               )}
                               <Link
                                 href="/library"
-                                className="text-[11px] font-medium text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline"
+                                className="text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                               >
                                 Add evidence to score
                               </Link>
@@ -744,31 +797,27 @@ export function DiscoverFeed() {
                       );
                     })()}
 
-                    <h3 className="text-sm font-bold leading-snug tracking-tight text-white">
-                      {j.title}
-                    </h3>
-
-                    <div className="mt-1 flex flex-col gap-1 font-mono text-xs text-slate-400">
+                    <div className="mt-1 flex flex-col gap-1 font-mono text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5">
-                        <MapPin className="h-3 w-3 text-slate-500" />
+                        <MapPin className="h-3 w-3 text-muted-foreground" />
                         {j.location || "Remote / Canada"}
                         {j.workplaceType && j.workplaceType !== "UNSPECIFIED" ? (
-                          <span className="rounded bg-slate-800 px-1 py-0.2 text-[10px] text-slate-400 lowercase">
+                          <span className="rounded bg-inset border border-hairline px-1.5 py-0.2 text-[10px] text-text-secondary lowercase">
                             ({j.workplaceType})
                           </span>
                         ) : null}
                       </span>
 
                       {salaryStr ? (
-                        <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
-                          <DollarSign className="h-3 w-3 text-emerald-500" />
+                        <span className="flex items-center gap-1.5 text-text-primary font-semibold">
+                          <DollarSign className="h-3 w-3 text-primary" />
                           {salaryStr}
                         </span>
                       ) : null}
 
                       {j.postedAt ? (
-                        <span className="flex items-center gap-1.5 text-slate-500">
-                          <Calendar className="h-3 w-3 text-slate-600" />
+                        <span className="flex items-center gap-1.5 text-muted-foreground">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
                           {new Date(j.postedAt).toLocaleDateString()}
                         </span>
                       ) : null}
@@ -777,11 +826,11 @@ export function DiscoverFeed() {
                     {j.compatibility && requiredCount > 0 && (
                       <div className="mt-2 space-y-1.5">
                         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
-                          <span className="rounded bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-emerald-300">
+                          <span className="rounded bg-primary/10 border border-primary/35 px-2 py-0.5 text-primary">
                             {j.compatibility.matchedSkills.length}/{requiredCount} Skills Matched
                           </span>
                           {j.compatibility.matchedEvidenceCount > 0 && (
-                            <span className="rounded border border-slate-700 bg-slate-800 px-2 py-0.5 text-slate-300">
+                            <span className="rounded border border-signal/35 bg-signal/10 px-2 py-0.5 text-signal">
                               {j.compatibility.matchedEvidenceCount} Evidence Items
                             </span>
                           )}
@@ -796,25 +845,25 @@ export function DiscoverFeed() {
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between border-t border-slate-800 pt-3 text-xs">
+                  <div className="flex items-center justify-between border-t border-hairline pt-3 text-xs">
                     {isSafeHref(j.applyUrl) ? (
                       <a
                         href={j.applyUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-slate-400 transition-colors hover:text-white"
+                        className="flex items-center gap-1 text-text-secondary transition-colors hover:text-foreground"
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                         Apply Link
                       </a>
                     ) : (
-                      <span className="font-mono text-slate-600">No Link</span>
+                      <span className="font-mono text-muted-foreground">No Link</span>
                     )}
 
                     {isAlreadyTracked ? (
                       <Link
                         href={`/tailor?jobId=${j.trackedJob?.id}`}
-                        className="flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-300 transition hover:bg-emerald-500/20"
+                        className="flex items-center gap-1.5 rounded-md border border-signal/40 bg-signal/10 px-2.5 py-1 text-xs font-medium text-signal transition hover:bg-signal/20"
                         data-testid={`in-tracker-btn-${j.id}`}
                       >
                         <CheckCircle2 className="h-3.5 w-3.5" />
@@ -825,7 +874,7 @@ export function DiscoverFeed() {
                         type="button"
                         disabled={promotingId === j.id}
                         onClick={() => handlePromoteJob(j)}
-                        className="flex items-center gap-1.5 rounded-md border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:border-amber-500 hover:bg-amber-500 hover:text-slate-950 focus-visible:border-amber-500 focus-visible:bg-amber-500 focus-visible:text-slate-950 disabled:opacity-50"
+                        className="flex min-h-11 items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-xs font-bold text-primary-foreground btn-glow active:scale-[0.98] hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
                         data-testid={`promote-btn-${j.id}`}
                       >
                         {promotingId === j.id ? (
@@ -845,25 +894,25 @@ export function DiscoverFeed() {
 
         {/* Pagination */}
         {!isLoading && totalJobs > 0 && (
-          <div className="flex items-center justify-between gap-2 border-t border-slate-800 bg-rf-bg py-4">
+          <div className="flex items-center justify-between gap-2 border-t border-hairline py-4">
             <button
               type="button"
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-3 py-1.5 text-xs text-rf-meta transition hover:text-rf-cloud disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-md border border-hairline bg-inset px-3 py-1.5 text-xs text-rf-cloud transition hover:bg-elevated hover:text-foreground disabled:opacity-40"
               data-testid="discover-page-prev"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
               Prev
             </button>
-            <span className="text-xs text-slate-500" data-testid="discover-page-indicator">
+            <span className="text-center text-xs tabular-nums text-on-surface-variant" data-testid="discover-page-indicator">
               Page {page} of {totalPages} ({totalJobs} total roles)
             </span>
             <button
               type="button"
               disabled={page >= totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-3 py-1.5 text-xs text-rf-meta transition hover:text-rf-cloud disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-md border border-hairline bg-inset px-3 py-1.5 text-xs text-rf-cloud transition hover:bg-elevated hover:text-foreground disabled:opacity-40"
               data-testid="discover-page-next"
             >
               Next

@@ -1,4 +1,6 @@
 import { test, expect } from "@playwright/test";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { PDFParse } = require("pdf-parse");
 
 test.describe("T5 Browser Smoke Check", () => {
   const consoleLogs: Record<string, string[]> = {};
@@ -47,6 +49,8 @@ test.describe("T5 Browser Smoke Check", () => {
     const codeBtn = codePanel.getByTestId("editor-mode-code");
     await expect(visualBtn).toBeVisible({ timeout: 15000 });
     await expect(codeBtn).toBeVisible({ timeout: 15000 });
+    await expect(page.locator(".typst-preview-svg svg").first()).toBeVisible({ timeout: 15000 });
+    const initialSvgHtml = await page.getByTestId("typst-preview-svg").innerHTML();
 
     // Toggle 1: Switch to Visual Form
     await visualBtn.click();
@@ -99,10 +103,24 @@ test.describe("T5 Browser Smoke Check", () => {
     expect(doc1).toContain("Berlin, Germany");
     expect(doc1).toContain("+49 30 123456");
 
-    // Also confirm preview SVG updates
+    // Also confirm preview SVG updates (Typst renders glyphs as SVG paths, so verify updated SVG + PDF text)
     const previewSvg = page.getByTestId("typst-preview-svg");
-    await expect(previewSvg).toBeVisible({ timeout: 15000 });
-    await expect(previewSvg).toContainText("Sarah Connor");
+    await expect(previewSvg.locator("svg").first()).toBeVisible({ timeout: 15000 });
+    await expect.poll(async () => await previewSvg.innerHTML(), { timeout: 15000 }).not.toBe(initialSvgHtml);
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.locator("[data-testid='export-dropdown-btn']").click();
+    await page.locator("[data-testid='export-pdf-menu-item']").click();
+    const download = await downloadPromise;
+    const pdfPath = await download.path();
+    expect(pdfPath).toBeTruthy();
+    if (pdfPath) {
+      const fs = await import("fs");
+      const parser = new PDFParse({ data: fs.readFileSync(pdfPath) });
+      const textResult = await parser.getText();
+      const extractedText = typeof textResult === "string" ? textResult : (textResult?.text || String(textResult));
+      expect(extractedText).toContain("Sarah Connor");
+    }
 
     // Toggle 3: Switch back to Visual Form
     await visualBtn.click();
@@ -159,6 +177,8 @@ test.describe("T5 Browser Smoke Check", () => {
 
     await page.evaluate((items) => {
       localStorage.setItem("resumeforge_guest_evidence", JSON.stringify(items));
+      localStorage.setItem("resumeforge_draft_migrated", "true");
+      localStorage.setItem("resumeforge_migration_dismissed", "true");
       localStorage.removeItem("rf_reviewed_duplicates");
     }, testDuplicates);
 
@@ -217,6 +237,8 @@ test.describe("T5 Browser Smoke Check", () => {
 
     await page.evaluate((items) => {
       localStorage.setItem("resumeforge_guest_evidence", JSON.stringify(items));
+      localStorage.setItem("resumeforge_draft_migrated", "true");
+      localStorage.setItem("resumeforge_migration_dismissed", "true");
       localStorage.removeItem("rf_reviewed_duplicates");
     }, mergeDuplicates);
 
@@ -240,7 +262,7 @@ test.describe("T5 Browser Smoke Check", () => {
     await expect(page.getByTestId("duplicate-review-card-guest-merge-candidate")).toHaveCount(0);
   });
 
-  test("4. /tracker Kanban view, drag card to APPLIED, reload persists status", async ({ page, request }) => {
+  test("4. /tracker Kanban view, drag card to APPLIED, reload persists status", async ({ page, request, baseURL }) => {
     setupConsoleListener(page, "/tracker");
 
     // Login via API to get session cookie
@@ -263,7 +285,7 @@ test.describe("T5 Browser Smoke Check", () => {
         {
           name: "rf_session",
           value: sessionMatch[1],
-          domain: "localhost",
+          domain: new URL(baseURL || "http://127.0.0.1:3005").hostname,
           path: "/",
         },
       ]);
@@ -346,7 +368,7 @@ test.describe("T5 Browser Smoke Check", () => {
 
     const coverLetterSection = page.getByTestId("tailor-cover-letter-section");
     await expect(coverLetterSection).toBeVisible({ timeout: 15000 });
-    await expect(coverLetterSection).toContainText("Active Section");
+    await expect(page.getByTestId("tailor-tab-cover-letter")).toHaveAttribute("aria-selected", "true");
   });
 
   test("7. /practice?jobId=X renders job context banner", async ({ page }) => {

@@ -18,7 +18,7 @@ const EvidenceSchema = z.object({
 });
 
 const RequestSchema = GenerateCoverLetterInputSchema.extend({
-  providerConfig: ProviderConfigSchema.extend({ apiKey: z.string().min(1).max(500) }),
+  providerConfig: ProviderConfigSchema.safeExtend({ apiKey: z.string().min(1).max(500) }),
   evidenceItems: z.array(EvidenceSchema).max(100),
   masterTypst: z.string().max(50_000).optional(),
 });

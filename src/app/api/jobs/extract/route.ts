@@ -7,6 +7,7 @@ import { extractFullTextFromUrl } from "@/lib/ingestion/tier2-fetcher";
 import { ProviderConfigSchema } from "@/lib/ai/types";
 import { formatJobDescriptionWithAi } from "@/lib/ai/gateway";
 import { parseJobDescriptionDocument } from "@/lib/jd/document-pipeline";
+import { requireUserId } from "@/lib/security/auth-request";
 
 const ExtractRequestSchema = z
   .object({
@@ -23,6 +24,9 @@ const ExtractRequestSchema = z
   });
 
 export async function POST(req: Request) {
+  const auth = await requireUserId(req);
+  if (auth instanceof Response) return auth;
+
   try {
     const body = await req.json();
     const validation = ExtractRequestSchema.safeParse(body);

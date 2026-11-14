@@ -16,7 +16,8 @@ const SKIP_DIRS = new Set(["node_modules", ".next", "dist", "coverage", ".git"])
 const SCAN_EXT = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
 
 const SCAN_RELATIVE_ROOTS = ["src", "scripts", "packages", "prisma", "tests", "e2e"];
-const SCAN_RELATIVE_FILES = ["next.config.ts", "vitest.config.ts", "playwright.config.ts"];
+const SCAN_RELATIVE_FILES = ["next.config.ts"];
+const ROOT_CONFIG_PATTERN = /^(?:playwright|vitest).*\.config\.(?:ts|tsx|js|mjs|cjs|mts|cts)$/i;
 
 export function collectDeclaredEnvNames(exampleText: string): Set<string> {
   const declared = new Set<string>();
@@ -36,6 +37,13 @@ export function collectUsedEnvNames(root: string): string[] {
   for (const rel of SCAN_RELATIVE_FILES) {
     const file = path.join(root, rel);
     if (fs.existsSync(file)) scanFile(file, found);
+  }
+  if (fs.existsSync(root)) {
+    for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      if (!ROOT_CONFIG_PATTERN.test(entry.name)) continue;
+      scanFile(path.join(root, entry.name), found);
+    }
   }
   return [...found].sort();
 }

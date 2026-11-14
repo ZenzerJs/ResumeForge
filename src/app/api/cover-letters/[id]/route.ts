@@ -6,10 +6,17 @@ import { getRequestUserId, requireUserId } from "@/lib/security/auth-request";
 
 const UpdateCoverLetterSchema = z.object({
   title: z.string().min(1).max(200).optional(),
+  salutation: z.string().max(500).optional(),
+  openingParagraph: z.string().max(20000).optional(),
+  bodyParagraphs: z.array(z.string().max(20000)).optional(),
+  closingParagraph: z.string().max(20000).optional(),
+  fullMarkdown: z.string().max(100000).optional(),
   proseMarkdown: z.string().max(100000).optional(),
   typstSource: z.string().max(200000).optional(),
   tone: z.enum(["FORMAL", "CONVERSATIONAL", "TECHNICAL", "EXECUTIVE"]).optional(),
   targetWordCount: z.number().int().min(50).max(2000).optional(),
+  evidenceCitations: z.array(z.string()).optional(),
+  status: z.enum(["DRAFT", "FINAL"]).optional(),
 });
 
 export async function GET(

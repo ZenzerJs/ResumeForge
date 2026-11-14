@@ -1,57 +1,71 @@
 import React from "react";
 import Link from "next/link";
 import { FileText, ArrowRight } from "lucide-react";
+import { BrandIcon } from "@/components/design-system/brand-icon";
+
+const FOOTER_STACK = ["Typst", "Next.js", "PostgreSQL", "CodeMirror", "Prisma"] as const;
 
 export function LandingFooter() {
   return (
     <footer
       data-testid="landing-footer"
-      className="relative z-20 mt-auto w-full min-w-0 shrink-0 border-t border-slate-800/80 bg-slate-950 py-10 px-4 md:px-8 text-slate-400"
+      className="relative z-20 mt-auto w-full min-w-0 shrink-0 border-t border-outline/70 bg-panel py-10 px-4 md:px-8 text-muted-foreground"
     >
       <div className="mx-auto flex w-full max-w-5xl min-w-0 flex-col items-center gap-6 text-center sm:items-start sm:text-left">
         <div className="space-y-1">
           <div className="flex items-center justify-center sm:justify-start gap-2">
-            <div className="h-6 w-6 rounded-lg bg-amber-950 border border-amber-500/40 text-amber-400 font-bold font-mono flex items-center justify-center text-xs">
+            <div className="h-6 w-6 rounded-[6px] bg-inset border border-primary/40 text-primary font-semibold font-mono flex items-center justify-center text-xs">
               RF
             </div>
-            <span className="text-white font-bold tracking-tight text-sm">ResumeForge</span>
+            <span className="text-foreground font-bold tracking-tight text-sm">ResumeForge</span>
           </div>
-          <p className="text-xs text-slate-500 font-mono">
-            Guest-ready workspace · WASM Typst · BYOK in this browser
+          <p className="text-xs text-muted-foreground font-mono">
+            Guest browser drafts · Optional Postgres sync · IndexedDB BYOK relay
           </p>
+          <div
+            className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 pt-1 text-[11px] font-mono text-muted-foreground/85 sm:justify-start"
+            aria-label="Core stack"
+          >
+            {FOOTER_STACK.map((tech) => (
+              <span key={tech} className="inline-flex items-center gap-1.5">
+                <BrandIcon name={tech} className="h-3.5 w-3.5 shrink-0" />
+                <span>{tech}</span>
+              </span>
+            ))}
+          </div>
         </div>
 
         <nav
           aria-label="Footer"
-          className="flex w-full min-w-0 flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-2 text-xs font-medium"
+          className="flex w-full min-w-0 flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-2 text-xs font-semibold"
         >
-          <Link href="/editor" className="hover:text-amber-400 transition-colors">
+          <Link href="/editor" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
             Editor
           </Link>
-          <Link href="/tailor" className="hover:text-purple-400 transition-colors">
+          <Link href="/tailor" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
             Tailor Engine
           </Link>
-          <Link href="/tracker" className="hover:text-blue-400 transition-colors">
+          <Link href="/tracker" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
             Tracker
           </Link>
-          <Link href="/library" className="hover:text-emerald-400 transition-colors">
+          <Link href="/library" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
             Evidence Bank
           </Link>
-          <Link href="/settings" className="hover:text-cyan-400 transition-colors">
+          <Link href="/settings" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
             BYOK Settings
           </Link>
-          <Link href="/privacy" className="hover:text-slate-200 transition-colors">
+          <Link href="/privacy" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
             Privacy Policy
           </Link>
         </nav>
 
         <Link
           href="/editor"
-          className="flex min-h-11 items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-white text-slate-950 hover:bg-slate-100 transition-all shadow-md"
+          className="inline-flex min-h-11 items-center gap-1.5 px-4 py-2 rounded-[6px] text-xs font-bold bg-primary text-primary-foreground hover:opacity-95 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
         >
-          <FileText className="h-3.5 w-3.5" />
+          <FileText className="h-3.5 w-3.5" aria-hidden />
           Launch Workspace
-          <ArrowRight className="h-3.5 w-3.5" />
+          <ArrowRight className="h-3.5 w-3.5" aria-hidden />
         </Link>
       </div>
     </footer>

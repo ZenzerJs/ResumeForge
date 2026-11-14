@@ -22,6 +22,7 @@ export function BulkPdfDropzone({ onComplete }: Props) {
   const [files, setFiles] = useState<FileState[]>([]);
   const [expandedFile, setExpandedFile] = useState<string | null>(null);
   const [unselectedBullets, setUnselectedBullets] = useState<Record<string, boolean>>({});
+  const [isDragOver, setIsDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const toggleBulletSelection = (bulletKey: string) => {
@@ -146,11 +147,21 @@ export function BulkPdfDropzone({ onComplete }: Props) {
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!isDragOver) setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+      setIsDragOver(false);
+    }
   };
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    setIsDragOver(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       processFiles(e.dataTransfer.files);
     }
@@ -163,28 +174,33 @@ export function BulkPdfDropzone({ onComplete }: Props) {
   };
 
   const statusClasses = {
-    Parsing: "bg-slate-800 text-slate-300 border border-slate-700",
-    Extracting: "bg-amber-500/15 text-amber-300 border border-amber-500/30",
-    Indexed: "bg-amber-500/15 text-amber-400 border border-amber-500/30",
-    Saved: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
-    Error: "bg-red-500/15 text-red-400 border border-red-500/30",
+    Parsing: "bg-elevated text-text-secondary border border-hairline",
+    Extracting: "bg-primary/15 text-primary border border-primary/30",
+    Indexed: "bg-primary/15 text-primary border border-primary/30",
+    Saved: "bg-status-success/15 text-status-success border border-status-success/30",
+    Error: "bg-status-danger/15 text-status-danger border border-status-danger/30",
   };
 
   return (
     <div className="w-full" data-testid="bulk-pdf-dropzone">
       <div
         onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        className="group rounded-xl border-2 border-dashed border-slate-800 bg-[#121929]/80 p-8 text-center cursor-pointer hover:border-[#ff8c00]/60 hover:bg-[#162035]/80 transition-all"
+        className={`group rounded-xl border-2 border-dashed glass-bar p-8 text-center cursor-pointer transition-all ${
+          isDragOver
+            ? "border-primary bg-primary/[0.08] shadow-[var(--shadow-2)]"
+            : "border-primary/40 hover:border-primary/75"
+        }`}
       >
-        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-slate-700/80 bg-[#0b1326] text-[#ff8c00] group-hover:scale-105 transition-transform">
+        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-primary/25 bg-inset/80 text-primary group-hover:scale-105 transition-transform">
           <Upload className="h-5 w-5" />
         </div>
-        <p className="text-sm font-semibold text-slate-100">
+        <p className="text-sm font-semibold text-foreground">
           Drag and drop resume PDFs here, or click to select files
         </p>
-        <p className="mt-1 text-xs font-mono text-slate-400">
+        <p className="mt-1 text-xs font-mono text-muted-foreground">
           Client-side PDF parsing · Extracts roles, projects &amp; impact bullets into your Evidence Bank
         </p>
         <input
@@ -211,12 +227,12 @@ export function BulkPdfDropzone({ onComplete }: Props) {
             return (
               <div
                 key={i}
-                className="rounded-xl border border-slate-800 bg-[#121929]/95 p-4 text-slate-100 shadow-md"
+                className="rounded-xl surface-raised p-4 text-foreground"
               >
                 <div className="flex flex-wrap justify-between items-center gap-2 mb-2.5">
                   <div className="flex items-center gap-2 min-w-0">
-                    <FileText className="h-4 w-4 text-[#ff8c00] shrink-0" />
-                    <span className="font-mono text-xs font-semibold text-white truncate">
+                    <FileText className="h-4 w-4 text-primary shrink-0" />
+                    <span className="font-mono text-xs font-semibold text-foreground truncate">
                       {file.name}
                     </span>
                     {file.extracted && (
@@ -224,7 +240,7 @@ export function BulkPdfDropzone({ onComplete }: Props) {
                         type="button"
                         onClick={() => setExpandedFile(isExpanded ? null : file.name)}
                         data-testid={`toggle-pdf-preview-${i}`}
-                        className="ml-1 inline-flex items-center gap-1 rounded bg-slate-800/80 px-2 py-0.5 text-[10px] font-mono text-slate-300 hover:text-white transition"
+                        className="ml-1 inline-flex items-center gap-1 rounded bg-elevated px-2 py-0.5 text-[10px] font-mono text-text-secondary hover:text-foreground transition"
                       >
                         {isExpanded ? (
                           <ChevronDown className="h-3 w-3" />
@@ -251,28 +267,28 @@ export function BulkPdfDropzone({ onComplete }: Props) {
                     )}
                   </span>
                 </div>
-                <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                <div className="w-full bg-inset rounded-full h-1.5 overflow-hidden">
                   <div
-                    className="bg-[#ff8c00] h-1.5 rounded-full transition-all duration-300"
+                    className="bg-primary h-1.5 rounded-full transition-all duration-300"
                     style={{ width: `${file.progress}%` }}
                   />
                 </div>
-                {file.error && <p className="text-red-400 text-xs mt-2 font-mono">{file.error}</p>}
+                {file.error && <p className="text-status-danger text-xs mt-2 font-mono">{file.error}</p>}
 
                 {isExpanded && file.extracted && (
                   <div
                     data-testid="pdf-extracted-preview"
-                    className="mt-3 pt-3 border-t border-slate-800/80 space-y-2 max-h-64 overflow-y-auto"
+                    className="mt-3 pt-3 border-t border-hairline space-y-2 max-h-64 overflow-y-auto"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">
+                      <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
                         Extracted Sections ({sectionEntries.length})
                       </div>
                       <button
                         type="button"
                         data-testid={`pdf-commit-selected-btn-${i}`}
                         onClick={() => void handleCommitSelected(file)}
-                        className="rounded border border-[#ff8c00]/40 bg-[#ff8c00]/15 px-2.5 py-1 text-[10px] font-mono font-semibold text-amber-300 hover:bg-[#ff8c00]/25 transition"
+                        className="rounded border border-primary/40 bg-primary/15 px-2.5 py-1 text-[10px] font-mono font-semibold text-primary hover:bg-primary/25 transition"
                       >
                         Save Selected to Evidence Bank
                       </button>
@@ -280,12 +296,12 @@ export function BulkPdfDropzone({ onComplete }: Props) {
                     {sectionEntries.map(([secName, bullets], sIdx) => (
                       <div
                         key={sIdx}
-                        className="rounded-lg border border-slate-800 bg-[#0b1326] p-2.5 space-y-1.5"
+                        className="rounded-lg border border-hairline bg-inset p-2.5 space-y-1.5"
                       >
-                        <div className="text-xs font-bold text-amber-300 font-mono uppercase">
+                        <div className="text-xs font-bold text-primary font-mono uppercase">
                           {secName}
                         </div>
-                        <ul className="space-y-1 text-xs text-slate-300">
+                        <ul className="space-y-1 text-xs text-text-secondary">
                           {bullets.slice(0, 6).map((b: string, bIdx: number) => {
                             const bulletKey = `${file.name}:${secName}:${bIdx}`;
                             const isChecked = !unselectedBullets[bulletKey];
@@ -297,9 +313,9 @@ export function BulkPdfDropzone({ onComplete }: Props) {
                                     checked={isChecked}
                                     onChange={() => toggleBulletSelection(bulletKey)}
                                     data-testid={`pdf-bullet-checkbox-${sIdx}-${bIdx}`}
-                                    className="mt-0.5 rounded border-slate-700 bg-slate-900 text-[#ff8c00] focus:ring-[#ff8c00]"
+                                    className="mt-0.5 rounded border-hairline bg-panel text-primary focus:ring-primary"
                                   />
-                                  <span className={isChecked ? "text-slate-200" : "text-slate-500 line-through"}>
+                                  <span className={isChecked ? "text-foreground" : "text-muted-foreground line-through"}>
                                     {b}
                                   </span>
                                 </label>

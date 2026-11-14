@@ -40,6 +40,32 @@ describe("Pitt CSC / Simplify Ingestion & Promotion API", () => {
     expect(discovered?.roleTitle).toBe("Backend Intern");
   });
 
+  it("retains source age across repeated relative and missing dates, and accepts a later-discovered original date", async () => {
+    const secret = process.env.JOB_SYNC_SECRET;
+    process.env.JOB_SYNC_SECRET = "expiry-test";
+    const sync = async (date: string) => syncHandler(new Request("http://localhost/api/jobs/sync-pittcsc", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer expiry-test" },
+      body: JSON.stringify({ rawMarkdown: `| Company | Role | Location | Application Link | Date Posted |\n| --- | --- | --- | --- | --- |\n| Expiry fixture | Engineer | Remote | [Apply](https://example.com/expiry-fixture) | ${date} |` }),
+    }));
+    try {
+      expect((await sync("3 days ago")).status).toBe(200);
+      const first = await prisma.discoveredJob.findFirst({ where: { company: "Expiry fixture" } });
+      expect(first).not.toBeNull();
+      await sync("1 day ago");
+      await sync("");
+      const repeated = await prisma.discoveredJob.findUnique({ where: { id: first!.id } });
+      expect(repeated?.datePosted).toBe("3 days ago");
+      await prisma.discoveredJob.update({ where: { id: first!.id }, data: { datePosted: null } });
+      const original = new Date(Date.now() - 80 * 86_400_000).toISOString();
+      await sync(original);
+      const learned = await prisma.discoveredJob.findUnique({ where: { id: first!.id } });
+      expect(learned?.datePosted).toBe(original);
+    } finally {
+      if (secret === undefined) delete process.env.JOB_SYNC_SECRET; else process.env.JOB_SYNC_SECRET = secret;
+      await prisma.discoveredJob.deleteMany({ where: { company: "Expiry fixture" } });
+    }
+  });
+
   it("fetches discovered jobs via GET /api/jobs/discovered", async () => {
     const req = new Request("http://localhost/api/jobs/discovered?search=Stripe");
     const res = await getDiscoveredHandler(req);

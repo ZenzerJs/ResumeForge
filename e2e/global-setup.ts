@@ -5,7 +5,7 @@ const EMAIL = "playwright@resumeforge.test";
 const PASSWORD = "playwright-test-secret";
 
 export default async function globalSetup(config: FullConfig) {
-  const baseURL = config.projects[0]?.use?.baseURL || "http://localhost:3005";
+  const baseURL = config.projects[0]?.use?.baseURL || "http://127.0.0.1:3005";
   await mkdir("e2e/.auth", { recursive: true });
 
   const browser = await chromium.launch();
@@ -30,6 +30,21 @@ export default async function globalSetup(config: FullConfig) {
   await page.request.patch(`${baseURL}/api/auth/me`, {
     data: { username: "playwright" },
   });
+
+  // Restore canonical form-safe starter Master Resume so persistent DB state from prior runs cannot poison editor/smoke tests
+  const starterRes = await page.request.get(`${baseURL}/templates/starter-resume.typ`);
+  if (starterRes.ok()) {
+    const starterSource = await starterRes.text();
+    if (starterSource.trim().length > 0) {
+      await page.request.post(`${baseURL}/api/resumes/save-master`, {
+        data: {
+          title: "Master Resume",
+          typstSource: starterSource,
+          confirmOverwrite: true,
+        },
+      });
+    }
+  }
 
   await page.context().storageState({ path: "e2e/.auth/user.json" });
   await browser.close();

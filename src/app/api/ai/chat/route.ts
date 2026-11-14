@@ -1,4 +1,4 @@
-import { getRequestUserId } from "@/lib/security/auth-request";
+import { requireUserId } from "@/lib/security/auth-request";
 import { sanitizeError } from "@/lib/ai/redact";
 import { ChatRequestSchema, type ChatStreamChunk } from "@/lib/ai/chat-types";
 import { buildChatSystemPrompt, buildChatContextPreamble } from "@/lib/ai/chat-prompt";
@@ -29,6 +29,10 @@ function emitTextChunks(text: string, emit: (chunk: ChatStreamChunk) => void) {
  * Streams SSE chunks: text | tool_start | tool_result | done | error.
  */
 export async function POST(request: Request) {
+  const auth = await requireUserId(request);
+  if (auth instanceof Response) return auth;
+  const userId = auth;
+
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -38,7 +42,6 @@ export async function POST(request: Request) {
       };
 
       try {
-        const userId = await getRequestUserId(request);
         const body = await request.json();
         const parsed = ChatRequestSchema.safeParse(body);
 
@@ -61,16 +64,26 @@ export async function POST(request: Request) {
           return;
         }
 
+        let authorizedActiveJobId: string | undefined;
         let activeJobTitle: string | undefined;
         let activeJobCompany: string | undefined;
         if (context?.activeJobId) {
           try {
-            const job = await prisma.job.findUnique({
-              where: { id: context.activeJobId },
-              select: { roleTitle: true, company: true },
+            const job = await prisma.job.findFirst({
+              where: {
+                id: context.activeJobId,
+                OR: [
+                  { userId },
+                  { userId: null, applications: { some: { userId } } },
+                ],
+              },
+              select: { id: true, roleTitle: true, company: true },
             });
-            activeJobTitle = job?.roleTitle || undefined;
-            activeJobCompany = job?.company || undefined;
+            if (job) {
+              authorizedActiveJobId = job.id;
+              activeJobTitle = job.roleTitle || undefined;
+              activeJobCompany = job.company || undefined;
+            }
           } catch {
             // Job lookup is optional context.
           }
@@ -114,7 +127,7 @@ export async function POST(request: Request) {
               toolCalls: completion.toolCalls,
               context: {
                 typstSource: context?.typstSource,
-                activeJobId: context?.activeJobId,
+                activeJobId: authorizedActiveJobId,
               },
               userId,
               emit,

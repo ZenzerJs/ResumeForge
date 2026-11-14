@@ -1,14 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
-import { clientKey, rateLimit } from "@/lib/security/rate-limit";
+import { clientKey, rateLimit, type RateLimitNamespace } from "@/lib/security/rate-limit";
 import { isMutationMethod, isPublicPath, originAllowed } from "@/lib/security/session";
 import { demoAllowsMutation, isDemoMode } from "@/lib/demo-mode";
 
 export const HEAVY_ENDPOINT_LIMITS: Record<string, { limit: number; windowMs: number }> = {
   "/api/jobs/bulk-import": { limit: 10, windowMs: 60_000 },
+  "/api/jobs/hydrate": { limit: 10, windowMs: 60_000 },
   "/api/resumes/upload-pdf": { limit: 10, windowMs: 60_000 },
   "/api/jobs/extract": { limit: 15, windowMs: 60_000 },
   "/api/connectors/sync": { limit: 5, windowMs: 60_000 },
 };
+
+const HEAVY_ENDPOINT_NAMESPACES: Record<string, RateLimitNamespace> = {
+  "/api/jobs/bulk-import": "heavy:/api/jobs/bulk-import",
+  "/api/jobs/hydrate": "heavy:/api/jobs/hydrate",
+  "/api/resumes/upload-pdf": "heavy:/api/resumes/upload-pdf",
+  "/api/jobs/extract": "heavy:/api/jobs/extract",
+  "/api/connectors/sync": "heavy:/api/connectors/sync",
+};
+
+const FETCH_FULLTEXT_LIMIT = {
+  namespace: "heavy:/api/jobs/[id]/fetch-fulltext" as RateLimitNamespace,
+  limit: 15,
+  windowMs: 60_000,
+};
+
+function isFetchFulltextPath(pathname: string): boolean {
+  return /^\/api\/jobs\/[^/]+\/fetch-fulltext$/.test(pathname);
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -57,11 +76,22 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Too many demo AI requests" }, { status: 429 });
     }
   } else if (heavyConfig) {
-    if (!rateLimit(clientKey(request, `heavy:${pathname}`), heavyConfig.limit, heavyConfig.windowMs)) {
+    const heavyNs = HEAVY_ENDPOINT_NAMESPACES[pathname];
+    if (!rateLimit(clientKey(request, heavyNs), heavyConfig.limit, heavyConfig.windowMs)) {
+      return NextResponse.json({ success: false, error: "Too many requests" }, { status: 429 });
+    }
+  } else if (isFetchFulltextPath(pathname)) {
+    if (
+      !rateLimit(
+        clientKey(request, FETCH_FULLTEXT_LIMIT.namespace),
+        FETCH_FULLTEXT_LIMIT.limit,
+        FETCH_FULLTEXT_LIMIT.windowMs
+      )
+    ) {
       return NextResponse.json({ success: false, error: "Too many requests" }, { status: 429 });
     }
   } else if (pathname.startsWith("/api/companies/") && pathname.endsWith("/dossier/generate")) {
-    if (!rateLimit(clientKey(request, "heavy"), 10, 60_000)) {
+    if (!rateLimit(clientKey(request, "heavy:dossier-generate"), 10, 60_000)) {
       return NextResponse.json({ success: false, error: "Too many requests" }, { status: 429 });
     }
   }

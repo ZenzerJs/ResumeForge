@@ -45,7 +45,7 @@ const FILE_EXT: Record<DsaLanguage, string> = {
 };
 
 const selectClass =
-  "h-8 appearance-none rounded-md border border-slate-700 bg-rf-elevated pl-2.5 pr-7 text-xs font-medium text-slate-100 transition-colors hover:border-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 cursor-pointer";
+  "h-8 appearance-none rounded-md border border-hairline bg-elevated pl-2.5 pr-7 text-xs font-medium text-foreground transition-colors hover:border-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 cursor-pointer";
 
 export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
   const searchParams = useSearchParams();
@@ -77,6 +77,13 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
   const [isAuditing, setIsAuditing] = useState<boolean>(false);
   const [, startTransition] = useTransition();
   const gutterRef = useRef<HTMLDivElement>(null);
+  const runAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      runAbortRef.current?.abort();
+    };
+  }, []);
 
   // If query parameters arrive after initial mount
   useEffect(() => {
@@ -103,6 +110,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
   const handleSelectProblem = (slug: string) => {
     const next = SANDBOX_PROBLEMS.find((p) => p.slug === slug);
     if (!next) return;
+    runAbortRef.current?.abort();
+    runAbortRef.current = null;
+    setIsRunning(false);
     setSelectedProblem(next);
     setCode(next.starterCode[selectedLanguage]);
     setRevealedHints({});
@@ -114,6 +124,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
   };
 
   const handleLanguageChange = (lang: DsaLanguage) => {
+    runAbortRef.current?.abort();
+    runAbortRef.current = null;
+    setIsRunning(false);
     setSelectedLanguage(lang);
     setCode(selectedProblem.starterCode[lang]);
     setExecutionSummary(null);
@@ -121,6 +134,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
   };
 
   const handleReset = () => {
+    runAbortRef.current?.abort();
+    runAbortRef.current = null;
+    setIsRunning(false);
     setCode(selectedProblem.starterCode[selectedLanguage]);
     setExecutionSummary(null);
     setScorecard(null);
@@ -197,6 +213,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
 
   const handleRun = async () => {
     if (isRunning) return;
+    runAbortRef.current?.abort();
+    const controller = new AbortController();
+    runAbortRef.current = controller;
     setIsRunning(true);
     try {
       const summary = await executeDsaCode({
@@ -204,11 +223,14 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
         language: selectedLanguage,
         code,
         timeoutMs: 2500,
+        signal: controller.signal,
       });
+      if (controller.signal.aborted) return;
       startTransition(() => {
         setExecutionSummary(summary);
       });
     } catch (err: unknown) {
+      if (controller.signal.aborted) return;
       setExecutionSummary({
         status: "Runtime Error",
         passedCount: 0,
@@ -218,7 +240,12 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
         errorMessage: err instanceof Error ? err.message : String(err),
       });
     } finally {
-      setIsRunning(false);
+      if (runAbortRef.current === controller) {
+        runAbortRef.current = null;
+      }
+      if (!controller.signal.aborted) {
+        setIsRunning(false);
+      }
     }
   };
 
@@ -254,12 +281,12 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
   return (
     <div
       className={cn(
-        "flex flex-col bg-rf-bg text-slate-100",
+        "flex flex-col bg-rf-bg text-foreground",
         embedded ? "min-h-0 flex-1 overflow-y-auto lg:overflow-hidden" : "min-h-screen"
       )}
     >
       {/* Toolbar */}
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-slate-800 px-4 py-2.5 md:px-6">
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-hairline px-4 py-2.5 md:px-6">
         <div className="flex min-w-0 flex-wrap items-center gap-2.5">
           <div className="relative">
             <label htmlFor="dsa-problem-select" className="sr-only">
@@ -279,7 +306,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               ))}
             </select>
             <ChevronDown
-              className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
               aria-hidden
             />
           </div>
@@ -292,10 +319,10 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
           >
             {selectedProblem.difficulty}
           </span>
-          <span className="rounded-full border border-slate-700 bg-rf-surface px-2.5 py-0.5 text-[11px] font-medium text-slate-300">
+          <span className="rounded-full border border-hairline bg-panel px-2.5 py-0.5 text-[11px] font-medium text-text-secondary">
             {selectedProblem.pattern}
           </span>
-          <span className="hidden font-mono text-[11px] tabular-nums text-slate-500 xl:inline">
+          <span className="hidden font-mono text-[11px] tabular-nums text-muted-foreground xl:inline">
             Time {selectedProblem.optimalTimeComplexity} · Space {selectedProblem.optimalSpaceComplexity}
           </span>
         </div>
@@ -304,25 +331,25 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
           type="button"
           onClick={() => setIsRecommenderOpen((prev) => !prev)}
           aria-expanded={isRecommenderOpen}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-700 bg-rf-surface px-3 text-xs font-medium text-slate-300 transition-colors hover:border-slate-600 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-hairline bg-panel px-3 text-xs font-medium text-text-secondary transition-colors hover:border-control hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
         >
           <Sparkles className="h-3.5 w-3.5 text-amber-400" aria-hidden />
           <span>Match with Job Description</span>
           {isRecommenderOpen ? (
-            <ChevronUp className="h-3.5 w-3.5 text-slate-400" aria-hidden />
+            <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
           ) : (
-            <ChevronDown className="h-3.5 w-3.5 text-slate-400" aria-hidden />
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
           )}
         </button>
       </header>
 
       {/* Collapsible JD recommender */}
       {isRecommenderOpen && (
-        <section className="shrink-0 border-b border-slate-800 bg-rf-surface/50 px-4 py-3 md:px-6">
+        <section className="shrink-0 border-b border-hairline bg-panel/50 px-4 py-3 md:px-6">
           <div className="mx-auto max-w-5xl space-y-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-xs font-semibold text-slate-200">Find problems for a target role</h2>
-              <span className="text-[11px] text-slate-500">
+              <h2 className="text-xs font-semibold text-foreground">Find problems for a target role</h2>
+              <span className="text-[11px] text-muted-foreground">
                 Ranks problems by keyword overlap with the job description
               </span>
             </div>
@@ -334,13 +361,13 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                 onChange={(e) => setJdInput(e.target.value)}
                 placeholder="Paste a job description snippet, e.g. backend systems, distributed caching…"
                 aria-label="Target job description snippet"
-                className="h-16 flex-1 resize-none rounded-lg border border-slate-700 bg-rf-bg p-2.5 text-xs leading-relaxed text-slate-200 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                className="h-16 flex-1 resize-none rounded-lg border border-hairline bg-inset p-2.5 text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
               />
               <button
                 type="button"
                 data-testid="dsa-jd-recommend-btn"
                 onClick={handleRecommend}
-                className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-slate-950 transition-colors hover:bg-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 sm:w-44"
+                className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-[#121010] transition-colors hover:bg-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 sm:w-44"
               >
                 <Sparkles className="h-3.5 w-3.5" aria-hidden />
                 <span>Rank Problems</span>
@@ -360,11 +387,11 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                         "flex flex-col justify-between gap-1.5 rounded-lg border p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60",
                         isCurrent
                           ? "border-amber-500/50 bg-amber-500/5"
-                          : "border-slate-800 bg-rf-bg hover:border-slate-600"
+                          : "border-hairline bg-inset hover:border-control"
                       )}
                     >
                       <span className="flex w-full items-center justify-between gap-2">
-                        <span className="truncate text-xs font-semibold text-slate-100">
+                        <span className="truncate text-xs font-semibold text-foreground">
                           {rec.problem.title}
                         </span>
                         <span className="shrink-0 rounded-full bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-amber-300">
@@ -373,7 +400,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                       </span>
                       <span
                         data-testid="dsa-match-reason"
-                        className="line-clamp-2 text-[11px] leading-relaxed text-slate-400"
+                        className="line-clamp-2 text-[11px] leading-relaxed text-text-secondary"
                       >
                         {rec.matchReason}
                       </span>
@@ -389,19 +416,19 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
       {/* Split body */}
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-12 lg:overflow-hidden">
         {/* Problem pane */}
-        <section className="space-y-6 rounded-xl border border-slate-800 bg-rf-surface p-5 lg:col-span-5 lg:overflow-y-auto">
+        <section className="space-y-6 rounded-xl border border-hairline bg-panel p-5 lg:col-span-5 lg:overflow-y-auto">
           <div>
-            <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-slate-500">
+            <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               {selectedProblem.pattern}
             </p>
-            <h1 className="mb-3 text-xl font-semibold tracking-tight text-white text-balance">
+            <h1 className="mb-3 text-xl font-semibold tracking-tight text-foreground text-balance">
               {selectedProblem.title}
             </h1>
             <div className="flex flex-wrap gap-1.5">
               {selectedProblem.categoryTags.map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-full border border-slate-700 px-2 py-0.5 text-[10px] font-medium text-slate-400"
+                  className="rounded-full border border-hairline px-2 py-0.5 text-[10px] font-medium text-text-secondary"
                 >
                   {tag}
                 </span>
@@ -409,27 +436,27 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
             </div>
           </div>
 
-          <div className="whitespace-pre-line text-sm leading-relaxed text-slate-300">
+          <div className="whitespace-pre-line text-sm leading-relaxed text-text-secondary">
             {selectedProblem.description}
           </div>
 
           <div className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Examples</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Examples</h2>
             {selectedProblem.examples.map((example, idx) => (
               <div
                 key={idx}
-                className="space-y-1.5 rounded-lg border border-slate-800 bg-rf-bg p-3 font-mono text-xs"
+                className="space-y-1.5 rounded-lg border border-hairline bg-inset p-3 font-mono text-xs"
               >
                 <div>
-                  <span className="font-semibold text-slate-500">Input: </span>
-                  <span className="text-slate-200">{example.input}</span>
+                  <span className="font-semibold text-muted-foreground">Input: </span>
+                  <span className="text-foreground">{example.input}</span>
                 </div>
                 <div>
-                  <span className="font-semibold text-slate-500">Output: </span>
+                  <span className="font-semibold text-muted-foreground">Output: </span>
                   <span className="text-emerald-400">{example.output}</span>
                 </div>
                 {example.explanation && (
-                  <div className="border-t border-slate-800 pt-1.5 font-sans text-[11px] leading-relaxed text-slate-400">
+                  <div className="border-t border-hairline pt-1.5 font-sans text-[11px] leading-relaxed text-text-secondary">
                     {example.explanation}
                   </div>
                 )}
@@ -438,22 +465,22 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Constraints</h2>
-            <ul className="list-inside list-disc space-y-1 font-mono text-xs text-slate-300">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Constraints</h2>
+            <ul className="list-inside list-disc space-y-1 font-mono text-xs text-text-secondary">
               {selectedProblem.constraints.map((c, i) => (
                 <li key={i}>{c}</li>
               ))}
             </ul>
           </div>
 
-          <div className="space-y-3 border-t border-slate-800 pt-5">
+          <div className="space-y-3 border-t border-hairline pt-5">
             <div className="flex items-center gap-1.5">
               <Lightbulb className="h-4 w-4 text-amber-400" aria-hidden />
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
                 Progressive Interview Hints
               </h2>
             </div>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-muted-foreground">
               Try solving without peeking first. Reveal hints progressively if stuck.
             </p>
 
@@ -468,27 +495,27 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                     : "Hint 3: Algorithm & Invariants";
 
                 return (
-                  <div key={idx} className="overflow-hidden rounded-lg border border-slate-800 bg-rf-bg">
+                  <div key={idx} className="overflow-hidden rounded-lg border border-hairline bg-inset">
                     <button
                       type="button"
                       data-testid={`dsa-hint-btn-${idx}`}
                       onClick={() => toggleHint(idx)}
                       aria-expanded={isRevealed}
-                      className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500/60"
+                      className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-text-secondary transition-colors hover:bg-elevated/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500/60"
                     >
                       <span className="flex items-center gap-2">
                         <Lightbulb
-                          className={cn("h-3.5 w-3.5", isRevealed ? "text-amber-400" : "text-slate-500")}
+                          className={cn("h-3.5 w-3.5", isRevealed ? "text-amber-400" : "text-muted-foreground")}
                           aria-hidden
                         />
                         <span>{label}</span>
                       </span>
-                      <span className="text-[11px] text-slate-500">{isRevealed ? "Hide" : "Reveal"}</span>
+                      <span className="text-[11px] text-muted-foreground">{isRevealed ? "Hide" : "Reveal"}</span>
                     </button>
                     {isRevealed && (
                       <div
                         data-testid={`dsa-hint-content-${idx}`}
-                        className="border-t border-slate-800 px-3 pb-3 pt-2 text-xs leading-relaxed text-slate-300"
+                        className="border-t border-hairline px-3 pb-3 pt-2 text-xs leading-relaxed text-text-secondary"
                       >
                         {hintText}
                       </div>
@@ -502,12 +529,12 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
           {/* Socratic AI Coach & Complexity Auditor */}
           <div
             data-testid="dsa-socratic-coach-panel"
-            className="space-y-3 border-t border-slate-800 pt-5"
+            className="space-y-3 border-t border-hairline pt-5"
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
                 <Bot className="h-4 w-4 text-amber-400" aria-hidden />
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
                   Socratic Interview Coach
                 </h2>
               </div>
@@ -516,23 +543,23 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               </span>
             </div>
 
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-text-secondary">
               Discuss constraints, walk through your Big-O approach, or request a Socratic nudge without spoiling the code.
             </p>
 
             {coachMessages.length > 0 && (
-              <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-slate-800 bg-rf-bg p-2.5 text-xs">
+              <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-hairline bg-inset p-2.5 text-xs">
                 {coachMessages.map((msg, i) => (
                   <div
                     key={i}
                     className={cn(
                       "rounded-md p-2 leading-relaxed",
                       msg.role === "user"
-                        ? "ml-4 bg-slate-800/80 text-slate-200"
-                        : "mr-2 border border-amber-500/20 bg-amber-500/5 text-slate-200"
+                        ? "ml-4 bg-elevated text-foreground"
+                        : "mr-2 border border-amber-500/20 bg-amber-500/5 text-foreground"
                     )}
                   >
-                    <span className="mb-0.5 block font-mono text-[10px] uppercase text-slate-400">
+                    <span className="mb-0.5 block font-mono text-[10px] uppercase text-muted-foreground">
                       {msg.role === "user" ? "You" : "Socratic Coach"}
                     </span>
                     {msg.content}
@@ -554,14 +581,14 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                   }
                 }}
                 placeholder="Explain your approach or ask a clarifying question…"
-                className="h-8 flex-1 rounded-md border border-slate-700 bg-rf-bg px-2.5 text-xs text-slate-100 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                className="h-8 flex-1 rounded-md border border-hairline bg-inset px-2.5 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
               />
               <button
                 type="button"
                 data-testid="dsa-coach-send-btn"
                 disabled={isAskingCoach || !coachInput.trim()}
                 onClick={() => void handleAskCoach()}
-                className="inline-flex h-8 items-center gap-1 rounded-md bg-slate-800 px-3 text-xs font-semibold text-amber-300 transition-colors hover:bg-slate-700 disabled:opacity-50"
+                className="inline-flex h-8 items-center gap-1 rounded-md bg-elevated px-3 text-xs font-semibold text-amber-300 transition-colors hover:bg-panel disabled:opacity-50"
               >
                 {isAskingCoach ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -597,30 +624,30 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                 className="space-y-2.5 rounded-lg border border-emerald-500/30 bg-emerald-950/15 p-3 text-xs"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-white">
+                  <span className="font-semibold text-foreground">
                     Interview Readiness Grade:{" "}
                     <span className="font-mono text-sm text-amber-400">{scorecard.grade}</span>{" "}
                     ({scorecard.overallScore}/100)
                   </span>
-                  <span className="font-mono text-[10px] uppercase text-slate-400">
+                  <span className="font-mono text-[10px] uppercase text-muted-foreground">
                     {scorecard.mode === "byok" ? "AI Audited" : "Heuristic Audit"}
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
-                  <div className="rounded border border-slate-800 bg-rf-bg p-2">
-                    <span className="block text-[10px] text-slate-400">Time Complexity</span>
+                  <div className="rounded border border-hairline bg-inset p-2">
+                    <span className="block text-[10px] text-muted-foreground">Time Complexity</span>
                     <span className={scorecard.complexityAudit.isTimeOptimal ? "text-emerald-400" : "text-amber-300"}>
                       {scorecard.complexityAudit.detectedTimeComplexity} (target {scorecard.complexityAudit.optimalTimeComplexity})
                     </span>
                   </div>
-                  <div className="rounded border border-slate-800 bg-rf-bg p-2">
-                    <span className="block text-[10px] text-slate-400">Space Complexity</span>
+                  <div className="rounded border border-hairline bg-inset p-2">
+                    <span className="block text-[10px] text-muted-foreground">Space Complexity</span>
                     <span className={scorecard.complexityAudit.isSpaceOptimal ? "text-emerald-400" : "text-amber-300"}>
                       {scorecard.complexityAudit.detectedSpaceComplexity} (target {scorecard.complexityAudit.optimalSpaceComplexity})
                     </span>
                   </div>
                 </div>
-                <p className="text-[11px] leading-relaxed text-slate-300">
+                <p className="text-[11px] leading-relaxed text-text-secondary">
                   {scorecard.complexityAudit.actionableFeedback}
                 </p>
               </div>
@@ -630,10 +657,10 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
 
         {/* Editor + console */}
         <section className="flex min-h-0 flex-col gap-3 lg:col-span-7">
-          <div className="flex min-h-[340px] flex-1 flex-col overflow-hidden rounded-xl border border-slate-800 bg-rf-surface">
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-800 px-3 py-2">
+          <div className="flex min-h-[340px] flex-1 flex-col overflow-hidden rounded-xl border border-hairline bg-panel">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-hairline px-3 py-2">
               <div className="flex min-w-0 items-center gap-3">
-                <span className="rounded-md border border-slate-700 bg-rf-bg px-2 py-1 font-mono text-[11px] text-slate-300">
+                <span className="rounded-md border border-hairline bg-inset px-2 py-1 font-mono text-[11px] text-text-secondary">
                   solution.{FILE_EXT[selectedLanguage]}
                 </span>
                 <div className="relative">
@@ -652,7 +679,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                     <option value="python">Python 3</option>
                   </select>
                   <ChevronDown
-                    className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+                    className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
                     aria-hidden
                   />
                 </div>
@@ -664,7 +691,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                   data-testid="dsa-reset-btn"
                   onClick={handleReset}
                   title="Reset code to the starter template"
-                  className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
                 >
                   <RotateCcw className="h-3.5 w-3.5" aria-hidden />
                   <span>Reset</span>
@@ -676,7 +703,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                   disabled={isRunning}
                   onClick={handleRun}
                   title="Run (Ctrl or ⌘ + Enter)"
-                  className="inline-flex h-8 items-center gap-1.5 rounded-md bg-amber-500 px-3.5 text-xs font-semibold text-slate-950 transition-colors hover:bg-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md bg-amber-500 px-3.5 text-xs font-semibold text-[#121010] transition-colors hover:bg-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 disabled:cursor-not-allowed disabled:bg-elevated disabled:text-muted-foreground"
                 >
                   {isRunning ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -688,11 +715,11 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               </div>
             </div>
 
-            <div className="relative flex min-h-0 flex-1 bg-rf-bg">
+            <div className="relative flex min-h-0 flex-1 bg-inset">
               <div
                 ref={gutterRef}
                 aria-hidden
-                className="select-none overflow-hidden border-r border-slate-800 bg-slate-950/40 py-4 pl-3 pr-3 text-right font-mono text-[13px] leading-relaxed text-slate-500"
+                className="select-none overflow-hidden border-r border-hairline bg-deep/40 py-4 pl-3 pr-3 text-right font-mono text-[13px] leading-relaxed text-muted-foreground"
               >
                 {Array.from({ length: lineCount }, (_, i) => (
                   <div key={i}>{i + 1}</div>
@@ -728,7 +755,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                 autoComplete="off"
                 autoCorrect="off"
                 wrap="off"
-                className="min-w-0 flex-1 resize-none whitespace-pre border-none bg-transparent p-4 font-mono text-[13px] leading-relaxed text-slate-100 caret-amber-400 selection:bg-amber-500/20 focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-slate-600"
+                className="min-w-0 flex-1 resize-none whitespace-pre border-none bg-transparent p-4 font-mono text-[13px] leading-relaxed text-foreground caret-amber-400 selection:bg-amber-500/20"
                 placeholder="// Write your solution here…"
                 aria-label="Solution code"
               />
@@ -736,10 +763,10 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
           </div>
 
           {/* Test console */}
-          <div className="flex h-72 shrink-0 flex-col overflow-hidden rounded-xl border border-slate-800 bg-rf-surface">
-            <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-800 px-3 py-2">
+          <div className="flex h-72 shrink-0 flex-col overflow-hidden rounded-xl border border-hairline bg-panel">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-hairline px-3 py-2">
               <div className="flex flex-wrap items-center gap-3">
-                <span className="text-xs font-semibold text-slate-200">Test Cases</span>
+                <span className="text-xs font-semibold text-foreground">Test Cases</span>
 
                 <div data-testid="dsa-execution-status" className="flex items-center gap-2">
                   {executionSummary ? (
@@ -759,16 +786,16 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                         )}
                         <span>{executionSummary.status}</span>
                       </span>
-                      <span className="font-mono text-[11px] tabular-nums text-slate-400">
+                      <span className="font-mono text-[11px] tabular-nums text-text-secondary">
                         {executionSummary.passedCount} / {executionSummary.totalCount} Passed
                       </span>
-                      <span className="font-mono text-[11px] tabular-nums text-slate-500">
+                      <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
                         ({executionSummary.totalTimeMs}ms)
                       </span>
                     </div>
                   ) : (
-                    <span className="text-[11px] text-slate-500">
-                      Press <kbd className="rounded border border-slate-700 px-1 font-mono text-[10px]">Run Code</kbd>{" "}
+                    <span className="text-[11px] text-muted-foreground">
+                      Press <kbd className="rounded border border-hairline px-1 font-mono text-[10px]">Run Code</kbd>{" "}
                       to test your solution
                     </span>
                   )}
@@ -783,7 +810,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               )}
             </div>
 
-            <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-slate-800 px-3 py-2">
+            <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-hairline px-3 py-2">
               {selectedProblem.testCases.map((tc, idx) => {
                 const res = executionSummary?.results[idx];
                 const isActive = activeTestCaseIndex === idx;
@@ -799,7 +826,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                       "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60",
                       isActive
                         ? "border-amber-500/40 bg-amber-500/15 text-amber-300"
-                        : "border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+                        : "border-hairline bg-inset text-text-secondary hover:border-control hover:text-foreground"
                     )}
                   >
                     <span>Case {idx + 1}</span>
@@ -814,37 +841,37 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               })}
             </div>
 
-            <div className="flex-1 space-y-3 overflow-y-auto p-3 font-mono text-xs text-slate-300">
+            <div className="flex-1 space-y-3 overflow-y-auto p-3 font-mono text-xs text-text-secondary">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <span className="block font-sans text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <span className="block font-sans text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Input
                   </span>
-                  <div className="whitespace-pre-wrap rounded-md border border-slate-800 bg-rf-bg p-2 text-slate-300">
+                  <div className="whitespace-pre-wrap rounded-md border border-hairline bg-inset p-2 text-text-secondary">
                     {JSON.stringify(activeTestCase.input, null, 2)}
                   </div>
                 </div>
 
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="font-sans text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <span className="font-sans text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Expected Output
                     </span>
                     <span className="text-emerald-400">{JSON.stringify(activeTestCase.expected)}</span>
                   </div>
 
-                  <span className="block pt-1 font-sans text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <span className="block pt-1 font-sans text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Actual Output
                   </span>
                   <div
                     data-testid="dsa-test-actual"
                     className={cn(
-                      "whitespace-pre-wrap rounded-md border bg-rf-bg p-2",
+                      "whitespace-pre-wrap rounded-md border bg-inset p-2",
                       activeResult
                         ? activeResult.passed
                           ? "border-emerald-500/30 text-emerald-300"
                           : "border-rose-500/30 text-rose-300"
-                        : "border-slate-800 text-slate-500"
+                        : "border-hairline text-muted-foreground"
                     )}
                   >
                     {activeResult
@@ -857,13 +884,13 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               </div>
 
               <div className="space-y-1 pt-1">
-                <span className="flex items-center gap-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  <Terminal className="h-3 w-3 text-slate-400" aria-hidden />
+                <span className="flex items-center gap-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <Terminal className="h-3 w-3 text-text-secondary" aria-hidden />
                   <span>Console output</span>
                 </span>
                 <pre
                   data-testid="dsa-stdout-output"
-                  className="max-h-24 overflow-y-auto whitespace-pre-wrap rounded-md border border-slate-800 bg-rf-bg p-2 text-[11px] leading-relaxed text-slate-300"
+                  className="max-h-24 overflow-y-auto whitespace-pre-wrap rounded-md border border-hairline bg-inset p-2 text-[11px] leading-relaxed text-text-secondary"
                 >
                   {activeResult?.stdout || "(no stdout captured)"}
                 </pre>

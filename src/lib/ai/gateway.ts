@@ -1,9 +1,22 @@
-import { ProviderConfig, ProviderConfigSchema, TestConnectionResult, GeneratePatchesInput, GeneratePatchesResult, EvidenceItemForPrompt, ConvertPdfInput, ConvertPdfResult } from "./types";
-import { testOpenAIConnection, generateOpenAIPatches, generateOpenAIQualitativeReview, generateOpenAICoverLetter, convertOpenAIPdfTextToTypst, repairTypstWithOpenAI, chatOpenAI } from "./providers/openai";
-import { testAnthropicConnection, generateAnthropicPatches, generateAnthropicQualitativeReview, generateAnthropicCoverLetter, convertAnthropicPdfTextToTypst, repairTypstWithAnthropic, chatAnthropic } from "./providers/anthropic";
-import { testGeminiConnection, generateGeminiPatches, generateGeminiQualitativeReview, generateGeminiCoverLetter, convertGeminiPdfTextToTypst, repairTypstWithGemini, chatGemini } from "./providers/gemini";
-import { testCustomConnection, generateCustomPatches, generateCustomQualitativeReview, generateCustomCoverLetter, convertCustomPdfTextToTypst, repairTypstWithCustom, chatCustom, ChatCompletionResult } from "./providers/custom";
+import {
+  ProviderConfig,
+  ProviderConfigSchema,
+  TestConnectionResult,
+  GeneratePatchesInput,
+  GeneratePatchesResult,
+  EvidenceItemForPrompt,
+  ConvertPdfInput,
+  ConvertPdfResult,
+  TextCompletionMessage,
+  TextCompletionOptions,
+  TextCompletionResult,
+} from "./types";
+import { testOpenAIConnection, completeText as completeOpenAIText, chatOpenAI } from "./providers/openai";
+import { testAnthropicConnection, completeText as completeAnthropicText, chatAnthropic } from "./providers/anthropic";
+import { testGeminiConnection, completeText as completeGeminiText, chatGemini } from "./providers/gemini";
+import { testCustomConnection, completeText as completeCustomText, chatCustom, ChatCompletionResult } from "./providers/custom";
 import { sanitizeError } from "./redact";
+import { stripCodeFences } from "./utils";
 import { buildPatchSystemPrompt, buildPatchUserPrompt } from "./prompt-template";
 import { buildQualitativeReviewSystemPrompt, buildQualitativeReviewUserPrompt, QualitativeReviewPromptInput } from "./qualitative-prompt";
 import { buildCoverLetterSystemPrompt, buildCoverLetterUserPrompt } from "./cover-letter-prompt";
@@ -11,32 +24,80 @@ import { buildPdfToTypstSystemPrompt, buildPdfToTypstUserPrompt, buildPdfSpanSys
 import { validateAssignments } from "@/lib/typst/resume-document";
 import { z } from "zod";
 import { GenerateCoverLetterInput } from "./cover-letter-schema";
-import { TypstRepairInput, TypstRepairInputSchema, TypstRepairProposal } from "./repair-schema";
+import { TypstRepairInput, TypstRepairInputSchema, TypstRepairProposal, TypstRepairProposalSchema } from "./repair-schema";
+import { buildTypstRepairSystemPrompt, buildTypstRepairUserPrompt } from "./repair-prompt";
 import { buildEvidenceExtractSystemPrompt, buildEvidenceExtractUserPrompt } from "./evidence-prompt";
 import { FormattedJd, FormattedJdSchema } from "./jd-format-schema";
 import { buildJdFormatSystemPrompt, buildJdFormatUserPrompt, JdFormatPromptInput } from "./jd-format-prompt";
 import { sanitizeTypstSource } from "../typst/sanitizer";
 import { isDemoMode } from "../demo-mode";
+import {
+  isServerManagedLocalConfig,
+  markServerManagedLocalConfig,
+  resolveProviderCredentials,
+} from "./providers/credentials";
+
+export { isServerManagedLocalConfig };
+
+async function dispatchTextCompletion(
+  resolvedConfig: ProviderConfig,
+  messages: TextCompletionMessage[],
+  jsonMode: boolean,
+  options?: TextCompletionOptions
+): Promise<TextCompletionResult> {
+  switch (resolvedConfig.provider) {
+    case "openai":
+      return completeOpenAIText(resolvedConfig, messages, jsonMode, options);
+    case "anthropic":
+      return completeAnthropicText(resolvedConfig, messages, jsonMode, options);
+    case "gemini":
+      return completeGeminiText(resolvedConfig, messages, jsonMode, options);
+    case "groq":
+    case "ollama":
+    case "custom":
+      return completeCustomText(resolvedConfig, messages, jsonMode, options);
+    default:
+      return {
+        success: false,
+        error: `Unsupported AI provider for ${options?.taskLabel ?? "completion"}: ${resolvedConfig.provider}`,
+      };
+  }
+}
 
 /**
  * Resolves server-side defaults and environment variables for AI providers.
  */
 export function resolveServerProviderConfig(config: ProviderConfig): ProviderConfig {
   if (config.provider === "groq") {
+    const { apiKey, baseUrl } = resolveProviderCredentials({
+      configApiKey: config.apiKey,
+      configBaseUrl: config.baseUrl,
+      envApiKey: process.env.GROQ_API_KEY,
+      defaultBaseUrl: "https://api.groq.com/openai/v1",
+      officialHosts: ["api.groq.com"],
+    });
     return {
       ...config,
-      apiKey: config.apiKey?.trim() || (!isDemoMode() ? process.env.GROQ_API_KEY?.trim() : undefined) || undefined,
-      baseUrl: config.baseUrl || "https://api.groq.com/openai/v1",
+      apiKey,
+      baseUrl,
       model: config.model || "llama-3.3-70b-versatile",
     };
   }
   if (config.provider === "ollama") {
-    return {
+    const hasCallerBase = Boolean(config.baseUrl?.trim());
+    const resolved: ProviderConfig = {
       ...config,
-      baseUrl: config.baseUrl || (!isDemoMode() ? process.env.OLLAMA_BASE_URL : undefined) || "http://localhost:11434/v1",
+      baseUrl:
+        config.baseUrl?.trim() ||
+        (!isDemoMode() ? process.env.OLLAMA_BASE_URL : undefined) ||
+        "http://localhost:11434/v1",
       model: config.model || "llama3.2",
       apiKey: config.apiKey || "ollama",
     };
+    if (!hasCallerBase) {
+      markServerManagedLocalConfig(resolved);
+    }
+    return resolved;
   }
   return config;
 }
@@ -87,6 +148,13 @@ export async function testProviderConnection(rawConfig: ProviderConfig): Promise
   }
 }
 
+function toPatchEnvelope(res: TextCompletionResult): GeneratePatchesResult {
+  if (!res.success || !res.text) {
+    return { success: false, error: res.error };
+  }
+  return { success: true, rawJson: res.text };
+}
+
 /**
  * Phase 4.2: Generates structured patch proposals via the configured BYOK AI provider.
  *
@@ -107,23 +175,20 @@ export async function generatePatchProposals(input: GeneratePatchesInput): Promi
   const userPrompt = buildPatchUserPrompt(input);
 
   try {
-    switch (resolvedConfig.provider) {
-      case "openai":
-        return await generateOpenAIPatches(resolvedConfig, systemPrompt, userPrompt);
-      case "anthropic":
-        return await generateAnthropicPatches(resolvedConfig, systemPrompt, userPrompt);
-      case "gemini":
-        return await generateGeminiPatches(resolvedConfig, systemPrompt, userPrompt);
-      case "groq":
-      case "ollama":
-      case "custom":
-        return await generateCustomPatches(resolvedConfig, systemPrompt, userPrompt);
-      default:
-        return {
-          success: false,
-          error: `Unsupported AI provider for patch generation: ${resolvedConfig.provider}`,
-        };
-    }
+    const res = await dispatchTextCompletion(
+      resolvedConfig,
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      true,
+      {
+        temperature: 0.3,
+        defaultModel: resolvedConfig.provider === "anthropic" ? "claude-sonnet-4-20250514" : undefined,
+        taskLabel: "patch generation",
+      }
+    );
+    return toPatchEnvelope(res);
   } catch (err) {
     return {
       success: false,
@@ -149,23 +214,20 @@ export async function generateQualitativeReview(input: QualitativeReviewPromptIn
   const userPrompt = buildQualitativeReviewUserPrompt(input);
 
   try {
-    switch (resolvedConfig.provider) {
-      case "openai":
-        return await generateOpenAIQualitativeReview(resolvedConfig, systemPrompt, userPrompt);
-      case "anthropic":
-        return await generateAnthropicQualitativeReview(resolvedConfig, systemPrompt, userPrompt);
-      case "gemini":
-        return await generateGeminiQualitativeReview(resolvedConfig, systemPrompt, userPrompt);
-      case "groq":
-      case "ollama":
-      case "custom":
-        return await generateCustomQualitativeReview(resolvedConfig, systemPrompt, userPrompt);
-      default:
-        return {
-          success: false,
-          error: `Unsupported AI provider for qualitative review: ${resolvedConfig.provider}`,
-        };
-    }
+    const res = await dispatchTextCompletion(
+      resolvedConfig,
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      true,
+      {
+        temperature: 0.3,
+        defaultModel: resolvedConfig.provider === "anthropic" ? "claude-3-5-sonnet-20241022" : undefined,
+        taskLabel: "qualitative review",
+      }
+    );
+    return toPatchEnvelope(res);
   } catch (err) {
     return {
       success: false,
@@ -196,23 +258,20 @@ export async function generateCoverLetter(
   const userPrompt = buildCoverLetterUserPrompt(input, evidenceItems, masterTypstSource);
 
   try {
-    switch (resolvedConfig.provider) {
-      case "openai":
-        return await generateOpenAICoverLetter(resolvedConfig, systemPrompt, userPrompt);
-      case "anthropic":
-        return await generateAnthropicCoverLetter(resolvedConfig, systemPrompt, userPrompt);
-      case "gemini":
-        return await generateGeminiCoverLetter(resolvedConfig, systemPrompt, userPrompt);
-      case "groq":
-      case "ollama":
-      case "custom":
-        return await generateCustomCoverLetter(resolvedConfig, systemPrompt, userPrompt);
-      default:
-        return {
-          success: false,
-          error: `Unsupported AI provider for cover letter generation: ${resolvedConfig.provider}`,
-        };
-    }
+    const res = await dispatchTextCompletion(
+      resolvedConfig,
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      true,
+      {
+        temperature: 0.4,
+        defaultModel: resolvedConfig.provider === "anthropic" ? "claude-3-5-sonnet-20241022" : undefined,
+        taskLabel: "cover letter generation",
+      }
+    );
+    return toPatchEnvelope(res);
   } catch (err) {
     return {
       success: false,
@@ -238,28 +297,25 @@ export async function convertPdfTextToTypst(input: ConvertPdfInput): Promise<Con
   const userPrompt = input.formattingVersion === 2 ? buildPdfSpanUserPrompt(input.rawText) : buildPdfToTypstUserPrompt(input.rawText, input.fileName, input.links);
 
   try {
-    let result: ConvertPdfResult;
-    switch (resolvedConfig.provider) {
-      case "openai":
-        result = await convertOpenAIPdfTextToTypst(resolvedConfig, systemPrompt, userPrompt);
-        break;
-      case "anthropic":
-        result = await convertAnthropicPdfTextToTypst(resolvedConfig, systemPrompt, userPrompt);
-        break;
-      case "gemini":
-        result = await convertGeminiPdfTextToTypst(resolvedConfig, systemPrompt, userPrompt);
-        break;
-      case "groq":
-      case "ollama":
-      case "custom":
-        result = await convertCustomPdfTextToTypst(resolvedConfig, systemPrompt, userPrompt);
-        break;
-      default:
-        return {
-          success: false,
-          error: `Unsupported AI provider for PDF conversion: ${resolvedConfig.provider}`,
-        };
-    }
+    const completion = await dispatchTextCompletion(
+      resolvedConfig,
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      false,
+      {
+        temperature: resolvedConfig.provider === "gemini" ? 0.1 : 0.2,
+        timeoutMs: 30_000,
+        thinkingBudget: resolvedConfig.provider === "gemini" ? 1024 : undefined,
+        defaultModel: resolvedConfig.provider === "anthropic" ? "claude-3-5-sonnet-20241022" : undefined,
+        taskLabel: "PDF conversion",
+      }
+    );
+
+    const result: ConvertPdfResult = completion.success && completion.text
+      ? { success: true, typstSource: stripCodeFences(completion.text) }
+      : { success: false, error: completion.error };
 
     if (input.formattingVersion === 2) {
       if (!result.success || !result.typstSource) return { success: false, error: "Empty PDF extraction response" };
@@ -308,25 +364,53 @@ export async function repairTypstSource(
   }
 
   const resolvedConfig = resolveServerProviderConfig(parseResult.data);
+  const systemPrompt = buildTypstRepairSystemPrompt();
+  const userPrompt = buildTypstRepairUserPrompt(inputValidate.data);
+
+  const missingKeyByProvider: Partial<Record<ProviderConfig["provider"], string>> = {
+    openai: "OpenAI API key is missing. Please configure your key in Settings.",
+    anthropic: "Anthropic API key is missing. Please configure your key in Settings.",
+    gemini: "Gemini API key is missing. Please configure your key in Settings.",
+  };
 
   try {
-    switch (resolvedConfig.provider) {
-      case "openai":
-        return await repairTypstWithOpenAI(resolvedConfig, inputValidate.data);
-      case "anthropic":
-        return await repairTypstWithAnthropic(resolvedConfig, inputValidate.data);
-      case "gemini":
-        return await repairTypstWithGemini(resolvedConfig, inputValidate.data);
-      case "groq":
-      case "ollama":
-      case "custom":
-        return await repairTypstWithCustom(resolvedConfig, inputValidate.data);
-      default:
-        return {
-          success: false,
-          error: `Unsupported AI provider for Typst repair: ${resolvedConfig.provider}`,
-        };
+    const completion = await dispatchTextCompletion(
+      resolvedConfig,
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      resolvedConfig.provider === "gemini",
+      {
+        temperature: 0.1,
+        timeoutMs: 30_000,
+        defaultModel:
+          resolvedConfig.provider === "gemini"
+            ? "gemini-1.5-pro"
+            : resolvedConfig.provider === "anthropic"
+            ? "claude-3-5-sonnet-20241022"
+            : undefined,
+        missingKeyMessage: missingKeyByProvider[resolvedConfig.provider],
+        taskLabel: "repair",
+      }
+    );
+
+    if (!completion.success || !completion.text) {
+      return { success: false, error: completion.error };
     }
+
+    const cleaned = stripCodeFences(completion.text);
+    const parsedJson = JSON.parse(cleaned);
+    const validated = TypstRepairProposalSchema.safeParse(parsedJson);
+
+    if (!validated.success) {
+      return {
+        success: false,
+        error: `Provider returned invalid repair proposal JSON: ${validated.error.issues.map((i) => i.message).join(", ")}`,
+      };
+    }
+
+    return { success: true, data: validated.data };
   } catch (err) {
     return {
       success: false,
@@ -356,23 +440,20 @@ export async function extractEvidenceFromMaster(
   const userPrompt = buildEvidenceExtractUserPrompt(typstSource);
 
   try {
-    switch (resolvedConfig.provider) {
-      case "openai":
-        return await generateOpenAIPatches(resolvedConfig, systemPrompt, userPrompt);
-      case "anthropic":
-        return await generateAnthropicPatches(resolvedConfig, systemPrompt, userPrompt);
-      case "gemini":
-        return await generateGeminiPatches(resolvedConfig, systemPrompt, userPrompt);
-      case "groq":
-      case "ollama":
-      case "custom":
-        return await generateCustomPatches(resolvedConfig, systemPrompt, userPrompt);
-      default:
-        return {
-          success: false,
-          error: `Unsupported AI provider for evidence extract: ${resolvedConfig.provider}`,
-        };
-    }
+    const res = await dispatchTextCompletion(
+      resolvedConfig,
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      true,
+      {
+        temperature: 0.3,
+        defaultModel: resolvedConfig.provider === "anthropic" ? "claude-sonnet-4-20250514" : undefined,
+        taskLabel: "evidence extract",
+      }
+    );
+    return toPatchEnvelope(res);
   } catch (err) {
     return {
       success: false,
@@ -454,28 +535,21 @@ export async function formatJobDescriptionWithAi(
   const userPrompt = buildJdFormatUserPrompt(input);
 
   try {
-    let rawResult: GeneratePatchesResult;
-    switch (resolvedConfig.provider) {
-      case "openai":
-        rawResult = await generateOpenAIPatches(resolvedConfig, systemPrompt, userPrompt);
-        break;
-      case "anthropic":
-        rawResult = await generateAnthropicPatches(resolvedConfig, systemPrompt, userPrompt);
-        break;
-      case "gemini":
-        rawResult = await generateGeminiPatches(resolvedConfig, systemPrompt, userPrompt);
-        break;
-      case "groq":
-      case "ollama":
-      case "custom":
-        rawResult = await generateCustomPatches(resolvedConfig, systemPrompt, userPrompt);
-        break;
-      default:
-        return {
-          success: false,
-          error: `Unsupported AI provider: ${resolvedConfig.provider}`,
-        };
-    }
+    const rawResult = toPatchEnvelope(
+      await dispatchTextCompletion(
+        resolvedConfig,
+        [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        true,
+        {
+          temperature: 0.3,
+          defaultModel: resolvedConfig.provider === "anthropic" ? "claude-sonnet-4-20250514" : undefined,
+          taskLabel: "JD formatting",
+        }
+      )
+    );
 
     if (!rawResult.success || !rawResult.rawJson) {
       return {

@@ -82,7 +82,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Resume rendering and export gates
-        run: npx playwright test --config playwright.resume-layout-v2.config.ts
+        run: npx playwright test --config playwright.demo.config.ts e2e/resume-layout-v2-verification.spec.ts
 
       - name: Preserve resume render evidence
         if: always()
