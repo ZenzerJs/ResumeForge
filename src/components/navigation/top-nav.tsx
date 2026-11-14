@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useId, useRef, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -12,11 +12,17 @@ import {
   LogOut,
   Menu,
   X,
-  Bell,
-  Terminal,
   Code2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   fetchSessionUser,
   signOutAndRedirect,
@@ -65,16 +71,16 @@ function SignOutButton({ className }: { className?: string }) {
 
 function GuestAuthLinks({ className, signupEnabled }: { className?: string; signupEnabled: boolean }) {
   return (
-    <div className={cn("hidden md:flex items-center gap-1", className)}>
+    <div className={cn("hidden md:flex items-center gap-2", className)}>
       <Link
         href="/login"
-        className="inline-flex min-h-11 items-center rounded-[6px] px-3 text-xs text-on-surface-variant hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="inline-flex min-h-9 items-center rounded-[7px] border border-outline/80 bg-transparent px-3.5 text-xs font-medium text-foreground/90 transition-colors hover:border-outline hover:bg-elevated/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         Sign In
       </Link>
       {signupEnabled ? <Link
         href="/login?mode=signup"
-        className="inline-flex min-h-11 items-center rounded-[6px] bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="inline-flex min-h-9 items-center rounded-[7px] bg-primary px-3.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         Sign Up
       </Link> : null}
@@ -111,19 +117,17 @@ function NavUtilities({ pathname }: { pathname: string }) {
               : "No AI API key configured — Click to connect in Settings"
           }
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
             aiStatus.hasKey
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+              ? "border-signal/35 bg-signal/10 text-signal hover:bg-signal/20"
               : "border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
           )}
         >
-          <span
-            className={cn(
-              "h-1.5 w-1.5 rounded-full",
-              aiStatus.hasKey ? "bg-emerald-400" : "bg-amber-400 animate-pulse"
-            )}
-            aria-hidden
-          />
+          {aiStatus.hasKey && hasBrandIcon(aiStatus.provider) ? (
+            <BrandIcon name={aiStatus.provider} className="h-3.5 w-3.5 shrink-0" />
+          ) : (
+            <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          )}
           <span className="hidden xl:inline">
             {aiStatus.hasKey ? `AI · ${aiStatus.provider.toUpperCase()}` : "Connect AI Key"}
           </span>
@@ -132,20 +136,6 @@ function NavUtilities({ pathname }: { pathname: string }) {
           </span>
         </Link>
       )}
-      <button
-        type="button"
-        aria-label="Notifications"
-        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-elevated hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <Bell className="h-4 w-4" aria-hidden />
-      </button>
-      <Link
-        href="/editor"
-        aria-label="Terminal"
-        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-elevated hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <Terminal className="h-4 w-4" aria-hidden />
-      </Link>
     </div>
   );
 }
@@ -155,8 +145,8 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined);
   const [signupEnabled, setSignupEnabled] = useState(true);
-  const drawerRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+  const mobileMenuTriggerRef = React.useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     void fetch("/api/demo-config").then((res) => res.json()).then((config) => {
@@ -178,35 +168,6 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
     setMobileOpen(false);
   }, [pathname]);
 
-  useEffect(() => {
-    if (!mobileOpen) return;
-    const drawer = drawerRef.current;
-    const focusable = drawer?.querySelectorAll<HTMLElement>(
-      'a[href], button:not([disabled])'
-    );
-    focusable?.[0]?.focus();
-
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setMobileOpen(false);
-        return;
-      }
-      if (event.key !== "Tab" || !focusable || focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [mobileOpen]);
-
   const isGuest = user === null;
 
   return (
@@ -217,7 +178,13 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
           className="flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-[6px]"
           aria-label="ResumeForge home"
         >
-          <div className={`bg-primary rounded-[6px] flex items-center justify-center font-bold text-primary-foreground ${compact ? "w-7 h-7 text-base" : "w-8 h-8 text-lg"}`}>
+          <div
+            className={`rounded-[8px] flex items-center justify-center font-bold text-primary-foreground ${compact ? "w-7 h-7 text-base" : "w-8 h-8 text-lg"}`}
+            style={{
+              background: "linear-gradient(135deg, rgb(var(--accent-action)), rgb(var(--accent-secondary)))",
+              boxShadow: "0 0 0 1px rgb(255 255 255 / 0.12) inset, 0 6px 20px rgb(var(--accent-action) / 0.35)",
+            }}
+          >
             R
           </div>
           <span className="font-bold text-xl text-foreground tracking-[-0.04em]">
@@ -231,40 +198,40 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
             {badge}
           </>
         ) : null}
-
-        <nav
-          className="hidden md:flex items-center gap-1 text-sm"
-          aria-label="Primary navigation"
-        >
-          {NAV_LINKS.map(({ href, label, icon: Icon }) => {
-            const isActive = pathname === href || pathname.startsWith(`${href}/`);
-            return (
-              <Link
-                key={href}
-                href={href}
-                title={label}
-                aria-current={isActive ? "page" : undefined}
-                className={cn(
-                  "flex items-center gap-2 whitespace-nowrap rounded-[6px] px-2.5 py-1.5 transition-colors border border-transparent hover:bg-elevated/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background lg:px-3",
-                  isActive
-                    ? "bg-primary/10 text-primary border-primary/30 font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                <span className="sr-only lg:not-sr-only">{label}</span>
-              </Link>
-            );
-          })}
-        </nav>
       </div>
+
+      <nav
+        className="hidden md:flex flex-1 items-center justify-center gap-1 lg:gap-2 text-sm"
+        aria-label="Primary navigation"
+      >
+        {NAV_LINKS.map(({ href, label }) => {
+          const isActive = pathname === href || pathname.startsWith(`${href}/`);
+          return (
+            <Link
+              key={href}
+              href={href}
+              title={label}
+              aria-current={isActive ? "page" : undefined}
+              className={cn(
+                "whitespace-nowrap rounded-[6px] px-3 py-1.5 text-[13px] transition-colors border border-transparent hover:bg-elevated/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                isActive
+                  ? "bg-primary/10 text-primary border-primary/30 font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
 
       <div className="flex items-center gap-2 shrink-0 min-w-0">
         <button
+          ref={mobileMenuTriggerRef}
           type="button"
           className="md:hidden inline-flex min-h-11 min-w-11 items-center justify-center rounded-[6px] text-on-surface-variant hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           aria-expanded={mobileOpen}
-          aria-controls={menuId}
+          aria-controls={mobileOpen ? menuId : undefined}
           aria-label={mobileOpen ? "Close menu" : "Open menu"}
           onClick={() => setMobileOpen((open) => !open)}
         >
@@ -291,13 +258,25 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
         ) : null}
       </div>
 
-      {mobileOpen ? (
-        <div
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent
           id={menuId}
-          ref={drawerRef}
-          className={`absolute left-0 right-0 border-b border-border bg-background px-6 py-4 md:hidden overscroll-contain ${compact ? "top-12" : "top-16"}`}
+          side="left"
+          className="w-72 border-r border-hairline bg-panel p-6 text-foreground md:hidden overscroll-contain"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            mobileMenuTriggerRef.current?.focus();
+          }}
         >
-          <nav aria-label="Mobile navigation" className="flex flex-col gap-1">
+          <SheetHeader className="border-b border-hairline pb-3 text-left">
+            <SheetTitle className="text-sm font-semibold text-foreground">
+              Navigation
+            </SheetTitle>
+            <SheetDescription className="sr-only">
+              Site links and account actions
+            </SheetDescription>
+          </SheetHeader>
+          <nav aria-label="Mobile navigation" className="mt-4 flex flex-col gap-1">
             {NAV_LINKS.map(({ href, label, icon: Icon }) => {
               const isActive = pathname === href || pathname.startsWith(`${href}/`);
               return (
@@ -345,8 +324,12 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
               </>
             )}
           </nav>
-        </div>
-      ) : null}
+        </SheetContent>
+      </Sheet>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-px ombre-divider"
+      />
     </header>
   );
 }

@@ -21,6 +21,7 @@ import {
   JobRequirementInput,
 } from "@/lib/matchScore";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
+import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
 
 interface PresetRole {
   id: string;
@@ -185,9 +186,9 @@ const PRESET_DEFAULT_SNIPPETS: Record<string, string> = {
 };
 
 const PRESET_STATIC_SVGS: Record<string, string> = {
-  backend: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">CORE SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">Languages:</tspan> Go, Python, TypeScript, SQL (PostgreSQL)</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">Infrastructure:</tspan> Docker, Kubernetes, Redis, RESTful APIs</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#0f172a"><tspan font-weight="700">Senior Software Engineer</tspan> | Nova Labs</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#64748b" text-anchor="end">2022 – Present</text><circle cx="42" cy="184" r="2" fill="#334155"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Engineered scalable Go microservices processing 12,000 req/sec with PostgreSQL persistence.</text><circle cx="42" cy="206" r="2" fill="#334155"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Automated containerized deployment pipelines using Docker and Kubernetes cluster nodes.</text></svg>`,
-  frontend: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">Frontend:</tspan> React, Next.js, TypeScript, Tailwind CSS, WebAssembly (WASM)</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">Tooling:</tspan> Vitest, Playwright, Docker, Webpack, Turbopack</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#0f172a"><tspan font-weight="700">Frontend Systems Lead</tspan> | WebCraft Systems</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#64748b" text-anchor="end">2021 – Present</text><circle cx="42" cy="184" r="2" fill="#334155"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Architected high-performance Next.js and TypeScript frontend interfaces serving 1.5M monthly users.</text><circle cx="42" cy="206" r="2" fill="#334155"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Reduced initial bundle payloads by 42% utilizing responsive component code splitting.</text></svg>`,
-  "ai-platform": `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">TECHNICAL SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">Languages:</tspan> Python, Go, C++</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#1e293b"><tspan font-weight="600">AI/Infra:</tspan> PyTorch, Docker, Kubernetes, Distributed Inference Systems</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#cbd5e1" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#0f172a"><tspan font-weight="700">Infrastructure &amp; Backend Engineer</tspan> | Nova Labs</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#64748b" text-anchor="end">2021 – Present</text><circle cx="42" cy="184" r="2" fill="#334155"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Designed automated distributed training pipeline jobs utilizing Python, Docker, and Kubernetes.</text><circle cx="42" cy="206" r="2" fill="#334155"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#334155">Maintained low-latency inference endpoints with 99.98% operational uptime.</text></svg>`,
+  backend: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">CORE SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Languages:</tspan> Go, Python, TypeScript, SQL (PostgreSQL)</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Infrastructure:</tspan> Docker, Kubernetes, Redis, RESTful APIs</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#181412"><tspan font-weight="700">Senior Software Engineer</tspan> | Nova Labs</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#7a6e65" text-anchor="end">2022 – Present</text><circle cx="42" cy="184" r="2" fill="#3a322f"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Engineered scalable Go microservices processing 12,000 req/sec with PostgreSQL persistence.</text><circle cx="42" cy="206" r="2" fill="#3a322f"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Automated containerized deployment pipelines using Docker and Kubernetes cluster nodes.</text></svg>`,
+  frontend: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Frontend:</tspan> React, Next.js, TypeScript, Tailwind CSS, WebAssembly (WASM)</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Tooling:</tspan> Vitest, Playwright, Docker, Webpack, Turbopack</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#181412"><tspan font-weight="700">Frontend Systems Lead</tspan> | WebCraft Systems</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#7a6e65" text-anchor="end">2021 – Present</text><circle cx="42" cy="184" r="2" fill="#3a322f"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Architected high-performance Next.js and TypeScript frontend interfaces serving 1.5M monthly users.</text><circle cx="42" cy="206" r="2" fill="#3a322f"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Reduced initial bundle payloads by 42% utilizing responsive component code splitting.</text></svg>`,
+  "ai-platform": `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">TECHNICAL SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Languages:</tspan> Python, Go, C++</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">AI/Infra:</tspan> PyTorch, Docker, Kubernetes, Distributed Inference Systems</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#181412"><tspan font-weight="700">Infrastructure &amp; Backend Engineer</tspan> | Nova Labs</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#7a6e65" text-anchor="end">2021 – Present</text><circle cx="42" cy="184" r="2" fill="#3a322f"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Designed automated distributed training pipeline jobs utilizing Python, Docker, and Kubernetes.</text><circle cx="42" cy="206" r="2" fill="#3a322f"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Maintained low-latency inference endpoints with 99.98% operational uptime.</text></svg>`,
 };
 
 export function AtsSandboxSection() {
@@ -312,7 +313,7 @@ export function AtsSandboxSection() {
 
   const scoreBadgeColor =
     scoreResult.compositeScore >= 80
-      ? "text-status-success border-status-success/40 bg-status-success/10"
+      ? "text-signal border-signal/40 bg-signal/10"
       : scoreResult.compositeScore >= 60
       ? "text-status-warning border-status-warning/40 bg-status-warning/10"
       : "text-status-danger border-status-danger/40 bg-status-danger/10";
@@ -324,7 +325,7 @@ export function AtsSandboxSection() {
     >
       {/* Header */}
       <div className="mb-12 text-center max-w-3xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-status-success/40 bg-status-success/10 text-status-success text-xs font-mono mb-4">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-signal/40 bg-signal/10 text-signal text-xs font-mono mb-4">
           <ShieldCheck className="h-4 w-4" />
           <span>ZERO-AUTH DETERMINISTIC SANDBOX</span>
         </div>
@@ -365,7 +366,7 @@ export function AtsSandboxSection() {
         {/* Left Column: JD Input & Live ATS Mathematical Breakdown (lg:col-span-6) */}
         <div className="lg:col-span-6 flex flex-col gap-6">
           {/* JD Input Panel */}
-          <div className="rounded-[10px] p-6 border border-outline/70 bg-panel shadow-lg">
+          <div className="rounded-[10px] p-6 surface-raised edge-glow">
             <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-outline/70">
               <div className="flex items-center gap-2">
                 <Terminal className="h-4 w-4 text-primary" />
@@ -388,7 +389,7 @@ export function AtsSandboxSection() {
               onChange={(e) => setCustomDescription(e.target.value)}
               rows={8}
               data-testid="sandbox-jd-input"
-              className="w-full bg-inset border border-outline/70 rounded-[8px] p-3.5 font-mono text-xs md:text-sm text-foreground leading-relaxed resize-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus:border-primary"
+              className="w-full bg-inset border border-outline/70 rounded-[8px] p-3.5 font-mono text-xs md:text-sm text-foreground leading-relaxed resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-ring"
             />
             <div className="mt-2.5 flex items-center justify-between flex-wrap gap-2 text-xs font-mono text-muted-foreground tabular-nums">
               <span>{customDescription.length} characters</span>
@@ -399,7 +400,7 @@ export function AtsSandboxSection() {
           {/* Mathematical ATS Score Panel */}
           <div
             data-testid="sandbox-score-panel"
-            className="rounded-[10px] p-6 border border-outline/70 bg-panel space-y-6 shadow-lg"
+            className="rounded-[10px] p-6 surface-raised edge-glow space-y-6"
           >
             {/* Header with Composite Score */}
             <div className="flex items-center justify-between pb-3.5 border-b border-outline/70">
@@ -427,13 +428,13 @@ export function AtsSandboxSection() {
                   <span className="text-on-surface-variant font-normal">
                     Core Stack (50% weight):
                   </span>
-                  <span className="font-semibold text-status-success">
+                  <span className="font-semibold text-signal">
                     {scoreResult.breakdown.coreStackScore}%
                   </span>
                 </div>
                 <div className="h-2.5 rounded-full bg-inset border border-outline/70 overflow-hidden">
                   <div
-                    className="h-full bg-status-success transition-all duration-500"
+                    className="h-full bg-signal transition-all duration-500"
                     style={{ width: `${scoreResult.breakdown.coreStackScore}%` }}
                   />
                 </div>
@@ -445,13 +446,13 @@ export function AtsSandboxSection() {
                   <span className="text-on-surface-variant font-normal">
                     Seniority (20% weight):
                   </span>
-                  <span className="font-semibold text-status-info">
+                  <span className="font-semibold text-primary">
                     {scoreResult.breakdown.seniorityScore}%
                   </span>
                 </div>
                 <div className="h-2.5 rounded-full bg-inset border border-outline/70 overflow-hidden">
                   <div
-                    className="h-full bg-status-info transition-all duration-500"
+                    className="h-full bg-primary transition-all duration-500"
                     style={{ width: `${scoreResult.breakdown.seniorityScore}%` }}
                   />
                 </div>
@@ -463,13 +464,13 @@ export function AtsSandboxSection() {
                   <span className="text-on-surface-variant font-normal">
                     Tools &amp; Infra (15% weight):
                   </span>
-                  <span className="font-semibold text-status-warning">
+                  <span className="font-semibold text-ember">
                     {scoreResult.breakdown.toolsScore}%
                   </span>
                 </div>
                 <div className="h-2.5 rounded-full bg-inset border border-outline/70 overflow-hidden">
                   <div
-                    className="h-full bg-status-warning transition-all duration-500"
+                    className="h-full bg-ember transition-all duration-500"
                     style={{ width: `${scoreResult.breakdown.toolsScore}%` }}
                   />
                 </div>
@@ -481,13 +482,13 @@ export function AtsSandboxSection() {
                   <span className="text-on-surface-variant font-normal">
                     Evidence Bank Coverage (15% weight):
                   </span>
-                  <span className="font-semibold text-primary">
+                  <span className="font-semibold text-foreground">
                     {scoreResult.breakdown.evidenceCoverageScore}%
                   </span>
                 </div>
                 <div className="h-2.5 rounded-full bg-inset border border-outline/70 overflow-hidden">
                   <div
-                    className="h-full bg-primary transition-all duration-500"
+                    className="h-full ombre-bar transition-all duration-500"
                     style={{ width: `${scoreResult.breakdown.evidenceCoverageScore}%` }}
                   />
                 </div>
@@ -505,14 +506,17 @@ export function AtsSandboxSection() {
                     key={link.skill}
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-xs font-mono border ${
                       link.verified
-                        ? "bg-status-success/10 border-status-success/35 text-status-success"
+                        ? "bg-signal/10 border-signal/35 text-signal"
                         : "bg-status-warning/10 border-status-warning/35 text-status-warning"
                     }`}
                   >
                     {link.verified ? (
-                      <CheckCircle2 className="h-3.5 w-3.5 text-status-success" />
+                      <CheckCircle2 className="h-3.5 w-3.5 text-signal" />
                     ) : (
                       <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
+                    )}
+                    {hasBrandIcon(link.skill) && (
+                      <BrandIcon name={link.skill} className="h-3.5 w-3.5 shrink-0" />
                     )}
                     <span>{link.skill}</span>
                   </span>
@@ -520,9 +524,13 @@ export function AtsSandboxSection() {
                 {scoreResult.missingRequiredSkills.map((skill) => (
                   <span
                     key={skill}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[6px] text-xs font-mono bg-status-danger/10 border border-status-danger/35 text-status-danger"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-xs font-mono bg-status-danger/10 border border-status-danger/35 text-status-danger"
                   >
-                    <span>✗ {skill}</span>
+                    <span aria-hidden="true">✗{" "}</span>
+                    {hasBrandIcon(skill) && (
+                      <BrandIcon name={skill} className="h-3.5 w-3.5 shrink-0" />
+                    )}
+                    <span>{skill}</span>
                   </span>
                 ))}
               </div>
@@ -563,7 +571,7 @@ export function AtsSandboxSection() {
 
         {/* Right Column: Live In-Browser Typst Compilation Preview (lg:col-span-6) */}
         <div className="lg:col-span-6 flex flex-col gap-4">
-          <div className="rounded-[10px] p-6 border border-outline/70 bg-panel flex-1 flex flex-col min-h-[520px] shadow-lg">
+          <div className="rounded-[10px] p-6 surface-raised edge-glow flex-1 flex flex-col min-h-[520px]">
             {/* Tab Controls & Compile Status */}
             <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-outline/70">
               <div className="flex items-center gap-2">
@@ -602,7 +610,7 @@ export function AtsSandboxSection() {
                     <Loader2 className="h-3.5 w-3.5 animate-spin" /> Compiling...
                   </span>
                 ) : (
-                  <span className="text-xs font-mono text-status-success flex items-center gap-1.5">
+                  <span className="text-xs font-mono text-signal flex items-center gap-1.5">
                     <CheckCircle2 className="h-3.5 w-3.5" /> Compiled in-browser
                   </span>
                 )}
@@ -687,7 +695,7 @@ export function AtsSandboxSection() {
                       value={customSnippet}
                       onChange={(e) => setCustomSnippet(e.target.value)}
                       rows={14}
-                      className="w-full flex-1 p-4 bg-inset border border-outline/70 rounded-[8px] font-mono text-xs md:text-sm text-foreground leading-relaxed resize-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus:border-primary"
+                      className="w-full flex-1 p-4 bg-inset border border-outline/70 rounded-[8px] font-mono text-xs md:text-sm text-foreground leading-relaxed resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-ring"
                       spellCheck={false}
                     />
                   ) : (

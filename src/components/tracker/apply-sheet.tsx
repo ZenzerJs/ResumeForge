@@ -92,19 +92,19 @@ export function ApplySheetPatchCard({
   onReject: () => void;
 }) {
   return (
-    <article data-testid={`apply-sheet-patch-${patch.id}`} className="rounded-lg border border-slate-700 bg-slate-900 p-3 space-y-2">
+    <article data-testid={`apply-sheet-patch-${patch.id}`} className="rounded-lg border border-hairline bg-inset p-3 space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-slate-200">{patch.operation.replace(/_/g, " ")} · {patch.targetSection}</span>
+        <span className="text-xs font-medium text-foreground">{patch.operation.replace(/_/g, " ")} · {patch.targetSection}</span>
         <div className="flex gap-2">
           <Button type="button" size="sm" variant={decision === "accepted" ? "default" : "outline"} onClick={onAccept} data-testid={`apply-sheet-accept-${patch.id}`}>Accept</Button>
           <Button type="button" size="sm" variant={decision === "rejected" ? "destructive" : "outline"} onClick={onReject} data-testid={`apply-sheet-reject-${patch.id}`}>Reject</Button>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2 text-[11px] font-mono whitespace-pre-wrap">
-        <div className="rounded bg-red-950/30 p-2 text-slate-300"><span className="mb-1 block text-[9px] uppercase text-slate-500">Before</span>{patch.before || "(empty)"}</div>
-        <div className="rounded bg-emerald-950/30 p-2 text-emerald-200"><span className="mb-1 block text-[9px] uppercase text-slate-500">After</span>{patch.after || "(empty)"}</div>
+        <div className="rounded bg-red-950/30 p-2 text-text-secondary"><span className="mb-1 block text-[9px] uppercase text-muted-foreground">Before</span>{patch.before || "(empty)"}</div>
+        <div className="rounded bg-emerald-950/30 p-2 text-emerald-200"><span className="mb-1 block text-[9px] uppercase text-muted-foreground">After</span>{patch.after || "(empty)"}</div>
       </div>
-      <p className="text-[11px] text-slate-400">{patch.rationale}</p>
+      <p className="text-[11px] text-muted-foreground">{patch.rationale}</p>
     </article>
   );
 }
@@ -536,7 +536,7 @@ export function ApplySheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         data-testid="apply-sheet"
-        className="w-full sm:max-w-lg bg-slate-950 border-slate-800 text-slate-100 p-6 flex flex-col justify-between overflow-y-auto"
+        className="w-full sm:max-w-lg bg-panel border-hairline text-foreground p-6 flex flex-col justify-between overflow-y-auto"
       >
         <div className="space-y-5">
           <SheetHeader>
@@ -544,21 +544,21 @@ export function ApplySheet({
               <Badge variant="outline" className="border-amber-500/40 text-amber-400 bg-amber-950/20 text-xs">
                 One-Click Apply
               </Badge>
-              <span className="text-[11px] text-slate-400 font-mono">Step {stepIndex} of 5</span>
+              <span className="text-[11px] text-muted-foreground font-mono">Step {stepIndex} of 5</span>
             </div>
-            <SheetTitle className="text-lg font-bold text-white flex items-center gap-2 pt-1">
-              <Briefcase className="size-4 text-amber-400" />
+            <SheetTitle className="text-lg font-bold text-foreground flex items-center gap-2 pt-1">
+              <Briefcase className="size-4 text-primary" />
               {job.roleTitle}
             </SheetTitle>
-            <SheetDescription className="text-xs text-slate-300 font-medium">
+            <SheetDescription className="text-xs text-text-secondary font-medium">
               {job.company} {job.location ? `• ${job.location}` : ""}
             </SheetDescription>
           </SheetHeader>
           {(job.variants?.length ?? 0) > 0 && (
-            <label className="block text-xs text-slate-400">
+            <label className="block text-xs text-muted-foreground">
               Sent variant
               <select
-                className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100"
+                className="mt-1 w-full rounded border border-hairline bg-inset px-2 py-1.5 text-xs text-foreground"
                 value={selectedVariantId ?? ""}
                 aria-label="Sent variant"
                 data-testid="apply-sheet-variant-select"
@@ -579,19 +579,19 @@ export function ApplySheet({
 
           {/* Progress Indicator */}
           <div className="space-y-1.5">
-            <Progress value={(stepIndex / 5) * 100} className="h-1.5 bg-slate-800" />
-            <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-              <span className={stepIndex >= 1 ? "text-amber-400" : ""}>1. Job</span>
-              <span className={stepIndex >= 2 ? "text-amber-400" : ""}>2. Tailor</span>
-              <span className={stepIndex >= 3 ? "text-amber-400" : ""}>3. Guardrail</span>
-              <span className={stepIndex >= 4 ? "text-amber-400" : ""}>4. Score</span>
-              <span className={stepIndex >= 5 ? "text-amber-400" : ""}>5. Apply</span>
+            <Progress value={(stepIndex / 5) * 100} className="h-1.5 bg-elevated" />
+            <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+              <span className={stepIndex >= 1 ? "text-primary" : ""}>1. Job</span>
+              <span className={stepIndex >= 2 ? "text-primary" : ""}>2. Tailor</span>
+              <span className={stepIndex >= 3 ? "text-primary" : ""}>3. Guardrail</span>
+              <span className={stepIndex >= 4 ? "text-primary" : ""}>4. Score</span>
+              <span className={stepIndex >= 5 ? "text-primary" : ""}>5. Apply</span>
             </div>
           </div>
 
           {/* Step 1: Job Details & Extracted Requirements */}
-          <div className="space-y-3 p-3.5 bg-slate-900/80 rounded-xl border border-slate-800 text-xs">
-            <h4 className="font-semibold text-slate-200 flex items-center justify-between">
+          <div className="space-y-3 p-3.5 bg-inset rounded-xl border border-hairline text-xs">
+            <h4 className="font-semibold text-foreground flex items-center justify-between">
               <span>Target Role Profile</span>
               {job.salarySnippet && (
                 <span className="text-emerald-400 text-[11px] font-mono">{job.salarySnippet}</span>
@@ -600,10 +600,10 @@ export function ApplySheet({
 
             {job.requirements?.requiredSkills && job.requirements.requiredSkills.length > 0 && (
               <div className="space-y-1">
-                <span className="text-[11px] text-slate-400">Required Skills:</span>
+                <span className="text-[11px] text-muted-foreground">Required Skills:</span>
                 <div className="flex flex-wrap gap-1">
                   {job.requirements.requiredSkills.map((s, i) => (
-                    <Badge key={i} variant="secondary" className="text-[10px] bg-slate-800 text-slate-200">
+                    <Badge key={i} variant="secondary" className="text-[10px] bg-elevated text-text-secondary border border-hairline">
                       {s}
                     </Badge>
                   ))}
@@ -615,7 +615,7 @@ export function ApplySheet({
           {/* Step 2 & 3: Tailoring & Guardrail Results */}
           {(patchBatch || demoLocalPatches) && pendingPatches.length > 0 && (
             <div className="space-y-3" data-testid="apply-sheet-patch-review">
-              <h4 className="text-xs font-semibold text-slate-200">Review proposed changes</h4>
+              <h4 className="text-xs font-semibold text-foreground">Review proposed changes</h4>
               {pendingPatches.map((patch) => (
                 <ApplySheetPatchCard
                   key={patch.id}
@@ -646,11 +646,11 @@ export function ApplySheet({
               ))}
             </div>
           )}
-          {tailoringNotice && <p className="rounded-lg border border-slate-700 bg-slate-900 p-3 text-xs text-slate-300" role="status">{tailoringNotice}</p>}
+          {tailoringNotice && <p className="rounded-lg border border-hairline bg-inset p-3 text-xs text-text-secondary" role="status">{tailoringNotice}</p>}
           {guardrailResult && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-semibold text-slate-300">Guardrail Audit</h4>
+                <h4 className="text-xs font-semibold text-text-secondary">Guardrail Audit</h4>
                 {appliedPatchCount > 0 && (
                   <Badge variant="outline" className="border-emerald-500/40 text-emerald-300 bg-emerald-950/30 text-[10px]">
                     {appliedPatchCount} AI Patch{appliedPatchCount === 1 ? "" : "es"} Applied
@@ -663,10 +663,10 @@ export function ApplySheet({
 
           {/* Step 4: ATS Score */}
           {atsScore && (
-            <div className="p-3.5 bg-slate-900/80 rounded-xl border border-slate-800 space-y-2">
+            <div className="p-3.5 bg-inset rounded-xl border border-hairline space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                  <BarChart3 className="size-3.5 text-amber-400" />
+                <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <BarChart3 className="size-3.5 text-primary" />
                   ATS Match Score
                 </span>
                 <Badge
@@ -680,7 +680,7 @@ export function ApplySheet({
                   {atsScore.overallScore} / 100
                 </Badge>
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-muted-foreground">
                 Matches {atsScore.requiredMatch.score}/{atsScore.requiredMatch.maxScore} required skills points.
               </p>
             </div>
@@ -735,7 +735,7 @@ export function ApplySheet({
               onClick={handleStartTailoring}
               disabled={isProcessing}
               data-testid="start-tailor-btn"
-              className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs gap-2 shadow-lg shadow-amber-500/20"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs gap-2 shadow-lg shadow-primary/20"
             >
               {isProcessing ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
               {patchBatch || demoLocalPatches ? "Apply Verified Patches & Verify" : "Tailor & Verify Guardrail"}
@@ -749,9 +749,9 @@ export function ApplySheet({
                   onClick={handleDownloadPdf}
                   disabled={hasHardViolations}
                   data-testid="apply-download-pdf-btn"
-                  className="w-full border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-xs gap-1.5"
+                  className="w-full border-hairline bg-inset text-foreground hover:bg-elevated disabled:opacity-50 disabled:cursor-not-allowed text-xs gap-1.5"
                 >
-                  <Download className="size-3.5 text-indigo-400" />
+                  <Download className="size-3.5 text-signal" />
                   Download PDF
                 </Button>
                 <Button
@@ -760,9 +760,9 @@ export function ApplySheet({
                   onClick={handleDownloadDocx}
                   disabled={hasHardViolations}
                   data-testid="apply-download-docx-btn"
-                  className="w-full border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-xs gap-1.5"
+                  className="w-full border-hairline bg-inset text-foreground hover:bg-elevated disabled:opacity-50 disabled:cursor-not-allowed text-xs gap-1.5"
                 >
-                  <FileText className="size-3.5 text-blue-400" />
+                  <FileText className="size-3.5 text-signal" />
                   Download DOCX
                 </Button>
               </div>
@@ -773,9 +773,9 @@ export function ApplySheet({
                 onClick={handleDownloadZip}
                 disabled={hasHardViolations}
                 data-testid="apply-download-zip-btn"
-                className="w-full border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-xs gap-1.5"
+                className="w-full border-hairline bg-inset text-foreground hover:bg-elevated disabled:opacity-50 disabled:cursor-not-allowed text-xs gap-1.5"
               >
-                <Package className="size-3.5 text-amber-400" />
+                <Package className="size-3.5 text-primary" />
                 Download Package (.zip)
               </Button>
 

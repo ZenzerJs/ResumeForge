@@ -45,7 +45,7 @@ export const PatchCard = React.memo(function PatchCard({
     <div
       data-testid={`patch-card-${id || "item"}`}
       className={cn(
-        "my-3 overflow-hidden rounded-xl border bg-slate-950/90 shadow-md text-xs transition-all",
+        "my-3 overflow-hidden rounded-xl border bg-inset shadow-md text-xs transition-all",
         applied
           ? "border-emerald-500/40 bg-emerald-950/10"
           : "border-amber-500/25 hover:border-amber-500/40",
@@ -53,9 +53,9 @@ export const PatchCard = React.memo(function PatchCard({
       )}
     >
       {/* Header bar */}
-      <div className="flex items-center justify-between border-b border-slate-800/80 bg-slate-900/70 px-3 py-2">
+      <div className="flex items-center justify-between border-b border-hairline bg-panel px-3 py-2">
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 font-medium text-[11px] text-slate-300">
+          <div className="flex items-center gap-1.5 font-medium text-[11px] text-text-secondary">
             {evidenceIds.length > 0 ? (
               <>
                 <ShieldCheck className="size-3.5 text-emerald-400 shrink-0" />
@@ -69,7 +69,7 @@ export const PatchCard = React.memo(function PatchCard({
             ) : (
               <>
                 <Sparkles className="size-3.5 text-amber-400 shrink-0" />
-                <span className="text-slate-400 font-mono text-[11px]">
+                <span className="text-muted-foreground font-mono text-[11px]">
                   {operation || "PROPOSED_PATCH"}
                 </span>
               </>
@@ -86,7 +86,7 @@ export const PatchCard = React.memo(function PatchCard({
 
       {/* Rationale explanation if available */}
       {rationale && (
-        <div className="px-3 pt-2.5 text-[11.5px] text-slate-300 italic leading-relaxed">
+        <div className="px-3 pt-2.5 text-[11.5px] text-text-secondary italic leading-relaxed">
           {rationale}
         </div>
       )}
@@ -109,13 +109,13 @@ export const PatchCard = React.memo(function PatchCard({
 
       {/* Action Footer */}
       {!applied && (onApply || onReject) && (
-        <div className="flex items-center justify-end gap-2 border-t border-slate-800/80 bg-slate-900/40 px-3 py-2">
+        <div className="flex items-center justify-end gap-2 border-t border-hairline bg-panel/60 px-3 py-2">
           {onReject && (
             <Button
               variant="ghost"
               size="xs"
               onClick={handleDismiss}
-              className="text-slate-400 hover:text-red-300 hover:bg-red-950/30 text-xs"
+              className="text-muted-foreground hover:text-red-300 hover:bg-red-950/30 text-xs"
             >
               <X className="mr-1 size-3" /> Dismiss
             </Button>
@@ -126,7 +126,7 @@ export const PatchCard = React.memo(function PatchCard({
               size="xs"
               onClick={onApply}
               disabled={isApplying}
-              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold shadow-xs text-xs"
+              className="bg-amber-500 hover:bg-amber-400 text-[#121010] font-semibold shadow-xs text-xs"
             >
               <Check className="mr-1 size-3" />
               {isApplying ? "Applying..." : "Apply Patch"}

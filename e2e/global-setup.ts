@@ -31,6 +31,21 @@ export default async function globalSetup(config: FullConfig) {
     data: { username: "playwright" },
   });
 
+  // Restore canonical form-safe starter Master Resume so persistent DB state from prior runs cannot poison editor/smoke tests
+  const starterRes = await page.request.get(`${baseURL}/templates/starter-resume.typ`);
+  if (starterRes.ok()) {
+    const starterSource = await starterRes.text();
+    if (starterSource.trim().length > 0) {
+      await page.request.post(`${baseURL}/api/resumes/save-master`, {
+        data: {
+          title: "Master Resume",
+          typstSource: starterSource,
+          confirmOverwrite: true,
+        },
+      });
+    }
+  }
+
   await page.context().storageState({ path: "e2e/.auth/user.json" });
   await browser.close();
 }

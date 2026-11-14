@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { assertLayoutExportReady, isResumeLayoutV2Enabled, parseManagedResume } from "@/lib/typst/resume-document";
 import { sanitizeTypstSvg } from "@/lib/typst/svg-sanitize";
 import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2, BarChart3, Sparkles, FileText, ChevronDown, Package, MoreHorizontal } from "lucide-react";
@@ -9,6 +9,7 @@ import { cleanTypstToText, sanitizeZipFilename } from "@/lib/export/zip";
 import { assertCanExport } from "@/lib/guardrail/policy";
 import { ResumeFacts } from "@/lib/facts/types";
 import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
+import { evaluateAtsScore } from "@/lib/ats-evaluator/evaluator";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -373,11 +374,21 @@ export function PreviewPanel({
 
   // Task 9.5: ATS Grade in Editor preview state
   const [showGrade, setShowGrade] = useState(false);
+  const [showDockedGrade, setShowDockedGrade] = useState(true);
   const [previewView, setPreviewView] = useState<"fit" | "actual">("fit");
 
   const handleToggleGrade = () => {
     setShowGrade((prev) => !prev);
   };
+
+  // Synchronous client-side Ember Ink ATS Grade computation for the docked Editor grade rail
+  const liveAtsGrade = useMemo<AtsEvaluationResult>(() => {
+    return evaluateAtsScore(
+      source || "",
+      extractedRequirements || EMPTY_EXTRACTED_REQUIREMENTS,
+      "Backend"
+    );
+  }, [source, extractedRequirements]);
 
   const handleExportPdf = async () => {
     try {
@@ -552,14 +563,47 @@ export function PreviewPanel({
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-inset">
       {/* 32px Pane Toolbar */}
-      <div className="flex min-h-8 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-outline/70 bg-panel px-2.5 py-0.5 text-xs text-text-secondary">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+      <div className="flex h-8 shrink-0 items-center justify-between gap-x-2 border-b border-outline/70 bg-panel px-2.5 text-xs text-text-secondary overflow-hidden">
+        <div className="flex min-w-0 items-center gap-x-2 overflow-hidden">
           <span className="h-2 w-2 shrink-0 rounded-full bg-status-success" />
-          <span className="font-semibold text-foreground shrink-0">Preview</span>
+          <button
+            type="button"
+            data-testid="preview-mode-pdf"
+            onClick={() => setShowGrade(false)}
+            aria-pressed={!showGrade}
+            className="font-semibold text-foreground shrink-0 hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+            title="Show live paper preview"
+          >
+            Preview
+          </button>
+          {!v2 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (showGrade) {
+                  setShowGrade(false);
+                  setShowDockedGrade(true);
+                } else {
+                  setShowDockedGrade((prev) => !prev);
+                }
+              }}
+              aria-pressed={showDockedGrade && !showGrade}
+              data-testid="preview-split-grade-toggle"
+              className="hidden xl:inline-flex items-center gap-1.5 font-mono text-[11px] tabular-nums text-text-secondary hover:text-foreground transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+              title="Toggle docked ATS Grade column alongside paper preview"
+            >
+              <span className="hidden 2xl:inline">
+                <b className="font-semibold text-status-success">1 / 1</b> page · fits ·
+              </span>
+              <span className={showDockedGrade && !showGrade ? "text-signal font-semibold" : "text-text-secondary"}>
+                Preview · Grade ▸
+              </span>
+            </button>
+          )}
           {isCompiling && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />}
           {v2 && (
             <div
-              className="inline-flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-mono tabular-nums text-text-secondary"
+              className="inline-flex min-w-0 items-center gap-x-2 text-[11px] font-mono tabular-nums text-text-secondary overflow-hidden"
               role="status"
               data-testid="layout-page-status"
             >
@@ -624,7 +668,7 @@ export function PreviewPanel({
             }`}
             title="Grade current draft against ATS evaluation engine"
           >
-            <BarChart3 className="h-3 w-3 text-primary" />
+            <BarChart3 className="h-3 w-3 text-signal" />
             {showGrade ? "Close Grade" : "Grade"}
           </button>
 
@@ -722,8 +766,16 @@ export function PreviewPanel({
         </div>
       </div>
 
-      {/* Main Preview Stage (8px top gutter, recessed dark backdrop) */}
-      <div ref={scrollContainerRef} className="relative flex-1 min-h-0 overflow-auto bg-inset px-4 pb-6 pt-2 flex flex-col items-center">
+      {/* Main Preview Body: Paper Stage + Docked Ember Ink ATS Grade Column */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <div
+          ref={scrollContainerRef}
+          className="relative flex-1 min-w-0 min-h-0 overflow-auto bg-deep px-4 pb-6 pt-2 flex flex-col items-center"
+          style={{
+            backgroundImage:
+              "radial-gradient(520px 280px at 50% 0%, rgb(var(--accent-action) / 0.06), transparent 70%)",
+          }}
+        >
         {/* Task 9.5: Dark ATS Grade Overlay Breakdown */}
         {showGrade && (
           <div data-testid="editor-ats-score-overlay" className="w-full max-w-[850px] mb-4">
@@ -915,6 +967,135 @@ export function PreviewPanel({
             <Loader2 className="h-8 w-8 animate-spin mb-2 text-primary" />
             <p className="text-xs">Initializing Typst WASM compiler...</p>
           </div>
+        )}
+        </div>
+
+        {/* Docked Right-Hand ATS Grade Column matching palette-lab.html#ember Section 03 */}
+        {!showGrade && showDockedGrade && (
+          <aside
+            data-testid="editor-ats-grade-aside"
+            aria-label="ATS Grade summary"
+            className="hidden xl:flex w-[248px] 2xl:w-[268px] shrink-0 flex-col gap-3.5 border-l border-hairline bg-panel p-4 overflow-y-auto"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-foreground">ATS Grade</h3>
+              <button
+                type="button"
+                data-testid="preview-mode-grade"
+                onClick={handleToggleGrade}
+                className="font-mono text-[11px] font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+              >
+                Full Rubric ▸
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3.5">
+              <div
+                className="relative grid h-[72px] w-[72px] shrink-0 place-items-center rounded-full"
+                style={{
+                  background: `conic-gradient(rgb(var(--accent-contrast)) ${liveAtsGrade.overallScore}%, rgb(214 196 176 / 0.14) 0)`,
+                  filter: "drop-shadow(0 0 14px rgb(var(--accent-contrast) / 0.35))",
+                }}
+              >
+                <div className="grid h-[58px] w-[58px] place-items-center rounded-full bg-panel font-sans text-[22px] font-bold tracking-[-0.03em] tabular-nums text-foreground">
+                  {liveAtsGrade.overallScore}
+                </div>
+              </div>
+              <div className="min-w-0">
+                <strong className="block text-sm font-semibold text-foreground">
+                  {liveAtsGrade.overallScore >= 80
+                    ? "Strong"
+                    : liveAtsGrade.overallScore >= 60
+                    ? "Solid"
+                    : "Developing"}
+                </strong>
+                <p className="mt-0.5 text-xs text-muted-foreground truncate">
+                  {roleTitle ? `vs. ${roleTitle}` : "General ATS readiness"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2.5 text-xs">
+              <div className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1">
+                <span className="text-text-secondary">Keywords</span>
+                <span className="font-mono font-semibold tabular-nums text-foreground">
+                  {liveAtsGrade.requiredMatch.percentage}
+                </span>
+                <div className="col-span-2 h-1.5 overflow-hidden rounded-full bg-hairline/70">
+                  <i
+                    className={`block h-full rounded-full ${
+                      liveAtsGrade.requiredMatch.percentage >= 75 ? "bg-signal" : "bg-primary"
+                    }`}
+                    style={{ width: `${liveAtsGrade.requiredMatch.percentage}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1">
+                <span className="text-text-secondary">Core stack</span>
+                <span className="font-mono font-semibold tabular-nums text-foreground">
+                  {liveAtsGrade.roleEvidence.percentage}
+                </span>
+                <div className="col-span-2 h-1.5 overflow-hidden rounded-full bg-hairline/70">
+                  <i
+                    className={`block h-full rounded-full ${
+                      liveAtsGrade.roleEvidence.percentage >= 75 ? "bg-signal" : "bg-primary"
+                    }`}
+                    style={{ width: `${liveAtsGrade.roleEvidence.percentage}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1">
+                <span className="text-text-secondary">Impact metrics</span>
+                <span className="font-mono font-semibold tabular-nums text-foreground">
+                  {liveAtsGrade.baseHealth.percentage}
+                </span>
+                <div className="col-span-2 h-1.5 overflow-hidden rounded-full bg-hairline/70">
+                  <i
+                    className="block h-full rounded-full bg-primary"
+                    style={{ width: `${liveAtsGrade.baseHealth.percentage}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {liveAtsGrade.gaps.length > 0 ? (
+                liveAtsGrade.gaps.slice(0, 2).map((issueText, idx) => {
+                  const isUrgent = idx === 0;
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-start gap-2.5 rounded-[8px] border border-hairline bg-inset p-2.5 text-xs text-text-secondary"
+                    >
+                      <span
+                        className={`shrink-0 rounded-[5px] border px-1.5 py-0.5 text-[10.5px] font-semibold ${
+                          isUrgent
+                            ? "border-status-danger/40 bg-status-danger/10 text-status-danger"
+                            : "border-primary/40 bg-primary/10 text-primary"
+                        }`}
+                      >
+                        {isUrgent ? "Urgent" : "Non-urgent"}
+                      </span>
+                      <span className="leading-snug">
+                        {issueText.replace(/^Warning:\s*/i, "").replace(/^Penalized:\s*/i, "")}
+                      </span>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="flex items-start gap-2.5 rounded-[8px] border border-hairline bg-inset p-2.5 text-xs text-text-secondary">
+                  <span className="shrink-0 rounded-[5px] border border-signal/40 bg-signal/10 px-1.5 py-0.5 text-[10.5px] font-semibold text-signal">
+                    Ready
+                  </span>
+                  <span className="leading-snug">
+                    No baseline ATS gaps detected. Open Full Rubric to score against a job posting.
+                  </span>
+                </div>
+              )}
+            </div>
+          </aside>
         )}
       </div>
     </div>

@@ -98,18 +98,18 @@ test.describe("WS0 — UX Bug Fixes & Staged AI Feedback", () => {
     const gradeCard = gradePanel.getByTestId("ats-score-panel");
     await expect(gradeCard).toBeVisible({ timeout: 10000 });
     const gradeBg = await gradeCard.evaluate((el) => getComputedStyle(el).backgroundColor);
-    expect(gradeBg).toBe("rgb(28, 32, 35)");
+    expect(gradeBg).toBe("rgb(27, 23, 22)");
 
     await page.goto("/nonexistent-route-check");
     const notFoundHeading = page.getByRole("heading", { name: "Document Not Found" });
     await expect(notFoundHeading).toBeVisible();
     const notFoundBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    expect(notFoundBg).toBe("rgb(21, 24, 26)");
+    expect(notFoundBg).toBe("rgb(18, 16, 16)");
     const cardBg = await page
       .locator(".bg-panel")
       .first()
       .evaluate((el) => getComputedStyle(el).backgroundColor);
-    expect(cardBg).toBe("rgb(28, 32, 35)");
+    expect(cardBg).toBe("rgb(27, 23, 22)");
   });
 
   test("0.3 Landing capability strip is mounted calmly without scrolling marquee", async ({

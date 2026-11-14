@@ -5,60 +5,64 @@
 
 export const tokens = {
   colors: {
-    // Studio Surfaces (Section 0)
-    background: 'rgb(21, 24, 26)',
-    surface: 'rgb(21, 24, 26)',
-    surfaceDim: 'rgb(21, 24, 26)',
-    surfaceBright: 'rgb(37, 42, 45)',
-    surfaceContainerLowest: 'rgb(17, 20, 22)',
-    surfaceContainerLow: 'rgb(21, 24, 26)',
-    surfaceContainer: 'rgb(28, 32, 35)',
-    surfaceContainerHigh: 'rgb(37, 42, 45)',
-    surfaceContainerHighest: 'rgb(37, 42, 45)',
-    surfaceVariant: 'rgb(37, 42, 45)',
+    // Studio Surfaces — Ember Ink (Section 0)
+    deep: 'rgb(10, 8, 8)',
+    background: 'rgb(18, 16, 16)',
+    surface: 'rgb(18, 16, 16)',
+    surfaceDim: 'rgb(18, 16, 16)',
+    surfaceBright: 'rgb(39, 33, 32)',
+    surfaceContainerLowest: 'rgb(21, 18, 17)',
+    surfaceContainerLow: 'rgb(18, 16, 16)',
+    surfaceContainer: 'rgb(27, 23, 22)',
+    surfaceContainerHigh: 'rgb(39, 33, 32)',
+    surfaceContainerHighest: 'rgb(39, 33, 32)',
+    surfaceVariant: 'rgb(39, 33, 32)',
     paperSheet: 'rgb(255, 255, 255)',
     paperInk: 'rgb(28, 30, 32)',
 
     // Text & Content Contrast Tokens
-    onBackground: 'rgb(237, 239, 237)',
-    onSurface: 'rgb(237, 239, 237)',
-    onSurfaceVariant: 'rgb(194, 201, 199)',
-    textMuted: 'rgb(151, 161, 159)',
+    onBackground: 'rgb(244, 238, 231)',
+    onSurface: 'rgb(244, 238, 231)',
+    onSurfaceVariant: 'rgb(208, 197, 185)',
+    textMuted: 'rgb(158, 146, 135)',
     inverseSurface: 'rgb(255, 255, 255)',
     inverseOnSurface: 'rgb(28, 30, 32)',
 
-    // Action & Brand Accent
-    primary: 'rgb(241, 181, 101)',
-    onPrimary: 'rgb(31, 24, 14)',
-    primaryContainer: 'rgb(241, 181, 101)',
-    onPrimaryContainer: 'rgb(31, 24, 14)',
-    primaryFixed: 'rgb(241, 181, 101)',
-    primaryFixedDim: 'rgb(241, 181, 101)',
-    inversePrimary: 'rgb(31, 24, 14)',
+    // Action & Brand Accent (Gold + Ember + Electric Blue 3-color motif)
+    primary: 'rgb(247, 189, 63)',
+    onPrimary: 'rgb(42, 28, 0)',
+    primaryContainer: 'rgb(247, 189, 63)',
+    onPrimaryContainer: 'rgb(42, 28, 0)',
+    primaryFixed: 'rgb(247, 189, 63)',
+    primaryFixedDim: 'rgb(247, 189, 63)',
+    inversePrimary: 'rgb(42, 28, 0)',
+    accentSecondary: 'rgb(255, 139, 61)',
+    accentContrast: 'rgb(79, 143, 255)',
+    contrastInk: 'rgb(3, 19, 47)',
 
     // Verification & Status Tokens
-    secondary: 'rgb(124, 204, 165)',
-    onSecondary: 'rgb(31, 24, 14)',
-    secondaryContainer: 'rgb(124, 204, 165)',
-    onSecondaryContainer: 'rgb(31, 24, 14)',
-    secondaryFixed: 'rgb(124, 204, 165)',
-    secondaryFixedDim: 'rgb(124, 204, 165)',
+    secondary: 'rgb(107, 214, 154)',
+    onSecondary: 'rgb(42, 28, 0)',
+    secondaryContainer: 'rgb(107, 214, 154)',
+    onSecondaryContainer: 'rgb(42, 28, 0)',
+    secondaryFixed: 'rgb(107, 214, 154)',
+    secondaryFixedDim: 'rgb(107, 214, 154)',
 
     // Warning & Alert Accents
-    tertiary: 'rgb(242, 148, 144)',
-    onTertiary: 'rgb(31, 24, 14)',
-    tertiaryContainer: 'rgb(242, 148, 144)',
-    statusInfo: 'rgb(145, 186, 217)',
+    tertiary: 'rgb(255, 138, 128)',
+    onTertiary: 'rgb(42, 28, 0)',
+    tertiaryContainer: 'rgb(255, 138, 128)',
+    statusInfo: 'rgb(79, 143, 255)',
 
     // Error Tokens
-    error: 'rgb(242, 148, 144)',
-    onError: 'rgb(31, 24, 14)',
-    errorContainer: 'rgb(242, 148, 144)',
-    onErrorContainer: 'rgb(237, 239, 237)',
+    error: 'rgb(255, 138, 128)',
+    onError: 'rgb(42, 28, 0)',
+    errorContainer: 'rgb(255, 138, 128)',
+    onErrorContainer: 'rgb(244, 238, 231)',
 
     // Borders & Outlines
-    outline: 'rgb(119, 130, 129)',
-    outlineVariant: 'rgb(55, 62, 64)',
+    outline: 'rgb(122, 110, 101)',
+    outlineVariant: 'rgb(58, 50, 47)',
   },
 
   typography: {

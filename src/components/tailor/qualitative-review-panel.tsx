@@ -105,27 +105,27 @@ export function QualitativeReviewPanel({
       ? "text-emerald-400 bg-emerald-950/60 border-emerald-800/80"
       : result.jdContextAdjustment < 0
       ? "text-red-400 bg-red-950/60 border-red-800/80"
-      : "text-slate-300 bg-slate-900 border-slate-700";
+      : "text-text-secondary bg-inset border-hairline";
 
   return (
     <div
-      className="bg-slate-950 border border-cyan-900/50 rounded-xl p-6 shadow-xl space-y-6"
+      className="bg-panel border border-signal/35 rounded-xl p-6 shadow-xl space-y-6"
       data-testid="qualitative-review-panel"
     >
       {/* Header Bar */}
-      <div className="flex items-center justify-between border-b border-cyan-900/30 pb-4">
+      <div className="flex items-center justify-between border-b border-hairline pb-4">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-cyan-950 border border-cyan-700/50 flex items-center justify-center text-cyan-400">
+          <div className="h-8 w-8 rounded-lg bg-signal/15 border border-signal/40 flex items-center justify-center text-signal">
             <Sparkles className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               AI Qualitative Reviewer
-              <span className="text-[10px] font-mono bg-cyan-950 text-cyan-400 border border-cyan-800 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-mono bg-signal/15 text-signal border border-signal/35 px-2 py-0.5 rounded-full">
                 BYOK Gateway Feedback
               </span>
             </h3>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-muted-foreground">
               On-demand qualitative commentary & Bounded JD Context Adjustment (-10 to +10 pts)
             </p>
           </div>
@@ -135,7 +135,7 @@ export function QualitativeReviewPanel({
           type="button"
           onClick={handleUseAsPrompt}
           data-testid="use-as-prompt-btn"
-          className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs rounded-lg flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition shrink-0"
+          className="px-3.5 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs rounded-lg flex items-center gap-1.5 shadow-md shadow-primary/20 transition shrink-0"
         >
           <ArrowRight className="h-3.5 w-3.5" />
           Use as prompt
@@ -144,12 +144,12 @@ export function QualitativeReviewPanel({
 
       {/* Bounded JD Context Adjustment Banner */}
       <div
-        className="bg-slate-900/90 border border-cyan-900/40 rounded-xl p-4 space-y-3"
+        className="bg-inset border border-hairline rounded-xl p-4 space-y-3"
         data-testid="jd-adjustment-banner"
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <Sliders className="h-5 w-5 text-cyan-400 shrink-0" />
+            <Sliders className="h-5 w-5 text-signal shrink-0" />
             <div>
               <div className="text-xs text-muted-foreground">
                 Deterministic Base Score:{" "}
@@ -177,7 +177,7 @@ export function QualitativeReviewPanel({
               type="button"
               onClick={() => setShowReasoning(!showReasoning)}
               data-testid="toggle-reasoning-btn"
-              className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 self-start sm:self-center font-medium"
+              className="text-xs text-signal hover:text-signal/80 flex items-center gap-1 self-start sm:self-center font-medium"
             >
               {showReasoning ? (
                 <>
@@ -196,21 +196,21 @@ export function QualitativeReviewPanel({
         {/* Expandable Reasoning Breakdown */}
         {showReasoning && result.adjustmentReasoning.length > 0 && (
           <div
-            className="border-t border-slate-800/80 pt-3 space-y-2"
+            className="border-t border-hairline pt-3 space-y-2"
             data-testid="adjustment-reasoning-list"
           >
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
               JD Signal & Adjustment Traceability:
             </div>
             {result.adjustmentReasoning.map((item, idx) => (
               <div
                 key={`adj-${idx}`}
                 data-testid="reasoning-item"
-                className="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-1 text-xs"
+                className="bg-panel border border-hairline rounded-lg p-3 space-y-1 text-xs"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-cyan-300 flex items-center gap-1.5">
-                    <FileSearch className="h-3.5 w-3.5 text-cyan-400" />
+                  <span className="font-semibold text-signal flex items-center gap-1.5">
+                    <FileSearch className="h-3.5 w-3.5 text-signal" />
                     &quot;{item.jdSignal}&quot;
                   </span>
                   <span
@@ -223,7 +223,7 @@ export function QualitativeReviewPanel({
                     {item.points >= 0 ? `+${item.points}` : item.points} pts ({item.targetCategory})
                   </span>
                 </div>
-                <p className="text-slate-300 text-xs mt-1">{item.explanation}</p>
+                <p className="text-text-secondary text-xs mt-1">{item.explanation}</p>
               </div>
             ))}
           </div>
@@ -232,13 +232,13 @@ export function QualitativeReviewPanel({
 
       {/* Overview Commentary */}
       <div className="space-y-2">
-        <h4 className="text-xs font-semibold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
-          <MessageSquareCode className="h-4 w-4 text-cyan-400" />
+        <h4 className="text-xs font-semibold text-signal uppercase tracking-wider flex items-center gap-1.5">
+          <MessageSquareCode className="h-4 w-4 text-signal" />
           Qualitative Assessment Overview
         </h4>
         <div
           data-testid="overview-commentary"
-          className="text-xs text-slate-200 bg-slate-900/60 border border-slate-800 rounded-lg p-3.5 leading-relaxed"
+          className="text-xs text-foreground bg-inset border border-hairline rounded-lg p-3.5 leading-relaxed"
         >
           {result.overviewCommentary}
         </div>
@@ -247,16 +247,16 @@ export function QualitativeReviewPanel({
       {/* Category Observations */}
       {result.categoryFeedbacks.length > 0 && (
         <div className="space-y-3" data-testid="category-feedbacks-list">
-          <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+          <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
             Category Observations & Nuance
           </h4>
           <div className="grid grid-cols-1 gap-3">
             {result.categoryFeedbacks.map((cf, idx) => (
               <div
                 key={`cf-${idx}`}
-                className="bg-slate-900 border border-slate-800 rounded-lg p-3.5 space-y-2 text-xs"
+                className="bg-inset border border-hairline rounded-lg p-3.5 space-y-2 text-xs"
               >
-                <span className="font-semibold text-white block border-b border-slate-800 pb-1.5">
+                <span className="font-semibold text-foreground block border-b border-hairline pb-1.5">
                   {cf.categoryName}
                 </span>
 
@@ -265,7 +265,7 @@ export function QualitativeReviewPanel({
                     <span className="text-[10px] text-emerald-400 font-semibold uppercase block">
                       Strengths
                     </span>
-                    <ul className="list-disc list-inside text-slate-300 space-y-0.5 mt-0.5">
+                    <ul className="list-disc list-inside text-text-secondary space-y-0.5 mt-0.5">
                       {cf.strengths.map((s, sIdx) => (
                         <li key={sIdx}>{s}</li>
                       ))}
@@ -278,7 +278,7 @@ export function QualitativeReviewPanel({
                     <span className="text-[10px] text-amber-400 font-semibold uppercase block">
                       Areas to Strengthen
                     </span>
-                    <ul className="list-disc list-inside text-slate-300 space-y-0.5 mt-0.5">
+                    <ul className="list-disc list-inside text-text-secondary space-y-0.5 mt-0.5">
                       {cf.weaknesses.map((w, wIdx) => (
                         <li key={wIdx}>{w}</li>
                       ))}
@@ -294,7 +294,7 @@ export function QualitativeReviewPanel({
       {/* Bullet-by-Bullet Qualitative Verdicts */}
       {result.bulletFeedbacks.length > 0 && (
         <div className="space-y-3" data-testid="bullet-feedbacks-list">
-          <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+          <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
             Bullet Evidence Veracity & Rigor ({result.bulletFeedbacks.length} reviewed)
           </h4>
           <div className="space-y-2">
@@ -304,10 +304,10 @@ export function QualitativeReviewPanel({
                 <div
                   key={`bf-${idx}`}
                   data-testid="bullet-feedback-item"
-                  className="bg-slate-900 border border-slate-800 rounded-lg p-3.5 space-y-2 text-xs"
+                  className="bg-inset border border-hairline rounded-lg p-3.5 space-y-2 text-xs"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <p className="font-mono text-slate-200 bg-slate-950/80 p-2 rounded border border-slate-800 flex-1">
+                    <p className="font-mono text-foreground bg-panel p-2 rounded border border-hairline flex-1">
                       &quot;{bf.bulletText}&quot;
                     </p>
                     <span
@@ -316,9 +316,9 @@ export function QualitativeReviewPanel({
                       <span>{badge.icon}</span> {badge.label}
                     </span>
                   </div>
-                  <p className="text-slate-300">{bf.reasoning}</p>
-                  <p className="text-slate-400 text-[11px] italic flex items-center gap-1 text-cyan-300/80">
-                    <Info className="h-3 w-3 text-cyan-400 shrink-0" />
+                  <p className="text-text-secondary">{bf.reasoning}</p>
+                  <p className="text-[11px] italic flex items-center gap-1 text-signal">
+                    <Info className="h-3 w-3 text-signal shrink-0" />
                     Advice: {bf.improvementAdvice}
                   </p>
                 </div>
@@ -330,18 +330,18 @@ export function QualitativeReviewPanel({
 
       {/* Next Steps Guidance Banner */}
       {result.nextStepsAdvice.length > 0 && (
-        <div className="bg-indigo-950/30 border border-indigo-800/50 rounded-xl p-4 space-y-2">
-          <h4 className="text-xs font-semibold text-indigo-300 flex items-center gap-2">
-            <Wand2 className="h-4 w-4 text-indigo-400" />
+        <div className="bg-signal/10 border border-signal/35 rounded-xl p-4 space-y-2">
+          <h4 className="text-xs font-semibold text-signal flex items-center gap-2">
+            <Wand2 className="h-4 w-4 text-signal" />
             Recommended Next Tailoring Actions
           </h4>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-text-secondary">
             Use these findings to guide your next edits in the Resume Editor or generate evidence-backed patches.
           </p>
-          <ul className="space-y-1 text-xs text-indigo-200 font-mono">
+          <ul className="space-y-1 text-xs text-foreground font-mono">
             {result.nextStepsAdvice.map((advice, idx) => (
               <li key={`advice-${idx}`} className="flex items-start gap-2">
-                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 mt-0.5 text-indigo-400" />
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 mt-0.5 text-signal" />
                 <span>{advice}</span>
               </li>
             ))}

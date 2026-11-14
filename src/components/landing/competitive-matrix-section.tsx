@@ -207,7 +207,7 @@ export function CompetitiveMatrixSection() {
       </div>
 
       {/* Comparison Table */}
-      <div className="overflow-x-auto rounded-[10px] border border-outline/70 bg-panel shadow-lg">
+      <div className="overflow-x-auto rounded-[10px] surface-raised edge-glow">
         <table className="w-full text-left border-collapse min-w-[920px]">
           <thead>
             <tr className="border-b border-outline/70 bg-inset">

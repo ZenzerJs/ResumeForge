@@ -6,6 +6,10 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
   }) => {
     await page.goto("/");
 
+    // Verify Ember Ink landing atmosphere and AsciiWaves canvas
+    await expect(page.getByTestId("landing-atmosphere")).toBeVisible();
+    await expect(page.getByTestId("ascii-waves-canvas")).toBeVisible();
+
     // Verify Instant ATS Sandbox Section
     const sandboxSection = page.getByTestId("instant-ats-sandbox-section");
     await expect(sandboxSection).toBeVisible();

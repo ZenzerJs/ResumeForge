@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { parseManagedResume, renderResumeDocument, updateResumeBlock } from "@/lib/typst/resume-document";
 
 type Preset = "student" | "professional" | "research";
@@ -18,6 +19,10 @@ export function presetSectionOrder<T extends { heading: { text: string } }>(sect
 
 export function ManagedResumeForm({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [preset, setPreset] = useState<Preset>("professional");
+  const [pendingPresetApply, setPendingPresetApply] = useState<{
+    preset: Preset;
+    sourceSnapshot: string;
+  } | null>(null);
   const managed = parseManagedResume(value);
   if (!managed) return <div role="status" className="p-6 text-sm text-foreground">This source has changed outside the form. Use Typst Code to preserve those changes.</div>;
   const { document: doc, profile, links, prefix } = managed;
@@ -50,22 +55,21 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
     return result;
   };
   const applyPreset = () => {
-    if (!window.confirm(`Apply the ${preset} section order to this draft?`)) return;
-    commit({ ...doc, sections: presetSectionOrder(doc.sections, preset) });
+    setPendingPresetApply({ preset, sourceSnapshot: value });
   };
   const field = (block: typeof doc.header[number], key: string) => (
     <label key={key} className="block space-y-1 text-xs text-text-secondary">
       <span className="capitalize">{block.kind.replace(/-/g, " ")}{block.unassigned ? " · review" : ""}</span>
-      <textarea defaultValue={block.text} key={`${key}:${block.text}`} onBlur={(event) => edit(block.span, event.currentTarget.value)} rows={block.text.length > 100 ? 3 : 1} className="w-full rounded border border-outline/70 bg-inset px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+      <textarea defaultValue={block.text} key={`${key}:${block.text}`} onBlur={(event) => edit(block.span, event.currentTarget.value)} rows={block.text.length > 100 ? 3 : 1} className="w-full rounded border border-outline/70 bg-inset px-3 py-2 text-sm text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" />
     </label>
   );
   return <div data-testid="managed-resume-form" className="h-full space-y-5 overflow-auto bg-panel p-4 text-foreground">
     <div className="flex flex-wrap items-center gap-2">
       <label htmlFor="resume-preset" className="text-xs text-text-secondary">Section order</label>
-      <select id="resume-preset" value={preset} onChange={(event) => setPreset(event.target.value as Preset)} className="rounded border border-outline/70 bg-inset p-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <select id="resume-preset" value={preset} onChange={(event) => setPreset(event.target.value as Preset)} className="rounded border border-outline/70 bg-inset p-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
         <option value="student">Student</option><option value="professional">Professional</option><option value="research">Research</option>
       </select>
-      <button type="button" onClick={applyPreset} className="rounded bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Apply to draft</button>
+      <button type="button" onClick={applyPreset} className="rounded bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">Apply to draft</button>
     </div>
     <p className="text-xs text-text-muted">Changes apply when you leave a field. Use Typst Code for unsupported source changes.</p>
     {links.length > 0 && <section className="space-y-3 rounded border border-outline/70 bg-canvas/40 p-3" aria-label="PDF link placement">
@@ -83,7 +87,7 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
               return selected ? { ...rest, label: selected.label, span: { start: selected.start, end: selected.end } } : rest;
             });
             onChange(prefix + renderResumeDocument(doc, profile, updated));
-          }} className="w-full rounded border border-outline/70 bg-inset p-2 text-sm text-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          }} className="w-full rounded border border-outline/70 bg-inset p-2 text-sm text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
             <option value="">Unassigned / automatic when unambiguous</option>
             {choices.map((choice) => <option key={`${choice.start}:${choice.end}`} value={`${choice.start}:${choice.end}`} disabled={links.some((other, i) => i !== index && other.span?.start === choice.start && other.span.end === choice.end && other.url !== link.url)}>{choice.label} — {choice.context}</option>)}
           </select>
@@ -95,5 +99,38 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
       {field(section.heading, `heading-${index}`)}
       {section.blocks.map((block, blockIndex) => field(block, `block-${index}-${blockIndex}`))}
     </section>)}
+    <ConfirmDialog
+      open={Boolean(pendingPresetApply)}
+      onOpenChange={(open) => {
+        if (!open) setPendingPresetApply(null);
+      }}
+      title="Apply Section Order Preset"
+      description={
+        pendingPresetApply
+          ? `Apply the ${pendingPresetApply.preset} section order to this draft?`
+          : ""
+      }
+      confirmLabel="Apply Preset"
+      dialogTestId="apply-preset-confirm-modal"
+      confirmTestId="confirm-apply-preset-btn"
+      cancelTestId="cancel-apply-preset-btn"
+      onConfirm={() => {
+        if (!pendingPresetApply) return;
+        const latest = parseManagedResume(value);
+        if (!latest || pendingPresetApply.sourceSnapshot !== value) {
+          setPendingPresetApply(null);
+          return;
+        }
+        onChange(
+          latest.prefix +
+            renderResumeDocument(
+              { ...latest.document, sections: presetSectionOrder(latest.document.sections, pendingPresetApply.preset) },
+              latest.profile,
+              latest.links
+            )
+        );
+        setPendingPresetApply(null);
+      }}
+    />
   </div>;
 }

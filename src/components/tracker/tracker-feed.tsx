@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { JobStatus, type WorkplaceFilter } from "@/lib/db/jobs";
 import { AppShell } from "@/components/design-system/app-shell";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   TrackerSubNav,
@@ -100,7 +101,7 @@ const MIN_SALARY_OPTIONS: { value: string; label: string }[] = [
 ];
 
 const FILTER_CONTROL =
-  "min-h-11 rounded-md border border-slate-700 bg-rf-elevated px-2.5 text-[12.5px] text-rf-cloud placeholder-slate-500 transition-colors duration-150 focus:border-amber-500/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60";
+  "min-h-11 rounded-md border border-hairline bg-inset px-2.5 text-[12.5px] text-rf-cloud placeholder-muted-foreground transition-colors duration-150 focus:border-primary/60";
 
 interface TrackerFeedProps {
   filterStatuses?: JobStatus[];
@@ -119,6 +120,9 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const [locationQuery, setLocationQuery] = useState("");
   const [debouncedLocation, setDebouncedLocation] = useState("");
   const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
+  const [activeLocationIndex, setActiveLocationIndex] = useState(-1);
+  const locationComboboxRef = useRef<HTMLDivElement | null>(null);
+  const locationListboxId = "tracker-location-listbox";
   const [minSalary, setMinSalary] = useState("0");
   const [workplace, setWorkplace] = useState<WorkplaceFilter>("all");
   const [statusFilter, setStatusFilter] = useState<JobStatus | "ALL">("ALL");
@@ -126,6 +130,10 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const [page, setPage] = useState(1);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [pendingDeleteJob, setPendingDeleteJob] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
   const [editingNotes, setEditingNotes] = useState<{ [id: string]: string }>({});
   const [isSavingNotes, setIsSavingNotes] = useState<{ [id: string]: boolean }>({});
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<{ [id: string]: boolean }>({});
@@ -139,6 +147,28 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const hydrateAttemptedRef = useRef<Set<string>>(new Set());
   const mountedRef = useRef(true);
   const activeCardRef = useRef<HTMLDivElement | null>(null);
+  const sheetOpenerRef = useRef<HTMLElement | null>(null);
+
+  const restoreTrackerListFocus = () => {
+    const opener = sheetOpenerRef.current;
+    if (opener && document.body.contains(opener)) {
+      opener.focus();
+      return;
+    }
+    const activeTarget = activeCardRef.current?.querySelector<HTMLElement>("button, a");
+    if (activeTarget && document.body.contains(activeTarget)) {
+      activeTarget.focus();
+      return;
+    }
+    const firstRowTarget = document.querySelector<HTMLElement>(
+      '[data-testid="tracker-job-list"] button, [data-testid="tracker-job-list"] a'
+    );
+    if (firstRowTarget && document.body.contains(firstRowTarget)) {
+      firstRowTarget.focus();
+      return;
+    }
+    document.getElementById("tracker-job-search")?.focus();
+  };
 
   useEffect(() => {
     const saved = sessionStorage.getItem("resumeforge_active_job_id");
@@ -380,6 +410,8 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
     sessionStorage.setItem("resumeforge_active_job_id", jobId);
     // Mobile: open full-screen sheet
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
+      sheetOpenerRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setMobileSheetOpen(true);
     }
   };
@@ -475,8 +507,18 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
     }
   };
 
-  const handleDeleteJob = async (jobId: string) => {
-    if (!confirm("Delete this job posting from the tracker?")) return;
+  const handleDeleteJob = (jobId: string) => {
+    const job = jobs.find((item) => item.id === jobId);
+    const label = job
+      ? `${job.roleTitle || "Untitled Role"}${job.company ? ` at ${job.company}` : ""}`
+      : "this job posting";
+    setPendingDeleteJob({ id: jobId, label });
+  };
+
+  const performDeleteJob = async (jobId: string): Promise<boolean> => {
+    if (!jobs.some((item) => item.id === jobId)) {
+      return false;
+    }
     try {
       if (isDemoMode) {
         const rows = JSON.parse(localStorage.getItem("resumeforge_guest_jobs") || "[]");
@@ -488,7 +530,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           sessionStorage.removeItem("resumeforge_active_job_id");
           setMobileSheetOpen(false);
         }
-        return;
+        return true;
       }
       const res = await fetch(`/api/jobs/${jobId}`, { method: "DELETE" });
       const json = await res.json().catch(() => ({}));
@@ -501,7 +543,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
               : json?.error || "Failed to delete job posting.";
         setTier2Notice((p) => ({ ...p, [jobId]: msg }));
         setImportNotice(msg);
-        return;
+        return false;
       }
       setJobs((prev) => prev.filter((j) => j.id !== jobId));
       if (activeJobId === jobId) {
@@ -509,9 +551,11 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         sessionStorage.removeItem("resumeforge_active_job_id");
         setMobileSheetOpen(false);
       }
+      return true;
     } catch {
       console.error("Failed to delete job");
       setImportNotice("Network error deleting job posting.");
+      return false;
     }
   };
 
@@ -624,6 +668,33 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const pipelineApplied = pipelineCounts.applied;
   const pipelineInterviewing = pipelineCounts.interviewing;
 
+  const filteredLocationCities = CANADIAN_CITIES.filter(
+    (c) =>
+      c.label.toLowerCase().includes(locationQuery.toLowerCase()) ||
+      c.value.toLowerCase().includes(locationQuery.toLowerCase())
+  );
+
+  const selectLocationOption = (option: (typeof CANADIAN_CITIES)[number]) => {
+    setLocationQuery(option.value === "ALL" ? "" : option.label);
+    setIsLocationDropdownOpen(false);
+    setActiveLocationIndex(-1);
+  };
+
+  useEffect(() => {
+    if (!isLocationDropdownOpen) return;
+    const onPointerDownOutside = (event: PointerEvent) => {
+      if (
+        locationComboboxRef.current &&
+        !locationComboboxRef.current.contains(event.target as Node)
+      ) {
+        setIsLocationDropdownOpen(false);
+        setActiveLocationIndex(-1);
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDownOutside);
+    return () => document.removeEventListener("pointerdown", onPointerDownOutside);
+  }, [isLocationDropdownOpen]);
+
   return (
     <AppShell variant="tracker">
       <TrackerSubNav
@@ -634,7 +705,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                 role="status"
                 aria-live="polite"
                 data-testid="hydrate-status"
-                className="hidden items-center gap-1.5 text-xs tabular-nums text-slate-400 sm:inline-flex"
+                className="hidden items-center gap-1.5 text-xs tabular-nums text-text-secondary sm:inline-flex"
                 title="Descriptions are fetched automatically and saved, so each posting is only fetched once."
               >
                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -661,13 +732,13 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         </div>
       )}
 
-      {/* Filter subheader — locked, not part of pane scroll */}
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-800 bg-rf-bg px-4 py-2.5">
+      {/* Filter subheader — sticky glass bar under TrackerSubNav */}
+      <div className="sticky top-11 z-10 flex shrink-0 flex-wrap items-center gap-2 border-b glass-bar px-4 py-2.5">
         <div className="relative min-w-[180px] flex-1 sm:max-w-xs">
           <label htmlFor="tracker-job-search" className="sr-only">
             Search jobs, companies, or keywords
           </label>
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <input
             id="tracker-job-search"
             data-testid="tracker-job-search"
@@ -679,45 +750,117 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           />
         </div>
 
-        <div className="relative min-w-[140px] flex-1 sm:max-w-[180px]">
+        <div ref={locationComboboxRef} className="relative min-w-[140px] flex-1 sm:max-w-[180px]">
           <label htmlFor="tracker-location-filter" className="sr-only">
             Filter by location
           </label>
-          <MapPin className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+          <MapPin className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <input
             id="tracker-location-filter"
             data-testid="tracker-location-filter"
             type="search"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={isLocationDropdownOpen && filteredLocationCities.length > 0}
+            aria-controls={locationListboxId}
+            aria-activedescendant={
+              isLocationDropdownOpen &&
+              activeLocationIndex >= 0 &&
+              filteredLocationCities[activeLocationIndex]
+                ? `${locationListboxId}-option-${activeLocationIndex}`
+                : undefined
+            }
             placeholder="Location (e.g. Toronto)"
             value={locationQuery}
             onChange={(e) => {
               setLocationQuery(e.target.value);
               setIsLocationDropdownOpen(true);
+              setActiveLocationIndex(-1);
             }}
-            onFocus={() => setIsLocationDropdownOpen(true)}
-            onBlur={() => setTimeout(() => setIsLocationDropdownOpen(false), 250)}
+            onFocus={() => {
+              setIsLocationDropdownOpen(true);
+              setActiveLocationIndex(-1);
+            }}
+            onBlur={(e) => {
+              if (!locationComboboxRef.current?.contains(e.relatedTarget as Node | null)) {
+                setIsLocationDropdownOpen(false);
+                setActiveLocationIndex(-1);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                if (!isLocationDropdownOpen) {
+                  setIsLocationDropdownOpen(true);
+                  setActiveLocationIndex(filteredLocationCities.length > 0 ? 0 : -1);
+                } else if (filteredLocationCities.length > 0) {
+                  setActiveLocationIndex((prev) =>
+                    prev < filteredLocationCities.length - 1 ? prev + 1 : 0
+                  );
+                }
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                if (!isLocationDropdownOpen) {
+                  setIsLocationDropdownOpen(true);
+                  setActiveLocationIndex(filteredLocationCities.length - 1);
+                } else if (filteredLocationCities.length > 0) {
+                  setActiveLocationIndex((prev) =>
+                    prev > 0 ? prev - 1 : filteredLocationCities.length - 1
+                  );
+                }
+              } else if (e.key === "Home" && isLocationDropdownOpen && filteredLocationCities.length > 0) {
+                e.preventDefault();
+                setActiveLocationIndex(0);
+              } else if (e.key === "End" && isLocationDropdownOpen && filteredLocationCities.length > 0) {
+                e.preventDefault();
+                setActiveLocationIndex(filteredLocationCities.length - 1);
+              } else if (
+                e.key === "Enter" &&
+                isLocationDropdownOpen &&
+                activeLocationIndex >= 0 &&
+                filteredLocationCities[activeLocationIndex]
+              ) {
+                e.preventDefault();
+                selectLocationOption(filteredLocationCities[activeLocationIndex]);
+              } else if (e.key === "Escape" && isLocationDropdownOpen) {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsLocationDropdownOpen(false);
+                setActiveLocationIndex(-1);
+              }
+            }}
             className={`${FILTER_CONTROL} w-full py-0 pl-8 pr-3`}
           />
-          {isLocationDropdownOpen && (
-            <div className="absolute left-0 top-full z-50 mt-1 max-h-56 w-56 overflow-auto rounded-lg border border-slate-700 bg-slate-900 p-1 shadow-2xl">
-              {CANADIAN_CITIES.filter(
-                (c) =>
-                  c.label.toLowerCase().includes(locationQuery.toLowerCase()) ||
-                  c.value.toLowerCase().includes(locationQuery.toLowerCase())
-              ).map((c) => (
-                <button
-                  key={c.value}
-                  type="button"
-                  onMouseDown={() => {
-                    setLocationQuery(c.value === "ALL" ? "" : c.label);
-                    setIsLocationDropdownOpen(false);
-                  }}
-                  className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left text-xs text-slate-300 transition hover:bg-amber-500/15 hover:text-amber-300"
-                >
-                  <MapPin className="h-3 w-3 shrink-0 text-slate-500" />
-                  <span>{c.label}</span>
-                </button>
-              ))}
+          {isLocationDropdownOpen && filteredLocationCities.length > 0 && (
+            <div
+              id={locationListboxId}
+              role="listbox"
+              aria-label="Location suggestions"
+              className="absolute left-0 top-full z-50 mt-1 max-h-56 w-56 overflow-auto rounded-[10px] border border-hairline bg-elevated p-1 shadow-2xl"
+            >
+              {filteredLocationCities.map((c, index) => {
+                const isActive = index === activeLocationIndex;
+                return (
+                  <button
+                    key={c.value}
+                    id={`${locationListboxId}-option-${index}`}
+                    type="button"
+                    role="option"
+                    aria-selected={isActive}
+                    tabIndex={-1}
+                    onPointerDown={(e) => e.preventDefault()}
+                    onClick={() => selectLocationOption(c)}
+                    className={`flex w-full items-center gap-2 rounded-[6px] px-3 py-1.5 text-left text-xs transition ${
+                      isActive
+                        ? "bg-primary/20 text-primary"
+                        : "text-on-surface-variant hover:bg-primary/15 hover:text-primary"
+                    }`}
+                  >
+                    <MapPin className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+                    <span>{c.label}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -777,9 +920,9 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           ))}
         </select>
 
-        <div className="ml-auto flex flex-wrap items-center gap-3 text-[12.5px] text-slate-500">
+        <div className="ml-auto flex flex-wrap items-center gap-3 text-[12.5px] text-muted-foreground">
           <div
-            className="flex items-center rounded-md border border-slate-700 bg-rf-elevated p-0.5"
+            className="flex items-center rounded-md border border-hairline bg-inset p-0.5"
             role="tablist"
             aria-label="Tracker display mode"
           >
@@ -791,8 +934,8 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
               data-testid="tracker-view-split"
               className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-mono font-semibold transition ${
                 viewMode === "split"
-                  ? "bg-amber-500 text-rf-bg shadow-sm"
-                  : "text-slate-400 hover:text-white"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <LayoutList className="h-3.5 w-3.5" />
@@ -806,8 +949,8 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
               data-testid="tracker-view-kanban"
               className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-mono font-semibold transition ${
                 viewMode === "kanban"
-                  ? "bg-amber-500 text-rf-bg shadow-sm"
-                  : "text-slate-400 hover:text-white"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <Columns3 className="h-3.5 w-3.5" />
@@ -825,13 +968,13 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             )}
           </span>
           <span className="hidden tabular-nums md:inline">
-            Applied <span className="text-amber-400">{pipelineApplied}</span>
+            Applied <span className="text-primary">{pipelineApplied}</span>
             {" · "}
-            Interviewing <span className="text-emerald-400">{pipelineInterviewing}</span>
+            Interviewing <span className="text-status-success">{pipelineInterviewing}</span>
           </span>
           <Link
             href="/tailor"
-            className="inline-flex min-h-11 items-center gap-1 rounded-md bg-amber-500 px-2.5 py-1.5 text-xs font-semibold text-rf-bg transition-colors duration-150 hover:bg-amber-400"
+            className="inline-flex min-h-11 items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary/90"
           >
             <Plus className="h-3.5 w-3.5" />
             Add Job
@@ -858,20 +1001,20 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                       setDraggedJobId(null);
                     }
                   }}
-                  className="flex h-full w-72 shrink-0 flex-col rounded-xl border border-slate-800 bg-rf-surface/90 overflow-hidden"
+                  className="flex h-full w-72 shrink-0 flex-col rounded-xl surface-raised overflow-hidden"
                 >
-                  <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/80 px-3.5 py-2.5">
-                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">
+                  <div className="flex items-center justify-between border-b border-hairline bg-inset/90 px-3.5 py-2.5">
+                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
                       {STATUS_LABELS[stage]}
                     </span>
-                    <span className="rounded-full bg-slate-800 border border-slate-700 px-2 py-0.5 font-mono text-[11px] font-semibold text-amber-300">
+                    <span className="rounded-full bg-elevated border border-hairline px-2 py-0.5 font-mono text-[11px] font-semibold text-primary">
                       {stageJobs.length}
                     </span>
                   </div>
 
                   <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
                     {stageJobs.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-slate-800/80 p-6 text-center text-xs font-mono text-slate-500">
+                      <div className="rounded-lg border border-dashed border-hairline p-6 text-center text-xs font-mono text-muted-foreground">
                         Drop job card here
                       </div>
                     ) : (
@@ -881,7 +1024,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                           draggable
                           onDragStart={() => setDraggedJobId(job.id)}
                           data-testid={`kanban-card-${job.id}`}
-                          className="rounded-lg border border-slate-800 bg-rf-elevated p-3 shadow-sm hover:border-amber-500/40 transition cursor-grab active:cursor-grabbing space-y-2"
+                          className="rounded-lg surface-raised card-lift p-3 cursor-grab active:cursor-grabbing space-y-2"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <button
@@ -892,23 +1035,23 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                               }}
                               className="text-left group"
                             >
-                              <h3 className="text-xs font-bold text-white group-hover:text-amber-300 transition line-clamp-2">
+                              <h3 className="text-xs font-bold text-foreground group-hover:text-primary transition line-clamp-2">
                                 {job.roleTitle}
                               </h3>
-                              <p className="text-[11px] font-mono text-slate-400 mt-0.5">
+                              <p className="text-[11px] font-mono text-muted-foreground mt-0.5">
                                 {job.company}
                               </p>
                             </button>
                           </div>
 
-                          <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800/80">
+                          <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-hairline">
                             <select
                               value={job.status}
                               onChange={(e) =>
                                 void handleStatusChange(job.id, e.target.value as JobStatus)
                               }
                               aria-label={`Change status for ${job.roleTitle}`}
-                              className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-[10px] font-mono text-slate-200 focus:border-amber-500 focus:outline-none"
+                              className="rounded-[6px] border border-control/70 bg-inset px-2 py-0.5 text-[10px] font-mono text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                             >
                               {(["SAVED", "APPLIED", "INTERVIEWING", "OFFER", "REJECTED"] as JobStatus[]).map(
                                 (st) => (
@@ -921,7 +1064,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
 
                             <Link
                               href={`/tailor?jobId=${job.id}&tab=overview`}
-                              className="text-[10px] font-mono font-semibold text-amber-400 hover:underline"
+                              className="text-[10px] font-mono font-semibold text-primary hover:underline"
                             >
                               Tailor →
                             </Link>
@@ -938,22 +1081,44 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       ) : (
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* List pane — independent scroll */}
-        <div className="flex min-h-0 w-full flex-col border-r border-slate-800 lg:w-[400px] lg:shrink-0">
+        <div className="flex min-h-0 w-full flex-col border-r border-hairline lg:w-[400px] lg:shrink-0">
           <div className="min-h-0 flex-1 overflow-y-auto" data-testid="tracker-job-list">
             {isLoading && (
               <div className="space-y-0 p-0">
                 {[...Array(6)].map((_, i) => (
-                  <Skeleton key={i} className="h-[110px] w-full rounded-none border-b border-slate-800 bg-rf-surface" />
+                  <div
+                    key={i}
+                    className="flex gap-3 surface-raised border-x-0 border-t-0 border-b border-hairline px-4 py-3.5"
+                  >
+                    <Skeleton className="h-9 w-9 rounded-full shrink-0" />
+                    <div className="min-w-0 flex-1 space-y-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <Skeleton className="h-3.5 w-44 max-w-full" />
+                          <Skeleton className="h-3 w-32" />
+                        </div>
+                        <Skeleton className="h-5 w-20 rounded-full shrink-0" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-3 w-20" />
+                        <Skeleton className="h-3 w-24" />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Skeleton className="h-7 w-24 rounded-[6px]" />
+                        <Skeleton className="h-7 w-7 rounded-[6px]" />
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
 
             {!isLoading && pageJobs.length === 0 && (
               <div className="flex flex-col items-center justify-center gap-4 px-4 py-20 text-center">
-                <Briefcase className="h-12 w-12 text-slate-700" />
+                <Briefcase className="h-12 w-12 text-muted-foreground/50" />
                 <div>
                   <p className="font-medium text-rf-meta">No jobs found</p>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {searchQuery || locationQuery
                       ? "Try adjusting search or location filters."
                       : "Go to the Tailor workspace to paste a job posting."}
@@ -961,7 +1126,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                 </div>
                 <Link
                   href="/tailor"
-                  className="mt-2 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-rf-bg transition-colors duration-150 hover:bg-amber-400"
+                  className="mt-2 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary/90"
                 >
                   Add Your First Job
                 </Link>
@@ -988,13 +1153,13 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
 
           {/* Pagination */}
           {!isLoading && totalJobs > 0 && (
-            <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-800 bg-rf-bg px-3 py-2">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-t glass-bar px-3 py-2">
               <button
                 type="button"
                 data-testid="jobs-page-prev"
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-2.5 py-1.5 text-xs text-rf-meta transition-colors duration-150 hover:text-rf-cloud disabled:opacity-40"
+                className="inline-flex items-center gap-1 rounded-md border border-hairline bg-inset px-2.5 py-1.5 text-xs text-rf-meta transition-colors duration-150 hover:text-rf-cloud disabled:opacity-40"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
                 Prev
@@ -1007,7 +1172,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                 data-testid="jobs-page-next"
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-2.5 py-1.5 text-xs text-rf-meta transition-colors duration-150 hover:text-rf-cloud disabled:opacity-40"
+                className="inline-flex items-center gap-1 rounded-md border border-hairline bg-inset px-2.5 py-1.5 text-xs text-rf-meta transition-colors duration-150 hover:text-rf-cloud disabled:opacity-40"
               >
                 Next
                 <ChevronRight className="h-3.5 w-3.5" />
@@ -1063,6 +1228,10 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             showNotes
             isSheet
             onClose={handleCloseSheet}
+            onSheetCloseAutoFocus={(event) => {
+              event.preventDefault();
+              restoreTrackerListFocus();
+            }}
             onStatusChange={handleStatusChange}
             onVariantChange={handleVariantChange}
             onNotesChange={(id, value) =>
@@ -1076,6 +1245,33 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           />
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteJob)}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteJob(null);
+        }}
+        title="Delete Job Posting"
+        description={
+          pendingDeleteJob
+            ? `Delete "${pendingDeleteJob.label}" from your job tracker? This action cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete Posting"
+        tone="destructive"
+        dialogTestId="delete-job-confirm-modal"
+        confirmTestId="confirm-delete-job-btn"
+        cancelTestId="cancel-delete-job-btn"
+        onConfirm={async () => {
+          if (!pendingDeleteJob) return;
+          const targetId = pendingDeleteJob.id;
+          const deleted = await performDeleteJob(targetId);
+          setPendingDeleteJob(null);
+          if (deleted) {
+            requestAnimationFrame(() => restoreTrackerListFocus());
+          }
+        }}
+      />
     </AppShell>
   );
 }

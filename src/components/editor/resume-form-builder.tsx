@@ -657,7 +657,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                     value={model.fullName}
                     onChange={(e) => commitModel({ ...model, fullName: e.target.value })}
                     data-testid="form-input-fullname"
-                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                 </div>
                 <div>
@@ -667,7 +667,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                     value={model.location}
                     onChange={(e) => commitModel({ ...model, location: e.target.value })}
                     data-testid="form-input-location"
-                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                 </div>
                 <div>
@@ -677,7 +677,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                     value={model.email}
                     onChange={(e) => commitModel({ ...model, email: e.target.value })}
                     data-testid="form-input-email"
-                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                 </div>
                 <div>
@@ -687,7 +687,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                     value={model.phone}
                     onChange={(e) => commitModel({ ...model, phone: e.target.value })}
                     data-testid="form-input-phone"
-                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                 </div>
                 <div>
@@ -696,7 +696,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                     type="text"
                     value={model.github}
                     onChange={(e) => commitModel({ ...model, github: e.target.value })}
-                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                 </div>
                 <div>
@@ -705,7 +705,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                     type="text"
                     value={model.linkedin}
                     onChange={(e) => commitModel({ ...model, linkedin: e.target.value })}
-                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                 </div>
               </div>
@@ -724,7 +724,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                 onChange={(e) => commitModel({ ...model, summary: e.target.value })}
                 placeholder="e.g. Senior Full-Stack Engineer with 5+ years building distributed cloud systems..."
                 data-testid="form-input-summary"
-                className="w-full rounded border border-outline/70 bg-inset p-2.5 text-xs text-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring leading-relaxed"
+                className="w-full rounded border border-outline/70 bg-inset p-2.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background leading-relaxed"
               />
             </div>
           </div>
@@ -794,7 +794,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                       onChange={(e) =>
                         updateEntryField(activeSection, entry.id, "title", e.target.value)
                       }
-                      className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     />
                   </div>
                   <div>
@@ -807,7 +807,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                       onChange={(e) =>
                         updateEntryField(activeSection, entry.id, "role", e.target.value)
                       }
-                      className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     />
                   </div>
                   <div>
@@ -820,7 +820,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                       onChange={(e) =>
                         updateEntryField(activeSection, entry.id, "location", e.target.value)
                       }
-                      className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     />
                   </div>
                   <div>
@@ -833,7 +833,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                       onChange={(e) =>
                         updateEntryField(activeSection, entry.id, "date", e.target.value)
                       }
-                      className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     />
                   </div>
                 </div>
@@ -860,7 +860,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                         onChange={(e) =>
                           updateEntryBullet(activeSection, entry.id, bIdx, e.target.value)
                         }
-                        className="flex-1 rounded border border-outline/70 bg-inset p-2 text-xs text-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring leading-relaxed"
+                        className="flex-1 rounded border border-outline/70 bg-inset p-2 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background leading-relaxed"
                       />
                       {entry.bullets.length > 1 && (
                         <button
@@ -925,7 +925,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                       commitModel({ ...model, skills: next });
                     }}
                     placeholder="Category (e.g. Languages)"
-                    className="w-full sm:w-44 shrink-0 rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs font-semibold text-primary focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="w-full sm:w-44 shrink-0 rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs font-semibold text-primary focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                   <input
                     type="text"
@@ -937,7 +937,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                       commitModel({ ...model, skills: next });
                     }}
                     placeholder="Comma-separated skills (e.g. TypeScript, Python, Go, PostgreSQL)"
-                    className="flex-1 w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex-1 w-full rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                   {model.skills.length > 1 && (
                     <button

@@ -38,8 +38,10 @@ test.describe("Phase 5 Tailored Cover Letter Generator E2E Tests", () => {
     await page.click("[data-testid='extract-reqs-btn']");
     await page.waitForSelector("[data-testid='req-skill-PostgreSQL']", { timeout: 5000 });
 
-    // Save Job
+    // Save Job and switch to Cover Letter tab
     await page.click("[data-testid='save-job-btn']");
+    await page.waitForSelector("text=Job posting saved successfully!", { timeout: 10000 });
+    await page.click("[data-testid='tailor-tab-cover-letter']");
     await page.waitForSelector("[data-testid='cover-letter-panel']", { timeout: 10000 });
 
     // Verify "Generate Tailored Cover Letter" button is present and clickable

@@ -1,6 +1,9 @@
 import React from "react";
 import Link from "next/link";
 import { FileText, ArrowRight } from "lucide-react";
+import { BrandIcon } from "@/components/design-system/brand-icon";
+
+const FOOTER_STACK = ["Typst", "Next.js", "PostgreSQL", "CodeMirror", "Prisma"] as const;
 
 export function LandingFooter() {
   return (
@@ -19,6 +22,17 @@ export function LandingFooter() {
           <p className="text-xs text-muted-foreground font-mono">
             Guest browser drafts · Optional Postgres sync · IndexedDB BYOK relay
           </p>
+          <div
+            className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 pt-1 text-[11px] font-mono text-muted-foreground/85 sm:justify-start"
+            aria-label="Core stack"
+          >
+            {FOOTER_STACK.map((tech) => (
+              <span key={tech} className="inline-flex items-center gap-1.5">
+                <BrandIcon name={tech} className="h-3.5 w-3.5 shrink-0" />
+                <span>{tech}</span>
+              </span>
+            ))}
+          </div>
         </div>
 
         <nav

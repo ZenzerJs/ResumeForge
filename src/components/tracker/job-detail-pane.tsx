@@ -37,6 +37,13 @@ import type { EvidenceItemWithBullets } from "@/lib/matching/matcher";
 import type { JobItem } from "@/components/tracker/job-types";
 import { isSafeHref } from "@/lib/security/safe-url";
 import { JobDescriptionMarkdown } from "@/components/tracker/job-description-markdown";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import dynamic from "next/dynamic";
 
 // Heavy, open-on-demand dialogs: keep them out of the initial tracker bundle.
@@ -92,6 +99,7 @@ interface JobDetailPaneProps {
   showNotes: boolean;
   isSheet?: boolean;
   onClose?: () => void;
+  onSheetCloseAutoFocus?: (event: Event) => void;
   onStatusChange: (jobId: string, status: JobStatus) => void;
   onVariantChange?: (jobId: string, variantId: string | null) => void;
   onNotesChange: (jobId: string, value: string) => void;
@@ -112,6 +120,7 @@ export function JobDetailPane({
   showNotes,
   isSheet = false,
   onClose,
+  onSheetCloseAutoFocus,
   onStatusChange,
   onVariantChange,
   onNotesChange,
@@ -308,21 +317,22 @@ export function JobDetailPane({
       <div className="max-w-4xl mx-auto space-y-6 relative z-10">
         {/* Mobile close button */}
         {isSheet && (
-          <div className="flex justify-end mb-2">
+          <div className="mb-2 flex justify-end">
+            <SheetClose asChild>
               <button
                 type="button"
-                onClick={onClose}
                 aria-label="Close detail sheet"
                 data-testid="job-detail-close-btn"
-                className="p-2 rounded-[6px] bg-surface-variant border border-outline-variant text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="rounded-[6px] border border-hairline bg-elevated p-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
-                <X className="w-5 h-5" />
+                <X className="h-5 w-5" />
               </button>
-            </div>
-          )}
+            </SheetClose>
+          </div>
+        )}
 
           {/* Detail Header Card */}
-          <div className="bg-card border border-border rounded-[10px] p-6">
+          <div className="surface-raised edge-glow rounded-[10px] p-6">
             <div className="flex gap-6 items-start">
               <CompanyAvatar company={job.company} className="h-16 w-16 text-3xl" />
               <div className="flex-1">
@@ -452,7 +462,7 @@ export function JobDetailPane({
             {/* Left Sub-column: Match & Notes */}
             <div className="xl:col-span-1 space-y-6">
               {/* Match Score Module */}
-              <div className="bg-card border border-border rounded-[10px] p-5">
+              <div className="surface-raised rounded-[10px] p-5">
                 <details className="group" open>
                   <summary className="flex justify-between items-center cursor-pointer mb-4 border-b border-border pb-2 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
                     <h3 className="font-section-label text-xs text-on-surface-variant uppercase tracking-widest">
@@ -494,7 +504,7 @@ export function JobDetailPane({
               </div>
 
               {/* Technical Interview & OA Practice Problems Module */}
-              <div className="bg-card border border-border rounded-[10px] p-5">
+              <div className="surface-raised rounded-[10px] p-5">
                 <div className="flex justify-between items-center mb-3 border-b border-border pb-2">
                   <h3 className="font-section-label text-xs text-on-surface-variant uppercase tracking-widest flex items-center gap-1.5">
                     <Code2 className="w-3.5 h-3.5 text-primary" />
@@ -562,7 +572,7 @@ export function JobDetailPane({
 
               {/* Notes Module */}
               {showNotes && (
-                <div className="bg-card border border-border rounded-[10px] p-5 flex flex-col">
+                <div className="surface-raised rounded-[10px] p-5 flex flex-col">
                   <h3 className="font-section-label text-xs text-on-surface-variant mb-3 border-b border-border pb-2 uppercase tracking-widest">
                     NOTES
                   </h3>
@@ -597,7 +607,7 @@ export function JobDetailPane({
 
             {/* Right Sub-column: Job Details */}
             <div className="xl:col-span-2">
-              <div className="bg-card border border-border rounded-[10px] p-6 h-full flex flex-col">
+              <div className="surface-raised rounded-[10px] p-6 h-full flex flex-col">
                 <div className="flex justify-between items-center mb-4 border-b border-border pb-2">
                   <h3 className="font-section-label text-xs text-on-surface-variant uppercase tracking-widest">
                     JOB DETAILS
@@ -661,47 +671,72 @@ export function JobDetailPane({
   if (isSheet) {
     return (
       <>
-        <div
-          className="fixed inset-0 z-50 flex flex-col bg-background overflow-y-auto"
-          data-testid="job-detail-sheet"
-          role="dialog"
-          aria-modal="true"
-        >
-          {content}
-        </div>
-        <ApplySheet
-          open={applySheetOpen}
-          onOpenChange={setApplySheetOpen}
-          job={applySheetJob}
-          masterTypst={masterTypst}
-          masterFacts={masterFacts}
-          onVariantChange={onVariantChange}
-        />
-        <ApplyPrepSheetModal
-          isOpen={prepSheetOpen}
-          onClose={() => setPrepSheetOpen(false)}
-          job={{
-            id: detailJob.id,
-            company: detailJob.company || "Company",
-            title: detailJob.roleTitle || "Position",
-            applyUrl: applyUrl,
-            location: location,
-            notes: detailJob.notes,
-            rawDescription: detailJob.rawDescription,
-            requirements: parsedRequirements,
+        <Sheet
+          open
+          onOpenChange={(open) => {
+            if (!open && !prepSheetOpen && !applySheetOpen) onClose?.();
           }}
-          coverLetter={null}
-          matchedHighlights={evidence.flatMap((e) => e.bullets.map((b) => b.text)).slice(0, 5)}
-          evidenceItems={evidence}
-          candidateInfo={candidateInfo}
-        />
+        >
+          <SheetContent
+            side="right"
+            hideCloseButton
+            data-testid="job-detail-sheet"
+            className="w-full max-w-full sm:max-w-full overflow-y-auto overscroll-contain border-l-0 bg-canvas p-0 text-foreground"
+            onEscapeKeyDown={(event) => {
+              if (prepSheetOpen || applySheetOpen) event.preventDefault();
+            }}
+            onPointerDownOutside={(event) => {
+              if (prepSheetOpen || applySheetOpen) event.preventDefault();
+            }}
+            onInteractOutside={(event) => {
+              if (prepSheetOpen || applySheetOpen) event.preventDefault();
+            }}
+            onCloseAutoFocus={(event) => {
+              onSheetCloseAutoFocus?.(event);
+            }}
+          >
+            <SheetTitle className="sr-only">
+              {job.roleTitle} at {job.company}
+            </SheetTitle>
+            <SheetDescription className="sr-only">
+              Job application details, resume match status, and notes.
+            </SheetDescription>
+            {content}
+            <ApplySheet
+              open={applySheetOpen}
+              onOpenChange={setApplySheetOpen}
+              job={applySheetJob}
+              masterTypst={masterTypst}
+              masterFacts={masterFacts}
+              onVariantChange={onVariantChange}
+            />
+            <ApplyPrepSheetModal
+              isOpen={prepSheetOpen}
+              onClose={() => setPrepSheetOpen(false)}
+              job={{
+                id: detailJob.id,
+                company: detailJob.company || "Company",
+                title: detailJob.roleTitle || "Position",
+                applyUrl: applyUrl,
+                location: location,
+                notes: detailJob.notes,
+                rawDescription: detailJob.rawDescription,
+                requirements: parsedRequirements,
+              }}
+              coverLetter={null}
+              matchedHighlights={evidence.flatMap((e) => e.bullets.map((b) => b.text)).slice(0, 5)}
+              evidenceItems={evidence}
+              candidateInfo={candidateInfo}
+            />
+          </SheetContent>
+        </Sheet>
       </>
     );
   }
 
   return (
     <>
-      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background/50 relative" data-testid="job-detail-pane">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden surface-raised edge-glow border-0 relative" data-testid="job-detail-pane">
         {content}
       </div>
       <ApplySheet

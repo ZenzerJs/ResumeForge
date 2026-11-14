@@ -16,7 +16,8 @@ test.describe("Phase 4.3 ATS Quality Score Panel E2E Tests", () => {
     // 3. Verify requirements extracted
     await page.waitForSelector("[data-testid='req-skill-PostgreSQL']", { timeout: 5000 });
 
-    // 4. Verify ATS Score Panel renders
+    // 4. Open Workspace tab and verify single ATS Score Panel renders
+    await page.click("[data-testid='tailor-tab-3-pane']");
     await page.waitForSelector("[data-testid='ats-score-panel']", { timeout: 5000 });
     await page.waitForSelector("[data-testid='overall-score-badge']", { timeout: 5000 });
     await page.waitForSelector("[data-testid='category-breakdown-grid']", { timeout: 5000 });

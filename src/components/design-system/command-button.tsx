@@ -5,17 +5,17 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const commandButtonVariants = cva(
-  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-3.5 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg text-xs font-semibold transition-[transform,color,background-color,border-color,box-shadow,opacity] duration-150 active:scale-[0.98] motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-3.5 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         primary:
-          "bg-amber-500 text-rf-bg shadow shadow-amber-500/20 hover:bg-amber-400",
+          "bg-primary text-primary-foreground btn-glow hover:bg-primary/90",
         secondary:
-          "border border-slate-700 bg-rf-surface text-rf-body hover:bg-rf-elevated hover:text-rf-cloud",
-        ghost: "text-rf-meta hover:bg-slate-800/60 hover:text-rf-cloud",
+          "border border-hairline bg-rf-surface text-rf-body hover:bg-rf-elevated hover:text-rf-cloud",
+        ghost: "text-rf-meta hover:bg-elevated hover:text-rf-cloud",
         success:
-          "bg-emerald-600 text-white shadow shadow-emerald-500/20 hover:bg-emerald-500",
+          "bg-status-success text-accent-ink shadow shadow-status-success/20 hover:bg-status-success/90",
       },
       size: {
         default: "h-8 px-3",

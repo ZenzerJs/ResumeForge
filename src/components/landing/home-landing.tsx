@@ -21,7 +21,9 @@ import {
   X,
 } from "lucide-react";
 import { TopNav } from "@/components/navigation/top-nav";
+import { BrandIcon } from "@/components/design-system/brand-icon";
 import { LandingAtmosphere } from "@/components/landing/landing-atmosphere";
+import { AmbientColorBlobs } from "@/components/design-system/workspace-atmosphere";
 import { ProductProofCard } from "@/components/landing/product-proof-card";
 import { CapabilityMarquee } from "@/components/landing/capability-marquee";
 import { LandingFooter } from "@/components/landing/landing-footer";
@@ -30,6 +32,14 @@ import { CompetitiveMatrixSection } from "@/components/landing/competitive-matri
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
 import type { DashboardStats } from "@/lib/db/stats";
 import { clearDemoSamplesForPersonalResume } from "@/lib/demo-client";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface HomeLandingProps {
   initialStats: DashboardStats;
@@ -48,6 +58,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 
   const pdfInputRef = useRef<HTMLInputElement>(null);
+  const cancelClearBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -193,15 +204,19 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
         {/* Hero Section with Staggered Reveal */}
         <section className="relative min-h-[680px] flex items-center px-6 md:px-12 max-w-7xl mx-auto w-full z-10 py-12">
           <div className="grid md:grid-cols-2 gap-12 items-center relative z-10 w-full">
-            {/* Hero Text Left Column */}
-            <div className="flex flex-col gap-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[6px] border border-outline/70 bg-panel w-fit">
+            {/* Hero Text Left Column with clear-window glass backing plane */}
+            <div
+              data-testid="landing-hero-copy-glass"
+              className="flex flex-col gap-6 rounded-[14px] glass-pane p-6 sm:p-8"
+            >
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-hairline bg-inset/80 w-fit">
+                <span className="h-2 w-2 rounded-full bg-signal shadow-[0_0_0_3px_rgb(var(--accent-contrast)/0.2)]" aria-hidden />
                 <KeyRound className="h-3.5 w-3.5 text-primary" aria-hidden />
-                <span className="font-mono text-xs text-primary">Guest Browser · Postgres Sync · BYOK</span>
+                <span className="font-mono text-xs text-text-secondary">Guest drafts stay in your browser · BYOK</span>
               </div>
 
               <h1 className="text-4xl md:text-5xl lg:text-6xl text-foreground leading-tight font-bold tracking-[-0.04em] text-pretty">
-                Make every application feel <span className="text-primary">intentional.</span>
+                Make every application feel <span className="text-ember-gradient">intentional.</span>
               </h1>
 
               <p className="text-on-surface-variant text-base md:text-lg max-w-xl leading-relaxed">
@@ -211,7 +226,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
               <div className="flex items-center gap-4 pt-2 flex-wrap">
                 <Link
                   href="/tailor"
-                  className="bg-primary text-primary-foreground font-bold px-6 py-3 rounded-[6px] inline-flex items-center gap-2 hover:opacity-95 transition-opacity min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  className="bg-primary text-primary-foreground btn-glow font-bold px-6 py-3 rounded-[6px] inline-flex items-center gap-2 hover:opacity-95 transition-opacity min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                 >
                   <ArrowRight className="h-4 w-4" aria-hidden />
                   Start Tailoring
@@ -277,7 +292,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
               const progressPct = Math.round((completedCount / 4) * 100);
 
               return (
-                <div className="rounded-[10px] border border-outline/70 bg-panel p-6 shadow-lg">
+                <div className="rounded-[10px] surface-raised edge-glow p-6">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-outline/70">
                     <div>
                       <div className="flex items-center gap-2.5">
@@ -298,7 +313,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                     <div className="flex items-center gap-3">
                       <div className="w-32 bg-inset h-2 rounded-full overflow-hidden">
                         <div
-                          className="bg-primary h-full rounded-full transition-all duration-300"
+                          className="ombre-bar h-full rounded-full transition-all duration-300"
                           style={{ width: `${Math.max(8, progressPct)}%` }}
                         />
                       </div>
@@ -483,9 +498,11 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
 
         {/* How ResumeForge Operates Pipeline Section */}
         <section
-          className="w-full bg-panel border-y border-outline/70 py-16 px-6 md:px-12 z-10 relative"
+          className="w-full bg-panel py-16 px-6 md:px-12 z-10 relative"
           data-testid="workflow-section"
         >
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-px ombre-divider" />
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-px ombre-divider" />
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-12">
               <h2 className="text-2xl md:text-3xl text-foreground font-bold tracking-[-0.03em] mb-2">How ResumeForge Operates</h2>
@@ -501,7 +518,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
               </div>
 
               <div className="flex flex-col items-center text-center p-4 relative">
-                <div className="hidden md:block absolute top-10 left-[-50%] w-full h-[1px] bg-outline/60 z-0"></div>
+                <div className="hidden md:block absolute top-10 left-[-50%] w-full h-px ombre-divider opacity-70 z-0"></div>
                 <div className="w-12 h-12 rounded-[8px] bg-inset flex items-center justify-center border border-outline/70 mb-4 relative z-10">
                   <Anchor className="h-5 w-5 text-primary" aria-hidden />
                 </div>
@@ -510,7 +527,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
               </div>
 
               <div className="flex flex-col items-center text-center p-4 relative">
-                <div className="hidden md:block absolute top-10 left-[-50%] w-full h-[1px] bg-outline/60 z-0"></div>
+                <div className="hidden md:block absolute top-10 left-[-50%] w-full h-px ombre-divider opacity-70 z-0"></div>
                 <div className="w-12 h-12 rounded-[8px] bg-primary/15 flex items-center justify-center border border-primary/50 mb-4 relative z-10">
                   <Sparkles className="h-5 w-5 text-primary" aria-hidden />
                 </div>
@@ -519,7 +536,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
               </div>
 
               <div className="flex flex-col items-center text-center p-4 relative">
-                <div className="hidden md:block absolute top-10 left-[-50%] w-full h-[1px] bg-outline/60 z-0"></div>
+                <div className="hidden md:block absolute top-10 left-[-50%] w-full h-px ombre-divider opacity-70 z-0"></div>
                 <div className="w-12 h-12 rounded-[8px] bg-inset flex items-center justify-center border border-outline/70 mb-4 relative z-10">
                   <ShieldCheck className="h-5 w-5 text-on-surface-variant" aria-hidden />
                 </div>
@@ -528,7 +545,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
               </div>
 
               <div className="flex flex-col items-center text-center p-4 relative">
-                <div className="hidden md:block absolute top-10 left-[-50%] w-full h-[1px] bg-outline/60 z-0"></div>
+                <div className="hidden md:block absolute top-10 left-[-50%] w-full h-px ombre-divider opacity-70 z-0"></div>
                 <div className="w-12 h-12 rounded-[8px] bg-inset flex items-center justify-center border border-outline/70 mb-4 relative z-10">
                   <Send className="h-5 w-5 text-primary" aria-hidden />
                 </div>
@@ -539,171 +556,198 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
           </div>
         </section>
 
-        {/* Workspace Capability Modules Grid */}
-        <section
-          className="py-20 px-6 md:px-12 max-w-7xl mx-auto w-full z-10"
-          data-testid="capability-grid-section"
-        >
-          <div className="text-center mb-14">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground tracking-[-0.03em]">Workspace Capability Modules</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="capability-cards-grid">
-            {/* Card 1: Master Resume Editor */}
-            <div className="bg-panel border border-outline/70 rounded-[10px] p-6 flex flex-col justify-between min-h-[260px] hover:border-outline transition-colors">
-              <div>
-                <div className="w-10 h-10 rounded-[6px] bg-inset border border-outline/70 flex items-center justify-center mb-6">
-                  <FileText className="h-5 w-5 text-primary" aria-hidden />
-                </div>
-                <h3 className="text-lg md:text-xl font-bold text-foreground mb-2 tracking-tight">Master Resume Editor</h3>
-                <p className="text-on-surface-variant text-sm leading-relaxed">
-                  Edit your protected Typst master resume with WASM compilation and instant live preview.
-                </p>
+        <div className="relative overflow-hidden" data-testid="landing-lower-atmosphere-stage">
+          <AmbientColorBlobs testId="landing-lower-blobs" variant="landing-lower" />
+          <div className="relative z-10">
+            {/* Workspace Capability Modules Grid */}
+            <section
+              className="py-20 px-6 md:px-12 max-w-7xl mx-auto w-full z-10"
+              data-testid="capability-grid-section"
+            >
+              <div className="text-center mb-14">
+                <h2 className="text-3xl md:text-4xl font-bold text-foreground tracking-[-0.03em]">Workspace Capability Modules</h2>
               </div>
-              <div className="mt-6 pt-4 border-t border-outline/70 flex items-center justify-between">
-                <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant tabular-nums">
-                  {`${stats.hasMasterResume ? 1 : 0} MASTER RESUME`}
-                </span>
-                <Link className="text-primary font-mono text-xs md:text-sm flex items-center gap-1 hover:underline" href="/editor">
-                  Open <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-                </Link>
-              </div>
-            </div>
-
-            {/* Card 2: Verified Evidence Bank */}
-            <div className="bg-panel border border-outline/70 rounded-[10px] p-6 flex flex-col justify-between min-h-[260px] hover:border-outline transition-colors">
-              <div>
-                <div className="w-10 h-10 rounded-[6px] bg-inset border border-outline/70 flex items-center justify-center mb-6">
-                  <FolderOpen className="h-5 w-5 text-on-surface-variant" aria-hidden />
-                </div>
-                <h3 className="text-lg md:text-xl font-bold text-foreground mb-2 tracking-tight">Verified Evidence Bank</h3>
-                <p className="text-on-surface-variant text-sm leading-relaxed">
-                  Central repository of career achievements, verified bullets, and skill inventory.
-                </p>
-              </div>
-              <div className="mt-6 pt-4 border-t border-outline/70 flex items-center justify-between">
-                <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant tabular-nums">
-                  {`${stats.evidenceCount} TOTAL ITEMS`}
-                </span>
-                <Link className="text-on-surface-variant hover:text-foreground font-mono text-xs md:text-sm flex items-center gap-1 transition-colors" href="/library">
-                  Open <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-                </Link>
-              </div>
-            </div>
-
-            {/* Card 3: Tailor Engine & AI Gateway (Large 2-row span) */}
-            <div className="bg-panel border border-outline/70 rounded-[10px] p-6 flex flex-col justify-between min-h-[260px] lg:col-span-1 md:col-span-2 lg:row-span-2">
-              <div>
-                <div className="w-10 h-10 rounded-[6px] bg-primary/10 border border-primary/30 flex items-center justify-center mb-6">
-                  <Settings className="h-5 w-5 text-primary" aria-hidden />
-                </div>
-                <h3 className="text-xl md:text-2xl font-bold text-foreground mb-3 tracking-tight">Tailor Engine &amp; AI Gateway</h3>
-                <p className="text-on-surface-variant text-sm leading-relaxed mb-6">
-                  Map verified evidence to job descriptions and inspect atomic diffs before applying changes. Guest drafts stay in this browser; signed-in workspaces persist in hosted Postgres; AI calls relay only when triggered using your BYOK key.
-                </p>
-                <div className="bg-inset border border-outline/70 rounded-[6px] p-3.5 font-mono text-xs text-on-surface-variant space-y-1.5 mb-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-foreground font-semibold">Patch Contract</span>
-                    <span className="text-primary text-xs">Evidence-Cited</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="capability-cards-grid">
+                {/* Card 1: Master Resume Editor */}
+                <div className="surface-raised card-lift edge-glow rounded-[10px] p-6 flex flex-col justify-between min-h-[260px]">
+                  <div>
+                    <div className="w-10 h-10 rounded-[6px] bg-inset border border-outline/70 flex items-center justify-center mb-6">
+                      <FileText className="h-5 w-5 text-primary" aria-hidden />
+                    </div>
+                    <h3 className="text-lg md:text-xl font-bold text-foreground mb-2 tracking-tight">Master Resume Editor</h3>
+                    <p className="text-on-surface-variant text-sm leading-relaxed">
+                      Edit your protected Typst master resume with WASM compilation and instant live preview.
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-mono text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5 rounded-[4px] border border-outline/60 bg-inset px-2 py-0.5">
+                        <BrandIcon name="typst" className="h-3 w-3 shrink-0" />
+                        <span>Typst</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 rounded-[4px] border border-outline/60 bg-inset px-2 py-0.5">
+                        <BrandIcon name="codemirror" className="h-3 w-3 shrink-0" />
+                        <span>CodeMirror</span>
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-muted-foreground text-xs leading-relaxed">
-                    Every proposed edit cites an `evidenceId` or surfaces an explicit Gap item.
-                  </p>
+                  <div className="mt-6 pt-4 border-t border-outline/70 flex items-center justify-between">
+                    <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant tabular-nums">
+                      {`${stats.hasMasterResume ? 1 : 0} MASTER RESUME`}
+                    </span>
+                    <Link className="text-primary font-mono text-xs md:text-sm flex items-center gap-1 hover:underline" href="/editor">
+                      Open <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                    </Link>
+                  </div>
                 </div>
-              </div>
-              <div className="mt-auto pt-4 border-t border-outline/70 flex items-center justify-between">
-                <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant tabular-nums">
-                  {`${stats.variantsCount} VARIANTS GENERATED`}
-                </span>
-                <Link className="bg-primary text-primary-foreground font-bold px-4 py-2 rounded-[6px] flex items-center gap-1.5 hover:opacity-95 transition-opacity text-xs md:text-sm" href="/tailor">
-                  Tailor Now
-                </Link>
-              </div>
-            </div>
 
-            {/* Card 4: AI Key Vault & Settings */}
-            <div className="bg-panel border border-outline/70 rounded-[10px] p-6 flex flex-col justify-between min-h-[260px] hover:border-outline transition-colors">
-              <div>
-                <div className="w-10 h-10 rounded-[6px] bg-inset border border-outline/70 flex items-center justify-center mb-6">
-                  <KeyRound className="h-5 w-5 text-on-surface-variant" aria-hidden />
+                {/* Card 2: Verified Evidence Bank */}
+                <div className="surface-raised card-lift edge-glow rounded-[10px] p-6 flex flex-col justify-between min-h-[260px]">
+                  <div>
+                    <div className="w-10 h-10 rounded-[6px] bg-inset border border-outline/70 flex items-center justify-center mb-6">
+                      <FolderOpen className="h-5 w-5 text-on-surface-variant" aria-hidden />
+                    </div>
+                    <h3 className="text-lg md:text-xl font-bold text-foreground mb-2 tracking-tight">Verified Evidence Bank</h3>
+                    <p className="text-on-surface-variant text-sm leading-relaxed">
+                      Central repository of career achievements, verified bullets, and skill inventory.
+                    </p>
+                  </div>
+                  <div className="mt-6 pt-4 border-t border-outline/70 flex items-center justify-between">
+                    <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant tabular-nums">
+                      {`${stats.evidenceCount} TOTAL ITEMS`}
+                    </span>
+                    <Link className="text-on-surface-variant hover:text-foreground font-mono text-xs md:text-sm flex items-center gap-1 transition-colors" href="/library">
+                      Open <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                    </Link>
+                  </div>
                 </div>
-                <h3 className="text-lg md:text-xl font-bold text-foreground mb-2 tracking-tight">AI Key Vault &amp; Settings</h3>
-                <p className="text-on-surface-variant text-sm leading-relaxed">
-                  Configure BYOK credentials (OpenAI, Anthropic, Gemini) encrypted in IndexedDB and relayed strictly on AI actions.
-                </p>
-              </div>
-              <div className="mt-6 pt-4 border-t border-outline/70 flex items-center justify-between">
-                <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant">INDEXEDDB VAULT</span>
-                <Link className="text-on-surface-variant hover:text-foreground font-mono text-xs md:text-sm flex items-center gap-1 transition-colors" href="/settings">
-                  Open <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-                </Link>
-              </div>
-            </div>
 
-            {/* Card 5: Job Application Tracker */}
-            <div className="bg-panel border border-outline/70 rounded-[10px] p-6 flex flex-col justify-between min-h-[260px] hover:border-outline transition-colors">
-              <div>
-                <div className="w-10 h-10 rounded-[6px] bg-inset border border-outline/70 flex items-center justify-center mb-6">
-                  <Briefcase className="h-5 w-5 text-primary" aria-hidden />
+                {/* Card 3: Tailor Engine & AI Gateway (Large 2-row span) */}
+                <div className="surface-raised card-lift edge-glow rounded-[10px] p-6 flex flex-col justify-between min-h-[260px] lg:col-span-1 md:col-span-2 lg:row-span-2">
+                  <div>
+                    <div className="w-10 h-10 rounded-[6px] bg-primary/10 border border-primary/30 flex items-center justify-center mb-6">
+                      <Settings className="h-5 w-5 text-primary" aria-hidden />
+                    </div>
+                    <h3 className="text-xl md:text-2xl font-bold text-foreground mb-3 tracking-tight">Tailor Engine &amp; AI Gateway</h3>
+                    <p className="text-on-surface-variant text-sm leading-relaxed mb-6">
+                      Map verified evidence to job descriptions and inspect atomic diffs before applying changes. Guest drafts stay in this browser; signed-in workspaces persist in hosted Postgres; AI calls relay only when triggered using your BYOK key.
+                    </p>
+                    <div className="bg-inset border border-outline/70 rounded-[6px] p-3.5 font-mono text-xs text-on-surface-variant space-y-1.5 mb-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-foreground font-semibold">Patch Contract</span>
+                        <span className="text-primary text-xs">Evidence-Cited</span>
+                      </div>
+                      <p className="text-muted-foreground text-xs leading-relaxed">
+                        Every proposed edit cites an `evidenceId` or surfaces an explicit Gap item.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5 rounded-[4px] border border-outline/60 bg-inset px-2 py-0.5">
+                        <BrandIcon name="postgresql" className="h-3 w-3 shrink-0" />
+                        <span>PostgreSQL</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 rounded-[4px] border border-outline/60 bg-inset px-2 py-0.5">
+                        <BrandIcon name="prisma" className="h-3 w-3 shrink-0" />
+                        <span>Prisma</span>
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-auto pt-4 border-t border-outline/70 flex items-center justify-between">
+                    <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant tabular-nums">
+                      {`${stats.variantsCount} VARIANTS GENERATED`}
+                    </span>
+                    <Link className="bg-primary text-primary-foreground font-bold px-4 py-2 rounded-[6px] flex items-center gap-1.5 hover:opacity-95 transition-opacity text-xs md:text-sm" href="/tailor">
+                      Tailor Now
+                    </Link>
+                  </div>
                 </div>
-                <h3 className="text-lg md:text-xl font-bold text-foreground mb-2 tracking-tight">Job Application Tracker</h3>
-                <p className="text-on-surface-variant text-sm leading-relaxed">
-                  Kanban &amp; list pipeline for tracking applications, interview notes, and status history.
-                </p>
+
+                {/* Card 4: AI Key Vault & Settings */}
+                <div className="surface-raised card-lift edge-glow rounded-[10px] p-6 flex flex-col justify-between min-h-[260px]">
+                  <div>
+                    <div className="w-10 h-10 rounded-[6px] bg-inset border border-outline/70 flex items-center justify-center mb-6">
+                      <KeyRound className="h-5 w-5 text-on-surface-variant" aria-hidden />
+                    </div>
+                    <h3 className="text-lg md:text-xl font-bold text-foreground mb-2 tracking-tight">AI Key Vault &amp; Settings</h3>
+                    <p className="text-on-surface-variant text-sm leading-relaxed">
+                      Configure BYOK credentials (OpenAI, Anthropic, Gemini) encrypted in IndexedDB and relayed strictly on AI actions.
+                    </p>
+                  </div>
+                  <div className="mt-6 pt-4 border-t border-outline/70 flex items-center justify-between">
+                    <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant">INDEXEDDB VAULT</span>
+                    <Link className="text-on-surface-variant hover:text-foreground font-mono text-xs md:text-sm flex items-center gap-1 transition-colors" href="/settings">
+                      Open <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Card 5: Job Application Tracker */}
+                <div className="surface-raised card-lift edge-glow rounded-[10px] p-6 flex flex-col justify-between min-h-[260px]">
+                  <div>
+                    <div className="w-10 h-10 rounded-[6px] bg-inset border border-outline/70 flex items-center justify-center mb-6">
+                      <Briefcase className="h-5 w-5 text-primary" aria-hidden />
+                    </div>
+                    <h3 className="text-lg md:text-xl font-bold text-foreground mb-2 tracking-tight">Job Application Tracker</h3>
+                    <p className="text-on-surface-variant text-sm leading-relaxed">
+                      Kanban &amp; list pipeline for tracking applications, interview notes, and status history.
+                    </p>
+                  </div>
+                  <div className="mt-6 pt-4 border-t border-outline/70 flex items-center justify-between">
+                    <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant tabular-nums">
+                      {`${stats.jobsCount} JOBS TRACKED`}
+                    </span>
+                    <Link className="text-primary font-mono text-xs md:text-sm flex items-center gap-1 hover:underline" href="/tracker">
+                      Open <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                    </Link>
+                  </div>
+                </div>
               </div>
-              <div className="mt-6 pt-4 border-t border-outline/70 flex items-center justify-between">
-                <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant tabular-nums">
-                  {`${stats.jobsCount} JOBS TRACKED`}
-                </span>
-                <Link className="text-primary font-mono text-xs md:text-sm flex items-center gap-1 hover:underline" href="/tracker">
-                  Open <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-                </Link>
-              </div>
-            </div>
+            </section>
+
+            {/* Phase: Instant ATS Sandbox Interactive Playground */}
+            <AtsSandboxSection />
+
+            {/* Phase: The Engineering Wedge Competitive Matrix */}
+            <CompetitiveMatrixSection />
           </div>
-        </section>
-
-        {/* Phase: Instant ATS Sandbox Interactive Playground */}
-        <AtsSandboxSection />
-
-        {/* Phase: The Engineering Wedge Competitive Matrix */}
-        <CompetitiveMatrixSection />
+        </div>
       </main>
 
       <LandingFooter />
-      {showClearConfirm ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="clear-master-title"
+      <Dialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+        <DialogContent
+          className="max-w-sm border-outline bg-elevated p-5"
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            cancelClearBtnRef.current?.focus();
+          }}
         >
-          <div className="w-full max-w-sm rounded-[10px] border border-outline bg-elevated p-5 shadow-2xl">
-            <h2 id="clear-master-title" className="text-base font-semibold text-foreground">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-base font-semibold text-foreground">
               Clear master resume?
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
               This removes master status from the current resume. You can save a new master from the editor.
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowClearConfirm(false)}
-                className="rounded-[6px] border border-outline px-3 py-2 text-sm text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={isClearingMaster}
-                onClick={handleClearMaster}
-                className="rounded-[6px] bg-status-danger px-3 py-2 text-sm font-semibold text-white hover:bg-status-danger/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-              >
-                {isClearingMaster ? "Clearing…" : "Clear Master"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-2 gap-2 sm:justify-end">
+            <button
+              ref={cancelClearBtnRef}
+              type="button"
+              onClick={() => setShowClearConfirm(false)}
+              className="rounded-[6px] border border-outline px-3 py-2 text-sm text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-elevated"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isClearingMaster}
+              onClick={handleClearMaster}
+              className="rounded-[6px] bg-status-danger px-3 py-2 text-sm font-semibold text-accent-ink hover:bg-status-danger/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-elevated disabled:opacity-50"
+            >
+              {isClearingMaster ? "Clearing…" : "Clear Master"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

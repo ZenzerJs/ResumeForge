@@ -23,6 +23,14 @@ interface OutcomePayload {
 
 const FUNNEL = ["SAVED", "APPLIED", "INTERVIEWING", "OFFER", "REJECTED"] as const;
 
+const STAGE_TOP_RULE: Record<(typeof FUNNEL)[number], string> = {
+  SAVED: "border-t-2 border-t-text-muted/70",
+  APPLIED: "border-t-2 border-t-ember",
+  INTERVIEWING: "border-t-2 border-t-signal",
+  OFFER: "border-t-2 border-t-primary",
+  REJECTED: "border-t-2 border-t-status-danger",
+};
+
 export function OutcomesPanel() {
   const [guest, setGuest] = useState(false);
   const [data, setData] = useState<OutcomePayload | null>(null);
@@ -46,30 +54,49 @@ export function OutcomesPanel() {
       <TrackerSubNav />
       <div className="mx-auto w-full max-w-4xl space-y-6 p-4">
         <div>
-          <h2 className="text-lg font-semibold text-slate-100">Pipeline outcomes</h2>
-          <p className="text-xs text-slate-400">Counts are yours only. Shared job listings stay SAVED for everyone else.</p>
+          <h2 className="text-lg font-semibold text-foreground">Pipeline outcomes</h2>
+          <p className="text-xs text-muted-foreground">Counts are yours only. Shared job listings stay SAVED for everyone else.</p>
         </div>
 
         {guest && (
-          <p className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-300">
-            <Link href="/login" className="text-amber-400 underline">Sign in</Link> to see which resume variants get interviews.
+          <p className="rounded-lg surface-raised px-4 py-3 text-sm text-text-secondary">
+            <Link href="/login" className="text-primary underline">Sign in</Link> to see which resume variants get interviews.
           </p>
         )}
 
         {!guest && data && totalTracked === 0 && (
-          <p className="rounded-lg border border-slate-800 px-4 py-3 text-sm text-slate-400">No applications yet. Mark a job Applied in the tracker.</p>
+          <p className="rounded-lg surface-raised px-4 py-3 text-sm text-muted-foreground">No applications yet. Mark a job Applied in the tracker.</p>
         )}
 
         {data && totalTracked > 0 && (
           <>
-            <section className="space-y-2" data-testid="outcome-funnel">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5" data-testid="outcome-stage-tiles">
+              {FUNNEL.map((status) => {
+                const count = data.funnel[status] ?? 0;
+                return (
+                  <div
+                    key={status}
+                    className={`rounded-xl surface-raised ${STAGE_TOP_RULE[status]} p-3.5`}
+                  >
+                    <div className="font-mono text-[10px] font-semibold uppercase tracking-wider text-text-secondary">
+                      {status}
+                    </div>
+                    <div className="mt-1 text-2xl font-bold tabular-nums text-foreground">
+                      {count}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <section className="space-y-2 rounded-xl surface-raised p-5" data-testid="outcome-funnel">
               {FUNNEL.map((status) => {
                 const count = data.funnel[status] ?? 0;
                 return (
                   <div key={status} className="grid grid-cols-[8rem_1fr_2rem] items-center gap-2 text-xs">
-                    <span className="text-slate-300">{status}</span>
-                    <div className="h-2 rounded bg-slate-800">
-                      <div className="h-2 rounded bg-amber-500" style={{ width: `${(count / max) * 100}%` }} />
+                    <span className="text-text-secondary">{status}</span>
+                    <div className="h-2 rounded bg-elevated">
+                      <div className="h-2 rounded bg-primary" style={{ width: `${(count / max) * 100}%` }} />
                     </div>
                     <span className="text-right font-mono tabular-nums text-foreground">{count}</span>
                   </div>
@@ -83,7 +110,7 @@ export function OutcomesPanel() {
               </p>
             </section>
 
-            <section className="overflow-x-auto" data-testid="outcome-variants">
+            <section className="overflow-x-auto rounded-xl surface-raised p-4" data-testid="outcome-variants">
               <table className="w-full text-left text-xs text-on-surface-variant">
                 <thead className="text-muted-foreground">
                   <tr>

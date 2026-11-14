@@ -3,7 +3,16 @@
 import React, { useEffect, useState } from "react";
 import { ALL_QUESTIONS, COMPANY_LOGOS } from "../../lib/interview/questionDatabase";
 import { InterviewQuestion, InterviewTrack } from "../../lib/schema/interviewPrep";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 import { CompanyBadge, getCompanyLogo } from "./company-logos";
+import { BrandIcon, hasBrandIcon } from "../design-system/brand-icon";
 
 export interface InterviewHubProps {
   onSolveInRunner?: (slug: string) => void;
@@ -148,7 +157,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
         {filteredQuestions.map(q => (
           <div 
             key={q.id} 
-            className="group flex flex-col justify-between rounded-[10px] border border-border bg-card p-4 text-foreground transition-colors hover:border-outline cursor-pointer [content-visibility:auto] [contain-intrinsic-size:auto_132px]"
+            className="group flex flex-col justify-between rounded-[10px] surface-raised card-lift p-4 text-foreground cursor-pointer [content-visibility:auto] [contain-intrinsic-size:auto_132px]"
             onClick={() => setSelectedQuestion(q)}
           >
             <div>
@@ -161,7 +170,10 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                 </span>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
-                <span className="font-semibold text-on-surface-variant">{q.category}</span>
+                <span className="inline-flex items-center gap-1.5 font-semibold text-on-surface-variant">
+                  {hasBrandIcon(q.category) && <BrandIcon name={q.category} className="h-3.5 w-3.5 shrink-0" />}
+                  {q.category}
+                </span>
                 <span>•</span>
                 <span>{q.sourceSet}</span>
               </div>
@@ -171,12 +183,13 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
               <div className="flex flex-wrap gap-1.5">
                 {q.companyTags.map(tag => {
                   const comp = COMPANY_LOGOS.find(c => c.slug === tag);
+                  const logo = getCompanyLogo(tag, "w-3 h-3 flex-shrink-0 grayscale");
                   return (
                     <span 
                       key={tag} 
                       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-[11px] text-on-surface-variant"
                     >
-                      {getCompanyLogo(tag, "w-3 h-3 flex-shrink-0 grayscale")}
+                      {logo ?? (hasBrandIcon(tag) ? <BrandIcon name={tag} className="h-3 w-3 shrink-0" /> : null)}
                       <span>{comp?.name || tag}</span>
                     </span>
                   );
@@ -206,38 +219,43 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
       )}
 
       {/* Problem Detail Modal */}
-      {selectedQuestion && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm animate-in fade-in duration-150"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setSelectedQuestion(null);
-          }}
+      <Dialog
+        open={Boolean(selectedQuestion)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedQuestion(null);
+        }}
+      >
+        <DialogContent
+          hideCloseButton
+          className="w-full max-w-2xl max-h-[90dvh] space-y-5 overflow-y-auto overscroll-contain rounded-[10px] border-hairline bg-panel p-6 text-foreground shadow-2xl"
         >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="question-modal-title"
-            className="w-full max-w-2xl max-h-[90vh] space-y-5 overflow-y-auto overscroll-contain rounded-[10px] border border-outline/70 bg-card p-6 text-foreground shadow-2xl"
-          >
-            <div className="flex justify-between items-start gap-4 border-b border-border pb-4">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${getDifficultyBadgeColor(selectedQuestion.difficulty)}`}>
-                    {selectedQuestion.difficulty}
-                  </span>
-                  <span className="text-xs text-muted-foreground">• {selectedQuestion.category}</span>
+          {selectedQuestion ? (
+            <>
+              <DialogHeader className="flex flex-row items-start justify-between gap-4 space-y-0 border-b border-hairline pb-4 text-left">
+                <div>
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${getDifficultyBadgeColor(selectedQuestion.difficulty)}`}>
+                      {selectedQuestion.difficulty}
+                    </span>
+                    <span className="text-xs text-muted-foreground">• {selectedQuestion.category}</span>
+                  </div>
+                  <DialogTitle className="text-xl font-bold text-foreground text-balance md:text-2xl">
+                    {selectedQuestion.title}
+                  </DialogTitle>
+                  <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
+                    {selectedQuestion.sourceSet}
+                  </DialogDescription>
                 </div>
-                <h2 id="question-modal-title" className="text-xl md:text-2xl font-bold text-foreground text-balance">{selectedQuestion.title}</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">{selectedQuestion.sourceSet}</p>
-              </div>
-              <button 
-                onClick={() => setSelectedQuestion(null)}
-                className="p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground rounded-[6px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                aria-label="Close modal"
-              >
-                ✕
-              </button>
-            </div>
+                <DialogClose asChild>
+                  <button
+                    type="button"
+                    className="rounded-[6px] p-1.5 text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    aria-label="Close modal"
+                  >
+                    ✕
+                  </button>
+                </DialogClose>
+              </DialogHeader>
             
             {/* Associated Companies with SVG Badges */}
             <div>
@@ -301,30 +319,26 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-2 border-t border-border">
-              {onSolveInRunner && selectedQuestion.track === "algorithms" ? (
+            {onSolveInRunner && selectedQuestion.track === "algorithms" ? (
+              <div className="flex items-center justify-start border-t border-hairline pt-2">
                 <button
+                  type="button"
                   onClick={() => {
                     const slug = selectedQuestion.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
                     setSelectedQuestion(null);
                     onSolveInRunner(slug);
                   }}
-                  className="px-3.5 py-2 bg-primary/10 hover:bg-primary/20 text-primary font-semibold text-xs rounded-[6px] border border-primary/30 transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  className="flex items-center gap-1.5 rounded-[6px] border border-primary/30 bg-primary/10 px-3.5 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   <span>Solve in Code Runner</span>
                   <span>&rarr;</span>
                 </button>
-              ) : <div />}
-              <button
-                onClick={() => setSelectedQuestion(null)}
-                className="px-4 py-2 bg-primary text-primary-foreground font-semibold text-xs rounded-[6px] hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              </div>
+            ) : null}
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

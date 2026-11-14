@@ -43,34 +43,41 @@ test("workspace themes, navigation reset, and real local logos", async ({ page, 
     const header = getComputedStyle(document.querySelector("header")!).backgroundColor;
     return { bodyBg, bodyFg, canvas, panel, elevated, card, input, header };
   });
-  expect(colors.canvas).toBe("21 24 26");
-  expect(colors.panel).toBe("28 32 35");
-  expect(colors.elevated).toBe("37 42 45");
-  expect(colors.bodyBg).toBe("rgb(21, 24, 26)");
-  expect(colors.bodyFg).toBe("rgb(237, 239, 237)");
-  expect(colors.card).toBe("rgb(28, 32, 35)");
+  expect(colors.canvas).toBe("18 16 16");
+  expect(colors.panel).toBe("27 23 22");
+  expect(colors.elevated).toBe("39 33 32");
+  expect(colors.bodyBg).toBe("rgb(18, 16, 16)");
+  expect(colors.bodyFg).toBe("rgb(244, 238, 231)");
+  expect(colors.card).toBe("rgb(27, 23, 22)");
   expect(colors.card).not.toBe(colors.input);
-  expect(colors.header).toContain("rgba(21, 24, 26, 0.9");
+  expect(colors.header).toContain("rgba(18, 16, 16, 0.9");
   await shot(page, "jobs-desktop.png");
   expect(external).toEqual([]);
   for (const [route, name] of [["/library", "library"], ["/settings", "settings"], ["/editor", "editor"], ["/tailor", "tailor"]]) {
     await page.goto(route);
     await expect(page.locator("[data-workspace-theme]")).toHaveCount(1);
     const routeBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    expect(routeBg).toBe("rgb(21, 24, 26)");
+    expect(routeBg).toBe("rgb(18, 16, 16)");
     await shot(page, `${name}-desktop.png`);
   }
   await page.goto("/"); await expect(page.locator("[data-workspace-theme]")).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   const home = await page.evaluate(async () => {
+    const root = getComputedStyle(document.documentElement);
+    const sans = root.getPropertyValue("--font-hanken").trim().split(",")[0].trim();
+    const mono = root.getPropertyValue("--font-mono").trim().split(",")[0].trim();
+    await Promise.all([
+      document.fonts.load(`400 16px ${sans}`),
+      document.fonts.load(`700 16px ${sans}`),
+      document.fonts.load(`400 14px ${mono}`),
+      document.fonts.load(`600 14px ${mono}`),
+    ]);
     await document.fonts.ready;
     const bodyBg = getComputedStyle(document.body).backgroundColor;
     const probes = ["bg-card", "bg-muted", "bg-rf-surface", "bg-popover", "bg-background", "bg-muted/50", "bg-rf-bg/90"].map(name => {
       const node = document.createElement("span"); node.className = name; document.body.appendChild(node);
       const color = getComputedStyle(node).backgroundColor; node.remove(); return color;
     });
-    const root = getComputedStyle(document.documentElement);
-    const sans = root.getPropertyValue("--font-hanken").trim().split(",")[0].trim();
-    const mono = root.getPropertyValue("--font-mono").trim().split(",")[0].trim();
     return {
       bodyBg,
       probes,
@@ -78,15 +85,15 @@ test("workspace themes, navigation reset, and real local logos", async ({ page, 
       monoLoaded: document.fonts.check(`400 14px ${mono}`) && document.fonts.check(`600 14px ${mono}`),
     };
   });
-  expect(home.bodyBg).toBe("rgb(21, 24, 26)");
+  expect(home.bodyBg).toBe("rgb(18, 16, 16)");
   expect(home.probes).toEqual([
-    "rgb(28, 32, 35)",
-    "rgb(37, 42, 45)",
-    "rgb(28, 32, 35)",
-    "rgb(37, 42, 45)",
-    "rgb(21, 24, 26)",
-    "rgba(37, 42, 45, 0.5)",
-    "rgba(21, 24, 26, 0.9)",
+    "rgb(27, 23, 22)",
+    "rgb(39, 33, 32)",
+    "rgb(27, 23, 22)",
+    "rgb(39, 33, 32)",
+    "rgb(18, 16, 16)",
+    "rgba(39, 33, 32, 0.5)",
+    "rgba(18, 16, 16, 0.9)",
   ]);
   expect(home.sansLoaded).toBe(true);
   expect(home.monoLoaded).toBe(true);
@@ -108,8 +115,8 @@ test("score shows weighted factors and accessible popover", async ({ page }) => 
     const cs = getComputedStyle(e);
     return { bg: cs.backgroundColor, color: cs.color };
   });
-  expect(popoverStyles.bg).toBe("rgb(37, 42, 45)");
-  expect(popoverStyles.color).toBe("rgb(237, 239, 237)");
+  expect(popoverStyles.bg).toBe("rgb(39, 33, 32)");
+  expect(popoverStyles.color).toBe("rgb(244, 238, 231)");
   await shot(page, "score-popover.png");
   const circle = dial.locator("circle").first(); expect(Number(await circle.getAttribute("stroke-width"))).toBeGreaterThanOrEqual(2.5); expect(Number(await circle.getAttribute("stroke-width"))).toBeLessThanOrEqual(4);
   await page.keyboard.press("Escape"); await expect(popover).not.toBeVisible();

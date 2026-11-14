@@ -38,6 +38,8 @@ export function mergeAndMarkAcceptedPatches(
   return markDocumentAsPatched(mergedContent);
 }
 
+export type PatchDecision = "pending" | "accepted" | "rejected";
+
 interface PatchDiffReviewProps {
   verified: PatchProposal[];
   rejected: RejectedPatch[];
@@ -49,15 +51,17 @@ interface PatchDiffReviewProps {
   localBaseTypstSource?: string | null;
   localStorageSourceKey?: string;
   masterFactsSnapshot: ResumeFacts | null;
+  decisions?: Record<string, PatchDecision>;
+  onDecisionsChange?: React.Dispatch<React.SetStateAction<Record<string, PatchDecision>>>;
+  acknowledgedSkills?: Set<string>;
+  onAcknowledgedSkillsChange?: React.Dispatch<React.SetStateAction<Set<string>>>;
   onApplySuccess?: (variantId: string, mergedContent: string) => void;
 }
-
-type PatchDecision = "pending" | "accepted" | "rejected";
 
 const SEVERITY_STYLES: Record<string, { bg: string; border: string; text: string; icon: string }> = {
   CRITICAL: { bg: "bg-red-950/60", border: "border-red-800/60", text: "text-red-300", icon: "text-red-400" },
   MODERATE: { bg: "bg-amber-950/60", border: "border-amber-800/60", text: "text-amber-300", icon: "text-amber-400" },
-  MINOR: { bg: "bg-slate-800/60", border: "border-slate-700/60", text: "text-slate-300", icon: "text-slate-400" },
+  MINOR: { bg: "bg-elevated/80", border: "border-hairline", text: "text-text-secondary", icon: "text-muted-foreground" },
 };
 
 const OPERATION_STYLES: Record<string, { bg: string; text: string }> = {
@@ -87,22 +91,30 @@ export function PatchDiffReview({
   localBaseTypstSource,
   localStorageSourceKey = "resumeforge_typst_source",
   masterFactsSnapshot,
+  decisions: controlledDecisions,
+  onDecisionsChange,
+  acknowledgedSkills: controlledAcknowledgedSkills,
+  onAcknowledgedSkillsChange,
   onApplySuccess,
 }: PatchDiffReviewProps) {
-  const [decisions, setDecisions] = useState<Record<string, PatchDecision>>(() => {
+  const [internalDecisions, setInternalDecisions] = useState<Record<string, PatchDecision>>(() => {
     const initial: Record<string, PatchDecision> = {};
     for (const patch of verified) {
       initial[patch.id] = "pending";
     }
     return initial;
   });
+  const decisions = controlledDecisions ?? internalDecisions;
+  const setDecisions = onDecisionsChange ?? setInternalDecisions;
 
   const [selectedPatch, setSelectedPatch] = useState<string | null>(null);
   const [isApplying, setIsApplying] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [applySuccess, setApplySuccess] = useState<string | null>(null);
   const [createdVariantId, setCreatedVariantId] = useState<string | null>(null);
-  const [acknowledgedSkills, setAcknowledgedSkills] = useState<Set<string>>(new Set());
+  const [internalAcknowledgedSkills, setInternalAcknowledgedSkills] = useState<Set<string>>(new Set());
+  const acknowledgedSkills = controlledAcknowledgedSkills ?? internalAcknowledgedSkills;
+  const setAcknowledgedSkills = onAcknowledgedSkillsChange ?? setInternalAcknowledgedSkills;
 
   const acceptedPatches = verified.filter((p) => decisions[p.id] === "accepted");
   const rejectedByUser = verified.filter((p) => decisions[p.id] === "rejected");
@@ -268,7 +280,7 @@ export function PatchDiffReview({
   return (
     <div className="space-y-6" data-testid="patch-diff-review">
       {/* Summary Bar */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
+      <div className="bg-panel border border-hairline rounded-xl p-4 flex items-center justify-between">
         <div className="flex items-center gap-4 text-xs">
           <span className="text-emerald-300 font-medium">
             ✓ {verified.length} verified patches
@@ -341,8 +353,8 @@ export function PatchDiffReview({
                     {gap.requirement}
                   </span>
                 </div>
-                <p className="text-xs text-slate-300 flex items-start gap-2">
-                  <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-slate-400" />
+                <p className="text-xs text-text-secondary flex items-start gap-2">
+                  <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-muted-foreground" />
                   {gap.recommendation}
                 </p>
               </div>
@@ -358,7 +370,7 @@ export function PatchDiffReview({
             <ShieldAlert className="h-4 w-4" />
             Rejected Patches — Invalid Citations ({rejected.length})
           </h3>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-muted-foreground">
             These patches were rejected because they cited evidence IDs that do not exist in the active Evidence Bank.
             This prevents AI hallucination from reaching your resume.
           </p>
@@ -380,14 +392,14 @@ export function PatchDiffReview({
               </div>
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
-                  <span className="text-slate-500 text-[10px] uppercase">Before</span>
-                  <div className="text-slate-400 bg-slate-950/50 rounded p-2 mt-1 font-mono">
+                  <span className="text-muted-foreground text-[10px] uppercase">Before</span>
+                  <div className="text-text-secondary bg-inset rounded p-2 mt-1 font-mono">
                     {item.patch.before || "(empty)"}
                   </div>
                 </div>
                 <div>
-                  <span className="text-slate-500 text-[10px] uppercase">After (Rejected)</span>
-                  <div className="text-red-300/60 bg-slate-950/50 rounded p-2 mt-1 font-mono line-through">
+                  <span className="text-muted-foreground text-[10px] uppercase">After (Rejected)</span>
+                  <div className="text-red-300/60 bg-inset rounded p-2 mt-1 font-mono line-through">
                     {item.patch.after || "(empty)"}
                   </div>
                 </div>
@@ -403,14 +415,14 @@ export function PatchDiffReview({
           <h3 className="text-sm font-semibold text-emerald-300 flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4" />
             Proposed Changes ({verified.length})
-            <span className="text-xs font-normal text-slate-400 ml-2">
+            <span className="text-xs font-normal text-muted-foreground ml-2">
               {acceptedPatches.length} accepted · {rejectedByUser.length} rejected · {pendingPatches.length} pending
             </span>
           </h3>
 
           {verified.map((patch, patchIndex) => {
             const decision = decisions[patch.id];
-            const opStyle = OPERATION_STYLES[patch.operation] || { bg: "bg-slate-800", text: "text-slate-300" };
+            const opStyle = OPERATION_STYLES[patch.operation] || { bg: "bg-elevated", text: "text-text-secondary" };
 
             return (
               <div
@@ -421,7 +433,7 @@ export function PatchDiffReview({
                     ? "bg-emerald-950/20 border-emerald-800/50"
                     : decision === "rejected"
                     ? "bg-red-950/10 border-red-900/30 opacity-60"
-                    : "bg-slate-900 border-slate-800"
+                    : "bg-panel border-hairline"
                 }`}
               >
                 {/* Header */}
@@ -430,8 +442,8 @@ export function PatchDiffReview({
                     <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${opStyle.bg} ${opStyle.text} border border-current/20`}>
                       {patch.operation.replace(/_/g, " ")}
                     </span>
-                    <button type="button" onClick={() => setSelectedPatch(patch.id)} aria-pressed={selectedPatch === patch.id} className="text-xs text-slate-300 font-medium underline">{patchIndex + 1}. {patch.targetSection}</button>
-                    <span className="text-[10px] text-slate-500 font-mono">
+                    <button type="button" onClick={() => setSelectedPatch(patch.id)} aria-pressed={selectedPatch === patch.id} className="text-xs text-text-secondary font-medium underline">{patchIndex + 1}. {patch.targetSection}</button>
+                    <span className="text-[10px] text-muted-foreground font-mono">
                       Confidence: {Math.round(patch.confidence * 100)}%
                     </span>
                   </div>
@@ -443,7 +455,7 @@ export function PatchDiffReview({
                       className={`p-1.5 rounded-md transition ${
                         decision === "accepted"
                           ? "bg-emerald-600 text-white"
-                          : "bg-slate-800 hover:bg-emerald-900/60 text-slate-400 hover:text-emerald-300"
+                          : "bg-elevated hover:bg-emerald-900/60 text-muted-foreground hover:text-emerald-300"
                       }`}
                       title="Accept patch"
                       aria-label={`Accept suggestion ${patchIndex + 1}`}
@@ -458,7 +470,7 @@ export function PatchDiffReview({
                       className={`p-1.5 rounded-md transition ${
                         decision === "rejected"
                           ? "bg-red-600 text-white"
-                          : "bg-slate-800 hover:bg-red-900/60 text-slate-400 hover:text-red-300"
+                          : "bg-elevated hover:bg-red-900/60 text-muted-foreground hover:text-red-300"
                       }`}
                       title="Reject patch"
                       aria-label={`Reject suggestion ${patchIndex + 1}`}
@@ -472,13 +484,13 @@ export function PatchDiffReview({
                 {/* Side-by-side diff */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <span className="text-[10px] uppercase text-slate-500 font-semibold">Before</span>
-                    <div className="text-xs text-slate-300 bg-red-950/20 border border-red-900/30 rounded-lg p-3 mt-1 font-mono whitespace-pre-wrap">
+                    <span className="text-[10px] uppercase text-muted-foreground font-semibold">Before</span>
+                    <div className="text-xs text-text-secondary bg-red-950/20 border border-red-900/30 rounded-lg p-3 mt-1 font-mono whitespace-pre-wrap">
                       {patch.before || "(empty)"}
                     </div>
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase text-slate-500 font-semibold">After</span>
+                    <span className="text-[10px] uppercase text-muted-foreground font-semibold">After</span>
                     <div className="text-xs text-emerald-200 bg-emerald-950/20 border border-emerald-900/30 rounded-lg p-3 mt-1 font-mono whitespace-pre-wrap">
                       {patch.after || "(empty)"}
                     </div>
@@ -486,14 +498,14 @@ export function PatchDiffReview({
                 </div>
 
                 {/* Rationale */}
-                <p className="text-xs text-slate-400 flex items-start gap-2">
-                  <ArrowRight className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-400" />
+                <p className="text-xs text-muted-foreground flex items-start gap-2">
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" />
                   {patch.rationale}
                 </p>
 
                 {/* Evidence Citations */}
                 <div className="flex flex-wrap gap-1.5">
-                  <span className="text-[10px] text-slate-500 uppercase font-semibold mr-1">Evidence:</span>
+                  <span className="text-[10px] text-muted-foreground uppercase font-semibold mr-1">Evidence:</span>
                   {patch.evidenceIds.map((eid) => (
                     <span
                       key={eid}
@@ -521,7 +533,7 @@ export function PatchDiffReview({
                 <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
                 <span>Acknowledge unverified skills before applying</span>
               </div>
-              <p className="text-[11px] text-slate-300">
+              <p className="text-[11px] text-text-secondary">
                 Only add skills if you have real experience; log them in your Evidence Bank first, or check below to confirm you have real experience with each skill:
               </p>
               <div className="space-y-1.5 pt-1">
@@ -535,7 +547,7 @@ export function PatchDiffReview({
                       checked={acknowledgedSkills.has(skill)}
                       onChange={() => toggleSkillAck(skill)}
                       data-testid={`ack-skill-checkbox-${skill}`}
-                      className="rounded border-amber-600 bg-slate-900 text-amber-500 focus:ring-amber-500"
+                      className="rounded border-amber-600 bg-inset text-amber-500 focus:ring-amber-500"
                     />
                     <span>I have real experience with <strong>{skill}</strong></span>
                   </label>
@@ -562,8 +574,8 @@ export function PatchDiffReview({
               <div className="flex items-center gap-2.5">
                 <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
                 <div>
-                  <span className="font-semibold block text-white">{applySuccess}</span>
-                  <span className="text-[11px] text-slate-300">
+                  <span className="font-semibold block text-foreground">{applySuccess}</span>
+                  <span className="text-[11px] text-text-secondary">
                     {localOnly
                       ? "Your tailored draft is saved in this browser. Open the editor to continue editing."
                       : "Your tailored variant is saved to the database. Edit and compile it live in the editor."}
@@ -589,7 +601,7 @@ export function PatchDiffReview({
             onClick={handleApplyAccepted}
             disabled={isApplying || acceptedPatches.length === 0}
             data-testid="apply-patches-btn"
-            className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-semibold text-sm px-6 py-3 rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition"
+            className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground font-semibold text-sm px-6 py-3 rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition"
           >
             {isApplying ? (
               <>
@@ -610,7 +622,7 @@ export function PatchDiffReview({
 
       {/* Empty state */}
       {verified.length === 0 && rejected.length === 0 && gaps.length === 0 && (
-        <div className="text-center py-12 text-slate-500 text-xs">
+        <div className="text-center py-12 text-muted-foreground text-xs">
           No patch proposals generated yet.
         </div>
       )}

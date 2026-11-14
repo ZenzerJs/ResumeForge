@@ -33,7 +33,7 @@ export function FitPercentageDial({ compositeScore, breakdown, size = 120, showL
               <circle className="text-muted stroke-current" strokeWidth={strokeWidth} fill="none" r={radius} cx={size / 2} cy={size / 2} />
               {score !== null && (
                 <circle
-                  className="text-primary stroke-current"
+                  className={`${score >= 70 ? "text-signal" : "text-primary"} stroke-current`}
                   strokeWidth={strokeWidth}
                   strokeDasharray={circumference}
                   strokeDashoffset={offset}
@@ -67,7 +67,7 @@ export function FitPercentageDial({ compositeScore, breakdown, size = 120, showL
                 </div>
                 {value !== null && (
                   <div role="progressbar" aria-label={factor} aria-valuemin={0} aria-valuemax={100} aria-valuenow={value} className="h-1.5 w-full rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-primary" style={{ width: `${value}%` }} />
+                    <div className={`h-full rounded-full ${value >= 70 ? "bg-signal" : "bg-primary"}`} style={{ width: `${value}%` }} />
                   </div>
                 )}
               </div>

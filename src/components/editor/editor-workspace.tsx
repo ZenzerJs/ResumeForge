@@ -39,6 +39,7 @@ import {
   stripPatchedDocumentMarker,
 } from "@/lib/guardrail/policy";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AppShell } from "@/components/design-system/app-shell";
 import { clearDemoSamplesForPersonalResume, getDemoContextFromBrowser, initializeDemoSamples } from "@/lib/demo-client";
 import { EditorWorkspaceSkeleton } from "@/components/editor/editor-workspace-skeleton";
@@ -100,6 +101,10 @@ export function EditorWorkspace() {
 
   // Task 7.9: Save as Master + Revert & Undo safety state
   const [showSaveConfirm, setShowSaveConfirm] = useState<boolean>(false);
+  const [pendingRevertDoc, setPendingRevertDoc] = useState<{
+    id: string | null;
+    title: string;
+  } | null>(null);
   const [lastSnapshotId, setLastSnapshotId] = useState<string | null>(null);
   const [isUndoing, setIsUndoing] = useState<boolean>(false);
   const [undoSuccess, setUndoSuccess] = useState<boolean>(false);
@@ -741,12 +746,21 @@ export function EditorWorkspace() {
     }
   };
 
-  const handleRevertToMaster = async () => {
-    if (!confirm("Revert live editor buffer to the persisted Master Resume? Any unsaved edits in this buffer will be discarded.")) {
+  const handleRevertToMaster = () => {
+    setPendingRevertDoc({
+      id: docMetadata.id ?? null,
+      title: docMetadata.title || "current document",
+    });
+  };
+
+  const performRevertToMaster = async (expectedDocId: string | null) => {
+    if ((docMetadata.id ?? null) !== expectedDocId) {
+      setPendingRevertDoc(null);
       return;
     }
     await loadCanonicalDocument();
     setLastSnapshotId(null);
+    setPendingRevertDoc(null);
   };
 
   const handleUndoOverwrite = async () => {
@@ -1036,7 +1050,7 @@ export function EditorWorkspace() {
             onClick={handleUndoOverwrite}
             disabled={isUndoing}
             data-testid="undo-overwrite-btn"
-            className="flex items-center gap-1.5 px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded text-xs font-semibold transition"
+            className="flex items-center gap-1.5 px-3 py-1 bg-primary hover:bg-primary/90 text-primary-foreground rounded text-xs font-semibold transition"
           >
             {isUndoing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Undo2 className="h-3.5 w-3.5" />}
             Undo Overwrite
@@ -1261,6 +1275,27 @@ export function EditorWorkspace() {
           </div>
         </AiAssistantWindow>
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingRevertDoc)}
+        onOpenChange={(open) => {
+          if (!open) setPendingRevertDoc(null);
+        }}
+        title="Revert to Master Resume"
+        description={
+          pendingRevertDoc
+            ? `Revert "${pendingRevertDoc.title}" to the persisted Master Resume? Any unsaved edits in this live buffer will be discarded.`
+            : ""
+        }
+        confirmLabel="Revert Buffer"
+        tone="destructive"
+        dialogTestId="revert-master-confirm-modal"
+        confirmTestId="confirm-revert-master-btn"
+        cancelTestId="cancel-revert-master-btn"
+        onConfirm={() =>
+          performRevertToMaster(pendingRevertDoc?.id ?? null)
+        }
+      />
     </AppShell>
   );
 }

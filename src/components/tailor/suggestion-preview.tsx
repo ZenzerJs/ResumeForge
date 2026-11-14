@@ -417,13 +417,13 @@ export function SuggestionPreview({
   const selectedPatch = patches.find((patch) => patch.id === selected);
   return (
     <section
-      className="space-y-3 rounded-xl border border-slate-700 bg-slate-900 p-3"
+      className="space-y-3 rounded-xl border border-hairline bg-panel p-3"
       aria-label="Resume suggestion preview"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-white">Review on resume</h3>
-          <p className="text-xs text-slate-400">
+          <h3 className="text-sm font-semibold text-foreground">Review on resume</h3>
+          <p className="text-xs text-muted-foreground">
             Suggested is a temporary preview; applying creates the saved result.
           </p>
         </div>
@@ -434,7 +434,7 @@ export function SuggestionPreview({
               type="button"
               aria-pressed={view === option}
               onClick={() => setView(option)}
-              className={`rounded px-3 py-2 text-xs ${view === option ? "bg-amber-400 text-slate-950" : "bg-slate-800 text-slate-200"}`}
+              className={`rounded px-3 py-2 text-xs ${view === option ? "bg-primary text-primary-foreground font-semibold" : "bg-elevated text-text-secondary"}`}
             >
               {option === "original" ? "Original" : "Suggested"}
             </button>
@@ -448,7 +448,7 @@ export function SuggestionPreview({
         </p>
       ) : null}
       {!active || active.pages === null ? (
-        <p role="status" className="text-xs text-slate-300">
+        <p role="status" className="text-xs text-text-secondary">
           Compiling and locating suggestions…
         </p>
       ) : active.error ? (
@@ -485,7 +485,7 @@ export function SuggestionPreview({
                           type="button"
                           aria-label={`Review suggestion ${patchIndex + 1}, ${decisions[patch.id] || "pending"}`}
                           onClick={() => onSelect(patch.id)}
-                          className={`absolute z-10 flex h-7 min-w-7 -translate-y-1/2 items-center justify-center rounded-full border px-1 text-xs font-bold text-slate-950 shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 ${decisions[patch.id] === "accepted" ? "border-emerald-800 bg-emerald-300" : decisions[patch.id] === "rejected" ? "border-red-800 bg-red-300" : "border-amber-700 bg-amber-300"}`}
+                          className={`absolute z-10 flex h-7 min-w-7 -translate-y-1/2 items-center justify-center rounded-full border px-1 text-xs font-bold text-primary-foreground shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 ${decisions[patch.id] === "accepted" ? "border-emerald-800 bg-emerald-300" : decisions[patch.id] === "rejected" ? "border-red-800 bg-red-300" : "border-amber-700 bg-amber-300"}`}
                           style={{
                             left: `max(0px, calc(${location.left}% - 34px))`,
                             top: `${location.top}%`,
@@ -502,7 +502,7 @@ export function SuggestionPreview({
         </div>
       )}
       {active && active.pages !== null && !active.error && (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-muted-foreground">
           {active.isProbing
             ? "Locating suggestions on preview…"
             : `${patches.filter((patch) => !active.locations[patch.id]).length} suggestion(s) have no verified location in this view; use the review list below.`}
@@ -511,7 +511,7 @@ export function SuggestionPreview({
       {selectedPatch && (
         <div
           ref={detailRef}
-          className="space-y-2 rounded-lg border border-amber-700/50 bg-slate-950 p-3 text-xs text-slate-200"
+          className="space-y-2 rounded-lg border border-amber-700/50 bg-inset p-3 text-xs text-foreground"
           aria-live="polite"
         >
           <p className="font-semibold text-amber-300">

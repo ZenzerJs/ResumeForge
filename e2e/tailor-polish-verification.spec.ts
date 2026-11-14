@@ -41,7 +41,7 @@ async function setup(page: Page) {
   await page.getByTestId("extract-reqs-btn").click();
   await expect(page.getByTestId("req-skill-TypeScript")).toBeVisible();
   await expect(page.getByText("Product Engineer", { exact: true })).toBeVisible();
-  await expect(page.getByTestId("overall-score-badge")).toBeVisible();
+  await expect(page.getByTestId("ats-score-panel")).toHaveCount(0);
   return errors;
 }
 
@@ -73,6 +73,9 @@ test("desktop workflow, tabs, and profile evaluation", async ({ page }) => {
   await expect(page.getByLabel("Role", { exact: true })).toBeFocused();
   const profileRequest = page.waitForRequest(request => request.url().includes("/api/ats/evaluate") && request.postDataJSON()?.roleProfile === "Frontend");
   await page.getByTestId("tailor-role-profile-select").selectOption("Frontend");
+  await expect(page.getByTestId("tailor-role-profile-select")).toHaveValue("Frontend");
+  await page.getByTestId("tailor-tab-3-pane").click();
+  await expect(page.getByTestId("ats-score-panel")).toHaveCount(1);
   await profileRequest;
   await expect(page.getByText("Role-Relevant Evidence (Frontend)")).toBeVisible();
   await page.getByTestId("tailor-tab-overview").focus();
@@ -92,7 +95,18 @@ test("desktop workflow, tabs, and profile evaluation", async ({ page }) => {
     const panelId = await tab.getAttribute("aria-controls");
     expect(panelId).toBeTruthy();
     await expect(page.locator(`[role="tabpanel"]#${panelId}`)).toHaveAttribute("aria-labelledby", await tab.getAttribute("id") || "");
+    if (id === "tailor-tab-3-pane") {
+      await expect(page.getByTestId("ats-score-panel")).toHaveCount(1);
+    } else {
+      await expect(page.getByTestId("ats-score-panel")).toHaveCount(0);
+    }
+    if (id === "tailor-tab-cover-letter") {
+      await expect(page.getByTestId("tailor-cover-letter-section")).toHaveCount(1);
+    } else {
+      await expect(page.getByTestId("tailor-cover-letter-section")).toHaveCount(0);
+    }
   }
+  await expect(page.getByTestId("tailor-role-profile-select")).toHaveValue("Frontend");
   await page.getByTestId("tailor-tab-job-info").click();
   await page.getByTestId("generate-patches-btn").click();
   await expect(page.getByText(/No AI provider configured/i).first()).toBeVisible();

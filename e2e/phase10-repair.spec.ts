@@ -317,22 +317,50 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     await expect(applyFixBtn).toBeDisabled();
   });
 
-  test("7. Landing renders a calm studio backdrop without AsciiWaves canvas", async ({ page }) => {
+  test("7. Landing renders expressive Ember Ink AsciiWaves canvas atmosphere", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
     const atmosphere = page.locator('[data-testid="landing-atmosphere"]');
     await expect(atmosphere).toBeVisible();
-    await expect(page.locator('[data-testid="ascii-waves-canvas"]')).toHaveCount(0);
+    const waveCanvas = page.locator('[data-testid="ascii-waves-canvas"]');
+    await expect(waveCanvas).toBeVisible();
+
+    await page.mouse.move(360, 260);
+    await page.setViewportSize({ width: 1600, height: 900 });
+
+    const canvasMetrics = await waveCanvas.evaluate((el: HTMLCanvasElement) => {
+      const ctx = el.getContext("2d");
+      if (!ctx || el.width === 0 || el.height === 0) return { width: 0, height: 0, nonTransparent: 0 };
+      const data = ctx.getImageData(0, 0, Math.min(el.width, 400), Math.min(el.height, 300)).data;
+      let nonTransparent = 0;
+      for (let i = 3; i < data.length; i += 16) {
+        if (data[i] > 0) nonTransparent++;
+      }
+      return { width: el.width, height: el.height, nonTransparent };
+    });
+    expect(canvasMetrics.width).toBeGreaterThanOrEqual(1600);
+    expect(canvasMetrics.nonTransparent).toBeGreaterThan(0);
   });
 
-  test("8. Reduced-motion media query preserves calm landing layout without wave canvas", async ({ page }) => {
+  test("8. Reduced-motion media query renders static fallback without looping AsciiWaves canvas and transitions dynamically", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
     const atmosphere = page.locator('[data-testid="landing-atmosphere"]');
     await expect(atmosphere).toBeVisible();
+    await expect(page.locator('[data-testid="atmosphere-static-fallback"]')).toBeVisible();
+    await expect(page.locator('[data-testid="ascii-waves-canvas"]')).toHaveCount(0);
+
+    // Dynamic mid-session toggle back to no-preference and then to reduce
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await expect(page.locator('[data-testid="ascii-waves-canvas"]')).toBeVisible();
+    await expect(page.locator('[data-testid="atmosphere-static-fallback"]')).toHaveCount(0);
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(page.locator('[data-testid="atmosphere-static-fallback"]')).toBeVisible();
     await expect(page.locator('[data-testid="ascii-waves-canvas"]')).toHaveCount(0);
   });
 });

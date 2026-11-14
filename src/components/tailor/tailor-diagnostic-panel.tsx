@@ -259,15 +259,30 @@ export const TailorDiagnosticPanel = ({
     }
   };
 
+  const formatSeverityLabel = (severity: ResumeDiagnosticItem["severity"]) => {
+    if (severity === "urgent") return "Urgent";
+    if (severity === "non_urgent") return "Non-urgent";
+    return "Cosmetic";
+  };
+
   return (
-    <div className="flex flex-col gap-4 p-4 border rounded" data-testid="tailor-diagnostic-panel">
-      <h3 className="font-bold tabular-nums">
-        Diagnostics ({report.overallScore}%)
-      </h3>
+    <div
+      className="flex flex-col gap-4 rounded-xl surface-raised p-5 text-foreground"
+      data-testid="tailor-diagnostic-panel"
+    >
+      <div className="flex items-center justify-between gap-3 border-b border-hairline pb-3">
+        <h3 className="text-lg font-semibold text-foreground">Diagnostics</h3>
+        <span className="font-mono text-sm font-semibold tabular-nums text-on-surface-variant">
+          {report.overallScore}%
+        </span>
+      </div>
 
       {patchResult && (
-        <div data-testid="diagnostic-patch-success" className="text-xs text-green-500 flex items-center gap-1.5">
-          <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
+        <div
+          data-testid="diagnostic-patch-success"
+          className="flex items-center gap-1.5 rounded-md border border-status-success/40 bg-status-success/15 px-3 py-2 text-xs text-status-success"
+        >
+          <BadgeCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
           Patched successfully! Review the change in the editor before saving.
         </div>
       )}
@@ -279,13 +294,13 @@ export const TailorDiagnosticPanel = ({
             data-testid="save-diagnostic-variant-btn"
             onClick={handleSaveVariant}
             disabled={isPersisting || Boolean(persistedVariantId)}
-            className="inline-flex items-center justify-center gap-1.5 rounded-md border border-amber-700/70 bg-amber-900/30 px-3 py-1.5 text-xs font-semibold text-amber-300 hover:bg-amber-900/50 transition disabled:opacity-50 w-fit"
+            className="inline-flex w-fit items-center justify-center gap-1.5 rounded-md border border-status-warning/40 bg-status-warning/15 px-3 py-1.5 text-xs font-semibold text-status-warning transition hover:bg-status-warning/25 disabled:opacity-50"
           >
             <Save className="h-3.5 w-3.5" aria-hidden />
             {persistedVariantId ? "Variant saved" : isPersisting ? "Saving variant…" : "Save as variant"}
           </button>
           {persistedVariantId && (
-            <div data-testid="diagnostic-variant-saved" className="text-xs text-green-500">
+            <div data-testid="diagnostic-variant-saved" className="text-xs text-status-success">
               Saved as ResumeVariant. Open it from the Editor via ?variantId=.
             </div>
           )}
@@ -293,7 +308,7 @@ export const TailorDiagnosticPanel = ({
             <div
               data-testid="diagnostic-variant-save-error"
               role="alert"
-              className="text-xs text-rose-400 rounded border border-rose-800/60 bg-rose-950/30 p-2"
+              className="rounded-md border border-status-danger/40 bg-status-danger/15 p-2.5 text-xs text-status-danger"
             >
               {persistError}
             </div>
@@ -305,35 +320,47 @@ export const TailorDiagnosticPanel = ({
         <div
           data-testid="diagnostic-patch-error"
           role="alert"
-          className="text-xs text-amber-500 flex items-start gap-1.5 rounded border border-amber-800/60 bg-amber-950/30 p-2"
+          className="flex items-start gap-1.5 rounded-md border border-status-warning/40 bg-status-warning/15 p-2.5 text-xs text-status-warning"
         >
-          <TriangleAlert className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden />
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
           {patchError}
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         {report.items.map((item, index) => {
           const applied = appliedIds.includes(item.id);
+          const severityEdge =
+            item.severity === "urgent"
+              ? "border-l-status-danger"
+              : item.severity === "non_urgent"
+                ? "border-l-status-warning"
+                : "border-l-status-info";
           return (
-            <div key={item.id} className="p-2 border rounded">
-              <div className="flex justify-between items-center">
+            <div
+              key={item.id}
+              className={`rounded-lg surface-raised border-l-[3px] ${severityEdge} p-3.5`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span
-                  className={`px-2 py-1 text-xs rounded ${
+                  className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${
                     item.severity === "urgent"
-                      ? "bg-red-100 text-red-800"
+                      ? "border-status-danger/40 bg-status-danger/15 text-status-danger"
                       : item.severity === "non_urgent"
-                        ? "bg-yellow-100 text-yellow-800"
-                        : "bg-blue-100 text-blue-800"
+                        ? "border-status-warning/40 bg-status-warning/15 text-status-warning"
+                        : "border-status-info/40 bg-status-info/15 text-status-info"
                   }`}
                 >
-                  {item.severity}
+                  {formatSeverityLabel(item.severity)}
                 </span>
-                <span className="text-sm font-medium">{item.category}</span>
+                <span className="text-xs font-medium text-muted-foreground">{item.category}</span>
               </div>
-              <p className="text-sm mt-1">{item.message}</p>
+              <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">{item.message}</p>
               {applied ? (
-                <span data-testid={`diagnostic-fix-applied-${index}`} className="text-xs text-green-500 mt-2 inline-block">
+                <span
+                  data-testid={`diagnostic-fix-applied-${index}`}
+                  className="mt-2 inline-block text-xs font-medium text-status-success"
+                >
                   Fix applied.
                 </span>
               ) : (
@@ -341,7 +368,7 @@ export const TailorDiagnosticPanel = ({
                   type="button"
                   data-testid={`apply-diagnostic-fix-${index}`}
                   onClick={() => handleApplyFix(item)}
-                  className="text-xs text-amber-400 mt-2 hover:underline"
+                  className="mt-2 text-xs font-semibold text-primary hover:underline"
                 >
                   Apply Fix
                 </button>

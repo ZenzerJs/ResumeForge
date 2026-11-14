@@ -16,6 +16,7 @@ import {
 import type { CoverLetterResponse } from "@/lib/ai/cover-letter-schema";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
 import { getDemoContextFromBrowser } from "@/lib/demo-client";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface CoverLetterPanelProps {
   jobId: string;
@@ -25,6 +26,8 @@ interface CoverLetterPanelProps {
   rawDescription: string;
   extractedRequirements?: Record<string, unknown>;
   activeRoleProfile?: string;
+  draftCoverLetter?: CoverLetterResponse | null;
+  onDraftCoverLetterChange?: (draft: CoverLetterResponse | null) => void;
 }
 
 export function CoverLetterPanel({
@@ -35,31 +38,54 @@ export function CoverLetterPanel({
   rawDescription,
   extractedRequirements,
   activeRoleProfile = "Full-stack",
+  draftCoverLetter,
+  onDraftCoverLetterChange,
 }: CoverLetterPanelProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
-  const [coverLetter, setCoverLetter] = useState<CoverLetterResponse | null>(null);
+  const [internalCoverLetter, setInternalCoverLetter] = useState<CoverLetterResponse | null>(null);
+  const coverLetter = draftCoverLetter !== undefined ? draftCoverLetter : internalCoverLetter;
+  const setCoverLetter = onDraftCoverLetterChange ?? setInternalCoverLetter;
   const [activeFormat, setActiveFormat] = useState<"markdown" | "text">("markdown");
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
+  const [pendingRegenerateJob, setPendingRegenerateJob] = useState<{
+    jobId: string;
+    label: string;
+  } | null>(null);
+  const prevJobIdRef = React.useRef<string | undefined>(jobId);
+  const draftCoverLetterRef = React.useRef(draftCoverLetter);
+  draftCoverLetterRef.current = draftCoverLetter;
 
-  // Task 8.6: Load existing cover letter draft for jobId on mount
+  // Task 8.6: Load existing cover letter draft for jobId on mount or job switch
   React.useEffect(() => {
+    setPendingRegenerateJob(null);
+    const jobChanged = prevJobIdRef.current !== jobId;
+    prevJobIdRef.current = jobId;
     if (!jobId) return;
+    let cancelled = false;
+
     async function loadExistingDraft() {
       try {
         const configRes = await fetch("/api/demo-config");
         const config = await configRes.json();
+        if (cancelled) return;
         setDemoMode(config.demoMode === true);
+        if (!jobChanged && draftCoverLetterRef.current) return;
         if (config.demoMode) {
           const local = localStorage.getItem(`resumeforge_demo_cover_letter_${jobId}`);
-          if (local) setCoverLetter(JSON.parse(local) as CoverLetterResponse);
+          if (local) {
+            setCoverLetter(JSON.parse(local) as CoverLetterResponse);
+          } else if (jobChanged) {
+            setCoverLetter(null);
+          }
           return;
         }
         const res = await fetch(`/api/cover-letters?jobId=${jobId}`);
         const json = await res.json();
+        if (cancelled) return;
         if (res.ok && json.success && Array.isArray(json.data) && json.data.length > 0) {
           const draft = json.data[0];
           setCoverLetter({
@@ -72,19 +98,21 @@ export function CoverLetterPanel({
             evidenceCitations: Array.isArray(draft.evidenceCitations) ? draft.evidenceCitations : [],
             gapsAddressed: [],
           });
+        } else if (jobChanged) {
+          setCoverLetter(null);
         }
       } catch {
         // Non-fatal
       }
     }
-    loadExistingDraft();
+    void loadExistingDraft();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
 
-  const handleGenerateCoverLetter = async () => {
-    if (coverLetter && !confirm("Regenerate cover letter? This will create a new evidence-grounded draft for this job.")) {
-      return;
-    }
-
+  const performGenerateCoverLetter = async () => {
     setIsGenerating(true);
     setGenerateError(null);
     setCoverLetter(null);
@@ -129,6 +157,18 @@ export function CoverLetterPanel({
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleGenerateCoverLetter = () => {
+    if (coverLetter) {
+      const targetName =
+        roleTitle || company
+          ? `${roleTitle || "this role"}${company ? ` at ${company}` : ""}`
+          : "this job";
+      setPendingRegenerateJob({ jobId, label: targetName });
+      return;
+    }
+    void performGenerateCoverLetter();
   };
 
   const getFullContent = () => {
@@ -205,20 +245,20 @@ export function CoverLetterPanel({
 
   return (
     <div
-      className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5"
+      className="bg-panel border border-hairline rounded-xl p-5 space-y-5"
       data-testid="cover-letter-panel"
     >
       {/* Top Banner Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="space-y-1">
-          <h3 className="text-base font-semibold text-slate-100 flex items-center gap-2">
-            <FileText className="h-5 w-5 text-indigo-400" />
+          <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+            <FileText className="h-5 w-5 text-signal" />
             Tailored Cover Letter Generator
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+            <span className="text-xs font-mono px-2 py-0.5 rounded bg-signal/15 text-signal border border-signal/35">
               Evidence Grounded
             </span>
           </h3>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-muted-foreground">
             Generate an evidence-backed cover letter grounded strictly in candidate Evidence Bank achievements.
           </p>
         </div>
@@ -228,7 +268,7 @@ export function CoverLetterPanel({
           onClick={handleGenerateCoverLetter}
           disabled={isGenerating}
           data-testid="generate-cover-letter-btn"
-          className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-xs rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 transition shrink-0"
+          className="px-4 py-2.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground font-semibold text-xs rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition shrink-0"
         >
           {isGenerating ? (
             <>
@@ -262,18 +302,18 @@ export function CoverLetterPanel({
       {coverLetter && (
         <div className="space-y-4" data-testid="cover-letter-workspace">
           {/* Format selector and action toolbar */}
-          <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="bg-inset border border-hairline rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
             {/* Format toggle */}
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-400 font-medium mr-1">View Format:</span>
+              <span className="text-xs text-muted-foreground font-medium mr-1">View Format:</span>
               <button
                 type="button"
                 onClick={() => setActiveFormat("markdown")}
                 data-testid="format-markdown-btn"
                 className={`px-3 py-1 rounded-md text-xs font-mono transition flex items-center gap-1.5 ${
                   activeFormat === "markdown"
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                    ? "bg-primary text-primary-foreground font-semibold"
+                    : "bg-elevated text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <FileCode2 className="h-3.5 w-3.5" />
@@ -285,8 +325,8 @@ export function CoverLetterPanel({
                 data-testid="format-text-btn"
                 className={`px-3 py-1 rounded-md text-xs font-mono transition flex items-center gap-1.5 ${
                   activeFormat === "text"
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                    ? "bg-primary text-primary-foreground font-semibold"
+                    : "bg-elevated text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <FileText className="h-3.5 w-3.5" />
@@ -300,7 +340,7 @@ export function CoverLetterPanel({
                 type="button"
                 onClick={handleCopy}
                 data-testid="copy-cover-letter-btn"
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-md font-medium transition flex items-center gap-1.5"
+                className="px-3 py-1.5 bg-elevated hover:bg-control/30 text-foreground border border-hairline text-xs rounded-md font-medium transition flex items-center gap-1.5"
               >
                 {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
                 {copied ? "Copied!" : "Copy to Clipboard"}
@@ -310,14 +350,14 @@ export function CoverLetterPanel({
                 type="button"
                 onClick={handleDownload}
                 data-testid="download-cover-letter-btn"
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-md font-medium transition flex items-center gap-1.5"
+                className="px-3 py-1.5 bg-elevated hover:bg-control/30 text-foreground border border-hairline text-xs rounded-md font-medium transition flex items-center gap-1.5"
               >
                 <Download className="h-3.5 w-3.5" />
                 Download ({activeFormat === "markdown" ? ".md" : ".txt"})
               </button>
 
               {demoMode ? (
-                <span className="px-3 py-1.5 text-xs text-slate-400" data-testid="cover-letter-local-only">
+                <span className="px-3 py-1.5 text-xs text-muted-foreground" data-testid="cover-letter-local-only">
                   Saved in this browser
                 </span>
               ) : (
@@ -337,15 +377,15 @@ export function CoverLetterPanel({
 
           {/* Evidence Citations Badges */}
           {coverLetter.evidenceCitations && coverLetter.evidenceCitations.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 text-xs bg-indigo-950/30 border border-indigo-900/40 rounded-lg p-3">
-              <span className="text-indigo-300 font-semibold uppercase text-[10px] tracking-wider">
+            <div className="flex flex-wrap items-center gap-2 text-xs bg-signal/10 border border-signal/30 rounded-lg p-3">
+              <span className="text-signal font-semibold uppercase text-[10px] tracking-wider">
                 Grounded Evidence Citations ({coverLetter.evidenceCitations.length}):
               </span>
               {coverLetter.evidenceCitations.map((cid) => (
                 <span
                   key={cid}
                   data-testid="evidence-citation-badge"
-                  className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800"
+                  className="text-[10px] font-mono px-2 py-0.5 rounded bg-signal/15 text-signal border border-signal/35"
                 >
                   ✓ {cid}
                 </span>
@@ -357,35 +397,35 @@ export function CoverLetterPanel({
           {activeFormat === "markdown" ? (
             <div
               data-testid="cover-letter-markdown-view"
-              className="bg-slate-950/80 border border-slate-800 rounded-xl p-5 text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-sans"
+              className="bg-inset border border-hairline rounded-xl p-5 text-sm text-foreground leading-relaxed whitespace-pre-wrap font-sans"
             >
               {coverLetter.fullMarkdown}
             </div>
           ) : (
             <div className="space-y-3" data-testid="cover-letter-plain-view">
-              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
-                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+              <div className="bg-inset border border-hairline rounded-xl p-4 space-y-2">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                   Salutation & Opening Hook
                 </span>
-                <p className="text-xs text-slate-200 font-medium">{coverLetter.salutation}</p>
-                <p className="text-xs text-slate-300 leading-relaxed font-sans">{coverLetter.openingParagraph}</p>
+                <p className="text-xs text-foreground font-medium">{coverLetter.salutation}</p>
+                <p className="text-xs text-text-secondary leading-relaxed font-sans">{coverLetter.openingParagraph}</p>
               </div>
 
               {coverLetter.bodyParagraphs.map((para, idx) => (
-                <div key={idx} className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
-                  <span className="text-[10px] uppercase font-bold text-indigo-400 tracking-wider">
+                <div key={idx} className="bg-inset border border-hairline rounded-xl p-4 space-y-2">
+                  <span className="text-[10px] uppercase font-bold text-signal tracking-wider">
                     Body Paragraph {idx + 1}
                   </span>
-                  <p className="text-xs text-slate-200 leading-relaxed font-sans">{para}</p>
+                  <p className="text-xs text-foreground leading-relaxed font-sans">{para}</p>
                 </div>
               ))}
 
-              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
-                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+              <div className="bg-inset border border-hairline rounded-xl p-4 space-y-2">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                   Closing Statement
                 </span>
-                <p className="text-xs text-slate-300 leading-relaxed font-sans">{coverLetter.closingParagraph}</p>
-                <p className="text-xs text-slate-400 font-medium whitespace-pre-line">
+                <p className="text-xs text-text-secondary leading-relaxed font-sans">{coverLetter.closingParagraph}</p>
+                <p className="text-xs text-muted-foreground font-medium whitespace-pre-line">
                   {`Sincerely,\n${
                     coverLetter.fullMarkdown.match(/Sincerely,\s*\n([^\n]+)/i)?.[1]?.trim() || "Candidate"
                   }`}
@@ -395,6 +435,32 @@ export function CoverLetterPanel({
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingRegenerateJob)}
+        onOpenChange={(open) => {
+          if (!open) setPendingRegenerateJob(null);
+        }}
+        title="Regenerate Cover Letter"
+        description={
+          pendingRegenerateJob
+            ? `Regenerate the cover letter for ${pendingRegenerateJob.label}? This creates a new evidence-grounded draft and replaces the current draft in view.`
+            : ""
+        }
+        confirmLabel="Regenerate"
+        isConfirming={isGenerating}
+        dialogTestId="regenerate-cover-letter-confirm-modal"
+        confirmTestId="confirm-regenerate-cover-letter-btn"
+        cancelTestId="cancel-regenerate-cover-letter-btn"
+        onConfirm={async () => {
+          if (!pendingRegenerateJob || pendingRegenerateJob.jobId !== jobId) {
+            setPendingRegenerateJob(null);
+            return;
+          }
+          setPendingRegenerateJob(null);
+          await performGenerateCoverLetter();
+        }}
+      />
     </div>
   );
 }

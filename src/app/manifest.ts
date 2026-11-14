@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Craft truthful, job-specific resume variants from one protected master resume.",
     start_url: "/",
     display: "standalone",
-    background_color: "#020617",
-    theme_color: "#f59e0b",
+    background_color: "#121010",
+    theme_color: "#f7bd3f",
     icons: [
       {
         src: "/icon",

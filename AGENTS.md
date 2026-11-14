@@ -4,6 +4,8 @@ Welcome, AI Agent (Gemini, Claude, GPT, or custom subagent).
 
 This repository is governed by strict architecture, security, and scoping rules. You must read and follow these guidelines unconditionally on every turn and task.
 
+Before building or changing UI, read DESIGN.md.
+
 ---
 
 ## Invariants

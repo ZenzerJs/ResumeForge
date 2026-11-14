@@ -23,7 +23,7 @@ const CODE_LINE_WIDTHS = [
 function CodeLine({ width, indent = false }: { width: string; indent?: boolean }) {
   return (
     <div className={cn("flex items-center gap-3", indent && "pl-6")}>
-      <Skeleton className={cn("h-2.5 rounded-sm bg-slate-700/70", width)} />
+      <Skeleton className={cn("h-2.5 rounded-sm bg-elevated", width)} />
     </div>
   );
 }
@@ -31,13 +31,13 @@ function CodeLine({ width, indent = false }: { width: string; indent?: boolean }
 function PreviewBulletBlock() {
   return (
     <div className="space-y-2">
-      <Skeleton className="h-2.5 w-28 rounded-sm bg-slate-300" />
+      <Skeleton className="h-2.5 w-28 rounded-sm bg-[#d8d0c5]" />
       {[0, 1, 2].map((i) => (
         <div key={i} className="flex items-start gap-2 pl-1">
-          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
+          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#d8d0c5]" />
           <Skeleton
             className={cn(
-              "h-2 rounded-sm bg-slate-300",
+              "h-2 rounded-sm bg-[#d8d0c5]",
               i === 0 ? "w-full" : i === 1 ? "w-[92%]" : "w-[78%]"
             )}
           />
@@ -173,22 +173,22 @@ export function EditorWorkspaceSkeleton({
           <div className="flex flex-1 items-start justify-center overflow-hidden bg-inset px-4 pb-6 pt-2">
             <div className="h-full w-full max-w-[420px] overflow-hidden rounded-[2px] border border-[#d8dce0] bg-paper p-6 shadow-[0_4px_16px_rgba(0,0,0,0.45)] sm:p-8">
               <div className="mx-auto mb-5 space-y-2 text-center">
-                <Skeleton className="mx-auto h-4 w-40 rounded-sm bg-slate-300" />
-                <Skeleton className="mx-auto h-2 w-56 rounded-sm bg-slate-200" />
+                <Skeleton className="mx-auto h-4 w-40 rounded-sm bg-[#d8d0c5]" />
+                <Skeleton className="mx-auto h-2 w-56 rounded-sm bg-[#e6dfd6]" />
               </div>
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <Skeleton className="h-2.5 w-24 rounded-sm bg-slate-300" />
-                  <Skeleton className="h-2 w-full rounded-sm bg-slate-200" />
-                  <Skeleton className="h-2 w-[90%] rounded-sm bg-slate-200" />
-                  <Skeleton className="h-2 w-[75%] rounded-sm bg-slate-200" />
+                  <Skeleton className="h-2.5 w-24 rounded-sm bg-[#d8d0c5]" />
+                  <Skeleton className="h-2 w-full rounded-sm bg-[#e6dfd6]" />
+                  <Skeleton className="h-2 w-[90%] rounded-sm bg-[#e6dfd6]" />
+                  <Skeleton className="h-2 w-[75%] rounded-sm bg-[#e6dfd6]" />
                 </div>
                 <PreviewBulletBlock />
                 <PreviewBulletBlock />
                 <div className="space-y-2">
-                  <Skeleton className="h-2.5 w-20 rounded-sm bg-slate-300" />
-                  <Skeleton className="h-2 w-full rounded-sm bg-slate-200" />
-                  <Skeleton className="h-2 w-[85%] rounded-sm bg-slate-200" />
+                  <Skeleton className="h-2.5 w-20 rounded-sm bg-[#d8d0c5]" />
+                  <Skeleton className="h-2 w-full rounded-sm bg-[#e6dfd6]" />
+                  <Skeleton className="h-2 w-[85%] rounded-sm bg-[#e6dfd6]" />
                 </div>
               </div>
             </div>

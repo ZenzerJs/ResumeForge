@@ -7,6 +7,7 @@ import { ALL_QUESTIONS } from "@/lib/interview/questionDatabase";
 import { AppShell } from "@/components/design-system/app-shell";
 import { PageHeader } from "@/components/design-system/page-header";
 import { StatusPill } from "@/components/design-system/status-pill";
+import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
 import { InterviewHub } from "@/components/interview/interview-hub";
 import { DsaWorkspace } from "@/components/interview/dsa-workspace";
 import { cn } from "@/lib/utils";
@@ -112,7 +113,7 @@ export function PracticeWorkspace() {
 
   return (
     <AppShell variant={mainTab === "runner" ? "editor" : "quiet"}>
-      <div className="flex min-h-0 flex-1 flex-col bg-rf-bg text-rf-cloud">
+      <div className="flex min-h-0 flex-1 flex-col text-rf-cloud">
         {mainTab === "questions" ? (
           <div className="mx-auto w-full max-w-6xl px-4 pt-6 md:px-8 space-y-4">
             <PageHeader
@@ -123,17 +124,17 @@ export function PracticeWorkspace() {
             />
 
             {/* Contextual Tracked Job Selector */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-800/80 bg-[#121929]/80 px-4 py-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl surface-raised px-4 py-3">
               <div className="flex items-center gap-2.5">
                 <Briefcase className="h-4 w-4 text-amber-400 shrink-0" />
                 <div>
                   <label
                     htmlFor="practice-job-context-select"
-                    className="block text-xs font-semibold text-slate-200"
+                    className="block text-xs font-semibold text-foreground"
                   >
                     Target Role Context
                   </label>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-text-secondary">
                     Select a tracked job to focus interview questions and behavioral rubrics on your target role.
                   </p>
                 </div>
@@ -143,7 +144,7 @@ export function PracticeWorkspace() {
                 data-testid="practice-job-context-select"
                 value={selectedJobId}
                 onChange={(e) => setSelectedJobId(e.target.value)}
-                className="h-9 min-w-[220px] rounded-lg border border-slate-700 bg-slate-900 px-3 text-xs text-slate-200 focus:border-amber-500 focus:outline-none"
+                className="h-9 min-w-[220px] rounded-[6px] border border-control/70 bg-inset px-3 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 <option value="">General Prep (All Roles)</option>
                 {trackedJobs.map((job) => (
@@ -161,9 +162,16 @@ export function PracticeWorkspace() {
               >
                 <div className="flex items-center gap-2 text-amber-200">
                   <Sparkles className="h-4 w-4 text-amber-400 shrink-0" />
-                  <span>
-                    Prepping for <strong className="font-semibold text-white">{selectedJob.roleTitle}</strong> at{" "}
-                    <strong className="font-semibold text-white">{selectedJob.company}</strong>
+                  <span className="inline-flex flex-wrap items-center gap-1.5">
+                    <span>
+                      Prepping for <strong className="font-semibold text-foreground">{selectedJob.roleTitle}</strong> at
+                    </span>
+                    <strong className="inline-flex items-center gap-1 font-semibold text-foreground">
+                      {hasBrandIcon(selectedJob.company) && (
+                        <BrandIcon name={selectedJob.company} className="h-3.5 w-3.5 shrink-0 text-amber-300" />
+                      )}
+                      {selectedJob.company}
+                    </strong>
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -180,7 +188,7 @@ export function PracticeWorkspace() {
           </div>
         ) : null}
 
-        <div className="border-b border-slate-800 mt-2">
+        <div className="border-b border-hairline mt-2">
         <div
           className={cn(
             "flex items-center gap-6 px-4 md:px-8",
@@ -195,8 +203,8 @@ export function PracticeWorkspace() {
             className={cn(
               "min-h-11 border-b-2 px-1 text-xs font-medium",
               mainTab === "questions"
-                ? "border-amber-500 text-white"
-                : "border-transparent text-slate-400 hover:text-slate-200"
+                ? "border-amber-500 text-foreground"
+                : "border-transparent text-text-secondary hover:text-foreground"
             )}
           >
             Questions
@@ -208,8 +216,8 @@ export function PracticeWorkspace() {
             className={cn(
               "min-h-11 border-b-2 px-1 text-xs font-medium",
               mainTab === "runner"
-                ? "border-amber-500 text-white"
-                : "border-transparent text-slate-400 hover:text-slate-200"
+                ? "border-amber-500 text-foreground"
+                : "border-transparent text-text-secondary hover:text-foreground"
             )}
           >
             Code Runner

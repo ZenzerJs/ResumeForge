@@ -33,6 +33,15 @@ const STATUS_LABELS: Record<JobStatus, string> = {
   ARCHIVED: "Archived",
 };
 
+const STATUS_BADGE_CLASSES: Record<JobStatus, string> = {
+  INTERVIEWING: "border-signal/40 bg-signal/10 text-signal",
+  APPLIED: "border-ember/40 bg-ember/10 text-ember",
+  OFFER: "border-primary/45 bg-primary/12 text-primary",
+  SAVED: "border-outline/70 bg-popover text-on-surface-variant",
+  REJECTED: "border-status-danger/40 bg-status-danger/10 text-status-danger",
+  ARCHIVED: "border-hairline bg-inset text-text-muted",
+};
+
 const ALL_STATUSES = Object.keys(STATUS_LABELS) as JobStatus[];
 
 interface JobListRowProps {
@@ -88,43 +97,52 @@ export function JobListRow({
     <div
       ref={rowRef}
       data-testid={`tracker-job-card-${job.id}`}
-      role="button"
-      tabIndex={0}
-      onClick={() => onSelect(job.id)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect(job.id);
-        }
-      }}
-      className={cn(
-        "flex gap-3 border-b border-border px-4 py-3.5 cursor-pointer transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+      style={
         isSelected
-          ? "bg-card shadow-[inset_3px_0_0_rgb(var(--accent-action))]"
-          : "bg-background hover:bg-card/60",
+          ? {
+              backgroundImage:
+                "linear-gradient(90deg, rgb(var(--accent-action) / 0.09), transparent 60%)",
+              boxShadow: "inset 3px 0 0 rgb(var(--accent-action)), var(--shadow-2)",
+            }
+          : undefined
+      }
+      className={cn(
+        "relative flex gap-3 border-b border-border px-4 py-3.5 card-lift hover:z-10",
+        isSelected
+          ? "bg-card shadow-[var(--shadow-2)]"
+          : "bg-panel/60 hover:bg-panel",
       )}
     >
-      <CompanyAvatar company={job.company} className="h-[34px] w-[34px]" />
+      <CompanyAvatar company={job.company} className="relative z-10 pointer-events-none h-[34px] w-[34px]" />
 
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="text-[13.5px] font-semibold leading-snug text-foreground">
-              {job.roleTitle || "Untitled Role"}
-            </h3>
-            <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
-              <span>{job.company || "Unknown Company"}</span>
-              {location ? <span>· {location}</span> : null}
-              {datePosted ? (
-                <span className="inline-flex items-center gap-1">
-                  · <Clock className="h-3 w-3 shrink-0" aria-hidden /> {datePosted}
-                </span>
-              ) : null}
-            </p>
-          </div>
+          <button
+            type="button"
+            data-testid={`job-select-btn-${job.id}`}
+            aria-pressed={isSelected}
+            aria-label={`${job.roleTitle || "Untitled Role"} at ${job.company || "Unknown Company"}`}
+            onClick={() => onSelect(job.id)}
+            className="min-w-0 flex-1 rounded-[6px] text-left after:absolute after:inset-0 after:z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            <span className="relative z-[1] block min-w-0">
+              <h3 className="text-[13.5px] font-semibold leading-snug text-foreground">
+                {job.roleTitle || "Untitled Role"}
+              </h3>
+              <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+                <span>{job.company || "Unknown Company"}</span>
+                {location ? <span>· {location}</span> : null}
+                {datePosted ? (
+                  <span className="inline-flex items-center gap-1">
+                    · <Clock className="h-3 w-3 shrink-0" aria-hidden /> {datePosted}
+                  </span>
+                ) : null}
+              </p>
+            </span>
+          </button>
 
           <div
-            className="shrink-0"
+            className="relative z-10 shrink-0"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
           >
@@ -135,7 +153,10 @@ export function JobListRow({
                 value={job.status}
                 data-testid={`job-status-select-${job.id}`}
                 onChange={(e) => onStatusChange(job.id, e.target.value as JobStatus)}
-                className="appearance-none rounded-full border border-outline/70 bg-popover px-2.5 py-1 pr-6 text-[11px] text-on-surface-variant transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer"
+                className={cn(
+                  "appearance-none rounded-full border px-2.5 py-1 pr-6 text-[11px] font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer",
+                  STATUS_BADGE_CLASSES[job.status] ?? STATUS_BADGE_CLASSES.SAVED,
+                )}
                 aria-label="Job status"
               >
                 {ALL_STATUSES.map((s) => (
@@ -162,7 +183,7 @@ export function JobListRow({
         </div>
 
         <div
-          className="relative mt-2.5 flex items-center gap-1.5"
+          className="relative z-10 mt-2.5 flex items-center gap-1.5"
           onClick={(e) => e.stopPropagation()}
         >
           <Link

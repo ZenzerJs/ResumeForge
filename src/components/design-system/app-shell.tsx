@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { TopNav } from "@/components/navigation/top-nav";
+import { WorkspaceAtmosphere } from "@/components/design-system/workspace-atmosphere";
 import { GuestMigrationModal } from "@/components/auth/guest-migration-modal";
 import { fetchSessionPayload } from "@/components/auth/session-user";
 import { cn } from "@/lib/utils";
@@ -197,6 +198,9 @@ export function AppShell({
       data-workspace-theme={variant === "landing" ? undefined : ""}
       data-testid={`app-shell-${variant}`}
     >
+      {variant !== "landing" && variant !== "editor" ? (
+        <WorkspaceAtmosphere variant={variant} />
+      ) : null}
       {!hideNav ? (
         <TopNav
           compact={variant === "editor"}
@@ -207,7 +211,7 @@ export function AppShell({
       <main
         id="main-content"
         className={cn(
-          "relative flex min-h-0 flex-1 flex-col",
+          "relative z-10 flex min-h-0 flex-1 flex-col",
           !hideNav &&
             (variant === "editor"
               ? "pt-[calc(3rem+env(safe-area-inset-top))]"
@@ -219,7 +223,7 @@ export function AppShell({
         {!hideNav && !(variant === "editor" && useToolbar) ? <GuestBanner /> : null}
         {!hideNav && useToolbar ? (
           <div
-            className="relative z-40 flex min-h-10 shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-outline/70 bg-panel px-4 py-1 lg:h-10 lg:flex-nowrap lg:px-6"
+            className="relative z-40 flex min-h-10 shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-outline/70 glass-bar px-4 py-1 lg:h-10 lg:flex-nowrap lg:px-6"
             data-testid="workspace-toolbar"
           >
             <div className="flex min-w-0 items-center gap-2.5">

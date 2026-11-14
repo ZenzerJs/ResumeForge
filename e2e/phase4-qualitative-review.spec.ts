@@ -11,7 +11,8 @@ test.describe("Phase 4.3b On-Demand AI Qualitative Reviewer E2E Tests", () => {
     await page.click("[data-testid='sample-backend-btn']");
     await page.click("[data-testid='extract-reqs-btn']");
 
-    // 2. Verify ATS Score Panel renders
+    // 2. Open Workspace tab and verify ATS Score Panel renders
+    await page.click("[data-testid='tailor-tab-3-pane']");
     await page.waitForSelector("[data-testid='ats-score-panel']", { timeout: 5000 });
 
     // 3. Verify Get AI Feedback button is present

@@ -50,23 +50,23 @@ const STATUS_BADGES: Record<
 > = {
   DEMONSTRATED_IN_EXPERIENCE: {
     label: "Demonstrated in Experience",
-    bg: "bg-emerald-950/80",
-    text: "text-emerald-300",
-    border: "border-emerald-800/80",
+    bg: "bg-signal/10",
+    text: "text-signal",
+    border: "border-signal/35",
     icon: "✓",
   },
   LISTED_IN_SKILLS_ONLY: {
     label: "Listed in Skills Only",
-    bg: "bg-amber-950/80",
-    text: "text-amber-300",
-    border: "border-amber-800/80",
+    bg: "bg-primary/10",
+    text: "text-primary",
+    border: "border-primary/35",
     icon: "~",
   },
   UNSUPPORTED_GAP: {
     label: "Unsupported Gap",
-    bg: "bg-red-950/80",
-    text: "text-red-300",
-    border: "border-red-800/80",
+    bg: "bg-status-danger/10",
+    text: "text-status-danger",
+    border: "border-status-danger/35",
     icon: "✗",
   },
 };
@@ -240,25 +240,22 @@ export function AtsScorePanel({
     return null;
   }
 
-  const scoreColor =
-    (result?.overallScore || 0) >= 80
-      ? "text-status-success border-status-success/40 bg-status-success/10"
-      : (result?.overallScore || 0) >= 60
-      ? "text-status-warning border-status-warning/40 bg-status-warning/10"
-      : "text-status-danger border-status-danger/40 bg-status-danger/10";
+  const overallPct = Math.max(0, Math.min(100, result?.overallScore || 0));
+  const gradeLabel =
+    overallPct >= 80 ? "Strong" : overallPct >= 60 ? "Solid" : "Needs work";
 
   return (
     <div
-      className={`@container bg-card border border-border rounded-[10px] p-6 shadow-lg space-y-6 min-w-0 ${appearance === "tailor" ? styles.tailor : ""} ${className}`}
+      className={`@container bg-panel border border-hairline rounded-[10px] p-6 shadow-lg space-y-6 min-w-0 ${appearance === "tailor" ? styles.tailor : ""} ${className}`}
       data-testid="ats-score-panel"
     >
-      {/* Header & Overall Match Meter — stacked in the Tailor sidebar */}
-      <div className="flex flex-col gap-4 border-b border-border pb-6">
+      {/* Header & Overall Match Meter — Ember Ink ATS Grade ring + summary */}
+      <div className="flex flex-col gap-4 border-b border-hairline pb-6">
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-foreground flex flex-wrap items-center gap-2">
-            <BarChart3 className="h-5 w-5 shrink-0 text-primary" />
-            <span>ATS Quality Score</span>
-            <span className={`text-[10px] font-mono bg-primary/10 text-primary border border-primary/25 px-2 py-0.5 rounded-full whitespace-nowrap ${styles.engineBadge}`}>
+            <BarChart3 className="h-5 w-5 shrink-0 text-signal" />
+            <span>ATS Grade</span>
+            <span className={`text-[10px] font-mono bg-signal/10 text-signal border border-signal/30 px-2 py-0.5 rounded-full whitespace-nowrap ${styles.engineBadge}`}>
               Deterministic Engine
             </span>
           </h2>
@@ -268,16 +265,33 @@ export function AtsScorePanel({
         </div>
 
         {result && (
-          <div className={`flex flex-col @md:flex-row @md:items-stretch gap-3 min-w-0 ${styles.scoreSummary}`}>
+          <div className={`flex flex-col @md:flex-row @md:items-center justify-between gap-4 min-w-0 ${styles.scoreSummary}`}>
             <div
               data-testid="overall-score-badge"
-              className={`px-4 py-3 rounded-[10px] border flex flex-col items-start justify-center min-w-0 ${scoreColor} ${styles.scoreBadge}`}
+              className={`px-4 py-3 rounded-[10px] border border-hairline bg-inset flex items-center gap-4 min-w-0 ${styles.scoreBadge}`}
             >
-              <span className="text-[10px] uppercase tracking-wider font-semibold opacity-80">
-                Overall Match
-              </span>
-              <div className={`text-3xl font-semibold tracking-tight font-mono tabular-nums leading-tight ${styles.scoreValue}`}>
-                {result.overallScore} <span className="text-sm font-normal text-muted-foreground">/ 100</span>
+              <div
+                data-testid="ats-overall-score"
+                className="relative grid h-[72px] w-[72px] shrink-0 place-items-center rounded-full"
+                style={{
+                  background: `conic-gradient(rgb(var(--accent-contrast)) ${overallPct}%, rgb(214 196 176 / 0.14) 0)`,
+                  filter: "drop-shadow(0 0 14px rgb(var(--accent-contrast) / 0.35))",
+                }}
+              >
+                <div className="grid h-[58px] w-[58px] place-items-center rounded-full bg-panel font-sans text-[22px] font-bold tracking-[-0.03em] tabular-nums text-foreground">
+                  {result.overallScore}
+                </div>
+              </div>
+              <div className="min-w-0">
+                <span className="block text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                  Overall Match · {gradeLabel}
+                </span>
+                <div className={`text-2xl font-bold tracking-tight font-mono tabular-nums leading-tight text-foreground ${styles.scoreValue}`}>
+                  {result.overallScore} <span className="text-sm font-normal text-muted-foreground">/ 100</span>
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground truncate">
+                  vs. {roleTitle || `${result.selectedProfile} profile`}
+                </p>
               </div>
             </div>
 
@@ -286,7 +300,7 @@ export function AtsScorePanel({
               onClick={handleFetchQualitativeReview}
               disabled={isLoadingQualitative || !result}
               data-testid="get-ai-feedback-btn"
-              className={`px-4 py-3 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground font-semibold text-xs rounded-[6px] flex items-center justify-center gap-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background @md:shrink-0 ${styles.feedback}`}
+              className={`px-4 py-3 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground btn-glow font-semibold text-xs rounded-[8px] flex items-center justify-center gap-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background @md:shrink-0 ${styles.feedback}`}
             >
               {isLoadingQualitative ? (
                 <>
@@ -345,10 +359,10 @@ export function AtsScorePanel({
       {result && (
         <div className={`grid grid-cols-1 gap-3 ${styles.categories}`} data-testid="category-breakdown-grid">
           {/* Category 1: Base Resume Health (30 pts) */}
-          <div className="bg-inset border border-border rounded-[10px] p-4 space-y-3 min-w-0">
+          <div className="bg-inset border border-hairline rounded-[10px] p-4 space-y-3 min-w-0">
             <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
               <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 min-w-0">
-                <ShieldCheck className="h-4 w-4 shrink-0 text-status-success" />
+                <ShieldCheck className="h-4 w-4 shrink-0 text-signal" />
                 <span className="break-words">Base Resume Health</span>
               </span>
               <span className="text-xs font-mono font-semibold tabular-nums text-foreground shrink-0">
@@ -357,7 +371,7 @@ export function AtsScorePanel({
             </div>
             <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
               <div
-                className="bg-status-success h-full transition-all"
+                className={`${result.baseHealth.percentage >= 75 ? "bg-signal" : "bg-primary"} h-full rounded-full transition-all`}
                 style={{ width: `${result.baseHealth.percentage}%` }}
               />
             </div>
@@ -380,10 +394,10 @@ export function AtsScorePanel({
           </div>
 
           {/* Category 2: Required Role Match (40 pts) */}
-          <div className="bg-inset border border-border rounded-[10px] p-4 space-y-3 min-w-0">
+          <div className="bg-inset border border-hairline rounded-[10px] p-4 space-y-3 min-w-0">
             <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
               <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 min-w-0">
-                <Briefcase className="h-4 w-4 shrink-0 text-primary" />
+                <Briefcase className="h-4 w-4 shrink-0 text-signal" />
                 <span className="break-words">Required Role Match</span>
               </span>
               <span className="text-xs font-mono font-semibold tabular-nums text-foreground shrink-0">
@@ -392,7 +406,7 @@ export function AtsScorePanel({
             </div>
             <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
               <div
-                className="bg-primary h-full transition-all"
+                className={`${result.requiredMatch.percentage >= 75 ? "bg-signal" : "bg-primary"} h-full rounded-full transition-all`}
                 style={{ width: `${result.requiredMatch.percentage}%` }}
               />
             </div>
@@ -404,7 +418,7 @@ export function AtsScorePanel({
           </div>
 
           {/* Category 3: Preferred Match (15 pts) */}
-          <div className="bg-inset border border-border rounded-[10px] p-4 space-y-3 min-w-0">
+          <div className="bg-inset border border-hairline rounded-[10px] p-4 space-y-3 min-w-0">
             <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
               <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 min-w-0">
                 <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
@@ -416,7 +430,7 @@ export function AtsScorePanel({
             </div>
             <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
               <div
-                className="bg-primary h-full transition-all"
+                className={`${result.preferredMatch.percentage >= 75 ? "bg-signal" : "bg-primary"} h-full rounded-full transition-all`}
                 style={{ width: `${result.preferredMatch.percentage}%` }}
               />
             </div>
@@ -428,10 +442,10 @@ export function AtsScorePanel({
           </div>
 
           {/* Category 4: Role-Relevant Evidence (15 pts) */}
-          <div className="bg-inset border border-border rounded-[10px] p-4 space-y-3 min-w-0">
+          <div className="bg-inset border border-hairline rounded-[10px] p-4 space-y-3 min-w-0">
             <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
               <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 min-w-0">
-                <Layers className="h-4 w-4 shrink-0 text-status-info" />
+                <Layers className="h-4 w-4 shrink-0 text-signal" />
                 <span className="break-words">Role-Relevant Evidence ({result.selectedProfile})</span>
               </span>
               <span className="text-xs font-mono font-semibold tabular-nums text-foreground shrink-0">
@@ -440,7 +454,7 @@ export function AtsScorePanel({
             </div>
             <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
               <div
-                className="bg-status-info h-full transition-all"
+                className={`${result.roleEvidence.percentage >= 75 ? "bg-signal" : "bg-primary"} h-full rounded-full transition-all`}
                 style={{ width: `${result.roleEvidence.percentage}%` }}
               />
             </div>
@@ -495,23 +509,38 @@ export function AtsScorePanel({
         </div>
       )}
 
-      {/* Truthful Actionable Gaps Guidance Panel */}
+      {/* Truthful Actionable Gaps Guidance Panel — Ember Ink Urgent / Non-urgent issue cards */}
       {result && result.gaps.length > 0 && (
-        <div className="bg-status-warning/10 border border-status-warning/30 rounded-[10px] p-4 space-y-3" data-testid="actionable-gaps-panel">
-          <h3 className="text-xs font-semibold text-status-warning flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-status-warning" />
+        <div className="bg-panel border border-hairline rounded-[10px] p-4 space-y-3" data-testid="actionable-gaps-panel">
+          <h3 className="text-xs font-semibold text-primary flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-primary" />
             Actionable Gaps Guidance (Truthful Recommendations)
           </h3>
           <p className="text-xs text-muted-foreground">
             Recommendations point to real, verifiable evidence additions or formatting improvements. No keyword stuffing or hidden text.
           </p>
           <ul className="space-y-2 text-xs text-on-surface-variant leading-relaxed">
-            {result.gaps.map((gap, idx) => (
-              <li key={`gap-${idx}`} className="flex items-start gap-2 min-w-0">
-                <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-status-warning" />
-                <span className="min-w-0 break-words">{gap}</span>
-              </li>
-            ))}
+            {result.gaps.map((gap, idx) => {
+              const isUrgent =
+                gap.startsWith("Missing required") || gap.startsWith("Penalized:");
+              return (
+                <li
+                  key={`gap-${idx}`}
+                  className="flex items-start gap-2.5 rounded-[8px] border border-hairline bg-inset p-2.5 min-w-0"
+                >
+                  <span
+                    className={`shrink-0 rounded-[5px] border px-1.5 py-0.5 text-[10.5px] font-semibold ${
+                      isUrgent
+                        ? "border-status-danger/40 bg-status-danger/10 text-status-danger"
+                        : "border-primary/40 bg-primary/10 text-primary"
+                    }`}
+                  >
+                    {isUrgent ? "Urgent" : "Non-urgent"}
+                  </span>
+                  <span className="min-w-0 break-words text-text-secondary">{gap}</span>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

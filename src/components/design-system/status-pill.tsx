@@ -17,11 +17,11 @@ export function StatusPill({
   className = "",
 }: StatusPillProps) {
   const styles = {
-    amber: "bg-amber-950/60 border-amber-800/60 text-amber-300",
-    emerald: "bg-emerald-950/60 border-emerald-800/60 text-emerald-300",
-    slate: "bg-slate-900/80 border-slate-800/80 text-slate-300",
-    cyan: "bg-cyan-950/60 border-cyan-800/60 text-cyan-300",
-    red: "bg-red-950/60 border-red-800/60 text-red-300",
+    amber: "bg-primary/15 border-primary/40 text-primary",
+    emerald: "bg-status-success/15 border-status-success/40 text-status-success",
+    slate: "bg-panel border-hairline text-text-secondary",
+    cyan: "bg-signal/15 border-signal/40 text-signal",
+    red: "bg-status-danger/15 border-status-danger/40 text-status-danger",
   };
 
   return (

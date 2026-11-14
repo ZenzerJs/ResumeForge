@@ -260,7 +260,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
     <div className="flex h-full min-h-0 flex-col" data-testid="chat-panel">
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-3">
         {demoMode && (
-          <p className="rounded-lg border border-slate-800 bg-slate-900/80 p-3 text-xs text-slate-300">
+          <p className="rounded-lg border border-hairline bg-inset p-3 text-xs text-text-secondary">
             Career Assistant chat is unavailable in the public demo because it reads saved account data. Use Tailoring and ATS review with your local draft instead.
           </p>
         )}
@@ -270,8 +270,8 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
               <MessageSquare className="h-6 w-6 text-amber-400" />
             </div>
             <div className="space-y-1">
-              <p className="text-xs font-medium text-slate-200">Career Assistant</p>
-              <p className="text-[11px] text-slate-500 max-w-[220px] leading-relaxed">
+              <p className="text-xs font-medium text-foreground">Career Assistant</p>
+              <p className="text-[11px] text-muted-foreground max-w-[220px] leading-relaxed">
                 Ask about your {resumeTitle || "resume"}, evidence bank, ATS fit, or a saved job.
               </p>
             </div>
@@ -282,7 +282,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
                   type="button"
                   data-testid="chat-quick-action"
                   onClick={() => void sendMessage(action)}
-                  className="rounded-full border border-slate-800 bg-slate-900/80 px-2.5 py-1 text-[10px] text-slate-300 hover:border-amber-700/60 hover:text-amber-200 transition"
+                  className="rounded-full border border-hairline bg-inset px-2.5 py-1 text-[10px] text-text-secondary hover:border-amber-700/60 hover:text-amber-200 transition"
                 >
                   {action}
                 </button>
@@ -301,7 +301,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
               className={
                 m.role === "user"
                   ? "max-w-[85%] rounded-xl border border-amber-800/40 bg-amber-950/30 px-3 py-2 text-xs text-amber-100"
-                  : "max-w-[92%] rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-2"
+                  : "max-w-[92%] rounded-xl border border-hairline bg-inset px-3 py-2"
               }
             >
               {m.toolCalls?.map((t) => (
@@ -318,14 +318,14 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
 
         {isStreaming && (
           <div className="flex justify-start" data-testid="chat-streaming">
-            <div className="max-w-[92%] rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-2">
+            <div className="max-w-[92%] rounded-xl border border-hairline bg-inset px-3 py-2">
               {streamingTools.map((t) => (
                 <ToolBadge key={t.id} name={t.name} state={t.state} />
               ))}
               {streamingContent ? (
                 <AiMarkdownRenderer content={streamingContent} />
               ) : (
-                <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
                   Thinking…
                 </div>
@@ -370,7 +370,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
         </div>
       )}
 
-      {!demoMode && <div className="border-t border-slate-800 p-3 space-y-2">
+      {!demoMode && <div className="border-t border-hairline p-3 space-y-2">
         <textarea
           ref={textareaRef}
           data-testid="chat-input"
@@ -384,7 +384,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
           }}
           onKeyDown={onKeyDown}
           placeholder="Ask about your resume, evidence, or a job…"
-          className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 placeholder-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 resize-none leading-relaxed"
+          className="w-full bg-inset border border-hairline rounded-lg p-2.5 text-xs text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 resize-none leading-relaxed"
         />
         <div className="flex justify-end">
           {isStreaming ? (
@@ -392,7 +392,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
               type="button"
               data-testid="chat-stop-btn"
               onClick={stopStreaming}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-slate-200 hover:bg-slate-800"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-inset px-3 py-1.5 text-[11px] font-semibold text-foreground hover:bg-elevated"
             >
               <Square className="h-3 w-3" />
               Stop
@@ -403,14 +403,14 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
               data-testid="chat-send-btn"
               disabled={!input.trim()}
               onClick={() => void sendMessage()}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 px-3 py-1.5 text-[11px] font-semibold text-slate-950 shadow shadow-amber-500/20"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 px-3 py-1.5 text-[11px] font-semibold text-[#121010] shadow shadow-amber-500/20"
             >
               <Send className="h-3 w-3" />
               Send
             </button>
           )}
         </div>
-        <p className="text-[10px] text-slate-600 flex items-center gap-1">
+        <p className="text-[10px] text-muted-foreground flex items-center gap-1">
           <Sparkles className="h-3 w-3" />
           Enter to send · Shift+Enter for a new line
         </p>

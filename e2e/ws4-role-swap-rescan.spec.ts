@@ -17,7 +17,8 @@ test.describe("WS4 — Tailor Auto-Rescan & Target Role Profile Swap", () => {
     await profileSelect.selectOption("AI/LLM");
     await expect(profileSelect).toHaveValue("AI/LLM");
 
-    // Check ATS score panel is visible
+    // Check ATS score panel is visible in Workspace tab
+    await page.getByTestId("tailor-tab-3-pane").click();
     const atsScorePanel = page.getByTestId("ats-score-panel");
     await expect(atsScorePanel).toBeVisible();
 

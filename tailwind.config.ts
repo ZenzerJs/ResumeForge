@@ -112,6 +112,7 @@ const config: Config = {
   			]
   		},
   		colors: {
+        deep: 'rgb(var(--surface-deep) / <alpha-value>)',
         canvas: 'rgb(var(--surface-canvas) / <alpha-value>)',
         panel: 'rgb(var(--surface-panel) / <alpha-value>)',
         elevated: 'rgb(var(--surface-elevated) / <alpha-value>)',
@@ -123,6 +124,12 @@ const config: Config = {
         'text-muted': 'rgb(var(--text-muted) / <alpha-value>)',
         hairline: 'rgb(var(--border-hairline) / <alpha-value>)',
         control: 'rgb(var(--border-control) / <alpha-value>)',
+        'accent-secondary': 'rgb(var(--accent-secondary) / <alpha-value>)',
+        ember: 'rgb(var(--accent-secondary) / <alpha-value>)',
+        'accent-contrast': 'rgb(var(--accent-contrast) / <alpha-value>)',
+        signal: 'rgb(var(--accent-contrast) / <alpha-value>)',
+        'accent-ink': 'rgb(var(--accent-ink) / <alpha-value>)',
+        'contrast-ink': 'rgb(var(--contrast-ink) / <alpha-value>)',
         'status-success': 'rgb(var(--status-success) / <alpha-value>)',
         'status-warning': 'rgb(var(--status-warning) / <alpha-value>)',
         'status-danger': 'rgb(var(--status-danger) / <alpha-value>)',
@@ -196,6 +203,20 @@ const config: Config = {
           border: 'rgb(var(--border-hairline) / <alpha-value>)',
           amber: 'rgb(var(--accent-action) / <alpha-value>)',
           emerald: 'rgb(var(--status-success) / <alpha-value>)'
+        },
+        /* Alias slate to warm Ember Ink stone/espresso so zero cool navy/blue-gray leaks */
+        slate: {
+          50: '#f4eee7',
+          100: '#f4eee7',
+          200: '#e6ddd3',
+          300: '#d0c5b9',
+          400: '#9e9287',
+          500: '#7a6e65',
+          600: '#5c514a',
+          700: '#3a322f',
+          800: '#272120',
+          900: '#1b1716',
+          950: '#151211',
         }
   		},
   		keyframes: {

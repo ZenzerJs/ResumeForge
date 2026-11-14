@@ -1,4 +1,6 @@
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import { test, expect } from "@playwright/test";
 
 test.describe("Cross-Page Multi-Workspace E2E Journey Tests (Task B2)", () => {
@@ -45,6 +47,7 @@ test.describe("Cross-Page Multi-Workspace E2E Journey Tests (Task B2)", () => {
 
     await page.click("[data-testid='save-job-btn']");
     await page.waitForSelector("text=Job posting saved successfully!", { timeout: 10000 });
+    await page.click("[data-testid='tailor-tab-3-pane']");
     await page.waitForSelector("[data-testid='ats-score-panel']", { timeout: 5000 });
     const activeJobId = await page.evaluate(() => sessionStorage.getItem("resumeforge_active_job_id"));
 
@@ -78,8 +81,7 @@ test.describe("Cross-Page Multi-Workspace E2E Journey Tests (Task B2)", () => {
       }
       process.env.DATABASE_URL ||= "postgresql://resumeforge:resumeforge@localhost:5432/resumeforge";
     }
-    const { createProposalBatch } = await import("../src/lib/ai/patch-batches");
-    const proposalBatch = await createProposalBatch({
+    const batchInput = JSON.stringify({
       userId: master.userId,
       masterResumeId: master.id,
       jobId: job.id,
@@ -97,6 +99,30 @@ test.describe("Cross-Page Multi-Workspace E2E Journey Tests (Task B2)", () => {
       ],
       gaps: [],
     });
+    const batchStdout = execFileSync(
+      process.execPath,
+      [
+        path.resolve("node_modules/tsx/dist/cli.mjs"),
+        "-e",
+        [
+          'import fs from "node:fs";',
+          'import { createProposalBatch } from "./src/lib/ai/patch-batches";',
+          'import { prisma } from "./src/lib/prisma";',
+          '(async () => {',
+          '  const input = JSON.parse(fs.readFileSync(0, "utf8"));',
+          '  const res = await createProposalBatch(input);',
+          '  console.log(JSON.stringify(res));',
+          '  await prisma.$disconnect();',
+          '})().catch(async (err) => { console.error(err); await prisma.$disconnect(); process.exit(1); });',
+        ].join(" "),
+      ],
+      {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        input: batchInput,
+      },
+    );
+    const proposalBatch = JSON.parse(batchStdout);
     expect(proposalBatch.verified).toHaveLength(1);
 
     const applyRes = await request.post("/api/ai/apply-patches", {
@@ -123,7 +149,7 @@ test.describe("Cross-Page Multi-Workspace E2E Journey Tests (Task B2)", () => {
     expect(badgeText).toContain("Tailored Variant");
 
     // Verify preview compiled without error
-    await page.waitForSelector("svg", { timeout: 10000 });
+    await page.waitForSelector(".typst-preview-svg svg", { timeout: 15000 });
 
     // Step 6: Navigate to /library, verify Evidence Bank workspace loads cleanly
     await page.goto("/library");
