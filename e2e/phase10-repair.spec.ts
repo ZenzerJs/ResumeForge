@@ -100,12 +100,84 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     await expect(fixWithAiBtn).toBeVisible({ timeout: 10000 });
     await fixWithAiBtn.click();
 
-    const closeRepairBtn = page.locator('[data-testid="close-repair-mode-btn"]').first();
-    await expect(closeRepairBtn).toBeVisible();
-    await closeRepairBtn.click();
+    const exitRepairBtn = page.locator('[data-testid="panel-ai"]').getByRole("button", { name: "Exit" });
+    await expect(exitRepairBtn).toBeVisible();
+    await expect(exitRepairBtn).toHaveText("Exit");
+    await exitRepairBtn.click();
 
     const repairHeader = page.locator("text=Typst Repair Assist").first();
     await expect(repairHeader).not.toBeVisible();
+  });
+
+  test("3b. AI Sidebar renders clean UTF-8 punctuation without mojibake across Tailor states", async ({ page }) => {
+    await page.goto("/editor");
+    await page.waitForLoadState("networkidle");
+
+    const aiPanel = page.locator('[data-testid="panel-ai"]');
+    await page.locator('[data-testid="ai-tab-tailor"]').click();
+
+    const jdTextarea = page.locator('textarea[placeholder*="Paste the job posting here…"]');
+    await expect(jdTextarea).toBeVisible();
+    await expect(aiPanel.getByRole("link", { name: "Browse saved jobs in Tracker →" })).toBeVisible();
+
+    // Missing API key state renders clean arrow prefix
+    await jdTextarea.fill("Senior TypeScript Engineer");
+    await aiPanel.getByRole("button", { name: "Generate Suggestions" }).click();
+    await expect(aiPanel.getByRole("link", { name: "→ Configure your API key in Settings" })).toBeVisible();
+
+    // Seed local Ollama settings and delay patch generation to observe loading + diff glyphs
+    await page.evaluate(() => {
+      localStorage.setItem("resumeforge_ai_settings", JSON.stringify({ provider: "ollama", model: "llama3" }));
+    });
+    await page.route("**/api/jobs/extract", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          data: { requiredSkills: ["TypeScript"], preferredSkills: [], domainTerms: [] },
+        }),
+      });
+    });
+    await page.route("**/api/jobs", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ success: true, data: { id: "mock-job-ui02" } }),
+      });
+    });
+    await page.route("**/api/ai/generate-patches", async (route) => {
+      await new Promise((r) => setTimeout(r, 350));
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          data: {
+            verified: [
+              {
+                id: "patch-ui02-1",
+                operation: "MODIFY_BULLET",
+                targetSection: "Experience",
+                before: "Built backend APIs.",
+                after: "Built typed TypeScript APIs.",
+                rationale: "Highlights TypeScript alignment.",
+                confidence: 0.92,
+                evidenceIds: ["ev-1"],
+              },
+            ],
+            gaps: [],
+          },
+        }),
+      });
+    });
+
+    await aiPanel.getByRole("button", { name: "Generate Suggestions" }).click();
+    await expect(aiPanel.getByText("Generating suggestions…")).toBeVisible();
+    await expect(aiPanel.getByText("− Built backend APIs.")).toBeVisible({ timeout: 10000 });
+
+    const panelText = await aiPanel.innerText();
+    expect(panelText).not.toMatch(/Ã.|â€.|Â.|ðŸ/);
   });
 
   test("4. Landing page renders SVG atmosphere background, proof card framing, and softened headline without horizontal overflow", async ({ page }) => {
@@ -245,23 +317,22 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     await expect(applyFixBtn).toBeDisabled();
   });
 
-  test("7. Landing atmosphere renders the AsciiWaves background layer", async ({ page }) => {
+  test("7. Landing renders a calm studio backdrop without AsciiWaves canvas", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
     const atmosphere = page.locator('[data-testid="landing-atmosphere"]');
     await expect(atmosphere).toBeVisible();
-    await expect(page.locator('[data-testid="ascii-waves-canvas"]')).toBeVisible();
+    await expect(page.locator('[data-testid="ascii-waves-canvas"]')).toHaveCount(0);
   });
 
-  test("8. Reduced-motion media query freezes landing atmosphere into a static composition", async ({ page }) => {
+  test("8. Reduced-motion media query preserves calm landing layout without wave canvas", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
     const atmosphere = page.locator('[data-testid="landing-atmosphere"]');
     await expect(atmosphere).toBeVisible();
-    await expect(page.locator('[data-testid="atmosphere-static-fallback"]')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('[data-testid="ascii-waves-canvas"]')).toHaveCount(0);
   });
 });

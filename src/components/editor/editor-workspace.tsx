@@ -788,40 +788,40 @@ export function EditorWorkspace() {
             {docMetadata.type === "MASTER_RESUME" && (
               <span
                 data-testid="doc-badge-master"
-                className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-950/60 text-amber-300 border border-amber-800/60 flex items-center gap-1.5 shadow-sm"
+                className="text-[11px] font-semibold px-2 py-0.5 rounded bg-elevated text-foreground border border-primary/40 flex items-center gap-1.5 whitespace-nowrap"
               >
-                <ShieldCheck className="h-3.5 w-3.5 text-amber-400" />
+                <ShieldCheck className="h-3.5 w-3.5 text-primary" />
                 Master Resume
               </span>
             )}
             {docMetadata.type === "RESUME_VARIANT" && (
               <span
                 data-testid="doc-badge-variant"
-                className="text-xs font-semibold px-2.5 py-1 rounded-full bg-sky-950/60 text-sky-300 border border-sky-800/60 flex items-center gap-1.5 shadow-sm"
+                className="text-[11px] font-semibold px-2 py-0.5 rounded bg-elevated text-foreground border border-status-info/40 flex items-center gap-1.5 whitespace-nowrap"
               >
-                <Sparkles className="h-3.5 w-3.5 text-sky-400" />
+                <Sparkles className="h-3.5 w-3.5 text-status-info" />
                 Tailored Variant ({docMetadata.title})
               </span>
             )}
             {docMetadata.type === "LOCAL_FALLBACK" && (
               <span
                 data-testid="doc-badge-fallback"
-                className="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-900 text-slate-300 border border-slate-700/60 flex items-center gap-1.5"
+                className="text-[11px] font-semibold px-2 py-0.5 rounded bg-elevated text-text-secondary border border-outline/70 flex items-center gap-1.5 whitespace-nowrap"
               >
-                <FileText className="h-3.5 w-3.5 text-slate-400" />
+                <FileText className="h-3.5 w-3.5 text-text-muted" />
                 {docMetadata.title}
               </span>
             )}
           </div>
         }
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {showShortcutSaveToast && (
               <div
                 data-testid="shortcut-save-toast"
-                className="flex items-center gap-1.5 px-3 py-1 bg-emerald-950/90 border border-emerald-700/80 text-emerald-200 text-xs font-medium rounded-md shadow-lg transition-all"
+                className="flex items-center gap-1.5 px-2.5 py-0.5 bg-elevated border border-status-success/60 text-foreground text-xs font-semibold rounded transition-all"
               >
-                <Check className="h-3.5 w-3.5 text-emerald-400" />
+                <Check className="h-3.5 w-3.5 text-status-success" />
                 <span>Draft Saved &amp; Recompiled</span>
               </div>
             )}
@@ -831,7 +831,7 @@ export function EditorWorkspace() {
               variant="outline"
               onClick={handleRevertToMaster}
               data-testid="revert-to-master-btn"
-              className="text-xs border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 gap-1.5"
+              className="min-h-10 lg:min-h-0 lg:h-7 px-2.5 text-xs border-outline/70 bg-transparent text-text-secondary hover:bg-elevated hover:text-foreground gap-1.5 focus-visible:ring-2 focus-visible:ring-ring"
               title="Discard unsaved live buffer changes and reload persisted Master Resume"
             >
               <RotateCcw className="h-3.5 w-3.5" />
@@ -844,16 +844,12 @@ export function EditorWorkspace() {
               onClick={handleSaveAsMaster}
               disabled={isSavingMaster || isLoadingDocument}
               data-testid="save-as-master-btn"
-              className="text-xs font-semibold gap-1.5 transition-colors"
-              style={{
-                background: saveSuccess
-                  ? "linear-gradient(135deg, #10B981, #059669)"
-                  : "linear-gradient(135deg, #F59E0B, #D97706)",
-                color: "#0A0E17",
-                boxShadow: saveSuccess
-                  ? "0 0 12px rgba(16,185,129,0.25)"
-                  : "0 0 12px rgba(245,158,11,0.2)",
-              }}
+              className={cn(
+                "min-h-10 lg:min-h-0 lg:h-7 px-3 text-xs font-semibold gap-1.5 transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                saveSuccess
+                  ? "bg-status-success text-secondary-foreground hover:bg-status-success/90"
+                  : "bg-primary text-primary-foreground hover:bg-primary/90"
+              )}
             >
               {isSavingMaster ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -880,10 +876,10 @@ export function EditorWorkspace() {
               }}
               data-testid={isAiCollapsed ? "expand-ai-sidebar-btn" : "toggle-ai-assistant-btn"}
               className={cn(
-                "h-8 shrink-0 gap-1.5 text-xs hidden lg:inline-flex transition-all",
+                "h-7 shrink-0 gap-1.5 px-2.5 text-xs hidden lg:inline-flex transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                 isAiPoppedOut || !isAiCollapsed
-                  ? "border-amber-500/50 bg-amber-500/20 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.2)]"
-                  : "border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-amber-400"
+                  ? "border-primary/60 bg-primary/15 text-primary hover:bg-primary/20"
+                  : "border-outline/70 bg-elevated text-text-secondary hover:bg-muted hover:text-foreground"
               )}
               title={
                 isAiPoppedOut
@@ -893,10 +889,10 @@ export function EditorWorkspace() {
                   : "Pop out AI Assistant into floating window"
               }
             >
-              <Bot className="h-3.5 w-3.5 text-amber-400" />
+              <Bot className="h-3.5 w-3.5 text-primary" />
               <span>AI Assistant</span>
               {isAiPoppedOut && (
-                <span className="text-[9px] bg-amber-500/30 px-1 py-0.5 rounded font-mono text-amber-200">
+                <span className="text-[9px] bg-primary/20 px-1 py-0.5 rounded font-mono text-primary">
                   POP-OUT
                 </span>
               )}
@@ -904,7 +900,7 @@ export function EditorWorkspace() {
 
             {/* Mobile Tab Selectors (< lg screens) */}
             <div
-              className="flex items-center gap-1 rounded-lg border border-border bg-background p-1 lg:hidden"
+              className="flex items-center gap-0.5 rounded border border-outline/70 bg-inset p-0.5 lg:hidden"
               role="tablist"
               aria-label="Workspace panels"
             >
@@ -913,7 +909,7 @@ export function EditorWorkspace() {
               size="sm"
               variant={activeTab === "editor" ? "default" : "ghost"}
               onClick={() => setActiveTab("editor")}
-              className="h-8 px-2 text-xs"
+              className="min-h-9 lg:min-h-0 lg:h-7 px-2 text-xs"
               aria-selected={activeTab === "editor"}
             >
               <Code2 className="h-3.5 w-3.5" />
@@ -924,7 +920,7 @@ export function EditorWorkspace() {
               size="sm"
               variant={activeTab === "preview" ? "default" : "ghost"}
               onClick={() => setActiveTab("preview")}
-              className="h-8 px-2 text-xs"
+              className="min-h-9 lg:min-h-0 lg:h-7 px-2 text-xs"
               aria-selected={activeTab === "preview"}
             >
               <Eye className="h-3.5 w-3.5" />
@@ -935,7 +931,7 @@ export function EditorWorkspace() {
               size="sm"
               variant={activeTab === "ai" ? "default" : "ghost"}
               onClick={() => setActiveTab("ai")}
-              className="h-8 px-2 text-xs"
+              className="min-h-9 lg:min-h-0 lg:h-7 px-2 text-xs"
               aria-selected={activeTab === "ai"}
             >
               {aiMode === "chat" ? (
@@ -1088,7 +1084,7 @@ export function EditorWorkspace() {
       />
 
       {/* Main Workspace Body */}
-      <div className="flex flex-1 min-h-0 overflow-hidden bg-background p-2 md:p-3">
+      <div className="flex flex-1 min-h-0 overflow-hidden bg-canvas px-1.5 pb-1.5 pt-0">
         {/* Desktop 3-Panel Resizable Layout (>= lg screens) — client-only to avoid SSR style hydration mismatch */}
         {isLayoutReady ? (
           <ResizablePanelGroup

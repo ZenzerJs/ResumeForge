@@ -999,7 +999,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                 <ChevronLeft className="h-3.5 w-3.5" />
                 Prev
               </button>
-              <span className="text-xs text-slate-500" data-testid="jobs-page-indicator">
+              <span className="text-xs tabular-nums text-muted-foreground" data-testid="jobs-page-indicator">
                 Page {page} of {totalPages}
               </span>
               <button

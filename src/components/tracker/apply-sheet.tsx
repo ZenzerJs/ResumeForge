@@ -673,8 +673,8 @@ export function ApplySheet({
                   variant="outline"
                   className={
                     atsScore.overallScore >= 80
-                      ? "border-emerald-500/50 text-emerald-400 bg-emerald-950/30"
-                      : "border-amber-500/50 text-amber-400 bg-amber-950/30"
+                      ? "tabular-nums border-status-success/50 text-status-success bg-status-success/10"
+                      : "tabular-nums border-status-warning/50 text-status-warning bg-status-warning/10"
                   }
                 >
                   {atsScore.overallScore} / 100

@@ -1,9 +1,9 @@
 .tailor {
-  border-color: var(--rf-border);
-  border-radius: 1rem;
-  background: var(--rf-surface);
+  border-color: rgb(var(--border-hairline));
+  border-radius: 10px;
+  background: rgb(var(--surface-panel));
   box-shadow: none;
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: var(--font-hanken), sans-serif;
 }
 
 .tailor h2 {
@@ -19,12 +19,12 @@
 }
 
 .tailor .engineBadge {
-  border-color: var(--rf-border);
-  background: var(--rf-bg);
-  color: var(--rf-meta);
+  border-color: rgb(var(--border-hairline));
+  background: rgb(var(--surface-canvas));
+  color: rgb(var(--text-muted));
   font-family: inherit;
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.5;
 }
 
@@ -35,20 +35,21 @@
 
 .tailor .scoreBadge {
   padding: 1.25rem;
-  border-color: var(--rf-border);
-  background: var(--rf-bg);
-  color: var(--rf-cloud);
+  border-color: rgb(var(--border-hairline));
+  background: rgb(var(--surface-canvas));
+  color: rgb(var(--text-primary));
   gap: 0.25rem;
 }
 
 .tailor .scoreBadge > span {
   font-size: 0.75rem;
-  color: var(--rf-meta);
+  color: rgb(var(--text-muted));
 }
 
 .tailor .scoreValue {
   font-family: inherit;
   font-size: 3rem;
+  font-weight: 700;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.04em;
@@ -56,28 +57,28 @@
 
 .tailor .feedback {
   min-height: 44px;
-  border: 1px solid var(--rf-border);
+  border: 1px solid rgb(var(--border-control));
   background: transparent;
-  color: var(--rf-cloud);
+  color: rgb(var(--text-primary));
   box-shadow: none;
   font-size: 0.875rem;
   transition: background-color 150ms ease;
 }
 
 .tailor .feedback:hover:not(:disabled) {
-  background: var(--rf-surface-elevated);
+  background: rgb(var(--surface-elevated));
 }
 
 .tailor button:focus-visible,
 .tailor select:focus-visible {
-  outline: 2px solid var(--rf-amber);
-  outline-offset: 3px;
+  outline: 2px solid rgb(var(--focus-ring));
+  outline-offset: 2px;
 }
 
 .tailor .categories > div {
-  background: var(--rf-bg);
-  border-color: var(--rf-border);
-  border-radius: 0.75rem;
+  background: rgb(var(--surface-inset));
+  border-color: rgb(var(--border-hairline));
+  border-radius: 10px;
 }
 
 @media (prefers-reduced-motion: reduce) {

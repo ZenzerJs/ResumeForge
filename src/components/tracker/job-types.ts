@@ -19,6 +19,7 @@ export interface JobItem {
   company?: string | null;
   roleTitle?: string | null;
   rawDescription?: string;
+  salaryLabel?: string | null;
   isPlaceholder?: boolean;
   extractFailure?: string | null;
   source: string;

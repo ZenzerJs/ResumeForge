@@ -16,15 +16,15 @@ export function Surface({
   ...props
 }: SurfaceProps) {
   const variantStyles = {
-    primary: "bg-rf-surface border border-[var(--rf-surface-border)] shadow-md",
-    elevated: "bg-rf-elevated border border-slate-700/60 shadow-lg",
-    flat: "bg-rf-bg border border-slate-800/60",
-    transparent: "bg-slate-950/40 border border-slate-800/40 backdrop-blur-sm",
+    primary: "bg-card border border-border shadow-md",
+    elevated: "bg-popover border border-outline/70 shadow-lg",
+    flat: "bg-background border border-border",
+    transparent: "bg-surface-container-lowest/60 border border-border/60 backdrop-blur-sm",
   };
 
   return (
     <div
-      className={cn("rounded-xl", variantStyles[variant], className)}
+      className={cn("rounded-[10px]", variantStyles[variant], className)}
       {...props}
     >
       {children}

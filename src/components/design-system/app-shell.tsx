@@ -33,7 +33,7 @@ interface AppShellProps {
   hideNav?: boolean;
 }
 
-function GuestBanner() {
+function GuestBanner({ inline = false }: { inline?: boolean }) {
   const [guest, setGuest] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
 
@@ -53,14 +53,38 @@ function GuestBanner() {
 
   if (!guest) return null;
 
+  if (inline) {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 rounded border border-outline/70 bg-elevated px-2 py-0.5 text-[11px] font-medium text-text-secondary whitespace-nowrap"
+        data-testid="guest-banner"
+      >
+        {demoMode ? (
+          <span>Demo (browser draft · BYOK)</span>
+        ) : (
+          <>
+            <span>Guest draft</span>
+            <span aria-hidden="true">·</span>
+            <Link
+              href="/login"
+              className="font-semibold text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+            >
+              Sign in
+            </Link>
+          </>
+        )}
+      </span>
+    );
+  }
+
   return (
     <div
-      className="border-b border-slate-800 bg-slate-900/80 px-4 py-2 text-center text-sm text-slate-300"
+      className="border-b border-outline/70 bg-panel px-4 py-2 text-center text-sm text-text-secondary"
       data-testid="guest-banner"
     >
       {demoMode
         ? "Public demo: samples are fictional, your drafts stay in this browser, and AI uses your BYOK key. Public signup is disabled."
-        : <>You’re using a guest session. Work stays in this browser until you{" "}<Link href="/login" className="font-semibold text-amber-400 underline-offset-2 hover:underline">sign in</Link>{" "}to save.</>}
+        : <>You’re using a guest session. Work stays in this browser until you{" "}<Link href="/login" className="font-semibold text-primary underline-offset-2 hover:underline">sign in</Link>{" "}to save.</>}
     </div>
   );
 }
@@ -75,34 +99,8 @@ export function AppShell({
   hideNav = false,
 }: AppShellProps) {
   const lockViewport = layout ? layout === "workspace" : variant === "editor" || variant === "tracker";
-  const hasWave = variant === "tracker";
   /** Editor actions are too wide for the global header; give them their own bar. */
   const useToolbar = variant === "editor" && Boolean(actions || badge);
-  const [motionPaused, setMotionPaused] = useState(false);
-  const [pageHidden, setPageHidden] = useState(false);
-
-  useEffect(() => {
-    if (!hasWave) return;
-    try {
-      setMotionPaused(localStorage.getItem("resumeforge_workspace_motion_paused") === "true");
-    } catch {
-      // Motion still works if browser storage is unavailable.
-    }
-    const updateVisibility = () => setPageHidden(document.hidden);
-    updateVisibility();
-    document.addEventListener("visibilitychange", updateVisibility);
-    return () => document.removeEventListener("visibilitychange", updateVisibility);
-  }, [hasWave]);
-
-  const toggleMotion = () => {
-    const next = !motionPaused;
-    setMotionPaused(next);
-    try {
-      localStorage.setItem("resumeforge_workspace_motion_paused", String(next));
-    } catch {
-      // The preference remains effective for the current view.
-    }
-  };
 
   const [showMigrationModal, setShowMigrationModal] = useState(false);
   const [guestDraft, setGuestDraft] = useState<string | null>(null);
@@ -194,51 +192,40 @@ export function AppShell({
     <div
       className={cn(
         "relative flex flex-col bg-rf-bg text-rf-body",
-        hasWave && "tracker-wave-canvas",
-        variant !== "tracker" && "bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(255,140,0,0.06),transparent)]",
         lockViewport ? "h-dvh max-h-dvh overflow-hidden" : "min-h-screen overflow-x-hidden"
       )}
       data-workspace-theme={variant === "landing" ? undefined : ""}
       data-testid={`app-shell-${variant}`}
     >
-      {hasWave && (
-        <div className="workspace-wave" aria-hidden="true" data-testid="workspace-wave">
-          <div className="workspace-wave-texture" data-paused={motionPaused || pageHidden} />
-        </div>
-      )}
       {!hideNav ? (
         <TopNav
-          backgroundMotion={hasWave ? { paused: motionPaused, onToggle: toggleMotion } : undefined}
+          compact={variant === "editor"}
           badge={useToolbar ? undefined : badge}
           actions={useToolbar ? undefined : actions}
         />
       ) : null}
-
-      {hideNav && hasWave && (
-        <button
-          type="button"
-          onClick={toggleMotion}
-          className="fixed bottom-3 right-3 z-50 rounded-md border border-slate-600 bg-rf-surface px-3 py-2 text-xs text-slate-100 focus-visible:ring-2 focus-visible:ring-amber-500 motion-reduce:hidden"
-        >
-          {motionPaused ? "Resume background motion" : "Pause background motion"}
-        </button>
-      )}
       <main
         id="main-content"
         className={cn(
           "relative flex min-h-0 flex-1 flex-col",
-          !hideNav && "pt-[calc(4rem+env(safe-area-inset-top))]",
+          !hideNav &&
+            (variant === "editor"
+              ? "pt-[calc(3rem+env(safe-area-inset-top))]"
+              : "pt-[calc(4rem+env(safe-area-inset-top))]"),
           lockViewport ? "overflow-hidden" : "overflow-y-auto",
           className
         )}
       >
-        {!hideNav ? <GuestBanner /> : null}
+        {!hideNav && !(variant === "editor" && useToolbar) ? <GuestBanner /> : null}
         {!hideNav && useToolbar ? (
           <div
-            className="relative z-40 flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-slate-800/80 bg-rf-bg px-4 py-2 md:px-8"
+            className="relative z-40 flex min-h-10 shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-outline/70 bg-panel px-4 py-1 lg:h-10 lg:flex-nowrap lg:px-6"
             data-testid="workspace-toolbar"
           >
-            <div className="flex min-w-0 items-center gap-3">{badge}</div>
+            <div className="flex min-w-0 items-center gap-2.5">
+              {badge}
+              <GuestBanner inline />
+            </div>
             <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">{actions}</div>
           </div>
         ) : null}

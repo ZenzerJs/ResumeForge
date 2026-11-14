@@ -261,7 +261,7 @@ export const TailorDiagnosticPanel = ({
 
   return (
     <div className="flex flex-col gap-4 p-4 border rounded" data-testid="tailor-diagnostic-panel">
-      <h3 className="font-bold">
+      <h3 className="font-bold tabular-nums">
         Diagnostics ({report.overallScore}%)
       </h3>
 

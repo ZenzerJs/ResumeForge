@@ -47,18 +47,18 @@ export function FitPercentageDial({ compositeScore, breakdown, size = 120, showL
             </svg>
             {showLabel && (
               <span className="absolute flex flex-col items-center text-center">
-                <span className="text-xl font-bold text-foreground">{score === null ? "—" : `${score}%`}</span>
+                <span className="text-xl font-bold tabular-nums text-foreground">{score === null ? "—" : `${score}%`}</span>
                 <span className="text-xs text-muted-foreground">Score</span>
               </span>
             )}
           </span>
-          {!showLabel && <span className="font-mono text-xs text-slate-200">{score === null ? "Unavailable" : `${score}%`}</span>}
+          {!showLabel && <span className="font-mono text-xs tabular-nums text-foreground">{score === null ? "Unavailable" : `${score}%`}</span>}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-4">
         <div className="space-y-4">
-          <h4 className="text-sm font-medium">Blended score breakdown</h4>
-          <div className="space-y-3 text-sm">
+          <h4 className="text-sm font-semibold">Blended score breakdown</h4>
+          <div className="space-y-3 text-sm tabular-nums">
             {blendedFactors(breakdown).map(({ label: factor, weight, score: value }) => (
               <div key={factor} className="space-y-1">
                 <div className="flex justify-between gap-2">

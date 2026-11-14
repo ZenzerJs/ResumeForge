@@ -591,7 +591,7 @@ export function LibraryWorkspace() {
       <div className="mx-auto max-w-5xl w-full px-6 pt-8 pb-16 flex-1 flex flex-col gap-8">
         {/* Page Title Header */}
         <div>
-          <h1 className="text-3xl font-extrabold text-white tracking-[-0.03em] mb-4">
+          <h1 className="text-3xl font-bold text-foreground tracking-[-0.03em] mb-4">
             Verified Evidence Bank Inventory
           </h1>
           <BulkPdfDropzone onComplete={handlePdfIngestComplete} />

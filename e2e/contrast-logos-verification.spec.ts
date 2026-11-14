@@ -32,32 +32,64 @@ test("workspace themes, navigation reset, and real local logos", async ({ page, 
   }
   await expect(page.getByTestId("job-card-synthetic-2").locator("span[aria-hidden=true]").first()).toHaveText("U");
   const colors = await page.evaluate(() => {
-    const style = getComputedStyle(document.body);
-    const canvas = style.getPropertyValue("--rf-bg").trim();
-    const surface = style.getPropertyValue("--rf-surface").trim();
+    const bodyBg = getComputedStyle(document.body).backgroundColor;
+    const bodyFg = getComputedStyle(document.body).color;
+    const style = getComputedStyle(document.documentElement);
+    const canvas = style.getPropertyValue("--surface-canvas").trim();
+    const panel = style.getPropertyValue("--surface-panel").trim();
+    const elevated = style.getPropertyValue("--surface-elevated").trim();
     const card = getComputedStyle(document.querySelector('[data-testid="job-card-synthetic-0"]')!).backgroundColor;
     const input = getComputedStyle(document.querySelector('[data-testid="discover-search-input"]')!).backgroundColor;
-    return { canvas, surface, card, input };
+    const header = getComputedStyle(document.querySelector("header")!).backgroundColor;
+    return { bodyBg, bodyFg, canvas, panel, elevated, card, input, header };
   });
-  expect(colors.canvas).toBe("#080e1c"); expect(colors.surface).toBe("#1c2940");
-  expect(colors.card).toBe("rgb(28, 41, 64)"); expect(colors.card).not.toBe(colors.input);
+  expect(colors.canvas).toBe("21 24 26");
+  expect(colors.panel).toBe("28 32 35");
+  expect(colors.elevated).toBe("37 42 45");
+  expect(colors.bodyBg).toBe("rgb(21, 24, 26)");
+  expect(colors.bodyFg).toBe("rgb(237, 239, 237)");
+  expect(colors.card).toBe("rgb(28, 32, 35)");
+  expect(colors.card).not.toBe(colors.input);
+  expect(colors.header).toContain("rgba(21, 24, 26, 0.9");
   await shot(page, "jobs-desktop.png");
   expect(external).toEqual([]);
   for (const [route, name] of [["/library", "library"], ["/settings", "settings"], ["/editor", "editor"], ["/tailor", "tailor"]]) {
-    await page.goto(route); await expect(page.locator("[data-workspace-theme]")).toHaveCount(1); await shot(page, `${name}-desktop.png`);
+    await page.goto(route);
+    await expect(page.locator("[data-workspace-theme]")).toHaveCount(1);
+    const routeBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    expect(routeBg).toBe("rgb(21, 24, 26)");
+    await shot(page, `${name}-desktop.png`);
   }
   await page.goto("/"); await expect(page.locator("[data-workspace-theme]")).toHaveCount(0);
-  const home = await page.evaluate(() => {
-    const style = getComputedStyle(document.body);
-    const colors = ["--rf-bg", "--rf-surface", "--rf-surface-elevated"].map(key => style.getPropertyValue(key).trim());
-    const probes = ["bg-card", "bg-muted", "bg-rf-surface"].map(name => {
+  const home = await page.evaluate(async () => {
+    await document.fonts.ready;
+    const bodyBg = getComputedStyle(document.body).backgroundColor;
+    const probes = ["bg-card", "bg-muted", "bg-rf-surface", "bg-popover", "bg-background", "bg-muted/50", "bg-rf-bg/90"].map(name => {
       const node = document.createElement("span"); node.className = name; document.body.appendChild(node);
       const color = getComputedStyle(node).backgroundColor; node.remove(); return color;
     });
-    return { colors, probes };
+    const root = getComputedStyle(document.documentElement);
+    const sans = root.getPropertyValue("--font-hanken").trim().split(",")[0].trim();
+    const mono = root.getPropertyValue("--font-mono").trim().split(",")[0].trim();
+    return {
+      bodyBg,
+      probes,
+      sansLoaded: document.fonts.check(`400 16px ${sans}`) && document.fonts.check(`700 16px ${sans}`),
+      monoLoaded: document.fonts.check(`400 14px ${mono}`) && document.fonts.check(`600 14px ${mono}`),
+    };
   });
-  expect(home.colors).toEqual(["#0b1326", "#171f33", "#222a3d"]);
-  expect(home.probes).toEqual(["rgb(23, 31, 51)", "rgb(34, 42, 61)", "rgb(23, 31, 51)"]);
+  expect(home.bodyBg).toBe("rgb(21, 24, 26)");
+  expect(home.probes).toEqual([
+    "rgb(28, 32, 35)",
+    "rgb(37, 42, 45)",
+    "rgb(28, 32, 35)",
+    "rgb(37, 42, 45)",
+    "rgb(21, 24, 26)",
+    "rgba(37, 42, 45, 0.5)",
+    "rgba(21, 24, 26, 0.9)",
+  ]);
+  expect(home.sansLoaded).toBe(true);
+  expect(home.monoLoaded).toBe(true);
   await shot(page, "home.png");
 });
 
@@ -72,7 +104,12 @@ test("score shows weighted factors and accessible popover", async ({ page }) => 
     expect(await bar.locator("div").evaluate(e => (e as HTMLElement).style.width)).toBe(`${value}%`);
   }
   await expect(popover).not.toContainText(/undefined|NaN/);
-  expect(await popover.evaluate(e => getComputedStyle(e).backgroundColor)).toBe("rgb(41, 59, 85)");
+  const popoverStyles = await popover.evaluate(e => {
+    const cs = getComputedStyle(e);
+    return { bg: cs.backgroundColor, color: cs.color };
+  });
+  expect(popoverStyles.bg).toBe("rgb(37, 42, 45)");
+  expect(popoverStyles.color).toBe("rgb(237, 239, 237)");
   await shot(page, "score-popover.png");
   const circle = dial.locator("circle").first(); expect(Number(await circle.getAttribute("stroke-width"))).toBeGreaterThanOrEqual(2.5); expect(Number(await circle.getAttribute("stroke-width"))).toBeLessThanOrEqual(4);
   await page.keyboard.press("Escape"); await expect(popover).not.toBeVisible();

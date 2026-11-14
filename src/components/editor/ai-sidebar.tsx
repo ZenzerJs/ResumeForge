@@ -586,11 +586,11 @@ export function AiSidebar({
   };
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-950 shadow-sm">
+    <div className="flex h-full flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-panel">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-        <span className="flex items-center gap-2 text-xs font-semibold text-slate-200">
-          <Wand2 className="h-4 w-4 text-amber-400" />
+      <div className="flex min-h-8 items-center justify-between border-b border-outline/70 bg-panel px-2.5 py-0.5 md:h-8">
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+          <Wand2 className="h-3.5 w-3.5 text-primary" />
           {repairContext ? "Typst Repair Assist" : mode === "chat" ? "AI Chat" : "AI Tailor"}
         </span>
         <div className="flex items-center gap-2">
@@ -598,7 +598,7 @@ export function AiSidebar({
             <button
               type="button"
               onClick={onDismissRepair}
-              className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              className="p-0.5 rounded text-text-secondary hover:text-foreground hover:bg-elevated transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               title="Close Repair Assist Mode"
               data-testid="close-repair-mode-btn"
             >
@@ -607,7 +607,7 @@ export function AiSidebar({
           )}
           <Link
             href="/settings"
-            className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-300 transition"
+            className="flex items-center gap-1 text-[11px] text-text-muted hover:text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
           >
             <Settings className="h-3 w-3" />
             Settings
@@ -616,7 +616,7 @@ export function AiSidebar({
             <button
               type="button"
               onClick={onPopOut}
-              className="p-1 rounded text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition"
+              className="p-0.5 rounded text-text-secondary hover:text-primary hover:bg-elevated transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               title={isPoppedOut ? "Dock back to sidebar" : "Pop out into floating window"}
               data-testid="popout-ai-window-btn"
             >
@@ -702,7 +702,7 @@ export function AiSidebar({
                   className="text-slate-400 hover:text-white text-xs font-mono"
                   data-testid="close-repair-mode-btn"
                 >
-                  âœ• Exit
+                  Exit
                 </button>
               )}
             </div>
@@ -903,7 +903,7 @@ export function AiSidebar({
               setError(null);
               setNoKeyError(false);
             }}
-            placeholder={"Paste the job posting hereâ€¦\n\n(or navigate to a job in the Tracker and click Copy JD to auto-fill)"}
+            placeholder={"Paste the job posting here…\n\n(or navigate to a job in the Tracker and click Copy JD to auto-fill)"}
             className="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs text-slate-200 placeholder-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 resize-none font-mono leading-relaxed"
           />
         </div>
@@ -922,7 +922,7 @@ export function AiSidebar({
                 href="/settings"
                 className="mt-2 block underline underline-offset-2 text-amber-400 hover:text-amber-300 text-xs font-medium"
               >
-                â†’ Configure your API key in Settings
+                → Configure your API key in Settings
               </Link>
             )}
           </div>
@@ -938,7 +938,7 @@ export function AiSidebar({
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Generating suggestionsâ€¦
+              Generating suggestions…
             </>
           ) : (
             <>
@@ -1048,7 +1048,7 @@ export function AiSidebar({
 
                   {s.before && (
                     <div className="text-[10px] bg-red-950/30 border border-red-900/40 rounded p-2 text-red-300 font-mono line-clamp-2">
-                      âˆ’ {s.before}
+                      − {s.before}
                     </div>
                   )}
                   {s.after && (
@@ -1136,7 +1136,7 @@ export function AiSidebar({
               href="/tracker"
               className="text-[11px] text-amber-400/80 hover:text-amber-400 underline underline-offset-2 transition"
             >
-              Browse saved jobs in Tracker â†’
+              Browse saved jobs in Tracker →
             </Link>
           </div>
         )}

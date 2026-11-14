@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { JobRequirements, JobRequirementsSchema } from "@/lib/jd-parser/types";
 import {
   extractPostingDateFromNotes,
+  extractSalaryFromNotes,
   isPlaceholderDescription,
   matchesWorkplaceFilter,
   type WorkplaceFilter,
@@ -320,12 +321,13 @@ export async function getJobsList(query: JobListQuery = {}) {
   let applied = 0;
   let interviewing = 0;
   let cursor: string | undefined;
-  const data: Array<Omit<Prisma.JobGetPayload<{ include: typeof jobListInclude }>, "applications" | "extractedRequirements" | "status"> & {
+  const data: Array<Omit<Prisma.JobGetPayload<{ include: typeof jobListInclude }>, "applications" | "extractedRequirements" | "status" | "rawDescription"> & {
     status: JobStatus;
     appliedAt: Date | null;
     appliedVariantId: string | null;
     extractedRequirements: JobRequirements;
     isPlaceholder: boolean;
+    salaryLabel: string | null;
   }> = [];
 
   for (;;) {
@@ -372,12 +374,14 @@ export async function getJobsList(query: JobListQuery = {}) {
       if (item.status === "INTERVIEWING") interviewing++;
       if (total >= start && total < start + limit) {
         // The scoped proposal lookup is internal and must not leak into board responses.
-        const { patchProposalBatches: _internal, ...visible } = item as typeof item & { patchProposalBatches?: unknown };
+        const { patchProposalBatches: _internal, rawDescription: _rawDescription, ...visible } = item as typeof item & { patchProposalBatches?: unknown };
         void _internal;
+        void _rawDescription;
         data.push({
           ...visible,
           extractedRequirements: parseRequirementsJson(job.extractedRequirements),
           isPlaceholder: isPlaceholderDescription(job.rawDescription),
+          salaryLabel: extractSalaryFromNotes(job.notes, job.rawDescription),
         });
       }
       total++;

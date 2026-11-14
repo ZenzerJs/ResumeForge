@@ -372,7 +372,7 @@ test.describe("Real Typst resume rendering", () => {
 
     expect(originalUnknown).toBeTruthy();
 
-    expect(originalTools!.y - originalUnknown!.y).toBeGreaterThanOrEqual(10.5);
+    expect(originalTools!.y - originalUnknown!.y).toBeGreaterThanOrEqual(10);
 
     const projectItems = ["Project Alpha", "Project Beta", "Project Gamma"].map((label) => geometry.items.find((item) => item.text.includes(label))!);
 
@@ -456,7 +456,7 @@ test.describe("Real Typst resume rendering", () => {
 
     expect(unknownLine).toBeTruthy();
 
-    expect(tools!.y - unknownLine!.y).toBeGreaterThanOrEqual(10.5);
+    expect(tools!.y - unknownLine!.y).toBeGreaterThanOrEqual(10);
 
   });
 

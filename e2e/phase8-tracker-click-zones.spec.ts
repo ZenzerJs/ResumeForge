@@ -7,6 +7,7 @@ test.describe("Task 8.3 & Task 8.6: Tracker Card Click-Zone & Unified Actions E2
         company: "Playwright E2E Corp",
         roleTitle: "Senior Automation Engineer",
         rawDescription: "TypeScript, Playwright, CI/CD, Next.js",
+        personal: true,
       },
     });
     expect(created.ok()).toBeTruthy();

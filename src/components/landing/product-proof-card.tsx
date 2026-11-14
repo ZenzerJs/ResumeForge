@@ -1,113 +1,68 @@
 "use client";
 
-import React, { useState } from "react";
-import { motion } from "framer-motion";
+import React from "react";
 import { FileCode, ShieldCheck, Database, Sparkles } from "lucide-react";
-import TextType from "@/components/ui/text-type";
 
-interface ProductProofCardProps {
-  shouldReduceMotion?: boolean;
-}
-
-export function ProductProofCard({ shouldReduceMotion = false }: ProductProofCardProps) {
-  const [rotateX, setRotateX] = useState(0);
-  const [rotateY, setRotateY] = useState(0);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (shouldReduceMotion) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left - rect.width / 2;
-    const y = e.clientY - rect.top - rect.height / 2;
-    setRotateX(-y / 40);
-    setRotateY(x / 40);
-  };
-
-  const handleMouseLeave = () => {
-    setRotateX(0);
-    setRotateY(0);
-  };
-
+export function ProductProofCard() {
   return (
-    <motion.div
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      animate={{ rotateX, rotateY }}
-      transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      style={{ transformStyle: "preserve-3d" }}
-      className="w-full bg-slate-950/90 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4 backdrop-blur-md relative overflow-hidden"
+    <div
+      className="w-full rounded-[10px] border border-outline/70 bg-panel p-5 space-y-4 shadow-lg"
       data-testid="product-proof-card"
     >
-      <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-        <div className="flex items-center gap-2">
-          <div className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-400">
-            WORKSPACE PREVIEW
-          </span>
-        </div>
-        <span className="text-xs font-mono text-slate-400 italic">
-          Illustrative interface — sample layout only
+      <div className="flex items-center justify-between gap-3 border-b border-outline/70 pb-3">
+        <span className="text-xs font-mono font-semibold text-foreground">
+          Sample Workspace Layout
+        </span>
+        <span className="text-xs font-mono text-muted-foreground">
+          Typst WASM Preview
         </span>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 font-mono text-xs">
-        <div className="flex items-center justify-between text-xs">
+      <div className="rounded-[6px] border border-outline/70 bg-inset p-4 space-y-3 font-mono text-xs">
+        <div className="flex items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2">
-            <FileCode className="h-4 w-4 text-amber-400" />
-            <span className="text-white font-semibold text-xs md:text-sm">master-resume.typ</span>
-            <span className="text-xs text-amber-400/90 bg-amber-950/50 border border-amber-800/50 px-2.5 py-0.5 rounded font-mono">
+            <FileCode className="h-4 w-4 text-primary" aria-hidden />
+            <span className="text-foreground font-semibold text-xs md:text-sm">master-resume.typ</span>
+            <span className="text-xs text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 rounded-[4px] font-mono">
               Protected Master
             </span>
           </div>
-          <span className="text-slate-400 text-xs font-mono">WASM Compiled</span>
+          <span className="text-muted-foreground text-xs font-mono">WASM Compiled</span>
         </div>
 
-        <div className="bg-slate-950 border border-slate-800/80 rounded-lg p-3.5 min-h-[140px] text-xs text-slate-300 overflow-x-auto">
-          {shouldReduceMotion ? (
-            <div className="space-y-1.5 leading-relaxed">
-              <div className="text-amber-300/90">#let section(title) = block(width: 100%)[ ... ]</div>
-              <div className="text-slate-300">#section(&quot;Technical Experience&quot;)</div>
-            </div>
-          ) : (
-            <TextType
-              text={[
-                '#let master = import("resume.pdf")',
-                '#set section(title) = block(width: 100%) [ ... ]\n\n#section("Technical Experience")\n#entry(title: "Senior Software Engineer", company: "TechCorp") [\n  - Architected high-throughput microservices using Go and gRPC.\n]',
-              ]}
-              typingSpeed={35}
-              pauseDuration={3000}
-              loop={true}
-              showCursor={true}
-              cursorCharacter="█"
-              cursorClassName="text-[#ff8c00] font-bold"
-              className="font-mono text-xs text-amber-200/90 leading-relaxed"
-            />
-          )}
-        </div>
+        <pre className="rounded-[6px] border border-outline/70 bg-canvas p-3.5 text-xs text-foreground/90 overflow-x-auto leading-relaxed whitespace-pre-wrap">
+{`#set section(title) = block(width: 100%)[ ... ]
+
+#section("Technical Experience")
+#entry(title: "Senior Software Engineer", company: "TechCorp")[
+  - Architected high-throughput microservices using Go and gRPC.
+]`}
+        </pre>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex items-center gap-2.5 text-xs">
-          <ShieldCheck className="h-4 w-4 text-amber-400 shrink-0" />
+        <div className="rounded-[6px] border border-outline/70 bg-inset p-3.5 flex items-center gap-2.5 text-xs">
+          <ShieldCheck className="h-4 w-4 text-primary shrink-0" aria-hidden />
           <div>
-            <span className="text-xs text-slate-400 font-mono uppercase block">Constraint</span>
-            <span className="font-semibold text-slate-200 text-xs md:text-sm">Protected Master</span>
+            <span className="text-[11px] text-muted-foreground font-mono uppercase tracking-[0.04em] block">Constraint</span>
+            <span className="font-semibold text-foreground text-xs md:text-sm">Protected Master</span>
           </div>
         </div>
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex items-center gap-2.5 text-xs">
-          <Database className="h-4 w-4 text-emerald-400 shrink-0" />
+        <div className="rounded-[6px] border border-outline/70 bg-inset p-3.5 flex items-center gap-2.5 text-xs">
+          <Database className="h-4 w-4 text-status-success shrink-0" aria-hidden />
           <div>
-            <span className="text-xs text-slate-400 font-mono uppercase block">Grounding</span>
-            <span className="font-semibold text-slate-200 text-xs md:text-sm">Evidence ID: exp-01</span>
+            <span className="text-[11px] text-muted-foreground font-mono uppercase tracking-[0.04em] block">Grounding</span>
+            <span className="font-semibold text-foreground text-xs md:text-sm">Evidence ID: exp-01</span>
           </div>
         </div>
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex items-center gap-2.5 text-xs">
-          <Sparkles className="h-4 w-4 text-purple-400 shrink-0" />
+        <div className="rounded-[6px] border border-outline/70 bg-inset p-3.5 flex items-center gap-2.5 text-xs">
+          <Sparkles className="h-4 w-4 text-primary shrink-0" aria-hidden />
           <div>
-            <span className="text-xs text-slate-400 font-mono uppercase block">ATS Rubric</span>
-            <span className="font-semibold text-slate-200 text-xs md:text-sm">100-Point Audit</span>
+            <span className="text-[11px] text-muted-foreground font-mono uppercase tracking-[0.04em] block">ATS Rubric</span>
+            <span className="font-semibold text-foreground text-xs md:text-sm tabular-nums">100-Point Audit</span>
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

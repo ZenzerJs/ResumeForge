@@ -159,6 +159,8 @@ test.describe("T5 Browser Smoke Check", () => {
 
     await page.evaluate((items) => {
       localStorage.setItem("resumeforge_guest_evidence", JSON.stringify(items));
+      localStorage.setItem("resumeforge_draft_migrated", "true");
+      localStorage.setItem("resumeforge_migration_dismissed", "true");
       localStorage.removeItem("rf_reviewed_duplicates");
     }, testDuplicates);
 
@@ -217,6 +219,8 @@ test.describe("T5 Browser Smoke Check", () => {
 
     await page.evaluate((items) => {
       localStorage.setItem("resumeforge_guest_evidence", JSON.stringify(items));
+      localStorage.setItem("resumeforge_draft_migrated", "true");
+      localStorage.setItem("resumeforge_migration_dismissed", "true");
       localStorage.removeItem("rf_reviewed_duplicates");
     }, mergeDuplicates);
 

@@ -21,9 +21,9 @@ test.describe("WS4 — Tailor Auto-Rescan & Target Role Profile Swap", () => {
     const atsScorePanel = page.getByTestId("ats-score-panel");
     await expect(atsScorePanel).toBeVisible();
 
-    // Check Profile buttons inside ATS panel
-    const fullstackBtn = page.getByTestId("profile-btn-Full-stack");
-    await expect(fullstackBtn).toBeVisible();
-    await fullstackBtn.click();
+    // Switch to Full-stack profile via header selector and verify ATS panel updates
+    await profileSelect.selectOption("Full-stack");
+    await expect(profileSelect).toHaveValue("Full-stack");
+    await expect(atsScorePanel).toContainText("Role-Relevant Evidence (Full-stack)");
   });
 });

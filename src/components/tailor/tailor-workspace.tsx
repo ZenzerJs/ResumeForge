@@ -580,6 +580,8 @@ export function TailorWorkspace() {
       return;
     }
 
+    const extractGeneration = ++scanGenerationRef.current;
+    setIsAutoScanning(false);
     setErrorMessage(null);
     setIsExtracting(true);
 
@@ -591,6 +593,7 @@ export function TailorWorkspace() {
       });
 
       const json = await res.json();
+      if (extractGeneration !== scanGenerationRef.current) return;
       if (!res.ok || !json.success) {
         setErrorMessage(json.error || "Failed to extract requirements.");
         setIsExtracting(false);
@@ -607,9 +610,12 @@ export function TailorWorkspace() {
 
       await fetchMatches(json.data);
     } catch (err) {
+      if (extractGeneration !== scanGenerationRef.current) return;
       setErrorMessage(String(err));
     } finally {
-      setIsExtracting(false);
+      if (extractGeneration === scanGenerationRef.current) {
+        setIsExtracting(false);
+      }
     }
   };
 
@@ -699,6 +705,7 @@ export function TailorWorkspace() {
     const generation = ++scanGenerationRef.current;
     const controller = new AbortController();
     const timer = setTimeout(async () => {
+      if (generation !== scanGenerationRef.current) return;
       try {
         setIsAutoScanning(true);
         const res = await fetch("/api/jobs/extract", {
@@ -1534,6 +1541,7 @@ export function TailorWorkspace() {
                               setCompany("Nova Labs");
                               setRoleTitle("Senior Backend Engineer");
                               setRawDescription(SAMPLE_BACKEND_JD);
+                              setExtractedRequirements(null);
                             }}
                             className="min-h-11 text-sm px-3 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
                           >
@@ -1547,6 +1555,7 @@ export function TailorWorkspace() {
                               setCompany("WebCraft Systems");
                               setRoleTitle("Frontend Engineer");
                               setRawDescription(SAMPLE_FRONTEND_JD);
+                              setExtractedRequirements(null);
                             }}
                             className="min-h-11 text-sm px-3 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
                           >

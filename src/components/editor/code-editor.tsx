@@ -88,10 +88,10 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
   }, [value, onChange]);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-md border border-slate-800/80 bg-slate-900 text-slate-100 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-slate-950 px-3 py-2 text-xs font-medium text-slate-400">
+    <div className="flex h-full flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-panel text-foreground">
+      <div className="flex min-h-8 flex-wrap items-center justify-between gap-2 border-b border-outline/70 bg-panel px-2.5 py-0.5 text-xs text-text-secondary md:h-8 md:flex-nowrap">
         <div
-          className="flex items-center gap-1 rounded-md border border-slate-800 bg-slate-900 p-0.5"
+          className="flex items-center gap-0.5 rounded border border-outline/70 bg-inset p-0.5"
           role="tablist"
           aria-label="Editor input mode"
         >
@@ -101,10 +101,10 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
             aria-selected={editorMode === "visual"}
             onClick={() => setEditorMode("visual")}
             data-testid="editor-mode-visual"
-            className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-mono font-semibold transition ${
+            className={`flex items-center gap-1 rounded-[4px] px-2 py-0.5 text-[11px] font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               editorMode === "visual"
-                ? "bg-[#ff8c00] text-slate-950 shadow-sm"
-                : "text-slate-400 hover:text-white"
+                ? "bg-primary text-primary-foreground"
+                : "text-text-secondary hover:text-foreground"
             }`}
           >
             <LayoutList className="h-3 w-3" />
@@ -116,10 +116,10 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
             aria-selected={editorMode === "code"}
             onClick={() => setEditorMode("code")}
             data-testid="editor-mode-code"
-            className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-mono font-semibold transition ${
+            className={`flex items-center gap-1 rounded-[4px] px-2 py-0.5 text-[11px] font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               editorMode === "code"
-                ? "bg-[#ff8c00] text-slate-950 shadow-sm"
-                : "text-slate-400 hover:text-white"
+                ? "bg-primary text-primary-foreground"
+                : "text-text-secondary hover:text-foreground"
             }`}
           >
             <Code2 className="h-3 w-3" />
@@ -127,7 +127,7 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {editorMode === "code" && (
             <>
               <button
@@ -135,13 +135,13 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
                 onClick={handleInsertEntrySnippet}
                 data-testid="insert-entry-snippet-btn"
                 title="Insert a new Experience/Project entry block"
-                className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-[10px] font-mono font-semibold transition"
+                className="flex items-center gap-1 px-2 py-0.5 rounded bg-elevated hover:bg-muted border border-outline/70 text-foreground text-[11px] font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <Plus className="h-3 w-3 text-[#ff8c00]" />
+                <Plus className="h-3 w-3 text-primary" />
                 Entry
               </button>
               {markedCount > 0 && (
-                <span className="text-[10px] font-mono text-emerald-500">
+                <span className="text-[10px] font-mono tabular-nums text-status-success">
                   {markedCount} mark{markedCount !== 1 ? "s" : ""}
                 </span>
               )}
@@ -149,16 +149,16 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
                 type="button"
                 onClick={handleMarkVerified}
                 title="Mark selected text as verified (Task 7.7)"
-                className="flex items-center gap-1 px-2 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/20 text-emerald-400 text-[10px] font-semibold transition"
+                className="flex items-center gap-1 px-2 py-0.5 rounded bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-status-success text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <ShieldCheck className="h-3 w-3" />
                 Mark
               </button>
             </>
           )}
-          {isResumeLayoutV2Enabled() && <button type="button" onClick={() => void handleReformat()} className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">Reformat draft</button>}
-          <span className="hidden sm:inline font-mono text-[10px] text-slate-500">
-            {editorMode === "visual" ? "Guided Mode" : "CodeMirror 6"}
+          {isResumeLayoutV2Enabled() && <button type="button" onClick={() => void handleReformat()} className="rounded border border-outline/70 bg-elevated px-2 py-0.5 text-[11px] font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Reformat draft</button>}
+          <span className="hidden xl:inline font-mono text-[10px] text-text-muted">
+            {editorMode === "visual" ? "Guided" : "CM6"}
           </span>
         </div>
       </div>

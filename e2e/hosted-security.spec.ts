@@ -323,19 +323,24 @@ test.describe("hosted auth and a11y gates", () => {
     await context.close();
   });
 
-  test("protected master cannot be overwritten via PUT", async ({ request }) => {
-    const save = await request.post("/api/resumes/save-master", {
-      data: {
-        title: "E2E Protected Master",
-        typstSource: "= Protected Master\n",
-        confirmOverwrite: true,
-      },
-    });
-    expect(save.ok()).toBeTruthy();
-    const saved = await save.json();
-    const put = await request.put(`/api/resumes/${saved.data.id}`, {
-      data: { typstSource: "= Hijack\n" },
-    });
-    expect(put.status()).toBe(403);
+  test("protected master cannot be overwritten via PUT", async ({ browser, baseURL }) => {
+    const { context } = await createIsolatedSignedInContext(browser, baseURL);
+    try {
+      const save = await context.request.post("/api/resumes/save-master", {
+        data: {
+          title: "E2E Protected Master",
+          typstSource: "= Protected Master\n",
+          confirmOverwrite: true,
+        },
+      });
+      expect(save.ok()).toBeTruthy();
+      const saved = await save.json();
+      const put = await context.request.put(`/api/resumes/${saved.data.id}`, {
+        data: { typstSource: "= Hijack\n" },
+      });
+      expect(put.status()).toBe(403);
+    } finally {
+      await context.close();
+    }
   });
 });

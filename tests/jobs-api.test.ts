@@ -309,4 +309,46 @@ describe("Jobs API Endpoint Rejection Path & Zod Validation Tests", () => {
       await prisma.user.deleteMany({ where: { id: { in: [owner.user.id, other.user.id] } } });
     }
   });
+
+  it("omits rawDescription from GET /api/jobs list rows while precomputing salaryLabel", async () => {
+    const owner = await createTestUser();
+    const company = `SalarySlimCo-${crypto.randomUUID()}`;
+    const createRes = await jobsPOST(
+      authedRequest(
+        "http://localhost:3000/api/jobs",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            company,
+            roleTitle: "Senior Backend Engineer",
+            rawDescription: "Compensation: $180,000 - $220,000 base. PostgreSQL and Go.",
+            personal: true,
+          }),
+        },
+        owner.cookie
+      )
+    );
+    expect(createRes.status).toBe(201);
+    const createdJob = (await createRes.json()).data as { id: string };
+
+    try {
+      const listRes = await jobsGET(
+        authedRequest(
+          `http://localhost:3000/api/jobs?q=${encodeURIComponent(company)}`,
+          { method: "GET" },
+          owner.cookie
+        )
+      );
+      expect(listRes.status).toBe(200);
+      const listJson = await listRes.json();
+      const row = listJson.data.find((j: { id: string }) => j.id === createdJob.id);
+      expect(row).toBeDefined();
+      expect("rawDescription" in row).toBe(false);
+      expect(row.salaryLabel).toContain("180");
+    } finally {
+      await prisma.job.deleteMany({ where: { id: createdJob.id } });
+      await prisma.user.deleteMany({ where: { id: owner.user.id } });
+    }
+  });
 });

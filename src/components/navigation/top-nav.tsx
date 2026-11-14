@@ -15,8 +15,6 @@ import {
   Bell,
   Terminal,
   Code2,
-  Pause,
-  Play,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -39,7 +37,7 @@ const NAV_LINKS = [
 interface TopNavProps {
   actions?: React.ReactNode;
   badge?: React.ReactNode;
-  backgroundMotion?: { paused: boolean; onToggle: () => void };
+  compact?: boolean;
 }
 
 function SignOutButton({ className }: { className?: string }) {
@@ -55,7 +53,7 @@ function SignOutButton({ className }: { className?: string }) {
         void signOutAndRedirect();
       }}
       className={cn(
-        "inline-flex min-h-11 items-center gap-2 rounded-md px-3 text-xs font-medium text-slate-300 hover:bg-slate-800/60 hover:text-white focus-visible:ring-2 focus-visible:ring-amber-500/60 disabled:opacity-50",
+        "inline-flex min-h-11 items-center gap-2 rounded-[6px] px-3 text-xs text-on-surface-variant hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50",
         className
       )}
     >
@@ -70,13 +68,13 @@ function GuestAuthLinks({ className, signupEnabled }: { className?: string; sign
     <div className={cn("hidden md:flex items-center gap-1", className)}>
       <Link
         href="/login"
-        className="inline-flex min-h-11 items-center rounded-md px-3 text-xs font-medium text-slate-300 hover:bg-slate-800/60 hover:text-white focus-visible:ring-2 focus-visible:ring-amber-500/60"
+        className="inline-flex min-h-11 items-center rounded-[6px] px-3 text-xs text-on-surface-variant hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         Sign In
       </Link>
       {signupEnabled ? <Link
         href="/login?mode=signup"
-        className="inline-flex min-h-11 items-center rounded-md bg-[#ff8c00] px-3 text-xs font-semibold text-black hover:bg-[#ffa024] focus-visible:ring-2 focus-visible:ring-amber-500/60"
+        className="inline-flex min-h-11 items-center rounded-[6px] bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         Sign Up
       </Link> : null}
@@ -113,7 +111,7 @@ function NavUtilities({ pathname }: { pathname: string }) {
               : "No AI API key configured — Click to connect in Settings"
           }
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-amber-500/60",
+            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring",
             aiStatus.hasKey
               ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
               : "border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
@@ -137,14 +135,14 @@ function NavUtilities({ pathname }: { pathname: string }) {
       <button
         type="button"
         aria-label="Notifications"
-        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800/50 hover:text-[#ff8c00] focus-visible:ring-2 focus-visible:ring-amber-500/60"
+        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-elevated hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <Bell className="h-4 w-4" aria-hidden />
       </button>
       <Link
         href="/editor"
         aria-label="Terminal"
-        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800/50 hover:text-[#ff8c00] focus-visible:ring-2 focus-visible:ring-amber-500/60"
+        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-elevated hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <Terminal className="h-4 w-4" aria-hidden />
       </Link>
@@ -152,7 +150,7 @@ function NavUtilities({ pathname }: { pathname: string }) {
   );
 }
 
-export function TopNav({ actions, badge, backgroundMotion }: TopNavProps) {
+export function TopNav({ actions, badge, compact = false }: TopNavProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined);
@@ -212,24 +210,24 @@ export function TopNav({ actions, badge, backgroundMotion }: TopNavProps) {
   const isGuest = user === null;
 
   return (
-    <header className="bg-rf-bg/90 backdrop-blur-xl border-b border-slate-800/80 fixed top-0 w-full z-50 flex items-center justify-between gap-3 px-4 md:px-8 h-16 pt-[env(safe-area-inset-top)] max-w-full overflow-visible">
-      <div className="flex items-center gap-8 min-w-0">
+    <header className={`bg-rf-bg/90 backdrop-blur-xl border-b border-border fixed top-0 w-full z-50 flex items-center justify-between gap-3 pt-[env(safe-area-inset-top)] max-w-full overflow-visible ${compact ? "h-12 px-4 md:px-6" : "h-16 px-4 md:px-8"}`}>
+      <div className={`flex items-center min-w-0 ${compact ? "gap-6" : "gap-8"}`}>
         <Link
           href="/"
-          className="flex items-center gap-2.5 focus-visible:ring-2 focus-visible:ring-amber-500/60 rounded"
+          className="flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-[6px]"
           aria-label="ResumeForge home"
         >
-          <div className="w-8 h-8 bg-[#ff8c00] rounded flex items-center justify-center font-bold text-black text-lg">
+          <div className={`bg-primary rounded-[6px] flex items-center justify-center font-bold text-primary-foreground ${compact ? "w-7 h-7 text-base" : "w-8 h-8 text-lg"}`}>
             R
           </div>
-          <span className="font-extrabold text-xl text-white tracking-[-0.04em]">
+          <span className="font-bold text-xl text-foreground tracking-[-0.04em]">
             ResumeForge
           </span>
         </Link>
 
         {badge ? (
           <>
-            <span className="hidden sm:block h-4 w-px bg-slate-700" aria-hidden />
+            <span className="hidden sm:block h-4 w-px bg-border" aria-hidden />
             {badge}
           </>
         ) : null}
@@ -247,10 +245,10 @@ export function TopNav({ actions, badge, backgroundMotion }: TopNavProps) {
                 title={label}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 transition-colors border border-transparent hover:bg-slate-800/40 focus-visible:ring-2 focus-visible:ring-amber-500/60 lg:px-3",
+                  "flex items-center gap-2 whitespace-nowrap rounded-[6px] px-2.5 py-1.5 transition-colors border border-transparent hover:bg-elevated/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background lg:px-3",
                   isActive
-                    ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                    : "text-slate-400 hover:text-white"
+                    ? "bg-primary/10 text-primary border-primary/30 font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" aria-hidden />
@@ -264,7 +262,7 @@ export function TopNav({ actions, badge, backgroundMotion }: TopNavProps) {
       <div className="flex items-center gap-2 shrink-0 min-w-0">
         <button
           type="button"
-          className="md:hidden inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-slate-300 hover:bg-slate-800/60 focus-visible:ring-2 focus-visible:ring-amber-500/60"
+          className="md:hidden inline-flex min-h-11 min-w-11 items-center justify-center rounded-[6px] text-on-surface-variant hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           aria-expanded={mobileOpen}
           aria-controls={menuId}
           aria-label={mobileOpen ? "Close menu" : "Open menu"}
@@ -273,27 +271,15 @@ export function TopNav({ actions, badge, backgroundMotion }: TopNavProps) {
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
         {actions}
-        {backgroundMotion && (
-          <button
-            type="button"
-            onClick={backgroundMotion.onToggle}
-            aria-label={backgroundMotion.paused ? "Resume background motion" : "Pause background motion"}
-            title={backgroundMotion.paused ? "Resume background motion" : "Pause background motion"}
-            data-testid="workspace-motion-toggle"
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-slate-300 hover:bg-slate-800/60 hover:text-white focus-visible:ring-2 focus-visible:ring-amber-500/60 motion-reduce:hidden"
-          >
-            {backgroundMotion.paused ? <Play className="h-4 w-4" aria-hidden /> : <Pause className="h-4 w-4" aria-hidden />}
-          </button>
-        )}
         <NavUtilities pathname={pathname} />
         {user ? (
           <>
             <Link
               href="/settings"
               title={user.username}
-              className="hidden lg:inline-flex max-w-[10rem] items-center gap-2 rounded-md px-2 py-1 text-xs text-slate-200 hover:bg-slate-800/60 focus-visible:ring-2 focus-visible:ring-amber-500/60"
+              className="hidden lg:inline-flex max-w-[10rem] items-center gap-2 rounded-[6px] px-2 py-1 text-xs text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-700 bg-slate-800 font-bold text-[#ff8c00]">
+              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-outline bg-elevated font-bold text-primary">
                 {usernameInitial(user.username)}
               </span>
               <span className="truncate">@{user.username}</span>
@@ -309,7 +295,7 @@ export function TopNav({ actions, badge, backgroundMotion }: TopNavProps) {
         <div
           id={menuId}
           ref={drawerRef}
-          className="absolute left-0 right-0 top-16 border-b border-slate-800 bg-[#0b1326] px-6 py-4 md:hidden overscroll-contain"
+          className={`absolute left-0 right-0 border-b border-border bg-background px-6 py-4 md:hidden overscroll-contain ${compact ? "top-12" : "top-16"}`}
         >
           <nav aria-label="Mobile navigation" className="flex flex-col gap-1">
             {NAV_LINKS.map(({ href, label, icon: Icon }) => {
@@ -319,8 +305,8 @@ export function TopNav({ actions, badge, backgroundMotion }: TopNavProps) {
                   key={href}
                   href={href}
                   className={cn(
-                    "flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm border border-transparent focus-visible:ring-2 focus-visible:ring-amber-500/60",
-                    isActive ? "bg-amber-500/10 text-amber-400 border-amber-500/30" : "text-slate-300 hover:bg-slate-800/40"
+                    "flex min-h-11 items-center gap-3 rounded-[6px] px-3 py-2 text-sm border border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    isActive ? "bg-primary/10 text-primary border-primary/30 font-semibold" : "text-on-surface-variant hover:bg-elevated"
                   )}
                 >
                   <Icon className="h-4 w-4" aria-hidden />
@@ -330,10 +316,10 @@ export function TopNav({ actions, badge, backgroundMotion }: TopNavProps) {
             })}
             {user ? (
               <>
-                <p className="mt-2 px-3 text-xs text-slate-400">@{user.username}</p>
+                <p className="mt-2 px-3 text-xs text-muted-foreground">@{user.username}</p>
                 <button
                   type="button"
-                  className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800/40 focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                  className="flex min-h-11 items-center gap-3 rounded-[6px] px-3 py-2 text-sm text-on-surface-variant hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   onClick={() => {
                     void signOutAndRedirect();
                   }}
@@ -346,13 +332,13 @@ export function TopNav({ actions, badge, backgroundMotion }: TopNavProps) {
               <>
                 <Link
                   href="/login"
-                  className="mt-2 flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800/40 focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                  className="mt-2 flex min-h-11 items-center gap-3 rounded-[6px] px-3 py-2 text-sm text-on-surface-variant hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   Sign In
                 </Link>
                 {signupEnabled ? <Link
                   href="/login?mode=signup"
-                  className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm text-amber-400 hover:bg-slate-800/40 focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                  className="flex min-h-11 items-center gap-3 rounded-[6px] px-3 py-2 text-sm text-primary hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   Sign Up
                 </Link> : null}

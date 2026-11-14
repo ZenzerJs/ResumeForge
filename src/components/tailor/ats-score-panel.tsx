@@ -96,6 +96,7 @@ export function AtsScorePanel({
 
   const onEvaluationCompleteRef = useRef(onEvaluationComplete);
   onEvaluationCompleteRef.current = onEvaluationComplete;
+  const qualitativeContextRef = useRef<{ typstContent: string; useMasterResume: boolean } | null>(null);
 
   const evaluationRequestBody =
     !useMasterResume && !typstContent.trim()
@@ -124,8 +125,15 @@ export function AtsScorePanel({
 
     setIsEvaluating(true);
     setEvalError(null);
-    setQualitativeResult(null);
-    setQualitativeError(null);
+    const prevQual = qualitativeContextRef.current;
+    if (
+      prevQual &&
+      (prevQual.typstContent !== typstContent || prevQual.useMasterResume !== useMasterResume)
+    ) {
+      setQualitativeResult(null);
+      setQualitativeError(null);
+      qualitativeContextRef.current = null;
+    }
 
     (async () => {
       try {
@@ -168,7 +176,7 @@ export function AtsScorePanel({
       active = false;
       controller.abort();
     };
-  }, [evaluationRequestBody]);
+  }, [evaluationRequestBody, typstContent, useMasterResume]);
 
   const handleFetchQualitativeReview = async () => {
     if (!result) return;
@@ -212,6 +220,7 @@ export function AtsScorePanel({
         setQualitativeError(json.error || "Failed to generate qualitative review.");
         setQualitativeResult(null);
       } else {
+        qualitativeContextRef.current = { typstContent, useMasterResume };
         setQualitativeResult(json.data);
       }
     } catch (err) {
@@ -233,27 +242,27 @@ export function AtsScorePanel({
 
   const scoreColor =
     (result?.overallScore || 0) >= 80
-      ? "text-emerald-400 border-emerald-500/40 bg-emerald-950/30"
+      ? "text-status-success border-status-success/40 bg-status-success/10"
       : (result?.overallScore || 0) >= 60
-      ? "text-amber-400 border-amber-500/40 bg-amber-950/30"
-      : "text-red-400 border-red-500/40 bg-red-950/30";
+      ? "text-status-warning border-status-warning/40 bg-status-warning/10"
+      : "text-status-danger border-status-danger/40 bg-status-danger/10";
 
   return (
     <div
-      className={`@container bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg space-y-6 min-w-0 ${appearance === "tailor" ? styles.tailor : ""} ${className}`}
+      className={`@container bg-card border border-border rounded-[10px] p-6 shadow-lg space-y-6 min-w-0 ${appearance === "tailor" ? styles.tailor : ""} ${className}`}
       data-testid="ats-score-panel"
     >
       {/* Header & Overall Match Meter — stacked in the Tailor sidebar */}
-      <div className="flex flex-col gap-4 border-b border-slate-800 pb-6">
+      <div className="flex flex-col gap-4 border-b border-border pb-6">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold text-white flex flex-wrap items-center gap-2">
-            <BarChart3 className="h-5 w-5 shrink-0 text-amber-400" />
+          <h2 className="text-base font-semibold text-foreground flex flex-wrap items-center gap-2">
+            <BarChart3 className="h-5 w-5 shrink-0 text-primary" />
             <span>ATS Quality Score</span>
-            <span className={`text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full whitespace-nowrap ${styles.engineBadge}`}>
+            <span className={`text-[10px] font-mono bg-primary/10 text-primary border border-primary/25 px-2 py-0.5 rounded-full whitespace-nowrap ${styles.engineBadge}`}>
               Deterministic Engine
             </span>
           </h2>
-          <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
             {appearance === "tailor" ? "See how your resume aligns with this job and where evidence is missing." : "Rule-based evaluation of tailored ResumeVariant against job description & role overlay"}
           </p>
         </div>
@@ -262,13 +271,13 @@ export function AtsScorePanel({
           <div className={`flex flex-col @md:flex-row @md:items-stretch gap-3 min-w-0 ${styles.scoreSummary}`}>
             <div
               data-testid="overall-score-badge"
-              className={`px-4 py-3 rounded-2xl border flex flex-col items-start justify-center min-w-0 ${scoreColor} ${styles.scoreBadge}`}
+              className={`px-4 py-3 rounded-[10px] border flex flex-col items-start justify-center min-w-0 ${scoreColor} ${styles.scoreBadge}`}
             >
               <span className="text-[10px] uppercase tracking-wider font-semibold opacity-80">
                 Overall Match
               </span>
-              <div className={`text-3xl font-extrabold tracking-tight font-mono leading-tight ${styles.scoreValue}`}>
-                {result.overallScore} <span className="text-sm font-normal text-slate-400">/ 100</span>
+              <div className={`text-3xl font-semibold tracking-tight font-mono tabular-nums leading-tight ${styles.scoreValue}`}>
+                {result.overallScore} <span className="text-sm font-normal text-muted-foreground">/ 100</span>
               </div>
             </div>
 
@@ -277,7 +286,7 @@ export function AtsScorePanel({
               onClick={handleFetchQualitativeReview}
               disabled={isLoadingQualitative || !result}
               data-testid="get-ai-feedback-btn"
-              className={`px-4 py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-600/20 transition @md:shrink-0 ${styles.feedback}`}
+              className={`px-4 py-3 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground font-semibold text-xs rounded-[6px] flex items-center justify-center gap-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background @md:shrink-0 ${styles.feedback}`}
             >
               {isLoadingQualitative ? (
                 <>
@@ -286,7 +295,7 @@ export function AtsScorePanel({
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-4 w-4 text-amber-200" />
+                  <Sparkles className="h-4 w-4" />
                   Get AI Feedback
                 </>
               )}
@@ -297,8 +306,8 @@ export function AtsScorePanel({
 
       {/* Interactive Role Profile Selector */}
       {appearance !== "tailor" && <div className="space-y-2">
-        <label className="block text-xs font-semibold text-slate-300 flex items-center gap-2">
-          <Layers className="h-3.5 w-3.5 text-amber-400" />
+        <label className="block text-xs font-semibold text-on-surface-variant flex items-center gap-2">
+          <Layers className="h-3.5 w-3.5 text-primary" />
           Target Role Profile Weighting
         </label>
         <div className="flex flex-wrap gap-2" data-testid="role-profile-selector">
@@ -311,13 +320,13 @@ export function AtsScorePanel({
                 onClick={() => handleSelectProfile(profile)}
                 aria-pressed={isSelected}
                 data-testid={`profile-btn-${profile}`}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-[6px] text-xs transition flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   isSelected
-                    ? "bg-amber-500 text-slate-950 font-semibold shadow-md shadow-amber-500/20 border border-amber-400"
-                    : "bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800"
+                    ? "bg-primary text-primary-foreground font-semibold border border-primary"
+                    : "bg-inset hover:bg-elevated text-on-surface-variant border border-border font-normal"
                 }`}
               >
-                {isSelected && <Sparkles className="h-3 w-3 text-slate-950" />}
+                {isSelected && <Sparkles className="h-3 w-3" />}
                 {profile}
               </button>
             );
@@ -326,7 +335,7 @@ export function AtsScorePanel({
       </div>}
 
       {evalError && (
-        <div className="p-3 bg-red-950/50 border border-red-800/50 rounded-lg flex items-center gap-2 text-xs text-red-300">
+        <div className="p-3 bg-status-danger/10 border border-status-danger/40 rounded-[6px] flex items-center gap-2 text-xs text-status-danger">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           <span>{evalError}</span>
         </div>
@@ -336,32 +345,32 @@ export function AtsScorePanel({
       {result && (
         <div className={`grid grid-cols-1 gap-3 ${styles.categories}`} data-testid="category-breakdown-grid">
           {/* Category 1: Base Resume Health (30 pts) */}
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 min-w-0">
+          <div className="bg-inset border border-border rounded-[10px] p-4 space-y-3 min-w-0">
             <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
-              <span className="text-xs font-semibold text-white flex items-center gap-1.5 min-w-0">
-                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400" />
+              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 min-w-0">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-status-success" />
                 <span className="break-words">Base Resume Health</span>
               </span>
-              <span className="text-xs font-mono font-bold text-slate-200 shrink-0">
+              <span className="text-xs font-mono font-semibold tabular-nums text-foreground shrink-0">
                 {result.baseHealth.score} / {result.baseHealth.maxScore} pts
               </span>
             </div>
-            <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+            <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
               <div
-                className="bg-emerald-500 h-full transition-all"
+                className="bg-status-success h-full transition-all"
                 style={{ width: `${result.baseHealth.percentage}%` }}
               />
             </div>
-            <ul className="text-xs space-y-1.5 text-slate-300 leading-relaxed break-words">
+            <ul className="text-xs space-y-1.5 text-on-surface-variant leading-relaxed break-words">
               {result.baseHealth.findings.map((f, idx) => (
                 <li
                   key={`base-${idx}`}
                   className={
                     f.startsWith("Penalized:")
-                      ? "text-red-400 font-bold"
+                      ? "text-status-danger font-bold"
                       : f.startsWith("Warning:")
-                      ? "text-amber-300"
-                      : "text-slate-300"
+                      ? "text-status-warning"
+                      : "text-on-surface-variant"
                   }
                 >
                   {f}
@@ -371,23 +380,23 @@ export function AtsScorePanel({
           </div>
 
           {/* Category 2: Required Role Match (40 pts) */}
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 min-w-0">
+          <div className="bg-inset border border-border rounded-[10px] p-4 space-y-3 min-w-0">
             <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
-              <span className="text-xs font-semibold text-white flex items-center gap-1.5 min-w-0">
-                <Briefcase className="h-4 w-4 shrink-0 text-amber-400" />
+              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 min-w-0">
+                <Briefcase className="h-4 w-4 shrink-0 text-primary" />
                 <span className="break-words">Required Role Match</span>
               </span>
-              <span className="text-xs font-mono font-bold text-slate-200 shrink-0">
+              <span className="text-xs font-mono font-semibold tabular-nums text-foreground shrink-0">
                 {result.requiredMatch.score} / {result.requiredMatch.maxScore} pts
               </span>
             </div>
-            <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+            <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
               <div
-                className="bg-amber-500 h-full transition-all"
+                className="bg-primary h-full transition-all"
                 style={{ width: `${result.requiredMatch.percentage}%` }}
               />
             </div>
-            <ul className="text-xs space-y-1.5 text-slate-300 leading-relaxed break-words">
+            <ul className="text-xs space-y-1.5 text-on-surface-variant leading-relaxed break-words">
               {result.requiredMatch.findings.slice(0, 5).map((f, idx) => (
                 <li key={`req-${idx}`}>{f}</li>
               ))}
@@ -395,23 +404,23 @@ export function AtsScorePanel({
           </div>
 
           {/* Category 3: Preferred Match (15 pts) */}
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 min-w-0">
+          <div className="bg-inset border border-border rounded-[10px] p-4 space-y-3 min-w-0">
             <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
-              <span className="text-xs font-semibold text-white flex items-center gap-1.5 min-w-0">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-amber-400" />
+              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 min-w-0">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
                 <span className="break-words">Preferred Match</span>
               </span>
-              <span className="text-xs font-mono font-bold text-slate-200 shrink-0">
+              <span className="text-xs font-mono font-semibold tabular-nums text-foreground shrink-0">
                 {result.preferredMatch.score} / {result.preferredMatch.maxScore} pts
               </span>
             </div>
-            <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+            <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
               <div
-                className="bg-amber-500 h-full transition-all"
+                className="bg-primary h-full transition-all"
                 style={{ width: `${result.preferredMatch.percentage}%` }}
               />
             </div>
-            <ul className="text-xs space-y-1.5 text-slate-300 leading-relaxed break-words">
+            <ul className="text-xs space-y-1.5 text-on-surface-variant leading-relaxed break-words">
               {result.preferredMatch.findings.slice(0, 5).map((f, idx) => (
                 <li key={`pref-${idx}`}>{f}</li>
               ))}
@@ -419,23 +428,23 @@ export function AtsScorePanel({
           </div>
 
           {/* Category 4: Role-Relevant Evidence (15 pts) */}
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 min-w-0">
+          <div className="bg-inset border border-border rounded-[10px] p-4 space-y-3 min-w-0">
             <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
-              <span className="text-xs font-semibold text-white flex items-center gap-1.5 min-w-0">
-                <Layers className="h-4 w-4 shrink-0 text-purple-400" />
+              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 min-w-0">
+                <Layers className="h-4 w-4 shrink-0 text-status-info" />
                 <span className="break-words">Role-Relevant Evidence ({result.selectedProfile})</span>
               </span>
-              <span className="text-xs font-mono font-bold text-slate-200 shrink-0">
+              <span className="text-xs font-mono font-semibold tabular-nums text-foreground shrink-0">
                 {result.roleEvidence.score} / {result.roleEvidence.maxScore} pts
               </span>
             </div>
-            <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+            <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
               <div
-                className="bg-purple-500 h-full transition-all"
+                className="bg-status-info h-full transition-all"
                 style={{ width: `${result.roleEvidence.percentage}%` }}
               />
             </div>
-            <ul className="text-xs space-y-1.5 text-slate-300 leading-relaxed break-words">
+            <ul className="text-xs space-y-1.5 text-on-surface-variant leading-relaxed break-words">
               {result.roleEvidence.findings.map((f, idx) => (
                 <li key={`role-${idx}`}>{f}</li>
               ))}
@@ -446,10 +455,10 @@ export function AtsScorePanel({
 
       {/* Per-Skill Evidence Status Breakdown */}
       {result && result.skillEvaluations.length > 0 && (
-        <div className="space-y-3 border-t border-slate-800 pt-5">
-          <h3 className="text-xs font-semibold text-white flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-amber-400" />
-            Skill Demonstration Status Tracing ({result.skillEvaluations.length} skills)
+        <div className="space-y-3 border-t border-border pt-5">
+          <h3 className="text-xs font-semibold text-foreground flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-primary" />
+            Skill Demonstration Status Tracing (<span className="tabular-nums">{result.skillEvaluations.length}</span> skills)
           </h3>
           <div className="grid grid-cols-1 gap-2" data-testid="skill-evaluations-list">
             {result.skillEvaluations.map((se, idx) => {
@@ -458,17 +467,17 @@ export function AtsScorePanel({
                 <div
                   key={`se-${idx}`}
                   data-testid="skill-evaluation-item"
-                  className="bg-slate-950 border border-slate-800 rounded-lg p-3 flex flex-col items-start gap-2 text-xs min-w-0"
+                  className="bg-inset border border-border rounded-[6px] p-3 flex flex-col items-start gap-2 text-xs min-w-0"
                 >
                   <div className="min-w-0 w-full">
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                      <span className="font-semibold text-slate-100 break-words">{se.skill}</span>
-                      <span className="text-[10px] text-slate-500 uppercase font-mono">
+                      <span className="font-semibold text-foreground break-words">{se.skill}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase font-mono">
                         ({se.category})
                       </span>
                     </div>
                     {se.matchedContext && (
-                      <p className="text-[11px] text-slate-400 mt-1 leading-relaxed break-words">
+                      <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed break-words">
                         {se.matchedContext}
                       </p>
                     )}
@@ -488,18 +497,18 @@ export function AtsScorePanel({
 
       {/* Truthful Actionable Gaps Guidance Panel */}
       {result && result.gaps.length > 0 && (
-        <div className="bg-amber-950/20 border border-amber-900/40 rounded-xl p-4 space-y-3" data-testid="actionable-gaps-panel">
-          <h3 className="text-xs font-semibold text-amber-300 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-400" />
+        <div className="bg-status-warning/10 border border-status-warning/30 rounded-[10px] p-4 space-y-3" data-testid="actionable-gaps-panel">
+          <h3 className="text-xs font-semibold text-status-warning flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-status-warning" />
             Actionable Gaps Guidance (Truthful Recommendations)
           </h3>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-muted-foreground">
             Recommendations point to real, verifiable evidence additions or formatting improvements. No keyword stuffing or hidden text.
           </p>
-          <ul className="space-y-2 text-xs text-amber-200/90 leading-relaxed">
+          <ul className="space-y-2 text-xs text-on-surface-variant leading-relaxed">
             {result.gaps.map((gap, idx) => (
               <li key={`gap-${idx}`} className="flex items-start gap-2 min-w-0">
-                <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-400" />
+                <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-status-warning" />
                 <span className="min-w-0 break-words">{gap}</span>
               </li>
             ))}
@@ -508,14 +517,14 @@ export function AtsScorePanel({
       )}
 
       {qualitativeError && (
-        <div className="p-3 bg-red-950/50 border border-red-800/50 rounded-lg flex items-center gap-2 text-xs text-red-300" data-testid="qualitative-error-banner">
+        <div className="p-3 bg-status-danger/10 border border-status-danger/40 rounded-[6px] flex items-center gap-2 text-xs text-status-danger" data-testid="qualitative-error-banner">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           <span>{qualitativeError}</span>
         </div>
       )}
 
       {qualitativeResult && result && (
-        <div className="border-t border-slate-800 pt-6">
+        <div className="border-t border-border pt-6">
           <QualitativeReviewPanel
             result={qualitativeResult}
             deterministicScore={result.overallScore}

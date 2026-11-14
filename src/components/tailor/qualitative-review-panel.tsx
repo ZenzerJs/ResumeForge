@@ -151,20 +151,20 @@ export function QualitativeReviewPanel({
           <div className="flex items-center gap-3">
             <Sliders className="h-5 w-5 text-cyan-400 shrink-0" />
             <div>
-              <div className="text-xs text-slate-400 font-medium">
+              <div className="text-xs text-muted-foreground">
                 Deterministic Base Score:{" "}
-                <span className="font-mono text-slate-200 font-bold">
+                <span className="font-mono text-foreground font-semibold tabular-nums">
                   {deterministicScore} / 100
                 </span>
               </div>
-              <div className="text-sm font-semibold text-white flex items-center gap-2 mt-0.5">
+              <div className="text-sm font-semibold text-foreground flex items-center gap-2 mt-0.5">
                 JD-Adjusted Score:{" "}
-                <span className="font-mono text-cyan-300 font-extrabold text-base">
+                <span className="font-mono text-status-info font-semibold tabular-nums text-base">
                   {adjustedScore} / 100
                 </span>
                 <span
                   data-testid="jd-adjustment-badge"
-                  className={`text-xs font-mono font-bold px-2 py-0.5 rounded border ${adjustmentBadgeColor}`}
+                  className={`text-xs font-mono font-semibold tabular-nums px-2 py-0.5 rounded border ${adjustmentBadgeColor}`}
                 >
                   ({adjustmentFormatted} pts for JD Emphasis)
                 </span>

@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { assertLayoutExportReady, isResumeLayoutV2Enabled, parseManagedResume } from "@/lib/typst/resume-document";
 import { sanitizeTypstSvg } from "@/lib/typst/svg-sanitize";
-import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2, BarChart3, Sparkles, FileText, ChevronDown, Package } from "lucide-react";
+import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2, BarChart3, Sparkles, FileText, ChevronDown, Package, MoreHorizontal } from "lucide-react";
 import dynamic from "next/dynamic";
 import { cleanTypstToText, sanitizeZipFilename } from "@/lib/export/zip";
 import { assertCanExport } from "@/lib/guardrail/policy";
@@ -373,6 +373,7 @@ export function PreviewPanel({
 
   // Task 9.5: ATS Grade in Editor preview state
   const [showGrade, setShowGrade] = useState(false);
+  const [previewView, setPreviewView] = useState<"fit" | "actual">("fit");
 
   const handleToggleGrade = () => {
     setShowGrade((prev) => !prev);
@@ -549,35 +550,82 @@ export function PreviewPanel({
   };
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-md border border-slate-200 bg-slate-100 shadow-sm">
-      {/* Header Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700">
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" />
-          <span>Live Document Preview</span>
-          {isCompiling && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />}
+    <div className="flex h-full flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-inset">
+      {/* 32px Pane Toolbar */}
+      <div className="flex min-h-8 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-outline/70 bg-panel px-2.5 py-0.5 text-xs text-text-secondary">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-status-success" />
+          <span className="font-semibold text-foreground shrink-0">Preview</span>
+          {isCompiling && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />}
+          {v2 && (
+            <div
+              className="inline-flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-mono tabular-nums text-text-secondary"
+              role="status"
+              data-testid="layout-page-status"
+            >
+              <span className="whitespace-nowrap">
+                {measurementError
+                  ? `Measurement failed: ${measurementError}`
+                  : !measurement || measurement.source !== source
+                  ? "Measuring…"
+                  : `${measurement.pages} ${measurement.pages === 1 ? "page" : "pages"} measured`}
+              </span>
+              {onApplyLayout && (
+                <button
+                  type="button"
+                  className="shrink-0 underline font-semibold text-primary hover:text-primary/80 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                  disabled={isFitting}
+                  onClick={() => void fitToOnePage()}
+                >
+                  {isFitting ? "Fitting…" : "Fit to one page"}
+                </button>
+              )}
+              {source.includes("// @layout-v2-link-placement-required") && (
+                <span className="shrink-0 text-status-warning">· Place links in Visual Form</span>
+              )}
+              {source.includes("// @layout-v2-review-required") && (
+                <span className="shrink-0">
+                  · <button type="button" className="underline font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm" onClick={() => void approve("review")}>I reviewed this content</button>
+                  {reviewApproval === source && " ✓"}
+                </span>
+              )}
+              {measurement?.source === source && measurement.pages === 2 && (
+                <span className="shrink-0">
+                  <button type="button" className="underline font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm" onClick={() => void approve("two-pages")}>Use two pages</button>
+                  {twoPageApproval === source && " ✓"}
+                </span>
+              )}
+              {measurement?.source === source && measurement.pages > 2 && (
+                <span className="shrink-0 text-text-muted">· Trim to ≤2 pages</span>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
-            onClick={handleToggleGrade}
-            data-testid="grade-resume-btn"
-            className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition-colors shadow-sm"
-            title="Grade current draft against ATS evaluation engine"
+            onClick={() => setPreviewView((v) => (v === "fit" ? "actual" : "fit"))}
+            data-testid="preview-view-toggle-btn"
+            className="inline-flex h-6 items-center rounded border border-outline/70 bg-elevated px-2 text-[11px] font-mono tabular-nums text-text-secondary hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            title="Toggle page preview sizing (Fit pane width or 100% scale)"
           >
-            <BarChart3 className="h-3.5 w-3.5 text-amber-600" />
-            {showGrade ? "Close Grade" : "Grade"}
+            {previewView === "fit" ? "Fit" : "100%"}
           </button>
 
           <button
             type="button"
-            onClick={onResetTemplate}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-            title="Reset to starter template"
+            onClick={handleToggleGrade}
+            data-testid="grade-resume-btn"
+            className={`inline-flex h-6 items-center gap-1 rounded border px-2 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              showGrade
+                ? "border-primary/60 bg-primary/15 text-primary"
+                : "border-outline/70 bg-elevated text-foreground hover:bg-muted"
+            }`}
+            title="Grade current draft against ATS evaluation engine"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Reset Template
+            <BarChart3 className="h-3 w-3 text-primary" />
+            {showGrade ? "Close Grade" : "Grade"}
           </button>
 
           <DropdownMenu>
@@ -586,24 +634,24 @@ export function PreviewPanel({
                 type="button"
                 disabled={isExporting}
                 data-testid="export-dropdown-btn"
-                className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-3 py-1 text-xs font-semibold text-slate-950 shadow-sm hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="inline-flex h-6 items-center gap-1 rounded bg-primary px-2.5 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {isExporting ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (
-                  <Download className="h-3.5 w-3.5" />
+                  <Download className="h-3 w-3" />
                 )}
                 Export
                 <ChevronDown className="h-3 w-3 opacity-80" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-48 bg-popover border-outline/70 text-popover-foreground">
               <DropdownMenuItem
                 onClick={handleExportPdf}
                 data-testid="export-pdf-menu-item"
                 className="cursor-pointer text-xs flex items-center gap-2"
               >
-                <Download className="size-3.5 text-amber-500" />
+                <Download className="size-3.5 text-primary" />
                 <span>Compiled PDF (.pdf)</span>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -611,7 +659,7 @@ export function PreviewPanel({
                 data-testid="export-docx-menu-item"
                 className="cursor-pointer text-xs flex items-center gap-2"
               >
-                <FileText className="size-3.5 text-blue-500" />
+                <FileText className="size-3.5 text-status-info" />
                 <span>Word ATS (.docx)</span>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -619,7 +667,7 @@ export function PreviewPanel({
                 data-testid="export-typst-menu-item"
                 className="cursor-pointer text-xs flex items-center gap-2"
               >
-                <FileText className="size-3.5 text-amber-500" />
+                <FileText className="size-3.5 text-primary" />
                 <span>Typst Source (.typ)</span>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -627,7 +675,7 @@ export function PreviewPanel({
                 data-testid="export-txt-menu-item"
                 className="cursor-pointer text-xs flex items-center gap-2"
               >
-                <FileText className="size-3.5 text-emerald-500" />
+                <FileText className="size-3.5 text-status-success" />
                 <span>Plain Text ATS (.txt)</span>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -635,7 +683,7 @@ export function PreviewPanel({
                 data-testid="export-json-menu-item"
                 className="cursor-pointer text-xs flex items-center gap-2"
               >
-                <FileText className="size-3.5 text-slate-500" />
+                <FileText className="size-3.5 text-text-secondary" />
                 <span>JSON Resume (.json)</span>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -643,40 +691,55 @@ export function PreviewPanel({
                 data-testid="export-zip-menu-item"
                 className="cursor-pointer text-xs flex items-center gap-2"
               >
-                <Package className="size-3.5 text-amber-600" />
+                <Package className="size-3.5 text-primary" />
                 <span>Application Package (.zip)</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="More preview actions"
+                title="More preview actions"
+                data-testid="preview-more-actions-btn"
+                className="inline-flex h-6 w-6 items-center justify-center rounded border border-outline/70 bg-elevated text-text-secondary hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44 bg-popover border-outline/70 text-popover-foreground">
+              <DropdownMenuItem
+                onClick={onResetTemplate}
+                className="cursor-pointer text-xs flex items-center gap-2"
+              >
+                <RefreshCw className="size-3.5 text-text-secondary" />
+                <span>Reset Template</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
 
-      {v2 && <div className="border-b border-slate-200 bg-white px-4 py-2 text-xs text-slate-700" role="status" data-testid="layout-page-status">
-        {onApplyLayout && <button type="button" className="mr-3 underline font-semibold disabled:opacity-50" disabled={isFitting} onClick={() => void fitToOnePage()}>{isFitting ? "Fitting…" : "Fit to one page"}</button>}
-        {measurementError ? `Measurement failed: ${measurementError}` : !measurement || measurement.source !== source ? "Measuring current document…" : `${measurement.pages} ${measurement.pages === 1 ? "page" : "pages"} measured`}
-        {source.includes("// @layout-v2-link-placement-required") && <span> · Place unresolved PDF links in Visual Form before export. Review controls stay outside the resume.</span>}
-        {source.includes("// @layout-v2-review-required") && <span> · Review unclassified content before final export. <button type="button" className="underline font-semibold" onClick={() => void approve("review")}>I reviewed this content</button>{reviewApproval === source && " ✓"}</span>}
-        {measurement?.source === source && measurement.pages === 2 && <span className="ml-2">Review content or <button type="button" className="underline font-semibold" onClick={() => void approve("two-pages")}>Use two pages</button>{twoPageApproval === source && " ✓"}</span>}
-        {measurement?.source === source && measurement.pages > 2 && " · Review content to reduce this resume to two pages."}
-      </div>}
-      {/* Main Preview Container */}
-      <div ref={scrollContainerRef} className="relative flex-1 min-h-0 overflow-auto p-4 md:p-6 flex flex-col items-center">
-        {/* Task 9.5: ATS Grade Overlay Breakdown */}
+      {/* Main Preview Stage (8px top gutter, recessed dark backdrop) */}
+      <div ref={scrollContainerRef} className="relative flex-1 min-h-0 overflow-auto bg-inset px-4 pb-6 pt-2 flex flex-col items-center">
+        {/* Task 9.5: Dark ATS Grade Overlay Breakdown */}
         {showGrade && (
-          <div data-testid="editor-ats-score-overlay" className="w-full max-w-[850px] mb-6">
+          <div data-testid="editor-ats-score-overlay" className="w-full max-w-[850px] mb-4">
             {!source || !source.trim() ? (
               <div
                 data-testid="editor-grade-error"
-                className="p-4 bg-red-950/90 border border-red-800 rounded-xl flex items-center justify-between gap-3 text-xs text-red-200 shadow-lg"
+                className="p-4 bg-panel border border-status-danger/60 rounded-[10px] flex items-center justify-between gap-3 text-xs text-foreground"
               >
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
+                  <AlertCircle className="h-4 w-4 text-status-danger shrink-0" />
                   <span>Cannot grade an empty document. Please enter valid Typst source.</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowGrade(false)}
-                  className="text-red-400 hover:text-red-200 text-xs underline font-medium"
+                  className="text-text-secondary hover:text-foreground text-xs underline font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                 >
                   Dismiss
                 </button>
@@ -695,24 +758,24 @@ export function PreviewPanel({
         {error && (
           <div
             data-testid="typst-error-banner"
-            className="w-full max-w-[850px] mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800 shadow-sm"
+            className="w-full max-w-[850px] mb-3 rounded-[10px] border border-status-danger/60 bg-panel p-3 text-xs text-foreground"
           >
             <div className="flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+              <AlertCircle className="h-4 w-4 text-status-danger shrink-0 mt-0.5" />
               <div className="flex-1">
                 <div className="flex items-center gap-2 font-semibold">
                   <span>Compilation Error</span>
                   {typeof error.line === "number" && (
-                    <span className="rounded bg-red-200 px-1.5 py-0.5 text-[10px] font-bold text-red-900">
+                    <span className="rounded bg-status-danger/20 border border-status-danger/40 px-1.5 py-0.5 text-[10px] font-bold text-status-danger tabular-nums">
                       Line {error.line}
                     </span>
                   )}
                 </div>
-                <p className="mt-1 font-mono text-[11px] leading-relaxed break-words whitespace-pre-wrap">
+                <p className="mt-1 font-mono text-[11px] leading-relaxed break-words whitespace-pre-wrap text-text-secondary">
                   {error.message}
                 </p>
                 <div className="mt-2 flex items-center justify-between">
-                  <p className="text-[10px] text-red-600">
+                  <p className="text-[10px] text-text-muted">
                     Showing last valid compilation preview below.
                   </p>
                   {onTriggerRepair && (
@@ -733,7 +796,7 @@ export function PreviewPanel({
                           sourceExcerpt: excerpt,
                         });
                       }}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-sm transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       data-testid="fix-typst-ai-btn"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
@@ -749,27 +812,27 @@ export function PreviewPanel({
         {exportError && (
           <div
             data-testid="export-error-recovery-banner"
-            className="w-full max-w-[850px] mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 shadow-sm space-y-2"
+            className="w-full max-w-[850px] mb-3 rounded-[10px] border border-status-warning/60 bg-panel p-3 text-xs text-foreground space-y-2"
           >
             <div className="flex items-center justify-between gap-3">
-              <p className="font-semibold">
+              <p className="font-semibold text-status-warning">
                 Export Notice: {exportError}
               </p>
               <button
                 type="button"
                 onClick={() => setExportError(null)}
-                className="text-amber-800 hover:text-amber-950 text-xs underline font-medium shrink-0"
+                className="text-text-secondary hover:text-foreground text-xs underline font-semibold shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
               >
                 Dismiss
               </button>
             </div>
-            <div className="flex items-center gap-2 pt-1 border-t border-amber-200">
-              <span className="text-[11px] text-amber-800 font-medium">Fallback direct downloads:</span>
+            <div className="flex items-center gap-2 pt-1 border-t border-outline/60">
+              <span className="text-[11px] text-text-secondary font-semibold">Fallback direct downloads:</span>
               <button
                 type="button"
                 onClick={handleExportPdf}
                 data-testid="fallback-download-pdf-btn"
-                className="px-2 py-0.5 rounded bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 font-medium text-[11px] inline-flex items-center gap-1 shadow-xs"
+                className="px-2 py-0.5 rounded bg-elevated border border-outline/70 text-primary hover:bg-muted font-semibold text-[11px] inline-flex items-center gap-1"
               >
                 <Download className="size-3" />
                 <span>PDF</span>
@@ -778,7 +841,7 @@ export function PreviewPanel({
                 type="button"
                 onClick={handleExportDocx}
                 data-testid="fallback-download-docx-btn"
-                className="px-2 py-0.5 rounded bg-white border border-amber-300 text-blue-700 hover:bg-blue-50 font-medium text-[11px] inline-flex items-center gap-1 shadow-xs"
+                className="px-2 py-0.5 rounded bg-elevated border border-outline/70 text-status-info hover:bg-muted font-semibold text-[11px] inline-flex items-center gap-1"
               >
                 <FileText className="size-3" />
                 <span>DOCX</span>
@@ -787,9 +850,12 @@ export function PreviewPanel({
           </div>
         )}
 
-        {/* Paper Sheet Preview Container */}
+        {/* White Paper Sheet Preview Container (1px edge + 1 restrained shadow) */}
         {v2 && measurement?.source === source ? (
-          <div className="w-full max-w-[850px] space-y-5" data-testid="layout-page-preview">
+          <div
+            className={previewView === "actual" ? "w-[816px] shrink-0 space-y-5" : "w-full max-w-[850px] space-y-5"}
+            data-testid="layout-page-preview"
+          >
             {Array.from({ length: measurement.pages }, (_, index) => {
               const pageNumber = index + 1;
               const renderedImage =
@@ -802,7 +868,7 @@ export function PreviewPanel({
                     if (el) pageSlotRefs.current.set(pageNumber, el);
                     else pageSlotRefs.current.delete(pageNumber);
                   }}
-                  className="overflow-hidden border border-slate-200 bg-white shadow-md"
+                  className="overflow-hidden border border-[#d8dce0] bg-paper text-paper-ink shadow-[0_4px_16px_rgba(0,0,0,0.45)]"
                 >
                   {/* Browser-rendered pages reflect the same PDF bytes used for export. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -822,13 +888,16 @@ export function PreviewPanel({
             <div
               data-testid="typst-preview-sanitize-error"
               role="alert"
-              className="w-full max-w-[850px] rounded-md border border-red-300 bg-red-50 p-4 text-xs text-red-800 shadow-sm"
+              className="w-full max-w-[850px] rounded-[10px] border border-status-danger/60 bg-panel p-4 text-xs text-foreground"
             >
-              <p className="font-semibold">Unsafe or invalid preview blocked</p>
-              <p className="mt-1 text-red-700">{sanitizedSvg.error}</p>
+              <p className="font-semibold text-status-danger">Unsafe or invalid preview blocked</p>
+              <p className="mt-1 text-text-secondary">{sanitizedSvg.error}</p>
             </div>
           ) : sanitizedSvg?.raw === svg && sanitizedSvg.clean ? (
-            <div className="w-full max-w-[850px] rounded-sm bg-white p-4 sm:p-8 shadow-md border border-slate-200">
+            <div
+              data-testid="typst-paper-sheet"
+              className={`${previewView === "actual" ? "w-[816px] shrink-0" : "w-full max-w-[850px]"} rounded-[2px] bg-paper text-paper-ink p-4 sm:p-8 border border-[#d8dce0] shadow-[0_4px_16px_rgba(0,0,0,0.45)]`}
+            >
               <div
                 data-testid="typst-preview-svg"
                 className="typst-preview-svg w-full overflow-hidden [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-w-full"
@@ -836,14 +905,14 @@ export function PreviewPanel({
               />
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-              <Loader2 className="h-6 w-6 animate-spin mb-2 text-amber-500" />
+            <div className="flex flex-col items-center justify-center h-64 text-text-muted">
+              <Loader2 className="h-6 w-6 animate-spin mb-2 text-primary" />
               <p className="text-xs">Verifying SVG preview...</p>
             </div>
           )
         ) : (
-          <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-            <Loader2 className="h-8 w-8 animate-spin mb-2 text-amber-500" />
+          <div className="flex flex-col items-center justify-center h-64 text-text-muted">
+            <Loader2 className="h-8 w-8 animate-spin mb-2 text-primary" />
             <p className="text-xs">Initializing Typst WASM compiler...</p>
           </div>
         )}

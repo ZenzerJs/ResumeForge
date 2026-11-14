@@ -21,17 +21,18 @@ test.describe("Phase 4.3 ATS Quality Score Panel E2E Tests", () => {
     await page.waitForSelector("[data-testid='overall-score-badge']", { timeout: 5000 });
     await page.waitForSelector("[data-testid='category-breakdown-grid']", { timeout: 5000 });
 
-    // 5. Test Role Profile Selector switching
-    await page.waitForSelector("[data-testid='role-profile-selector']", { timeout: 5000 });
-    await page.click("[data-testid='profile-btn-Frontend']");
+    // 5. Test Role Profile Selector switching via Tailor header selector
+    const profileSelect = page.getByTestId("tailor-role-profile-select");
+    await expect(profileSelect).toBeVisible({ timeout: 5000 });
+    await profileSelect.selectOption("Frontend");
 
     // Verify profile switch updates UI
     await page.waitForSelector("text=Role-Relevant Evidence (Frontend)", { timeout: 5000 });
 
-    await page.click("[data-testid='profile-btn-AI/LLM']");
+    await profileSelect.selectOption("AI/LLM");
     await page.waitForSelector("text=Role-Relevant Evidence (AI/LLM)", { timeout: 5000 });
 
-    await page.click("[data-testid='profile-btn-Backend']");
+    await profileSelect.selectOption("Backend");
     await page.waitForSelector("text=Role-Relevant Evidence (Backend)", { timeout: 5000 });
   });
 

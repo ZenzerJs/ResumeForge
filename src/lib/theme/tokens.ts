@@ -1,66 +1,64 @@
 /**
- * Forge Terminal Design System Tokens
- * Source of truth for all colors, typography, spacing, border-radius, shadows, and z-index.
+ * Unified Studio Design System Tokens
+ * Mirrors the Section 0 CSS custom properties in src/app/globals.css.
  */
 
 export const tokens = {
   colors: {
-    // Brand Base & Surfaces (Deep Space dark mode hierarchy)
-    background: '#0b1326',
-    surface: '#0b1326',
-    surfaceDim: '#0b1326',
-    surfaceBright: '#31394d',
-    surfaceContainerLowest: '#060e20',
-    surfaceContainerLow: '#131b2e',
-    surfaceContainer: '#171f33',
-    surfaceContainerHigh: '#222a3d',
-    surfaceContainerHighest: '#2d3449',
-    surfaceVariant: '#2d3449',
+    // Studio Surfaces (Section 0)
+    background: 'rgb(21, 24, 26)',
+    surface: 'rgb(21, 24, 26)',
+    surfaceDim: 'rgb(21, 24, 26)',
+    surfaceBright: 'rgb(37, 42, 45)',
+    surfaceContainerLowest: 'rgb(17, 20, 22)',
+    surfaceContainerLow: 'rgb(21, 24, 26)',
+    surfaceContainer: 'rgb(28, 32, 35)',
+    surfaceContainerHigh: 'rgb(37, 42, 45)',
+    surfaceContainerHighest: 'rgb(37, 42, 45)',
+    surfaceVariant: 'rgb(37, 42, 45)',
+    paperSheet: 'rgb(255, 255, 255)',
+    paperInk: 'rgb(28, 30, 32)',
 
     // Text & Content Contrast Tokens
-    onBackground: '#dae2fd',
-    onSurface: '#dae2fd',
-    onSurfaceVariant: '#ddc1ae',
-    inverseSurface: '#dae2fd',
-    inverseOnSurface: '#283044',
+    onBackground: 'rgb(237, 239, 237)',
+    onSurface: 'rgb(237, 239, 237)',
+    onSurfaceVariant: 'rgb(194, 201, 199)',
+    textMuted: 'rgb(151, 161, 159)',
+    inverseSurface: 'rgb(255, 255, 255)',
+    inverseOnSurface: 'rgb(28, 30, 32)',
 
-    // Action & Brand Accent (High-energy Forge Orange)
-    primary: '#ff8c00',
-    onPrimary: '#4d2600',
-    primaryContainer: '#ff8c00',
-    onPrimaryContainer: '#623200',
-    primaryFixed: '#ffdcc3',
-    primaryFixedDim: '#ffb77d',
-    inversePrimary: '#904d00',
+    // Action & Brand Accent
+    primary: 'rgb(241, 181, 101)',
+    onPrimary: 'rgb(31, 24, 14)',
+    primaryContainer: 'rgb(241, 181, 101)',
+    onPrimaryContainer: 'rgb(31, 24, 14)',
+    primaryFixed: 'rgb(241, 181, 101)',
+    primaryFixedDim: 'rgb(241, 181, 101)',
+    inversePrimary: 'rgb(31, 24, 14)',
 
-    // Verification & Status Accent (Verified Emerald/Green)
-    secondary: '#4edea3',
-    onSecondary: '#003824',
-    secondaryContainer: '#00a572',
-    onSecondaryContainer: '#00311f',
-    secondaryFixed: '#6ffbbe',
-    secondaryFixedDim: '#4edea3',
+    // Verification & Status Tokens
+    secondary: 'rgb(124, 204, 165)',
+    onSecondary: 'rgb(31, 24, 14)',
+    secondaryContainer: 'rgb(124, 204, 165)',
+    onSecondaryContainer: 'rgb(31, 24, 14)',
+    secondaryFixed: 'rgb(124, 204, 165)',
+    secondaryFixedDim: 'rgb(124, 204, 165)',
 
     // Warning & Alert Accents
-    tertiary: '#ffb3ad',
-    onTertiary: '#68000a',
-    tertiaryContainer: '#ff8780',
+    tertiary: 'rgb(242, 148, 144)',
+    onTertiary: 'rgb(31, 24, 14)',
+    tertiaryContainer: 'rgb(242, 148, 144)',
+    statusInfo: 'rgb(145, 186, 217)',
 
     // Error Tokens
-    error: '#ffb4ab',
-    onError: '#690005',
-    errorContainer: '#93000a',
-    onErrorContainer: '#ffdad6',
+    error: 'rgb(242, 148, 144)',
+    onError: 'rgb(31, 24, 14)',
+    errorContainer: 'rgb(242, 148, 144)',
+    onErrorContainer: 'rgb(237, 239, 237)',
 
     // Borders & Outlines
-    outline: '#a48c7a',
-    outlineVariant: '#564334',
-
-    // Translucency & Glow Overlays
-    glassBg: 'rgba(45, 52, 73, 0.4)',
-    glassBorder: 'rgba(164, 140, 122, 0.2)',
-    glowPrimary: 'rgba(255, 140, 0, 0.15)',
-    glowSecondary: 'rgba(78, 222, 163, 0.15)',
+    outline: 'rgb(119, 130, 129)',
+    outlineVariant: 'rgb(55, 62, 64)',
   },
 
   typography: {
@@ -73,13 +71,13 @@ export const tokens = {
       pageTitle: {
         fontSize: '40px',
         lineHeight: '1.2',
-        fontWeight: '800',
+        fontWeight: '700',
         letterSpacing: '-0.02em',
       },
       pageTitleMobile: {
         fontSize: '32px',
         lineHeight: '1.2',
-        fontWeight: '800',
+        fontWeight: '700',
         letterSpacing: '-0.02em',
       },
       headingXl: {
@@ -146,10 +144,8 @@ export const tokens = {
   },
 
   shadows: {
-    glass: '0 0 20px rgba(255, 140, 0, 0.05)',
-    glowPrimary: '0 0 20px rgba(255, 140, 0, 0.2)',
-    glowSecondary: '0 0 20px rgba(78, 222, 163, 0.2)',
-    panel: '0 20px 40px -15px rgba(0, 0, 0, 0.5)',
+    paper: '0 4px 16px rgba(0, 0, 0, 0.45)',
+    panel: '0 10px 25px -5px rgba(0, 0, 0, 0.45)',
   },
 
   zIndex: {

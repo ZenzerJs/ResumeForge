@@ -39,28 +39,28 @@ test("workspace themes, navigation reset, and real local logos", async ({ page, 
     const input = getComputedStyle(document.querySelector('[data-testid="discover-search-input"]')!).backgroundColor;
     return { canvas, surface, card, input };
   });
-  expect(colors.canvas).toBe("#080e1c"); expect(colors.surface).toBe("#1c2940");
-  expect(colors.card).toBe("rgb(28, 41, 64)"); expect(colors.card).not.toBe(colors.input);
+  expect(colors.canvas).toBe("rgb(21 24 26)");
+  expect(colors.surface).toBe("rgb(28 32 35)");
+  expect(colors.card).toBe("rgb(28, 32, 35)");
+  expect(colors.card).not.toBe(colors.input);
   await shot(page, "jobs-desktop.png");
   expect(external).toEqual([]);
   for (const [route, name] of [["/library", "library"], ["/settings", "settings"], ["/editor", "editor"], ["/tailor", "tailor"]]) {
     await page.goto(route); await expect(page.locator("[data-workspace-theme]")).toHaveCount(1);
-    if (name === "editor" || name === "tailor") await expect(page.getByTestId("workspace-wave")).toHaveCount(0);
+    await expect(page.getByTestId("workspace-wave")).toHaveCount(0);
+    await expect(page.locator(".tracker-wave-canvas")).toHaveCount(0);
     await shot(page, `${name}-desktop.png`);
   }
   await page.goto("/"); await expect(page.locator("[data-workspace-theme]")).toHaveCount(0); await expect(page.getByTestId("workspace-wave")).toHaveCount(0); await expect(page.locator(".tracker-wave-canvas")).toHaveCount(0);
-  expect(await page.getByRole("banner").evaluate(e => getComputedStyle(e).backgroundColor)).toBe("rgba(11, 19, 38, 0.9)");
+  expect(await page.getByRole("banner").evaluate(e => getComputedStyle(e).backgroundColor)).toBe("rgba(21, 24, 26, 0.9)");
   const home = await page.evaluate(() => {
-    const style = getComputedStyle(document.body);
-    const colors = ["--rf-bg", "--rf-surface", "--rf-surface-elevated"].map(key => style.getPropertyValue(key).trim());
-    const probes = ["bg-card", "bg-muted", "bg-rf-surface"].map(name => {
+    const probes = ["bg-card", "bg-muted", "bg-rf-surface", "bg-canvas"].map(name => {
       const node = document.createElement("span"); node.className = name; document.body.appendChild(node);
       const color = getComputedStyle(node).backgroundColor; node.remove(); return color;
     });
-    return { colors, probes };
+    return { probes };
   });
-  expect(home.colors).toEqual(["#0b1326", "#171f33", "#222a3d"]);
-  expect(home.probes).toEqual(["rgb(23, 31, 51)", "rgb(34, 42, 61)", "rgb(23, 31, 51)"]);
+  expect(home.probes).toEqual(["rgb(28, 32, 35)", "rgb(37, 42, 45)", "rgb(28, 32, 35)", "rgb(21, 24, 26)"]);
   await shot(page, "home.png");
 });
 
@@ -75,7 +75,7 @@ test("score shows weighted factors and accessible popover", async ({ page }) => 
     expect(await bar.locator("div").evaluate(e => (e as HTMLElement).style.width)).toBe(`${value}%`);
   }
   await expect(popover).not.toContainText(/undefined|NaN/);
-  expect(await popover.evaluate(e => getComputedStyle(e).backgroundColor)).toBe("rgb(41, 59, 85)");
+  expect(await popover.evaluate(e => getComputedStyle(e).backgroundColor)).toBe("rgb(37, 42, 45)");
   await shot(page, "score-popover.png");
   const circle = dial.locator("circle").first(); expect(Number(await circle.getAttribute("stroke-width"))).toBeGreaterThanOrEqual(2.5); expect(Number(await circle.getAttribute("stroke-width"))).toBeLessThanOrEqual(4);
   await page.keyboard.press("Escape"); await expect(popover).not.toBeVisible();
@@ -99,42 +99,22 @@ test("local logo failure falls back and mobile score opens by touch", async ({ b
 
 
 
-test("wave is slow, compositor-only, pausable, and does not block navigation", async ({ page }) => {
+test("retired wave texture and motion toggle stay absent while tracker navigation works", async ({ page }) => {
   await mock(page); await page.goto("/tracker/feed"); await expect(page.getByTestId("job-card-synthetic-0")).toBeVisible();
-  const wave = page.getByTestId("workspace-wave"); const texture = wave.locator(".workspace-wave-texture");
-  const canvas = page.locator(".tracker-wave-canvas");
-  const canvasStyle = await canvas.evaluate(e => ({ image: getComputedStyle(e).backgroundImage, animation: getComputedStyle(e).animationName }));
-  expect(canvasStyle.image).toContain("workspace-wave.svg"); expect(canvasStyle.animation).toBe("none");
-  expect((await wave.boundingBox())!.height).toBeLessThanOrEqual(144);
-  await expect(wave).toHaveAttribute("aria-hidden", "true");
-  const animation = await texture.evaluate(e => {
-    const style = getComputedStyle(e); const animations = e.getAnimations();
-    const effect = animations[0]?.effect as KeyframeEffect | undefined;
-    return { duration: style.animationDuration, playState: style.animationPlayState, frames: effect?.getKeyframes(), pointer: getComputedStyle(e.parentElement!).pointerEvents };
-  });
-  expect(animation.duration).toBe("72s"); expect(animation.playState).toBe("running"); expect(animation.pointer).toBe("none");
-  expect(animation.frames?.length).toBeGreaterThan(0);
-  for (const frame of animation.frames || []) for (const key of Object.keys(frame)) expect(["offset", "easing", "composite", "computedOffset", "transform"]).toContain(key);
-  const pause = page.getByTestId("workspace-motion-toggle"); await expect(pause).toHaveAccessibleName("Pause background motion");
-  await pause.focus(); await expect(pause).toBeFocused(); await page.keyboard.press("Enter");
-  await expect(texture).toHaveAttribute("data-paused", "true"); await expect(pause).toHaveAccessibleName("Resume background motion");
-  await expect.poll(() => texture.evaluate(e => getComputedStyle(e).animationPlayState)).toBe("paused");
-  await pause.click(); await expect(texture).toHaveAttribute("data-paused", "false"); await expect(pause).toHaveAccessibleName("Pause background motion");
-  await page.evaluate(() => { Object.defineProperty(document, "hidden", { configurable: true, value: true }); document.dispatchEvent(new Event("visibilitychange")); });
-  await expect(texture).toHaveAttribute("data-paused", "true");
-  await page.evaluate(() => { Reflect.deleteProperty(document, "hidden"); document.dispatchEvent(new Event("visibilitychange")); });
-  await expect(texture).toHaveAttribute("data-paused", "false");
+  await expect(page.getByTestId("workspace-wave")).toHaveCount(0);
+  await expect(page.locator(".workspace-wave-texture")).toHaveCount(0);
+  await expect(page.locator(".tracker-wave-canvas")).toHaveCount(0);
+  await expect(page.getByTestId("workspace-motion-toggle")).toHaveCount(0);
   await page.getByTestId("tracker-tab-all").click(); await expect(page).toHaveURL(/\/tracker$/); await expect(page.getByTestId("tracker-job-list")).toBeVisible();
   await page.getByTestId("tracker-tab-feed").click(); await expect(page.getByTestId("job-card-synthetic-0")).toBeVisible();
   await shot(page, "wave-desktop.png");
 });
 
-test("reduced motion renders static wave and mobile controls remain usable", async ({ browser }) => {
+test("reduced motion keeps tracker static and mobile controls remain usable", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true, reducedMotion: "reduce" });
   const page = await context.newPage(); await mock(page); await page.goto("/tracker/feed"); await expect(page.getByTestId("job-card-synthetic-0")).toBeVisible();
-  const texture = page.getByTestId("workspace-wave").locator(".workspace-wave-texture");
-  expect(await texture.evaluate(e => getComputedStyle(e).animationName)).toBe("none");
-  await expect(page.getByTestId("workspace-motion-toggle")).not.toBeVisible();
+  await expect(page.getByTestId("workspace-wave")).toHaveCount(0);
+  await expect(page.getByTestId("workspace-motion-toggle")).toHaveCount(0);
   await page.getByTestId("discover-search-input").tap(); await expect(page.getByTestId("discover-search-input")).toBeFocused();
   await shot(page, "wave-mobile-reduced.png"); await context.close();
 });

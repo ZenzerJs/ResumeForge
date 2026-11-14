@@ -54,17 +54,17 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
 
   const getDifficultyBadgeColor = (diff: string) => {
     switch (diff) {
-      case "Easy": return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
-      case "Medium": return "bg-amber-500/10 text-amber-400 border-amber-500/20";
-      case "Hard": return "bg-rose-500/10 text-rose-400 border-rose-500/20";
-      default: return "bg-slate-800 text-slate-300 border-slate-700";
+      case "Easy": return "bg-status-success/10 text-status-success border-status-success/30";
+      case "Medium": return "bg-status-warning/10 text-status-warning border-status-warning/30";
+      case "Hard": return "bg-status-danger/10 text-status-danger border-status-danger/30";
+      default: return "bg-elevated text-text-secondary border-border";
     }
   };
 
   return (
     <div className="w-full space-y-6">
       {/* Filter Controls */}
-      <div className="space-y-3 p-4 bg-slate-900/60 border border-slate-800/80 rounded-xl">
+      <div className="space-y-3 p-4 bg-card border border-border rounded-[10px]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Track Filters */}
           <div className="flex flex-wrap gap-1.5">
@@ -77,10 +77,10 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
               <button
                 key={t.id}
                 onClick={() => setTrack(t.id as any)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
+                className={`px-3 py-1.5 rounded-[6px] text-xs font-semibold transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   track === t.id
-                    ? "bg-amber-500/15 border-amber-500/40 text-amber-300"
-                    : "border-slate-800 bg-slate-900/80 hover:bg-slate-800/80 text-slate-400 hover:text-slate-100"
+                    ? "bg-primary/15 border-primary/40 text-primary"
+                    : "border-border bg-elevated/60 hover:bg-elevated text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {t.label}
@@ -94,10 +94,10 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
               <button
                 key={d}
                 onClick={() => setDifficulty(d as any)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors border ${
+                className={`px-2.5 py-1 rounded-[6px] text-xs font-semibold transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   difficulty === d
-                    ? "bg-amber-500/15 border-amber-500/40 text-amber-300"
-                    : "border-slate-800 bg-slate-900/80 hover:bg-slate-800/80 text-slate-400 hover:text-slate-100"
+                    ? "bg-primary/15 border-primary/40 text-primary"
+                    : "border-border bg-elevated/60 hover:bg-elevated text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {d === "all" ? "All Levels" : d}
@@ -107,17 +107,17 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
         </div>
 
         {/* Company Filter Pills */}
-        <div className="pt-2 border-t border-slate-800/80">
+        <div className="pt-2 border-t border-border">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400 flex-shrink-0">
+            <span className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground flex-shrink-0">
               Company:
             </span>
             <button
               onClick={() => setCompany("all")}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex-shrink-0 border ${
+              className={`px-2.5 py-1 rounded-[6px] text-xs transition-colors flex-shrink-0 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                 company === "all"
-                  ? "bg-amber-500/15 text-amber-300 border-amber-500/40 font-semibold"
-                  : "bg-slate-900/80 text-slate-400 hover:text-slate-100 border-slate-800 hover:bg-slate-800/80"
+                  ? "bg-primary/15 text-primary border-primary/40 font-semibold"
+                  : "bg-elevated/60 text-muted-foreground hover:text-foreground border-border hover:bg-elevated"
               }`}
             >
               All Companies
@@ -128,10 +128,10 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                 <button
                   key={c.slug}
                   onClick={() => setCompany(isSelected ? "all" : c.slug)}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex-shrink-0 border ${
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-xs transition-colors flex-shrink-0 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                     isSelected
-                      ? "bg-amber-500/15 text-amber-300 border-amber-500/40 font-semibold"
-                      : "bg-slate-900/80 text-slate-400 hover:text-slate-100 border-slate-800 hover:bg-slate-800/80"
+                      ? "bg-primary/15 text-primary border-primary/40 font-semibold"
+                      : "bg-elevated/60 text-muted-foreground hover:text-foreground border-border hover:bg-elevated"
                   }`}
                 >
                   {getCompanyLogo(c.slug, "w-3.5 h-3.5 flex-shrink-0 grayscale")}
@@ -148,12 +148,12 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
         {filteredQuestions.map(q => (
           <div 
             key={q.id} 
-            className="group flex flex-col justify-between rounded-xl border border-slate-800 bg-rf-surface p-4 text-slate-100 transition-colors hover:border-slate-600 cursor-pointer [content-visibility:auto] [contain-intrinsic-size:auto_132px]"
+            className="group flex flex-col justify-between rounded-[10px] border border-border bg-card p-4 text-foreground transition-colors hover:border-outline cursor-pointer [content-visibility:auto] [contain-intrinsic-size:auto_132px]"
             onClick={() => setSelectedQuestion(q)}
           >
             <div>
               <div className="flex justify-between items-start gap-2 mb-2">
-                <h3 className="font-semibold text-base text-slate-100 transition-colors line-clamp-1">
+                <h3 className="font-semibold text-base text-foreground transition-colors line-clamp-1">
                   {q.title}
                 </h3>
                 <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${getDifficultyBadgeColor(q.difficulty)}`}>
@@ -161,20 +161,20 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                 </span>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
-                <span className="font-medium text-foreground/80">{q.category}</span>
+                <span className="font-semibold text-on-surface-variant">{q.category}</span>
                 <span>•</span>
                 <span>{q.sourceSet}</span>
               </div>
             </div>
 
-            <div className="pt-3 border-t border-border/50 flex flex-wrap items-center justify-between gap-2 mt-auto">
+            <div className="pt-3 border-t border-border flex flex-wrap items-center justify-between gap-2 mt-auto">
               <div className="flex flex-wrap gap-1.5">
                 {q.companyTags.map(tag => {
                   const comp = COMPANY_LOGOS.find(c => c.slug === tag);
                   return (
                     <span 
                       key={tag} 
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted/60 text-[11px] text-muted-foreground font-medium"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-[11px] text-on-surface-variant"
                     >
                       {getCompanyLogo(tag, "w-3 h-3 flex-shrink-0 grayscale")}
                       <span>{comp?.name || tag}</span>
@@ -183,7 +183,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                 })}
               </div>
               {q.timeComplexity && (
-                <span className="text-[10px] font-mono text-muted-foreground/70 bg-muted/40 px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                   {q.timeComplexity}
                 </span>
               )}
@@ -193,12 +193,12 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
       </div>
 
       {filteredQuestions.length === 0 && (
-        <div className="text-center py-16 border border-dashed border-border rounded-2xl bg-muted/10">
+        <div className="text-center py-16 border border-dashed border-border rounded-[10px] bg-card/50">
           <p className="text-base font-semibold text-foreground">No questions found</p>
           <p className="text-sm text-muted-foreground mt-1">Try resetting or loosening the active company or track filters.</p>
           <button
             onClick={() => { setTrack("all"); setDifficulty("all"); setCompany("all"); }}
-            className="mt-4 px-4 py-2 border border-slate-600 text-slate-200 text-xs font-semibold rounded-lg hover:bg-slate-800 transition-colors"
+            className="mt-4 px-4 py-2 border border-outline text-foreground text-xs font-semibold rounded-[6px] hover:bg-elevated transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             Reset All Filters
           </button>
@@ -217,7 +217,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
             role="dialog"
             aria-modal="true"
             aria-labelledby="question-modal-title"
-            className="w-full max-w-2xl max-h-[90vh] space-y-5 overflow-y-auto overscroll-contain rounded-2xl border border-slate-700/80 bg-rf-surface p-6 text-slate-100 shadow-2xl"
+            className="w-full max-w-2xl max-h-[90vh] space-y-5 overflow-y-auto overscroll-contain rounded-[10px] border border-outline/70 bg-card p-6 text-foreground shadow-2xl"
           >
             <div className="flex justify-between items-start gap-4 border-b border-border pb-4">
               <div>
@@ -232,7 +232,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
               </div>
               <button 
                 onClick={() => setSelectedQuestion(null)}
-                className="p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg transition-colors"
+                className="p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground rounded-[6px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 aria-label="Close modal"
               >
                 ✕
@@ -254,23 +254,23 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
 
             {/* Constraints & Complexity */}
             {(selectedQuestion.timeComplexity || selectedQuestion.spaceComplexity || selectedQuestion.constraints) && (
-              <div className="grid grid-cols-2 gap-3 p-3 bg-muted/30 border border-border rounded-xl text-xs">
+              <div className="grid grid-cols-2 gap-3 p-3 bg-inset border border-border rounded-[10px] text-xs">
                 {selectedQuestion.timeComplexity && (
                   <div>
-                    <span className="text-muted-foreground font-medium">Time Complexity:</span>
+                    <span className="text-muted-foreground font-semibold">Time Complexity:</span>
                     <p className="font-mono text-foreground font-semibold mt-0.5">{selectedQuestion.timeComplexity}</p>
                   </div>
                 )}
                 {selectedQuestion.spaceComplexity && (
                   <div>
-                    <span className="text-muted-foreground font-medium">Space Complexity:</span>
+                    <span className="text-muted-foreground font-semibold">Space Complexity:</span>
                     <p className="font-mono text-foreground font-semibold mt-0.5">{selectedQuestion.spaceComplexity}</p>
                   </div>
                 )}
                 {selectedQuestion.constraints && selectedQuestion.constraints.length > 0 && (
-                  <div className="col-span-2 pt-2 border-t border-border/50">
-                    <span className="text-muted-foreground font-medium">Constraints:</span>
-                    <ul className="list-disc list-inside mt-0.5 text-foreground/80 space-y-0.5">
+                  <div className="col-span-2 pt-2 border-t border-border">
+                    <span className="text-muted-foreground font-semibold">Constraints:</span>
+                    <ul className="list-disc list-inside mt-0.5 text-on-surface-variant space-y-0.5">
                       {selectedQuestion.constraints.map((c, i) => (
                         <li key={i}>{c}</li>
                       ))}
@@ -283,20 +283,20 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
             {/* Rubric Guide */}
             <div>
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Discussion Rubric & Key Points</h4>
-              <div className="p-3.5 bg-muted/40 border border-border/80 rounded-xl text-xs text-foreground/90 leading-relaxed whitespace-pre-wrap font-sans">
+              <div className="p-3.5 bg-inset border border-border rounded-[10px] text-xs text-on-surface-variant leading-relaxed whitespace-pre-wrap font-sans">
                 {selectedQuestion.rubricGuide}
               </div>
             </div>
 
             {/* STAR Behavioral Framework Alignment */}
             {selectedQuestion.starRubric && (
-              <div className="p-3.5 bg-primary/5 border border-primary/20 rounded-xl space-y-2">
+              <div className="p-3.5 bg-primary/5 border border-primary/25 rounded-[10px] space-y-2">
                 <h4 className="text-xs font-bold text-primary uppercase tracking-wider">STAR Behavioral Response Framework</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  <div><span className="font-semibold text-foreground/90">Situation: </span><span className="text-muted-foreground">{selectedQuestion.starRubric.situation}</span></div>
-                  <div><span className="font-semibold text-foreground/90">Task: </span><span className="text-muted-foreground">{selectedQuestion.starRubric.task}</span></div>
-                  <div><span className="font-semibold text-foreground/90">Action: </span><span className="text-muted-foreground">{selectedQuestion.starRubric.action}</span></div>
-                  <div><span className="font-semibold text-foreground/90">Result: </span><span className="text-muted-foreground">{selectedQuestion.starRubric.result}</span></div>
+                  <div><span className="font-semibold text-foreground">Situation: </span><span className="text-muted-foreground">{selectedQuestion.starRubric.situation}</span></div>
+                  <div><span className="font-semibold text-foreground">Task: </span><span className="text-muted-foreground">{selectedQuestion.starRubric.task}</span></div>
+                  <div><span className="font-semibold text-foreground">Action: </span><span className="text-muted-foreground">{selectedQuestion.starRubric.action}</span></div>
+                  <div><span className="font-semibold text-foreground">Result: </span><span className="text-muted-foreground">{selectedQuestion.starRubric.result}</span></div>
                 </div>
               </div>
             )}
@@ -309,7 +309,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                     setSelectedQuestion(null);
                     onSolveInRunner(slug);
                   }}
-                  className="px-3.5 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 dark:text-amber-400 font-semibold text-xs rounded-lg border border-amber-500/30 transition-colors flex items-center gap-1.5"
+                  className="px-3.5 py-2 bg-primary/10 hover:bg-primary/20 text-primary font-semibold text-xs rounded-[6px] border border-primary/30 transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   <span>Solve in Code Runner</span>
                   <span>&rarr;</span>
@@ -317,7 +317,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
               ) : <div />}
               <button
                 onClick={() => setSelectedQuestion(null)}
-                className="px-4 py-2 bg-primary text-primary-foreground font-semibold text-xs rounded-lg hover:bg-primary/90 transition-colors"
+                className="px-4 py-2 bg-primary text-primary-foreground font-semibold text-xs rounded-[6px] hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 Close
               </button>

@@ -12,6 +12,7 @@ test.describe("Phase 6 Job Application Tracker E2E Tests", () => {
         roleTitle: "Staff Software Engineer",
         rawDescription: "TypeScript, Node.js, Distributed Systems, PostgreSQL",
         source: "pasted",
+        personal: true,
       },
     });
     expect(createRes.ok()).toBeTruthy();

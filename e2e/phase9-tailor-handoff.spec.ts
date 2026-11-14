@@ -40,10 +40,18 @@ test.describe("Task 9.6 — Tailor AI Feedback -> Editor Handoff E2E Tests", () 
       "Senior Software Engineer role requiring TypeScript, Node.js, PostgreSQL, Docker, and microservices architecture experience."
     );
 
-    // Click Extract Requirements button
+    // Click Extract Requirements button and await extraction + ATS re-evaluation
     const extractBtn = page.locator('[data-testid="extract-reqs-btn"]');
     await expect(extractBtn).toBeEnabled();
+    const extractResponse = page.waitForResponse(
+      (res) => res.url().includes("/api/jobs/extract") && res.request().method() === "POST"
+    );
+    const evalResponse = page.waitForResponse(
+      (res) => res.url().includes("/api/ats/evaluate") && res.request().method() === "POST"
+    );
     await extractBtn.click();
+    await extractResponse;
+    await evalResponse;
 
     // Click Get AI Feedback button in ATS Score Panel
     const getFeedbackBtn = page.locator('[data-testid="get-ai-feedback-btn"]');

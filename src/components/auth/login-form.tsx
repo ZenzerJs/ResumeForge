@@ -193,19 +193,19 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
       data-testid="login-form"
       onSubmit={handleSubmit}
       noValidate
-      className={`w-full max-w-md rounded-2xl border border-slate-800 bg-[#121929]/95 p-8 shadow-2xl backdrop-blur-md ${className}`}
+      className={`w-full max-w-md rounded-[10px] border border-border bg-card p-8 shadow-2xl ${className}`}
     >
       <div className="mb-6">
         <div className="flex items-center gap-2.5 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-[#ff8c00] flex items-center justify-center font-bold text-black text-base shadow-[0_0_12px_rgba(255,140,0,0.3)]">
+          <div className="w-8 h-8 rounded-[6px] bg-primary flex items-center justify-center font-bold text-primary-foreground text-base">
             R
           </div>
-          <span className="text-xl font-bold tracking-tight text-white">ResumeForge</span>
+          <span className="text-xl font-bold tracking-tight text-foreground">ResumeForge</span>
         </div>
-        <h1 className="text-2xl font-extrabold text-white tracking-tight">
+        <h1 className="text-2xl font-bold text-foreground tracking-tight">
           {mode === "signup" ? "Create your account" : "Welcome back"}
         </h1>
-        <p className="mt-1.5 text-sm text-slate-400 leading-relaxed">
+        <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
           {mode === "signup"
             ? "Sign up to store evidence, tailor resumes, and sync job applications."
             : "Sign in with your email or username to access your workspace."}
@@ -214,7 +214,7 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
 
       {mode === "signup" ? (
         <div className="mb-4">
-          <label htmlFor="username" className="block text-xs font-mono uppercase tracking-wider text-slate-300 font-semibold mb-1.5">
+          <label htmlFor="username" className="block text-xs font-mono uppercase tracking-wider text-on-surface-variant font-semibold mb-1.5">
             Username
           </label>
           <div className="relative">
@@ -234,18 +234,18 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
                 if (error) setError(null);
               }}
               placeholder="e.g. janesmith"
-              className="h-11 w-full rounded-lg border border-slate-700 bg-slate-900/90 px-3 pl-10 text-sm text-white placeholder:text-slate-500 outline-none transition focus-visible:border-amber-500 focus-visible:ring-2 focus-visible:ring-amber-500/30"
+              className="h-11 w-full rounded-[6px] border border-outline/70 bg-input px-3 pl-10 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             />
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
-          <p className="mt-1.5 text-xs text-slate-500 font-mono">
+          <p className="mt-1.5 text-xs text-muted-foreground font-mono">
             3–24 characters. Letters, numbers, underscores, or hyphens.
           </p>
         </div>
       ) : null}
 
       <div className="mb-4">
-        <label htmlFor="email" className="block text-xs font-mono uppercase tracking-wider text-slate-300 font-semibold mb-1.5">
+        <label htmlFor="email" className="block text-xs font-mono uppercase tracking-wider text-on-surface-variant font-semibold mb-1.5">
           {mode === "signup" ? "Email address" : "Email or username"}
         </label>
         <div className="relative">
@@ -263,14 +263,14 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
               if (error) setError(null);
             }}
             placeholder={mode === "signup" ? "name@example.com" : "Email or username"}
-            className="h-11 w-full rounded-lg border border-slate-700 bg-slate-900/90 px-3 pl-10 text-sm text-white placeholder:text-slate-500 outline-none transition focus-visible:border-amber-500 focus-visible:ring-2 focus-visible:ring-amber-500/30"
+            className="h-11 w-full rounded-[6px] border border-outline/70 bg-input px-3 pl-10 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           />
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
+          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         </div>
       </div>
 
       <div className="mb-5">
-        <label htmlFor="password" className="block text-xs font-mono uppercase tracking-wider text-slate-300 font-semibold mb-1.5">
+        <label htmlFor="password" className="block text-xs font-mono uppercase tracking-wider text-on-surface-variant font-semibold mb-1.5">
           Password
         </label>
         <div className="relative">
@@ -290,14 +290,14 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
               if (error) setError(null);
             }}
             placeholder={mode === "signup" ? "Minimum 8 characters" : "Enter your password"}
-            className="h-11 w-full rounded-lg border border-slate-700 bg-slate-900/90 px-3 pl-10 pr-12 text-sm text-white placeholder:text-slate-500 outline-none transition focus-visible:border-amber-500 focus-visible:ring-2 focus-visible:ring-amber-500/30"
+            className="h-11 w-full rounded-[6px] border border-outline/70 bg-input px-3 pl-10 pr-12 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           />
-          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
+          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <button
             type="button"
             data-testid="toggle-password-visibility-btn"
             onClick={() => setShowPassword((open) => !open)}
-            className="absolute right-1 top-1/2 inline-flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:text-white focus-visible:ring-2 focus-visible:ring-amber-500/60"
+            className="absolute right-1 top-1/2 inline-flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[6px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             aria-label={showPassword ? "Hide password" : "Show password"}
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -309,7 +309,7 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
         <div
           data-testid="login-error-msg"
           role="alert"
-          className="mb-5 rounded-lg border border-rose-800/80 bg-rose-950/40 p-3 text-xs md:text-sm text-rose-300 leading-relaxed"
+          className="mb-5 rounded-[6px] border border-status-danger/50 bg-status-danger/10 p-3 text-xs md:text-sm text-status-danger leading-relaxed"
         >
           {error}
         </div>
@@ -320,7 +320,7 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
         data-testid="login-submit-btn"
         disabled={isSubmitting}
         aria-busy={isSubmitting}
-        className="flex h-11 w-full items-center justify-center rounded-lg bg-[#ff8c00] font-semibold text-black hover:bg-[#ffa024] focus-visible:ring-2 focus-visible:ring-amber-500/60 transition disabled:opacity-50 text-sm shadow-[0_0_15px_rgba(255,140,0,0.25)] cursor-pointer"
+        className="flex h-11 w-full items-center justify-center rounded-[6px] bg-primary font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition disabled:opacity-50 text-sm cursor-pointer"
       >
         {isSubmitting ? (
           <>
@@ -334,11 +334,11 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
         )}
       </button>
 
-      <div className="mt-4 pt-4 border-t border-slate-800/80 flex flex-col gap-3 text-center">
+      <div className="mt-4 pt-4 border-t border-border flex flex-col gap-3 text-center">
         {signupEnabled ? <button
           type="button"
           data-testid="login-mode-toggle-btn"
-          className="text-xs md:text-sm text-slate-400 hover:text-amber-400 transition focus-visible:ring-2 focus-visible:ring-amber-500/60 rounded py-1 cursor-pointer"
+          className="text-xs md:text-sm text-muted-foreground hover:text-primary transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded py-1 cursor-pointer"
           onClick={() => {
             setError(null);
             setMode(mode === "signup" ? "signin" : "signup");
@@ -347,12 +347,12 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
           {mode === "signup"
             ? "Already have an account? Sign in"
             : "Don't have an account? Create one"}
-        </button> : <p className="text-xs text-slate-400">Public signup is disabled in the demo. Self-host ResumeForge to create an account.</p>}
+        </button> : <p className="text-xs text-muted-foreground">Public signup is disabled in the demo. Self-host ResumeForge to create an account.</p>}
 
         <Link
           href="/"
           data-testid="login-guest-btn"
-          className="flex h-10 w-full items-center justify-center rounded-lg border border-slate-700/80 text-xs md:text-sm text-slate-300 hover:bg-slate-800/60 hover:text-white transition focus-visible:ring-2 focus-visible:ring-amber-500/60"
+          className="flex h-10 w-full items-center justify-center rounded-[6px] border border-outline/70 text-xs md:text-sm text-on-surface-variant hover:bg-elevated hover:text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           Continue as guest
         </Link>

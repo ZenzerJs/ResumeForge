@@ -93,7 +93,7 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
     await expect(matrixSection).toContainText("Document Quality & Layout");
     await expect(matrixSection).toContainText("ATS Evaluation Engine");
 
-    await expect(matrixSection).toContainText("ResumeForge (Local)");
+    await expect(matrixSection).toContainText("ResumeForge (Guest / Postgres)");
     await expect(matrixSection).toContainText("Competitors");
     await expect(matrixSection).toContainText("Teal");
     await expect(matrixSection).toContainText("Simplify");

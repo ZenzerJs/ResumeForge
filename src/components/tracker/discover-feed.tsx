@@ -883,7 +883,7 @@ export function DiscoverFeed() {
               <ChevronLeft className="h-3.5 w-3.5" />
               Prev
             </button>
-            <span className="text-center text-xs text-slate-300" data-testid="discover-page-indicator">
+            <span className="text-center text-xs tabular-nums text-on-surface-variant" data-testid="discover-page-indicator">
               Page {page} of {totalPages} ({totalJobs} total roles)
             </span>
             <button

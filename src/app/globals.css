@@ -4,75 +4,40 @@
 
 @layer base {
   :root {
-    /* ResumeForge Forge Terminal tokens */
-    --rf-bg: #0b1326;
-    --rf-surface: #171f33;
-    --rf-surface-elevated: #222a3d;
-    --rf-cloud: #dae2fd;
-    --rf-body: #dae2fd;
-    --rf-meta: #94a3b8;
-    --rf-border: rgba(148, 163, 184, 0.22);
-    --rf-amber: #ff8c00;
-    --rf-emerald: #4edea3;
-    /* RGB channels let Tailwind apply opacity modifiers to scoped tokens. */
-    --rf-bg-rgb: 11 19 38;
-    --rf-surface-rgb: 23 31 51;
-    --rf-elevated-rgb: 34 42 61;
-    --theme-background: 11 19 38;
-    --theme-card: 23 31 51;
-    --theme-popover: 23 31 51;
-    --theme-muted: 34 42 61;
-    --theme-accent: 34 42 61;
-    --theme-input: 43 53 80;
-    --theme-border: 148 163 184;
-    --theme-border-alpha: 0.2;
-    --rf-popover-surface: #0f172a;
-    --rf-popover-border: rgba(51, 65, 85, 0.8);
-    --rf-surface-border: rgba(30, 41, 59, 0.8);
+    /* Unified Studio Design System tokens (space-separated sRGB channels) */
+    --surface-canvas: 21 24 26;
+    --surface-panel: 28 32 35;
+    --surface-elevated: 37 42 45;
+    --surface-inset: 17 20 22;
+    --paper-sheet: 255 255 255;
+    --paper-ink: 28 30 32;
+    --text-primary: 237 239 237;
+    --text-secondary: 194 201 199;
+    --text-muted: 151 161 159;
+    --border-hairline: 55 62 64;
+    --border-control: 119 130 129;
+    --accent-action: 241 181 101;
+    --accent-ink: 31 24 14;
+    --status-success: 124 204 165;
+    --status-warning: var(--accent-action);
+    --status-danger: 242 148 144;
+    --status-info: 145 186 217;
+    --focus-ring: var(--accent-action);
+    --hairline-width: 1px;
 
-    /* Theme colors */
-    --background: #0b1326;
-    --foreground: #dae2fd;
-    --card: #171f33;
-    --card-foreground: #dae2fd;
-    --popover: #171f33;
-    --popover-foreground: #dae2fd;
-    --primary: #ff8c00;
-    --primary-foreground: #4d2600;
-    --secondary: #4edea3;
-    --secondary-foreground: #003824;
-    --muted: #2d3449;
-    --muted-foreground: #94a3b8;
-    --accent: #222a3d;
-    --accent-foreground: #ff8c00;
-    --destructive: #ffb4ab;
-    --destructive-foreground: #690005;
-    --border: rgba(148, 163, 184, 0.22);
-    --input: #1e293b;
-    --ring: #ff8c00;
-    --radius: 0.25rem;
-  }
-
-  /* Portals are siblings of AppShell, so scope through the containing body. */
-  body:has([data-workspace-theme]) {
-    --rf-bg: #080e1c;
-    --rf-surface: #1c2940;
-    --rf-surface-elevated: #2b3b55;
-    --rf-border: rgba(165, 185, 213, 0.42);
-    --rf-bg-rgb: 8 14 28;
-    --rf-surface-rgb: 28 41 64;
-    --rf-elevated-rgb: 43 59 85;
-    --theme-background: 8 14 28;
-    --theme-card: 28 41 64;
-    --theme-popover: 41 59 85;
-    --theme-muted: 43 59 85;
-    --theme-accent: 43 59 85;
-    --theme-input: 12 21 38;
-    --theme-border: 165 185 213;
-    --theme-border-alpha: 0.42;
-    --rf-popover-surface: #293b55;
-    --rf-popover-border: rgba(165, 185, 213, 0.48);
-    --rf-surface-border: rgba(165, 185, 213, 0.32);
+    /* Direct full-color legacy aliases for var(--rf-*) consumers */
+    --rf-bg: rgb(var(--surface-canvas));
+    --rf-surface: rgb(var(--surface-panel));
+    --rf-surface-elevated: rgb(var(--surface-elevated));
+    --rf-cloud: rgb(var(--text-primary));
+    --rf-body: rgb(var(--text-primary));
+    --rf-meta: rgb(var(--text-muted));
+    --rf-border: rgb(var(--border-hairline));
+    --rf-amber: rgb(var(--accent-action));
+    --rf-emerald: rgb(var(--status-success));
+    --rf-popover-surface: rgb(var(--surface-elevated));
+    --rf-popover-border: rgb(var(--border-control));
+    --rf-surface-border: rgb(var(--border-hairline));
   }
 
   * {
@@ -86,7 +51,7 @@
   }
 
   body {
-    background-color: var(--rf-bg);
+    background-color: rgb(var(--surface-canvas));
     @apply text-foreground antialiased;
     margin: 0;
     padding: 0;
@@ -101,70 +66,25 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: var(--rf-bg);
+    background: rgb(var(--surface-canvas));
   }
 
   ::-webkit-scrollbar-thumb {
-    background: var(--rf-surface-elevated);
+    background: rgb(var(--surface-elevated));
     border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #2a3140;
+    background: rgb(var(--border-control));
   }
 
   /* Selection highlight */
   ::selection {
-    background: rgba(245, 158, 11, 0.25);
-    color: #fcd34d;
+    background: rgb(var(--accent-action) / 0.25);
+    color: rgb(var(--text-primary));
   }
 }
 
-
-/* The full-page texture is static; only the small band below moves. */
-.tracker-wave-canvas {
-  background-image:
-    linear-gradient(rgba(8, 14, 28, 0.92), rgba(8, 14, 28, 0.92)),
-    url("/workspace-wave.svg");
-  background-size: auto, 360px 144px;
-  background-repeat: repeat;
-}
-
-/* A small repeating band, rather than a canvas or frame-by-frame script. */
-.workspace-wave {
-  position: fixed;
-  inset: auto 0 0;
-  height: 144px;
-  overflow: hidden;
-  pointer-events: none;
-  opacity: 0.22;
-  mask-image: linear-gradient(transparent, black 45%);
-}
-
-.workspace-wave-texture {
-  width: calc(100% + 360px);
-  height: 100%;
-  background: url("/workspace-wave.svg") repeat-x left bottom / 360px 144px;
-  animation: workspace-wave-drift 72s linear infinite;
-}
-
-.workspace-wave-texture[data-paused="true"] {
-  animation-play-state: paused;
-}
-
-@keyframes workspace-wave-drift {
-  to { transform: translateX(-360px); }
-}
-
-/* Home has no workspace marker, preserving its existing navigation. */
-[data-workspace-theme] > header {
-  background-color: rgba(13, 23, 39, 0.96);
-  border-color: rgba(165, 185, 213, 0.22);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .workspace-wave-texture { animation: none; }
-}
 
 /* Page transition */
 @layer utilities {
@@ -206,8 +126,8 @@
 
   /* Gold highlighter stroke */
   .highlight-gold {
-    background: linear-gradient(transparent 55%, rgba(245, 158, 11, 0.20) 55%);
-    border-bottom: 2px solid rgba(245, 158, 11, 0.5);
+    background: linear-gradient(transparent 55%, rgb(var(--accent-action) / 0.2) 55%);
+    border-bottom: 2px solid rgb(var(--accent-action) / 0.5);
     padding: 0 2px;
     border-radius: 1px;
   }
@@ -215,44 +135,19 @@
   /* Subtle grid texture background */
   .bg-grid {
     background-image:
-      linear-gradient(rgba(30, 37, 54, 0.5) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(30, 37, 54, 0.5) 1px, transparent 1px);
+      linear-gradient(rgb(var(--border-hairline) / 0.5) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--border-hairline) / 0.5) 1px, transparent 1px);
     background-size: 40px 40px;
-  }
-
-  /* Glassmorphism Panel & Glow utilities */
-  .glass-panel {
-    background-color: rgba(18, 24, 38, 0.65);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 140, 0, 0.18);
-    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  }
-
-  .glow-effect:hover {
-    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.15), 0 0 25px rgba(255, 140, 0, 0.25);
-    border-color: rgba(255, 140, 0, 0.55);
-  }
-
-  .glow-secondary:hover {
-    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.15), 0 0 25px rgba(78, 222, 163, 0.25);
-    border-color: rgba(78, 222, 163, 0.55);
-  }
-
-  .terminal-text {
-    color: #ff8c00;
-    text-shadow: 0 0 8px rgba(255, 140, 0, 0.4);
   }
 
   /* Ink spotlight hover */
   .hover-spotlight {
-    transition: box-shadow 0.25s ease, border-color 0.25s ease;
+    transition: box-shadow 150ms ease, border-color 150ms ease;
   }
 
   .hover-spotlight:hover {
-    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.15), 0 8px 24px rgba(0, 0, 0, 0.4);
-    border-color: rgba(245, 158, 11, 0.25);
+    box-shadow: 0 0 0 1px rgb(var(--accent-action) / 0.15), 0 8px 24px rgb(0 0 0 / 0.4);
+    border-color: rgb(var(--accent-action) / 0.25);
   }
 
   /* Pulse skeleton animation */
@@ -263,20 +158,6 @@
 
   .skeleton-pulse {
     animation: skeleton-pulse 1.8s ease-in-out infinite;
-  }
-
-  /* Marquee Ticker Animation */
-  @keyframes marquee-scroll {
-    from { transform: translateX(0); }
-    to { transform: translateX(-50%); }
-  }
-
-  .animate-marquee,
-  .marquee-track {
-    display: flex;
-    width: max-content;
-    animation: marquee-scroll var(--marquee-s, 36s) linear infinite;
-    will-change: transform;
   }
 
   /* Streaming Cursor Animation */
@@ -290,7 +171,7 @@
     width: 6px;
     height: 14px;
     margin-left: 3px;
-    background-color: var(--primary);
+    background-color: rgb(var(--accent-action));
     vertical-align: middle;
     border-radius: 2px;
     animation: cursor-pulse 0.8s ease-in-out infinite;
@@ -302,18 +183,8 @@
     }
 
     .skeleton-pulse,
-    .animate-marquee,
-    .marquee-track,
     .streaming-cursor {
       animation: none !important;
-    }
-
-    .animate-marquee,
-    .marquee-track {
-      width: 100% !important;
-      flex-wrap: wrap !important;
-      justify-content: center !important;
-      transform: none !important;
     }
   }
 }

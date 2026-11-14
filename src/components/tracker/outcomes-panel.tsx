@@ -71,11 +71,11 @@ export function OutcomesPanel() {
                     <div className="h-2 rounded bg-slate-800">
                       <div className="h-2 rounded bg-amber-500" style={{ width: `${(count / max) * 100}%` }} />
                     </div>
-                    <span className="text-right font-mono text-slate-200">{count}</span>
+                    <span className="text-right font-mono tabular-nums text-foreground">{count}</span>
                   </div>
                 );
               })}
-              <p className="pt-2 text-xs text-slate-400">
+              <p className="pt-2 text-xs tabular-nums text-muted-foreground">
                 Interview rate {(data.interviewRate * 100).toFixed(0)}%
                 {data.medianResponseDays !== null
                   ? ` · median ${data.medianResponseDays.toFixed(1)} days to a response`
@@ -84,8 +84,8 @@ export function OutcomesPanel() {
             </section>
 
             <section className="overflow-x-auto" data-testid="outcome-variants">
-              <table className="w-full text-left text-xs text-slate-300">
-                <thead className="text-slate-500">
+              <table className="w-full text-left text-xs text-on-surface-variant">
+                <thead className="text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-3">Variant</th>
                     <th className="py-2 pr-3">Job</th>
@@ -96,12 +96,12 @@ export function OutcomesPanel() {
                 </thead>
                 <tbody>
                   {data.variants.map((row) => (
-                    <tr key={row.variantId ?? "none"} className="border-t border-slate-800">
+                    <tr key={row.variantId ?? "none"} className="border-t border-border">
                       <td className="py-2 pr-3">{row.variantTitle}</td>
                       <td className="py-2 pr-3">{[row.roleTitle, row.company].filter(Boolean).join(" · ") || "—"}</td>
-                      <td className="py-2 pr-3">{row.applications}</td>
-                      <td className="py-2 pr-3">{row.interviews}</td>
-                      <td className="py-2">{(row.interviewRate * 100).toFixed(0)}%</td>
+                      <td className="py-2 pr-3 tabular-nums">{row.applications}</td>
+                      <td className="py-2 pr-3 tabular-nums">{row.interviews}</td>
+                      <td className="py-2 tabular-nums">{(row.interviewRate * 100).toFixed(0)}%</td>
                     </tr>
                   ))}
                 </tbody>
