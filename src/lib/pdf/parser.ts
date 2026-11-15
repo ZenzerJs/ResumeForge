@@ -1,8 +1,173 @@
 // Compatible with both pdf-parse v1 function & pdf-parse v2 PDFParse class
-const pdfParseModule = require("pdf-parse");
 import { normalizeSectionTitle, canonicalSectionRank } from "@/lib/typst/section-order";
 import { safeDestination } from "@/lib/typst/inline-content";
 import { typstContent, typstString } from "@/lib/typst/resume-document";
+
+type Matrix2D = [number, number, number, number, number, number];
+
+function readMatrixTuple(init?: string | number[]): Matrix2D {
+  if (Array.isArray(init) && init.length >= 6) {
+    return [
+      Number(init[0]) || 0,
+      Number(init[1]) || 0,
+      Number(init[2]) || 0,
+      Number(init[3]) || 0,
+      Number(init[4]) || 0,
+      Number(init[5]) || 0,
+    ];
+  }
+  return [1, 0, 0, 1, 0, 0];
+}
+
+class ServerDOMMatrix {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  e: number;
+  f: number;
+
+  constructor(init?: string | number[]) {
+    const [a, b, c, d, e, f] = readMatrixTuple(init);
+    this.a = a;
+    this.b = b;
+    this.c = c;
+    this.d = d;
+    this.e = e;
+    this.f = f;
+  }
+
+  get m11() { return this.a; }
+  get m12() { return this.b; }
+  get m21() { return this.c; }
+  get m22() { return this.d; }
+  get m41() { return this.e; }
+  get m42() { return this.f; }
+  get is2D() { return true; }
+  get isIdentity() {
+    return this.a === 1 && this.b === 0 && this.c === 0 && this.d === 1 && this.e === 0 && this.f === 0;
+  }
+
+  static fromMatrix(other?: Partial<ServerDOMMatrix>): ServerDOMMatrix {
+    return new ServerDOMMatrix(
+      other ? [other.a ?? 1, other.b ?? 0, other.c ?? 0, other.d ?? 1, other.e ?? 0, other.f ?? 0] : undefined
+    );
+  }
+
+  multiplySelf(other: Partial<ServerDOMMatrix>): this {
+    const a2 = other.a ?? 1;
+    const b2 = other.b ?? 0;
+    const c2 = other.c ?? 0;
+    const d2 = other.d ?? 1;
+    const e2 = other.e ?? 0;
+    const f2 = other.f ?? 0;
+    const a1 = this.a, b1 = this.b, c1 = this.c, d1 = this.d, e1 = this.e, f1 = this.f;
+    this.a = a1 * a2 + c1 * b2;
+    this.b = b1 * a2 + d1 * b2;
+    this.c = a1 * c2 + c1 * d2;
+    this.d = b1 * c2 + d1 * d2;
+    this.e = a1 * e2 + c1 * f2 + e1;
+    this.f = b1 * e2 + d1 * f2 + f1;
+    return this;
+  }
+
+  multiply(other: Partial<ServerDOMMatrix>): ServerDOMMatrix {
+    return ServerDOMMatrix.fromMatrix(this).multiplySelf(other);
+  }
+
+  preMultiplySelf(other: Partial<ServerDOMMatrix>): this {
+    const res = ServerDOMMatrix.fromMatrix(other).multiplySelf(this);
+    this.a = res.a; this.b = res.b; this.c = res.c; this.d = res.d; this.e = res.e; this.f = res.f;
+    return this;
+  }
+
+  translateSelf(tx = 0, ty = 0): this {
+    return this.multiplySelf({ a: 1, b: 0, c: 0, d: 1, e: tx, f: ty });
+  }
+
+  translate(tx = 0, ty = 0): ServerDOMMatrix {
+    return ServerDOMMatrix.fromMatrix(this).translateSelf(tx, ty);
+  }
+
+  scaleSelf(scaleX = 1, scaleY = scaleX): this {
+    return this.multiplySelf({ a: scaleX, b: 0, c: 0, d: scaleY, e: 0, f: 0 });
+  }
+
+  scale(scaleX = 1, scaleY = scaleX): ServerDOMMatrix {
+    return ServerDOMMatrix.fromMatrix(this).scaleSelf(scaleX, scaleY);
+  }
+
+  invertSelf(): this {
+    const det = this.a * this.d - this.b * this.c;
+    if (!det) {
+      this.a = NaN; this.b = NaN; this.c = NaN; this.d = NaN; this.e = NaN; this.f = NaN;
+      return this;
+    }
+    const { a, b, c, d, e, f } = this;
+    this.a = d / det;
+    this.b = -b / det;
+    this.c = -c / det;
+    this.d = a / det;
+    this.e = (c * f - d * e) / det;
+    this.f = (b * e - a * f) / det;
+    return this;
+  }
+
+  inverse(): ServerDOMMatrix {
+    return ServerDOMMatrix.fromMatrix(this).invertSelf();
+  }
+
+  transformPoint(point?: { x?: number; y?: number }) {
+    const x = point?.x ?? 0;
+    const y = point?.y ?? 0;
+    return {
+      x: this.a * x + this.c * y + this.e,
+      y: this.b * x + this.d * y + this.f,
+      z: 0,
+      w: 1,
+    };
+  }
+}
+
+class ServerImageData {
+  width: number;
+  height: number;
+  data: Uint8ClampedArray;
+  constructor(width: number, height: number) {
+    this.width = width;
+    this.height = height;
+    this.data = new Uint8ClampedArray(width * height * 4);
+  }
+}
+
+class ServerPath2D {}
+
+/**
+ * Polyfills browser canvas geometry globals missing in Node/serverless runtimes
+ * (e.g. Vercel without native @napi-rs/canvas) before loading pdf-parse / pdfjs.
+ */
+export function ensurePdfJsNodeGlobals(): void {
+  const g = globalThis as Record<string, unknown>;
+  if (typeof g.DOMMatrix === "undefined") {
+    g.DOMMatrix = ServerDOMMatrix;
+  }
+  if (typeof g.ImageData === "undefined") {
+    g.ImageData = ServerImageData;
+  }
+  if (typeof g.Path2D === "undefined") {
+    g.Path2D = ServerPath2D;
+  }
+}
+
+let cachedPdfParseModule: any = null;
+
+function getPdfParseModule() {
+  ensurePdfJsNodeGlobals();
+  if (!cachedPdfParseModule) {
+    cachedPdfParseModule = require("pdf-parse");
+  }
+  return cachedPdfParseModule;
+}
 
 export interface ExtractedPdfLink {
   label?: string;
@@ -97,6 +262,7 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedPdfResult> {
   };
 
   try {
+    const pdfParseModule = getPdfParseModule();
     let rawText = "";
     let numpages = 1;
     let info: Record<string, unknown> = {};

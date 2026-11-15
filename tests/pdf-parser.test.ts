@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { convertTextToTypst } from "@/lib/pdf/parser";
+import { convertTextToTypst, ensurePdfJsNodeGlobals, parsePdfBuffer } from "@/lib/pdf/parser";
 import { extractResumeFacts } from "@/lib/facts/extract";
 
 describe("PDF Parser & Typst Converter", () => {
@@ -179,5 +179,52 @@ Engineering: Next.js, React, FastAPI, REST APIs, PostgreSQL, Prisma, Docker, Git
     expect(typst).toContain("FileLink");
     expect(typst).toContain("CredLink");
     expect(typst).toContain('#link("https://portfolio.example.com/work")[Portfolio]');
+  });
+
+  it("polyfills missing DOMMatrix/ImageData/Path2D globals and parses a PDF buffer safely", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const prevDOMMatrix = g.DOMMatrix;
+    const prevImageData = g.ImageData;
+    const prevPath2D = g.Path2D;
+    try {
+      delete g.DOMMatrix;
+      delete g.ImageData;
+      delete g.Path2D;
+
+      ensurePdfJsNodeGlobals();
+      expect(typeof g.DOMMatrix).toBe("function");
+      expect(typeof g.ImageData).toBe("function");
+      expect(typeof g.Path2D).toBe("function");
+
+      const samplePdf = Buffer.from(
+        "%PDF-1.4\n" +
+          "1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj\n" +
+          "2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj\n" +
+          "3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj\n" +
+          "4 0 obj<< /Length 44 >>stream\n" +
+          "BT /F1 12 Tf 72 720 Td (Hello ResumeForge) Tj ET\n" +
+          "endstream\nendobj\n" +
+          "5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj\n" +
+          "xref\n0 6\n" +
+          "0000000000 65535 f \n" +
+          "0000000009 00000 n \n" +
+          "0000000058 00000 n \n" +
+          "0000000115 00000 n \n" +
+          "0000000241 00000 n \n" +
+          "0000000335 00000 n \n" +
+          "trailer<< /Size 6 /Root 1 0 R >>\n" +
+          "startxref\n405\n%%EOF"
+      );
+      const parsed = await parsePdfBuffer(samplePdf);
+      expect(parsed.text).toContain("Hello ResumeForge");
+      expect(parsed.numpages).toBe(1);
+    } finally {
+      if (prevDOMMatrix === undefined) delete g.DOMMatrix;
+      else g.DOMMatrix = prevDOMMatrix;
+      if (prevImageData === undefined) delete g.ImageData;
+      else g.ImageData = prevImageData;
+      if (prevPath2D === undefined) delete g.Path2D;
+      else g.Path2D = prevPath2D;
+    }
   });
 });
