@@ -24,6 +24,7 @@ Generate evidence-grounded, job-specific resume variants from a protected Master
 
 > "Built after a season of silent rejections as a first-year. This tool carried my own search into a Google technical interview as a second-year."
 
+
 </div>
 
 ---
@@ -51,12 +52,7 @@ See the tailoring workflow in action—from matching real job requirements again
 
 <div align="center">
 
-<!-- NOTE: GitHub renders an inline video player only for `user-attachments` URLs created by dragging and dropping an `.mp4` directly into GitHub's web editor. Until replaced with a web-editor upload URL, this thumbnail links to the repo's `docs/demo.mp4` file. -->
-<a href="docs/demo.mp4">
-  <img src="docs/video-thumbnail.png" alt="Watch the ResumeForge demo video (0:19)" width="800" />
-</a>
-
-*Click the thumbnail above to open `docs/demo.mp4` (or drag `docs/demo.mp4` into GitHub's web editor for an inline player).*
+https://github.com/user-attachments/assets/64820390-cd87-41f1-9e0a-42dcec21f57e
 
 </div>
 
@@ -260,10 +256,10 @@ ResumeForge/
 
 The AI never invents experience—it only rephrases, restructures, or highlights what already exists in your verified Evidence Bank. Every AI-assisted change is a **diffable, reviewable patch**, and every score or recommendation traces back to a concrete, auditable rule.
 
-*Developed with AI coding assistants (Cursor, Antigravity). Architecture, product specification ([`PRODUCT.md`](PRODUCT.md)), design system ([`DESIGN.md`](DESIGN.md)), and security threat model ([`SECURITY.md`](SECURITY.md)) designed and validated by [@ZenzerJs](https://github.com/ZenzerJs).*
+*Developed alongside AI coding assistants (Cursor, Antigravity). Architecture, product specification ([`PRODUCT.md`](PRODUCT.md)), design system ([`DESIGN.md`](DESIGN.md)), and security threat model ([`SECURITY.md`](SECURITY.md)) designed by [@ZenzerJs](https://github.com/ZenzerJs).*
 
 <div align="center">
 
-*Built by [@ZenzerJs](https://github.com/ZenzerJs) · [MIT License](LICENSE)*
+*Built & Designed by [@ZenzerJs](https://github.com/ZenzerJs) · [MIT License](LICENSE)*
 
 </div>
