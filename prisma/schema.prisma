@@ -85,6 +85,8 @@ model Bullet {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
   patchCitations PatchCitation[] @relation("PatchCitationBullet")
+
+  @@index([evidenceId])
 }
 
 model Job {
@@ -113,6 +115,7 @@ model Job {
   dossier               CompanyDossier? @relation(fields: [dossierId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([userId, createdAt(sort: Desc)])
   @@index([dossierId])
 }
 
@@ -198,6 +201,9 @@ model ResumeVariant {
   patches         Patch[]
   coverLetters    CoverLetter[]
   applications    JobApplication[]
+
+  @@index([masterResumeId])
+  @@index([jobId])
 }
 
 model JobApplication {
@@ -245,6 +251,8 @@ model Patch {
   status            String        @default("PENDING") // PENDING | ACCEPTED | REJECTED | REJECTED_CITATION
   createdAt         DateTime      @default(now())
   citations         PatchCitation[]
+
+  @@index([variantId])
 }
 
 // Additive normalized citation storage. Legacy evidenceCitations remains readable.
@@ -310,6 +318,8 @@ model CoverLetter {
   updatedAt         DateTime       @updatedAt
 
   @@index([userId])
+  @@index([jobId])
+  @@index([variantId])
 }
 
 // Pitt CSC / Simplify Summer 2026 Ingestion Feed

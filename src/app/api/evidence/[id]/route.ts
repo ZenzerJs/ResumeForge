@@ -90,7 +90,13 @@ export async function PUT(
       );
     }
 
-    const updated = await updateEvidenceItem(id, validation.data);
+    const updated = await updateEvidenceItem(id, validation.data, userId);
+    if (!updated) {
+      return NextResponse.json(
+        { success: false, error: "Evidence item not found" },
+        { status: 404 }
+      );
+    }
     return NextResponse.json({ success: true, data: updated });
   } catch (err) {
     return NextResponse.json(
@@ -128,9 +134,9 @@ export async function DELETE(
     const mode = searchParams.get("mode");
 
     if (mode === "purge") {
-      await deleteEvidenceItem(id);
+      await deleteEvidenceItem(id, userId);
     } else {
-      await archiveEvidenceItem(id);
+      await archiveEvidenceItem(id, userId);
     }
 
     return NextResponse.json({ success: true, message: "Evidence item processed" });

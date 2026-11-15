@@ -122,7 +122,7 @@ async function seedSimplifyJobs() {
   let skippedCount = 0;
 
   for (const job of SIMPLIFY_JOBS_SNAPSHOT) {
-    // Check if job already exists in SQLite database
+    // Check if job already exists in Postgres database
     const existing = await prisma.job.findFirst({
       where: {
         company: job.company,
@@ -146,7 +146,7 @@ async function seedSimplifyJobs() {
       source: "manual",
     });
 
-    // Create job record in SQLite database
+    // Create job record in Postgres database
     const created = await createJob({
       company: validatedInput.company,
       roleTitle: validatedInput.roleTitle,

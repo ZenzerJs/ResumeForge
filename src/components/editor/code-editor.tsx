@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useCallback, useEffect } from "react";
+import dynamic from "next/dynamic";
 import CodeMirror, { ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { RangeSetBuilder } from "@codemirror/state";
 import {
@@ -12,9 +13,31 @@ import {
 } from "@codemirror/view";
 import { ShieldCheck, LayoutList, Code2, Plus, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ResumeFormBuilder, legacyFormToResumeDocument, parseTypstToStructuredModel, serializeStructuredModelToTypst } from "./resume-form-builder";
-import { ManagedResumeForm } from "./managed-resume-form";
 import { isResumeLayoutV2Enabled, parseManagedResume, renderResumeDocument } from "@/lib/typst/resume-document";
+
+const ResumeFormBuilder = dynamic(
+  () => import("./resume-form-builder").then((m) => m.ResumeFormBuilder),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full items-center justify-center p-6 text-xs font-mono text-text-secondary">
+        Loading visual form…
+      </div>
+    ),
+  }
+);
+
+const ManagedResumeForm = dynamic(
+  () => import("./managed-resume-form").then((m) => m.ManagedResumeForm),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full items-center justify-center p-6 text-xs font-mono text-text-secondary">
+        Loading guided form…
+      </div>
+    ),
+  }
+);
 
 const emberInkEditorTheme = EditorView.theme(
   {
@@ -219,6 +242,11 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
     try {
       const response = await fetch("/templates/starter-resume.typ");
       const starter = await response.text();
+      const {
+        parseTypstToStructuredModel,
+        serializeStructuredModelToTypst,
+        legacyFormToResumeDocument,
+      } = await import("./resume-form-builder");
       const model = parseTypstToStructuredModel(snapshot);
       const canonical = serializeStructuredModelToTypst(model).trim() === snapshot.trim();
       if (!response.ok || (snapshot.trim() !== starter.trim() && !canonical)) {

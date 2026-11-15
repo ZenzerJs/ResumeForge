@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { fetchDemoConfig } from "@/components/auth/session-user";
 import {
   Bot,
   Sparkles,
@@ -140,6 +141,15 @@ export function AiSidebar({
   const [patchBatch, setPatchBatch] = useState<{ batchId: string; revisionToken: string; baseTypstSource: string; jobId: string } | null>(null);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [demoBaseTypstSource, setDemoBaseTypstSource] = useState<string | null>(null);
+  const tailorAbortRef = useRef<AbortController | null>(null);
+  const repairAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      tailorAbortRef.current?.abort();
+      repairAbortRef.current?.abort();
+    };
+  }, []);
 
   // Task 9.6: Seeded feedback context from Tailor review
   const [seededFeedback, setSeededFeedback] = useState<{
@@ -156,7 +166,7 @@ export function AiSidebar({
     if (!urlJobId || typeof window === "undefined") return;
     let cancelled = false;
     (async () => {
-      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      const demoConfig = await fetchDemoConfig();
       if (cancelled) return;
       if (demoConfig?.demoMode) {
         setSeededFeedback(null);
@@ -190,7 +200,7 @@ export function AiSidebar({
     if (!urlJobId) return;
     let cancelled = false;
     (async () => {
-      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      const demoConfig = await fetchDemoConfig();
       if (cancelled) return;
       if (demoConfig?.demoMode) {
         try {
@@ -225,6 +235,11 @@ export function AiSidebar({
       return;
     }
 
+    tailorAbortRef.current?.abort();
+    const controller = new AbortController();
+    tailorAbortRef.current = controller;
+    const { signal } = controller;
+
     setIsGenerating(true);
     setTailorStage("connecting");
     setError(null);
@@ -247,8 +262,10 @@ export function AiSidebar({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rawDescription: jdText }),
+        signal,
       });
       const extractJson = await extractRes.json();
+      if (signal.aborted) return;
 
       if (!extractRes.ok || !extractJson.success) {
         const errMsg =
@@ -262,7 +279,8 @@ export function AiSidebar({
 
       const jobRequirements = extractJson.data;
 
-      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      const demoConfig = await fetchDemoConfig();
+      if (signal.aborted) return;
       const isDemo = demoConfig?.demoMode === true;
       const demoContext = isDemo ? getDemoContextFromBrowser() : undefined;
       if (isDemo && (!demoContext?.masterTypst || demoContext.masterTypst !== source || localStorage.getItem("resumeforge_typst_source") !== source)) {
@@ -277,8 +295,10 @@ export function AiSidebar({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ rawDescription: jdText, source: "pasted", personal: true }),
+          signal,
         });
         const saveJson = await saveRes.json();
+        if (signal.aborted) return;
         if (saveRes.ok && saveJson.success && typeof saveJson.data?.id === "string") {
           jobId = saveJson.data.id;
         }
@@ -289,6 +309,7 @@ export function AiSidebar({
       const patchRes = await fetch(isDemo ? "/api/demo/generate-patches" : "/api/ai/generate-patches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal,
         body: JSON.stringify({
           providerConfig: {
             provider: aiSettings.provider,
@@ -312,6 +333,7 @@ export function AiSidebar({
       });
 
       const patchJson = await patchRes.json();
+      if (signal.aborted) return;
 
       if (!patchRes.ok || !patchJson.success) {
         const isProxyProvider = ["openai", "anthropic", "groq"].includes(
@@ -344,10 +366,14 @@ export function AiSidebar({
       }
       setTailorStage("done");
     } catch (err) {
+      if (signal.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
       setError(err instanceof Error ? err.message : "Unexpected error during generation.");
       setTailorStage("error");
     } finally {
-      setIsGenerating(false);
+      if (tailorAbortRef.current === controller) {
+        tailorAbortRef.current = null;
+        setIsGenerating(false);
+      }
     }
   }, [jdText, masterFacts, seededFeedback, source, urlJobId]);
 
@@ -522,6 +548,11 @@ export function AiSidebar({
 
   const handleGenerateRepair = async () => {
     if (!repairContext) return;
+    repairAbortRef.current?.abort();
+    const controller = new AbortController();
+    repairAbortRef.current = controller;
+    const { signal } = controller;
+
     setIsRepairing(true);
     setRepairStage("connecting");
     setRepairError(null);
@@ -533,11 +564,13 @@ export function AiSidebar({
 
     try {
       const providerConfig = await resolveClientProviderConfig();
+      if (signal.aborted) return;
 
       setRepairStage("writing");
       const res = await fetch("/api/ai/repair-typst", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal,
         body: JSON.stringify({
           source,
           compileError: repairContext.compileError,
@@ -549,6 +582,7 @@ export function AiSidebar({
       });
 
       const json = await res.json();
+      if (signal.aborted) return;
       if (res.ok && json.success && json.data) {
         const prop: TypstRepairProposal = json.data;
         setRepairProposal(prop);
@@ -557,6 +591,7 @@ export function AiSidebar({
         setRepairStage("verifying");
         const { compileTypstToSvg } = await import("@/lib/typst/compiler");
         const valResult = await compileTypstToSvg(prop.replacementSource);
+        if (signal.aborted) return;
         if (!valResult.success) {
           setPreValidationValid(false);
           setPreValidationError(valResult.error.message);
@@ -571,11 +606,15 @@ export function AiSidebar({
         setRepairStage("error");
       }
     } catch (err) {
+      if (signal.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
       const errMsg = err instanceof Error ? err.message : "Error generating repair";
       setRepairError(errMsg);
       setRepairStage("error");
     } finally {
-      setIsRepairing(false);
+      if (repairAbortRef.current === controller) {
+        repairAbortRef.current = null;
+        setIsRepairing(false);
+      }
     }
   };
 

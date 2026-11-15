@@ -74,28 +74,36 @@ export async function syncSingleConnector(
 
   try {
     const rawListings: RawJobListing[] = await connector.fetchJobs(params);
-    let insertedCount = 0;
+    const now = new Date();
+    const keyedListings = rawListings.map((item) => ({
+      item,
+      fingerprint: generateJobFingerprint(item.companyName, item.title, item.applyUrl),
+    }));
+    const fingerprints = Array.from(new Set(keyedListings.map((k) => k.fingerprint)));
+    const existingRows =
+      fingerprints.length > 0
+        ? await prisma.ingestedJob.findMany({
+            where: { fingerprint: { in: fingerprints } },
+            select: {
+              id: true,
+              fingerprint: true,
+              postedAt: true,
+              createdAt: true,
+              description: true,
+              location: true,
+              workplaceType: true,
+              parsedRequirements: true,
+            },
+          })
+        : [];
+    const existingByFingerprint = new Map(existingRows.map((row) => [row.fingerprint, row]));
 
-    for (const item of rawListings) {
-      const fingerprint = generateJobFingerprint(
-        item.companyName,
-        item.title,
-        item.applyUrl
-      );
+    const toCreate: Prisma.IngestedJobCreateManyInput[] = [];
+    const toUpdate: Array<ReturnType<typeof prisma.ingestedJob.update>> = [];
+    const queuedNewFingerprints = new Set<string>();
 
-      const existing = await prisma.ingestedJob.findUnique({
-        where: { fingerprint },
-        select: {
-          id: true,
-          postedAt: true,
-          createdAt: true,
-          description: true,
-          location: true,
-          workplaceType: true,
-          parsedRequirements: true,
-        },
-      });
-
+    for (const { item, fingerprint } of keyedListings) {
+      const existing = existingByFingerprint.get(fingerprint);
       const nextWorkplaceType = mapWorkplaceTypeToPrisma(item.workplaceType);
       const needsEnrichment =
         !existing ||
@@ -111,34 +119,42 @@ export async function syncSingleConnector(
           })
         : null;
 
-      await prisma.ingestedJob.upsert({
-        where: { fingerprint },
-        update: {
-          title: item.title,
-          location: item.location,
-          workplaceType: nextWorkplaceType,
-          isCanadianEligible: item.isCanadianEligible,
-          description: item.descriptionPlain,
-          descriptionHtml: item.descriptionHtml,
-          applyUrl: item.applyUrl,
-          postedAt: item.postedAt && item.postedAt <= new Date() &&
-            (!existing?.postedAt || item.postedAt.getTime() > new Date(existing.postedAt).getTime())
-            ? item.postedAt
-            : existing?.postedAt ?? null,
-          salaryMin: item.compensation?.min,
-          salaryMax: item.compensation?.max,
-          salaryCurrency: item.compensation?.currency || "CAD",
-          rawMetadata: (item.metadata || {}) as any,
-          ...(enrichment
-            ? {
-                lat: enrichment.lat,
-                lng: enrichment.lng,
-                cityNorm: enrichment.cityNorm,
-                parsedRequirements: enrichment.parsedRequirements as unknown as Prisma.InputJsonValue,
-              }
-            : {}),
-        },
-        create: {
+      if (existing) {
+        toUpdate.push(
+          prisma.ingestedJob.update({
+            where: { fingerprint },
+            data: {
+              title: item.title,
+              location: item.location,
+              workplaceType: nextWorkplaceType,
+              isCanadianEligible: item.isCanadianEligible,
+              description: item.descriptionPlain,
+              descriptionHtml: item.descriptionHtml,
+              applyUrl: item.applyUrl,
+              postedAt:
+                item.postedAt &&
+                item.postedAt <= now &&
+                (!existing.postedAt || item.postedAt.getTime() > new Date(existing.postedAt).getTime())
+                  ? item.postedAt
+                  : existing.postedAt ?? null,
+              salaryMin: item.compensation?.min,
+              salaryMax: item.compensation?.max,
+              salaryCurrency: item.compensation?.currency || "CAD",
+              rawMetadata: (item.metadata || {}) as Prisma.InputJsonValue,
+              ...(enrichment
+                ? {
+                    lat: enrichment.lat,
+                    lng: enrichment.lng,
+                    cityNorm: enrichment.cityNorm,
+                    parsedRequirements: enrichment.parsedRequirements as unknown as Prisma.InputJsonValue,
+                  }
+                : {}),
+            },
+          }),
+        );
+      } else if (!queuedNewFingerprints.has(fingerprint)) {
+        queuedNewFingerprints.add(fingerprint);
+        toCreate.push({
           fingerprint,
           externalId: item.externalId,
           source: prismaSource,
@@ -150,11 +166,11 @@ export async function syncSingleConnector(
           description: item.descriptionPlain,
           descriptionHtml: item.descriptionHtml,
           applyUrl: item.applyUrl,
-          postedAt: item.postedAt && item.postedAt <= new Date() ? item.postedAt : null,
+          postedAt: item.postedAt && item.postedAt <= now ? item.postedAt : null,
           salaryMin: item.compensation?.min,
           salaryMax: item.compensation?.max,
           salaryCurrency: item.compensation?.currency || "CAD",
-          rawMetadata: (item.metadata || {}) as any,
+          rawMetadata: (item.metadata || {}) as Prisma.InputJsonValue,
           lat: enrichment?.lat ?? null,
           lng: enrichment?.lng ?? null,
           cityNorm: enrichment?.cityNorm ?? null,
@@ -163,13 +179,18 @@ export async function syncSingleConnector(
               description: item.descriptionPlain,
               location: item.location,
             })).parsedRequirements as unknown as Prisma.InputJsonValue,
-        },
-      });
-
-      if (!existing) {
-        insertedCount++;
+        });
       }
     }
+
+    if (toCreate.length > 0) {
+      await prisma.ingestedJob.createMany({ data: toCreate, skipDuplicates: true });
+    }
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < toUpdate.length; i += BATCH_SIZE) {
+      await prisma.$transaction(toUpdate.slice(i, i + BATCH_SIZE));
+    }
+    const insertedCount = toCreate.length;
 
     // Record Sync Log
     await prisma.connectorSyncLog.create({
@@ -284,24 +305,25 @@ export async function promoteIngestedJobToTrackedJob(
       : null,
   ].filter(Boolean);
 
-  // Create corresponding Job record
-  const createdJob = await prisma.job.create({
-    data: {
-      userId: userId || null,
-      company: ingested.companyName,
-      roleTitle: ingested.title,
-      rawDescription: ingested.description,
-      source: ingested.source.toLowerCase(),
-      status: "SAVED",
-      notes: notesParts.join(" | "),
-    },
-  });
+  // Create corresponding Job record and link trackedJobId atomically
+  return await prisma.$transaction(async (tx) => {
+    const createdJob = await tx.job.create({
+      data: {
+        userId: userId || null,
+        company: ingested.companyName,
+        roleTitle: ingested.title,
+        rawDescription: ingested.description,
+        source: ingested.source.toLowerCase(),
+        status: "SAVED",
+        notes: notesParts.join(" | "),
+      },
+    });
 
-  // Link trackedJobId on IngestedJob
-  await prisma.ingestedJob.update({
-    where: { id: ingestedJobId },
-    data: { trackedJobId: createdJob.id },
-  });
+    await tx.ingestedJob.update({
+      where: { id: ingestedJobId },
+      data: { trackedJobId: createdJob.id },
+    });
 
-  return createdJob;
+    return createdJob;
+  });
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/security/auth-request";
 import { extractResumeFacts } from "@/lib/facts/extract";
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
     const userId = await requireUserId(request);
     if (userId instanceof NextResponse) return userId;
 
-    let body: any;
+    let body: unknown;
     try {
       body = await request.json();
     } catch {
@@ -131,7 +132,7 @@ export async function POST(request: Request) {
       } else {
         if (conflictStrategy === "REPLACE_MASTER") {
           // Pre-write snapshot of previous master before un-mastering
-          await (tx as any).masterHistory.create({
+          await tx.masterHistory.create({
             data: {
               resumeId: existingMaster.id,
               title: existingMaster.title,
@@ -155,7 +156,9 @@ export async function POST(request: Request) {
         }
       }
 
-      const factSnapshot = targetIsMaster ? (extractResumeFacts(typstSource) as any) : undefined;
+      const factSnapshot = targetIsMaster
+        ? (extractResumeFacts(typstSource) as unknown as Prisma.InputJsonValue)
+        : undefined;
 
       const createdResume = await tx.resume.create({
         data: {

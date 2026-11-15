@@ -36,14 +36,19 @@ export function OutcomesPanel() {
   const [data, setData] = useState<OutcomePayload | null>(null);
 
   useEffect(() => {
-    void fetch("/api/stats/outcomes")
+    const controller = new AbortController();
+    void fetch("/api/stats/outcomes", { signal: controller.signal })
       .then((res) => res.json())
       .then((json) => {
-        if (json.success) {
+        if (!controller.signal.aborted && json.success) {
           setGuest(Boolean(json.guest));
           setData(json.data);
         }
+      })
+      .catch(() => {
+        // Non-blocking: leave empty state on network or abort errors
       });
+    return () => controller.abort();
   }, []);
 
   const max = data ? Math.max(1, ...FUNNEL.map((key) => data.funnel[key] ?? 0)) : 1;

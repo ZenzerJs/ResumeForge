@@ -1,6 +1,7 @@
 "use client";
 
 import { CompanyAvatar } from "@/components/tracker/company-avatar";
+import { fetchDemoConfig } from "@/components/auth/session-user";
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -10,7 +11,6 @@ import {
   X,
   DownloadCloud,
   Check,
-  MoreHorizontal,
   Sparkles,
   FileText,
   Building2,
@@ -108,8 +108,6 @@ interface JobDetailPaneProps {
   onJobLoaded?: (job: JobItem) => void;
 }
 
-const jobDetailCache = new Map<string, JobItem>();
-
 export function JobDetailPane({
   job,
   notesValue,
@@ -138,33 +136,28 @@ export function JobDetailPane({
   const [prepSheetOpen, setPrepSheetOpen] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     if (job.rawDescription && !isPlaceholderDescription(job.rawDescription)) {
       setDetailJob(job);
-      void fetch("/api/demo-config").then((res) => res.json()).then((config) => {
-        setDemoMode(config?.demoMode === true);
-        if (config?.demoMode !== true) jobDetailCache.set(job.id, job);
-      }).catch(() => {});
-      return;
+      void fetchDemoConfig().then((config) => {
+        if (!cancelled) setDemoMode(config?.demoMode === true);
+      });
+      return () => {
+        cancelled = true;
+      };
     }
     setDetailJob(job);
-    let cancelled = false;
     (async () => {
       try {
-        const config = await fetch("/api/demo-config").then((res) => res.json()).catch(() => ({}));
+        const config = await fetchDemoConfig();
         if (cancelled) return;
         const localDemo = config?.demoMode === true;
         setDemoMode(localDemo);
         if (localDemo) return;
-        const cached = jobDetailCache.get(job.id);
-        if (cached?.rawDescription && !isPlaceholderDescription(cached.rawDescription)) {
-          setDetailJob({ ...job, ...cached });
-          return;
-        }
         const res = await fetch(`/api/jobs/${job.id}`);
         const json = await res.json();
         if (!cancelled && res.ok && json.success && json.data) {
           const merged: JobItem = { ...job, ...json.data };
-          jobDetailCache.set(job.id, merged);
           setDetailJob(merged);
           onJobLoaded?.(merged);
         }
@@ -193,7 +186,7 @@ export function JobDetailPane({
     let cancelled = false;
     (async () => {
       try {
-        const config = await fetch("/api/demo-config").then((res) => res.json()).catch(() => ({}));
+        const config = await fetchDemoConfig();
         if (cancelled) return;
         const localDemo = config?.demoMode === true;
         setDemoMode(localDemo);
@@ -225,7 +218,7 @@ export function JobDetailPane({
     let cancelled = false;
     (async () => {
       try {
-        const config = await fetch("/api/demo-config").then((res) => res.json()).catch(() => ({}));
+        const config = await fetchDemoConfig();
         if (cancelled) return;
         if (config?.demoMode === true) {
           const localSource = localStorage.getItem("resumeforge_typst_source");
@@ -257,7 +250,7 @@ export function JobDetailPane({
   const masterFacts = useMemo(() => {
     if (!masterTypst) return null;
     try {
-      return extractResumeFacts(masterTypst, evidence as any);
+      return extractResumeFacts(masterTypst, evidence);
     } catch {
       return null;
     }
@@ -290,7 +283,7 @@ export function JobDetailPane({
     if (!detailJob.id) return;
     (async () => {
       try {
-        const config = await fetch("/api/demo-config").then((res) => res.json()).catch(() => ({}));
+        const config = await fetchDemoConfig();
         if (cancelled || config?.demoMode === true) return;
         const res = await fetch(`/api/jobs/${detailJob.id}/interview-prep`);
         const json = await res.json();
@@ -309,7 +302,6 @@ export function JobDetailPane({
 
   const hasVariant = (detailJob.variants?.length ?? 0) > 0;
   const hasCoverLetter = (detailJob.coverLetters?.length ?? 0) > 0;
-  const tailorTestId = hasVariant ? "tailor-resume-btn-existing" : "tailor-resume-btn";
   const coverTestId = hasCoverLetter ? "open-cover-letter-btn" : "generate-cover-letter-btn";
 
   const content = (
@@ -660,7 +652,9 @@ export function JobDetailPane({
   );
 
   const applySheetJob = {
-    ...(detailJob as any),
+    ...detailJob,
+    company: detailJob.company || "Company",
+    roleTitle: detailJob.roleTitle || "Role",
     jobUrl: applyUrl,
     location,
     salarySnippet: salary,

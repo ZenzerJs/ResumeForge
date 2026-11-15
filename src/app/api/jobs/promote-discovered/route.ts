@@ -9,9 +9,19 @@ export async function POST(req: Request) {
     const gated = await requireUserId(req);
     if (gated instanceof NextResponse) return gated;
 
-    const { discoveredJobId } = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
 
-    if (!discoveredJobId) {
+    const discoveredJobId =
+      body && typeof body === "object" && "discoveredJobId" in body
+        ? (body as { discoveredJobId?: unknown }).discoveredJobId
+        : undefined;
+
+    if (typeof discoveredJobId !== "string" || !discoveredJobId.trim()) {
       return NextResponse.json({ error: "discoveredJobId is required" }, { status: 400 });
     }
 
@@ -26,6 +36,7 @@ export async function POST(req: Request) {
     // Create active job record for tailoring & tracking
     const activeJob = await prisma.job.create({
       data: {
+        userId: gated,
         company: discovered.company,
         roleTitle: discovered.roleTitle,
         rawDescription: `${discovered.roleTitle} at ${discovered.company} (${discovered.location}).${isSafeHref(discovered.applyUrl) ? ` Application Link: ${discovered.applyUrl}` : ""}`,
@@ -36,7 +47,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, jobId: activeJob.id, data: activeJob });
   } catch (err) {
-    console.error("Promote discovered job error:", err);
+    console.error("Promote discovered job error:", sanitizeError(err));
     return NextResponse.json(
       { success: false, error: "Failed to promote job", message: sanitizeError(err) },
       { status: 500 }

@@ -31,6 +31,7 @@ import { PageSkeleton } from "@/components/design-system/page-skeleton";
 import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
 import { OpenAILogo } from "@/components/interview/company-logos";
 import {
+  fetchDemoConfig,
   fetchSessionUser,
   signOutAndRedirect,
   usernameInitial,
@@ -86,7 +87,7 @@ export function SettingsWorkspace() {
     let cancelled = false;
     async function loadSettings() {
       try {
-        const demoConfig = await fetch("/api/demo-config").then((res) => res.json()).catch(() => ({}));
+        const demoConfig = await fetchDemoConfig();
         const isDemo = demoConfig.demoMode === true;
         if (!cancelled) setDemoMode(isDemo);
         const config = await getActiveConfig();

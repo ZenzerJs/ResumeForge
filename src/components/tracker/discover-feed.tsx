@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -219,7 +219,13 @@ export function DiscoverFeed() {
     };
   }, []);
 
+  const fetchAbortRef = useRef<AbortController | null>(null);
+
   const fetchIngestedJobs = useCallback(async () => {
+    fetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
+
     try {
       setIsLoading(true);
       const params = new URLSearchParams({
@@ -239,18 +245,23 @@ export function DiscoverFeed() {
       if (minScoreFilter !== "0") params.set("minScore", minScoreFilter);
       if (canadianOnly) params.set("canadianOnly", "true");
 
-      const res = await fetch(`/api/connectors/jobs?${params.toString()}`);
+      const res = await fetch(`/api/connectors/jobs?${params.toString()}`, {
+        signal: controller.signal,
+      });
       const json = await res.json();
-      if (res.ok && json.success) {
+      if (!controller.signal.aborted && res.ok && json.success) {
         setJobs(json.data || []);
         setTotalJobs(json.meta?.total ?? 0);
         setTotalPages(json.meta?.totalPages ?? 1);
         setHasEvidence(Boolean(json.hasEvidence));
       }
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       console.error("Failed to fetch connector jobs:", err);
     } finally {
-      setIsLoading(false);
+      if (!controller.signal.aborted) {
+        setIsLoading(false);
+      }
     }
   }, [
     page,
@@ -267,8 +278,45 @@ export function DiscoverFeed() {
   ]);
 
   useEffect(() => {
-    fetchIngestedJobs();
+    void fetchIngestedJobs();
+    return () => {
+      fetchAbortRef.current?.abort();
+    };
   }, [fetchIngestedJobs]);
+
+  const activeClientSkills = useMemo(
+    () => clientSkills.filter((s) => s.length >= 2),
+    [clientSkills]
+  );
+
+  const jobCardMeta = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        fundingBadge: ReturnType<typeof formatFundingBadge>;
+        h1bBadge: ReturnType<typeof formatH1BBadge>;
+        matchedClientSkills: string[];
+        clientSkillPct: number | null;
+      }
+    >();
+    const denom = Math.min(clientSkills.length, 8);
+    for (const j of jobs) {
+      const intel = normalizeCompanyIntel(j.companyName);
+      const fundingBadge = formatFundingBadge(intel.fundingIntel);
+      const h1bBadge = formatH1BBadge(intel.h1bIntel);
+      const haystack = `${j.title} ${j.description || ""}`.toLowerCase();
+      const matchedClientSkills =
+        activeClientSkills.length > 0
+          ? activeClientSkills.filter((s) => haystack.includes(s))
+          : [];
+      const clientSkillPct =
+        clientSkills.length > 0
+          ? Math.min(98, Math.max(15, Math.round((matchedClientSkills.length / denom) * 100)))
+          : null;
+      map.set(j.id, { fundingBadge, h1bBadge, matchedClientSkills, clientSkillPct });
+    }
+    return map;
+  }, [jobs, activeClientSkills, clientSkills.length]);
 
   // Reset to page 1 on filter changes
   useEffect(() => {
@@ -734,25 +782,11 @@ export function DiscoverFeed() {
 
                     {/* Signal Badge Pill with Popover, Funding & H1B Sub-Badges */}
                     {(() => {
-                      const intel = normalizeCompanyIntel(j.companyName);
-                      const fundingBadge = formatFundingBadge(intel.fundingIntel);
-                      const h1bBadge = formatH1BBadge(intel.h1bIntel);
-                      const haystack = `${j.title} ${j.description || ""}`.toLowerCase();
-                      const matchedClientSkills = clientSkills.filter(
-                        (s) => s.length >= 2 && haystack.includes(s)
-                      );
-                      const clientSkillPct =
-                        clientSkills.length > 0
-                          ? Math.min(
-                              98,
-                              Math.max(
-                                15,
-                                Math.round(
-                                  (matchedClientSkills.length / Math.min(clientSkills.length, 8)) * 100
-                                )
-                              )
-                            )
-                          : null;
+                      const meta = jobCardMeta.get(j.id);
+                      const fundingBadge = meta?.fundingBadge ?? null;
+                      const h1bBadge = meta?.h1bBadge ?? null;
+                      const matchedClientSkills = meta?.matchedClientSkills ?? [];
+                      const clientSkillPct = meta?.clientSkillPct ?? null;
                       return (
                         <div className="flex flex-wrap items-center gap-2 my-0.5">
                           {hasEvidence ? (

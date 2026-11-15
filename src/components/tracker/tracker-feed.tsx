@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -37,6 +37,7 @@ import {
   isPlaceholderDescription,
 } from "@/lib/ingestion/helpers";
 import { matchesPostedWithin, type PostedWithin } from "@/lib/jobs/posted-within";
+import { fetchDemoConfig } from "@/components/auth/session-user";
 
 export type { JobItem, JobVariant, JobCoverLetter };
 
@@ -185,10 +186,23 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
     return () => window.clearTimeout(timer);
   }, [locationQuery]);
 
+  const fetchJobsAbortRef = useRef<AbortController | null>(null);
+  const noticeTimerRef = useRef<number | null>(null);
+
+  const scheduleNoticeClear = useCallback(() => {
+    if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = window.setTimeout(() => setImportNotice(null), 6000);
+  }, []);
+
   const fetchJobs = useCallback(async () => {
+    fetchJobsAbortRef.current?.abort();
+    const controller = new AbortController();
+    fetchJobsAbortRef.current = controller;
+
     try {
       setIsLoading(true);
-      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      const demoConfig = await fetchDemoConfig();
+      if (controller.signal.aborted) return;
       setIsDemoMode(demoConfig?.demoMode === true);
       if (demoConfig?.demoMode) {
         let localJobs: JobItem[] = [];
@@ -257,9 +271,11 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       } else if (filterStatuses?.length) {
         params.set("status", filterStatuses.join(","));
       }
-      const res = await fetch(`/api/jobs?${params.toString()}`);
+      const res = await fetch(`/api/jobs?${params.toString()}`, {
+        signal: controller.signal,
+      });
       const json = await res.json();
-      if (res.ok && json.success) {
+      if (!controller.signal.aborted && res.ok && json.success) {
         setJobs(json.data);
         setTotalJobs(json.meta?.total ?? json.data.length);
         setTotalPages(json.meta?.totalPages ?? 1);
@@ -273,20 +289,27 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         setEditingNotes((prev) => ({ ...prev, ...notesMap }));
       }
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       console.error("Failed to fetch jobs:", err);
     } finally {
-      setIsLoading(false);
+      if (!controller.signal.aborted) {
+        setIsLoading(false);
+      }
     }
   }, [page, postedWithin, debouncedSearch, debouncedLocation, workplace, statusFilter, filterStatuses, minSalary]);
 
   useEffect(() => {
-    fetchJobs();
+    void fetchJobs();
+    return () => {
+      fetchJobsAbortRef.current?.abort();
+    };
   }, [fetchJobs]);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
     };
   }, []);
 
@@ -373,7 +396,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const demoConfig = await fetch("/api/demo-config").then((res) => res.json()).catch(() => ({}));
+      const demoConfig = await fetchDemoConfig();
       if (cancelled) return;
       setIsDemoMode(demoConfig?.demoMode === true);
       if (demoConfig?.demoMode === true) return;
@@ -604,7 +627,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const handleRefreshFromSource = async () => {
     if (isDemoMode) {
       setImportNotice("Demo tracker uses browser-local jobs. Add or edit jobs here; live import and connector sync require self-hosting.");
-      window.setTimeout(() => setImportNotice(null), 6000);
+      scheduleNoticeClear();
       return;
     }
     try {
@@ -648,7 +671,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
 
       setImportNotice(`${trackerPart} ${feedPart}`);
       fetchJobs();
-      setTimeout(() => setImportNotice(null), 6000);
+      scheduleNoticeClear();
     } catch (err) {
       console.error("Failed to refresh jobs from source:", err);
       setImportNotice("Network error refreshing jobs.");
@@ -668,10 +691,14 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const pipelineApplied = pipelineCounts.applied;
   const pipelineInterviewing = pipelineCounts.interviewing;
 
-  const filteredLocationCities = CANADIAN_CITIES.filter(
-    (c) =>
-      c.label.toLowerCase().includes(locationQuery.toLowerCase()) ||
-      c.value.toLowerCase().includes(locationQuery.toLowerCase())
+  const filteredLocationCities = useMemo(
+    () =>
+      CANADIAN_CITIES.filter(
+        (c) =>
+          c.label.toLowerCase().includes(locationQuery.toLowerCase()) ||
+          c.value.toLowerCase().includes(locationQuery.toLowerCase())
+      ),
+    [locationQuery]
   );
 
   const selectLocationOption = (option: (typeof CANADIAN_CITIES)[number]) => {

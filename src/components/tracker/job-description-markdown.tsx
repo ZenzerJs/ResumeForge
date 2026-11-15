@@ -1,4 +1,6 @@
-import React from "react";
+"use client";
+
+import React, { useMemo } from "react";
 import { parseJobDescriptionMarkdown } from "@/lib/ingestion/jd-format";
 
 function renderInline(text: string): React.ReactNode {
@@ -31,7 +33,7 @@ export function JobDescriptionMarkdown({
   markdown: string;
   hideLeadingHeader?: boolean;
 }) {
-  const blocks = parseJobDescriptionMarkdown(markdown);
+  const blocks = useMemo(() => parseJobDescriptionMarkdown(markdown), [markdown]);
 
   if (blocks.length === 0) {
     return <p className="text-sm text-on-surface-variant">No description available.</p>;

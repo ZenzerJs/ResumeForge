@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { CheckCircle2, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
 import { cn } from "@/lib/utils";
@@ -32,43 +32,43 @@ export function TechDiffPillList({
 }: TechDiffPillListProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Build uniform items list
-  let items: TechDiffItem[] = [];
+  const sortedItems = useMemo(() => {
+    let items: TechDiffItem[] = [];
 
-  if (directItems && directItems.length > 0) {
-    items = directItems;
-  } else {
-    const verifiedSet = new Set(verifiedSkillNames.map((s) => s.toLowerCase().trim()));
-    const missingSet = new Set(missingSkillNames.map((s) => s.toLowerCase().trim()));
+    if (directItems && directItems.length > 0) {
+      items = directItems;
+    } else {
+      const verifiedSet = new Set(verifiedSkillNames.map((s) => s.toLowerCase().trim()));
 
-    // Case-insensitive deduplication preserving original casing
-    const seen = new Set<string>();
-    const uniqueSkills: string[] = [];
-    for (const raw of [...allRequiredSkills, ...verifiedSkillNames, ...missingSkillNames]) {
-      const norm = raw.toLowerCase().trim();
-      if (norm && !seen.has(norm)) {
-        seen.add(norm);
-        uniqueSkills.push(raw.trim());
+      // Case-insensitive deduplication preserving original casing
+      const seen = new Set<string>();
+      const uniqueSkills: string[] = [];
+      for (const raw of [...allRequiredSkills, ...verifiedSkillNames, ...missingSkillNames]) {
+        const norm = raw.toLowerCase().trim();
+        if (norm && !seen.has(norm)) {
+          seen.add(norm);
+          uniqueSkills.push(raw.trim());
+        }
       }
+
+      items = uniqueSkills.map((skill) => {
+        const lower = skill.toLowerCase().trim();
+        const isVerified = verifiedSet.has(lower);
+
+        return {
+          skill,
+          verified: isVerified,
+          matchType: isVerified ? "exact" : "missing",
+        };
+      });
     }
 
-    items = uniqueSkills.map((skill) => {
-      const lower = skill.toLowerCase().trim();
-      const isVerified = verifiedSet.has(lower);
-
-      return {
-        skill,
-        verified: isVerified,
-        matchType: isVerified ? "exact" : "missing",
-      };
+    // Sort: verified first, then missing
+    return [...items].sort((a, b) => {
+      if (a.verified === b.verified) return a.skill.localeCompare(b.skill);
+      return a.verified ? -1 : 1;
     });
-  }
-
-  // Sort: verified first, then missing
-  const sortedItems = [...items].sort((a, b) => {
-    if (a.verified === b.verified) return a.skill.localeCompare(b.skill);
-    return a.verified ? -1 : 1;
-  });
+  }, [directItems, allRequiredSkills, verifiedSkillNames, missingSkillNames]);
 
   const displayedItems = isExpanded
     ? sortedItems

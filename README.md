@@ -16,9 +16,7 @@
 
 *Zero hallucination. Zero data leaks. Every resume bullet is a reviewable, evidence-backed patch.*
 
-<!-- TODO: Replace this screenshot with an animated demo GIF (docs/demo.gif)
-     showing the full workflow: paste JD → generate patches → accept → preview PDF. -->
-<img src="docs/screenshot.png" alt="ResumeForge landing page — evidence-grounded resume workspace with live Typst preview" width="800" />
+<img src="docs/homepage-waves.gif" alt="ResumeForge homepage with animated gold, ember, and blue ASCII waves behind the resume workspace preview" width="800" />
 
 > Built after a season of silent rejections as a first-year. This tool carried my own search into a Google technical interview as a second-year.
 

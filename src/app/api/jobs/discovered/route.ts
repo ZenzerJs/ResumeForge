@@ -9,6 +9,13 @@ import {
 import { isBoardEligible } from "@/lib/jobs/expiry";
 import { sanitizeError } from "@/lib/ai/redact";
 
+const WITHIN_DAYS: Record<Exclude<PostedWithin, "all">, number> = {
+  "1d": 1,
+  "3d": 3,
+  "7d": 7,
+  "30d": 30,
+};
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -18,6 +25,7 @@ export async function GET(req: Request) {
     const postedWithin: PostedWithin = isPostedWithinParam(postedRaw) ? postedRaw : "all";
 
     const where: Prisma.DiscoveredJobWhereInput = {};
+    const andFilters: Prisma.DiscoveredJobWhereInput[] = [];
 
     if (filter === "open") {
       where.isClosed = false;
@@ -26,14 +34,36 @@ export async function GET(req: Request) {
     }
 
     if (search) {
-      where.OR = [
-        { company: { contains: search, mode: "insensitive" } },
-        { roleTitle: { contains: search, mode: "insensitive" } },
-        { location: { contains: search, mode: "insensitive" } },
-      ];
+      andFilters.push({
+        OR: [
+          { company: { contains: search, mode: "insensitive" } },
+          { roleTitle: { contains: search, mode: "insensitive" } },
+          { location: { contains: search, mode: "insensitive" } },
+        ],
+      });
     }
-    const filtered: Awaited<ReturnType<typeof prisma.discoveredJob.findMany>> = [];
+
     const now = new Date();
+    if (postedWithin !== "all") {
+      const cutoff = new Date(now.getTime() - WITHIN_DAYS[postedWithin] * 86_400_000);
+      andFilters.push({
+        OR: [
+          { createdAt: { gte: cutoff } },
+          {
+            AND: [
+              { datePosted: { not: null } },
+              { NOT: { datePosted: { endsWith: "ago" } } },
+            ],
+          },
+        ],
+      });
+    }
+
+    if (andFilters.length > 0) {
+      where.AND = andFilters;
+    }
+
+    const filtered: Awaited<ReturnType<typeof prisma.discoveredJob.findMany>> = [];
     let cursor: string | undefined;
     for (;;) {
       const page = await prisma.discoveredJob.findMany({

@@ -42,17 +42,25 @@ import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AppShell } from "@/components/design-system/app-shell";
 import { clearDemoSamplesForPersonalResume, getDemoContextFromBrowser, initializeDemoSamples } from "@/lib/demo-client";
+import { fetchDemoConfig } from "@/components/auth/session-user";
 import { EditorWorkspaceSkeleton } from "@/components/editor/editor-workspace-skeleton";
 
 const STORAGE_KEY = "resumeforge_typst_source";
 const COMPILE_DEBOUNCE_MS = 400;
 const SOURCE_PERSIST_MS = 500;
 
-import { ConfirmMasterDialog } from "./confirm-master-dialog";
-import { AiAssistantWindow } from "./ai-assistant-window";
 import { ResumeFacts } from "@/lib/facts/types";
 import { extractResumeFacts } from "@/lib/facts/extract";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
+
+const ConfirmMasterDialog = dynamic(
+  () => import("./confirm-master-dialog").then((m) => m.ConfirmMasterDialog),
+  { ssr: false }
+);
+const AiAssistantWindow = dynamic(
+  () => import("./ai-assistant-window").then((m) => m.AiAssistantWindow),
+  { ssr: false }
+);
 
 const CodeEditor = dynamic(() => import("./code-editor").then((m) => ({ default: m.CodeEditor })), {
   ssr: false,
@@ -150,9 +158,18 @@ export function EditorWorkspace() {
   const [isAiPoppedOut, setIsAiPoppedOut] = useState<boolean>(false);
   const [aiMode, setAiMode] = useState<"chat" | "tailor">("chat");
   const [isLayoutReady, setIsLayoutReady] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(true);
   const isAiCollapsedRef = useRef<boolean>(isAiCollapsed);
   const skipResizePersistRef = useRef(false);
   const suppressResizePersistUntilRef = useRef(0);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const sync = () => setIsDesktop(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   useEffect(() => {
     const persisted = parsePersistedLayout(
@@ -209,7 +226,7 @@ export function EditorWorkspace() {
     }
   };
 
-  const handleLayoutChange = useCallback((layoutData: any) => {
+  const handleLayoutChange = useCallback((layoutData: Record<string, number> | number[]) => {
     let layoutMap: Record<string, number>;
     if (Array.isArray(layoutData)) {
       layoutMap = {
@@ -298,7 +315,7 @@ export function EditorWorkspace() {
 
   const loadFrozenMasterSnapshot = useCallback(async () => {
     try {
-      const demoConfig = await fetch("/api/demo-config").then((res) => res.json()).catch(() => ({}));
+      const demoConfig = await fetchDemoConfig();
       if (demoConfig?.demoMode) {
         const rawSnapshot = localStorage.getItem("resumeforge_demo_master_facts");
         setMasterFacts(rawSnapshot ? JSON.parse(rawSnapshot) as ResumeFacts : null);
@@ -335,7 +352,7 @@ export function EditorWorkspace() {
       sessionStorage.getItem("resumeforge_ai_patched_buffer") === "true";
     setHasAiPatchedBuffer(persistedAiPatched);
     try {
-      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      const demoConfig = await fetchDemoConfig();
       if (demoConfig?.demoMode) {
         initializeDemoSamples();
         const personalSource = localStorage.getItem(STORAGE_KEY);
@@ -443,6 +460,7 @@ export function EditorWorkspace() {
       });
     } else {
       const starter = await loadStarterTemplate();
+      if (!current()) return;
       setSource(starter);
       setDocMetadata({
         type: "LOCAL_FALLBACK",
@@ -679,7 +697,7 @@ export function EditorWorkspace() {
       setIsSavingMaster(true);
       setSaveSuccess(false);
 
-      const demoConfig = await fetch("/api/demo-config").then((res) => res.json()).catch(() => ({}));
+      const demoConfig = await fetchDemoConfig();
       if (demoConfig?.demoMode) {
         const demoContext = getDemoContextFromBrowser();
         const facts = extractResumeFacts(cleanMasterSource, demoContext?.evidenceItems || []);
@@ -1099,39 +1117,124 @@ export function EditorWorkspace() {
 
       {/* Main Workspace Body */}
       <div className="flex flex-1 min-h-0 overflow-hidden bg-canvas px-1.5 pb-1.5 pt-0">
-        {/* Desktop 3-Panel Resizable Layout (>= lg screens) — client-only to avoid SSR style hydration mismatch */}
-        {isLayoutReady ? (
-          <ResizablePanelGroup
-            id="editor-resizable-panel-group"
-            orientation="horizontal"
-            onLayoutChange={handleLayoutChange}
-            className="hidden lg:flex h-full w-full"
-            data-testid="editor-resizable-panel-group"
-          >
-            {/* Panel 1: CodeMirror Editor */}
-            <ResizablePanel
-              id="panel-code"
-              defaultSize={layout["panel-code"] ?? 45}
-              minSize={20}
-              className="h-full overflow-hidden"
-              data-testid="panel-code"
+        {/* Desktop 3-Panel Resizable Layout (>= lg screens) vs Mobile Tabbed View (< lg screens) */}
+        {isDesktop ? (
+          isLayoutReady ? (
+            <ResizablePanelGroup
+              id="editor-resizable-panel-group"
+              orientation="horizontal"
+              onLayoutChange={handleLayoutChange}
+              className="hidden lg:flex h-full w-full"
+              data-testid="editor-resizable-panel-group"
             >
-              <div className="h-full min-h-0">
+              {/* Panel 1: CodeMirror Editor */}
+              <ResizablePanel
+                id="panel-code"
+                defaultSize={layout["panel-code"] ?? 45}
+                minSize={20}
+                className="h-full overflow-hidden"
+                data-testid="panel-code"
+              >
+                <div className="h-full min-h-0">
+                  <CodeEditor value={source} onChange={handleSourceChange} />
+                </div>
+              </ResizablePanel>
+
+              <ResizableHandle withHandle />
+
+              {/* Panel 2: Live Preview */}
+              <ResizablePanel
+                id="panel-preview"
+                defaultSize={layout["panel-preview"] ?? 35}
+                minSize={25}
+                className="h-full overflow-hidden"
+                data-testid="panel-preview"
+              >
+                <div className="h-full min-h-0">
+                  <PreviewPanel
+                    svg={svg}
+                    error={error}
+                    source={source}
+                    isCompiling={isCompiling}
+                    masterFacts={masterFacts}
+                    allowUnfrozenMasterSelfExport={
+                      docMetadata.type === "MASTER_RESUME" ||
+                      (docMetadata.type === "LOCAL_FALLBACK" &&
+                        !hasAiPatchedBuffer &&
+                        !isDocumentPatched(source))
+                    }
+                    onApplyLayout={handleSourceChange}
+                    onResetTemplate={handleResetTemplate}
+                    onTriggerRepair={handleTriggerRepair}
+                  />
+                </div>
+              </ResizablePanel>
+
+              <ResizableHandle withHandle />
+
+              {/* Panel 3: AI Sidebar (Collapsible) */}
+              <ResizablePanel
+                id="panel-ai"
+                panelRef={aiPanelRef}
+                defaultSize={isAiCollapsed || isAiPoppedOut ? 0 : (layout["panel-ai"] ?? 20)}
+                minSize={15}
+                collapsible={true}
+                collapsedSize={0}
+                onResize={(size) => {
+                  if (skipResizePersistRef.current) return;
+                  if (Date.now() < suppressResizePersistUntilRef.current) return;
+                  const sizeNum =
+                    typeof size === "number"
+                      ? size
+                      : typeof size === "object" &&
+                          size !== null &&
+                          "asPercentage" in size &&
+                          typeof size.asPercentage === "number"
+                        ? size.asPercentage
+                        : 20;
+                  const isCurrentlyCollapsed = sizeNum <= 2;
+                  if (isCurrentlyCollapsed !== isAiCollapsedRef.current) {
+                    updateAiCollapsedState(isCurrentlyCollapsed);
+                    persistLayoutState(layout, isCurrentlyCollapsed);
+                  }
+                }}
+                className="h-full overflow-hidden"
+                data-testid="panel-ai"
+              >
+                <div className="h-full min-h-0">
+                  {!isAiPoppedOut && (
+                    <AiSidebar
+                      source={source}
+                      onApplyToBuffer={handleApplyRepair}
+                      isCollapsed={isAiCollapsed}
+                      isPoppedOut={false}
+                      onPopOut={handleToggleAiPopOut}
+                      masterFacts={masterFacts}
+                      onToggleCollapse={toggleAiSidebarCollapse}
+                      repairContext={repairContext}
+                      onDismissRepair={() => setRepairContext(null)}
+                      onModeChange={setAiMode}
+                    />
+                  )}
+                </div>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          ) : (
+            <div
+              className="hidden lg:flex h-full w-full"
+              data-testid="editor-resizable-panel-group-placeholder"
+              aria-hidden
+            />
+          )
+        ) : (
+          <div className="flex h-full w-full flex-col lg:hidden">
+            {activeTab === "editor" && (
+              <div className="h-full w-full overflow-hidden">
                 <CodeEditor value={source} onChange={handleSourceChange} />
               </div>
-            </ResizablePanel>
-
-            <ResizableHandle withHandle />
-
-            {/* Panel 2: Live Preview */}
-            <ResizablePanel
-              id="panel-preview"
-              defaultSize={layout["panel-preview"] ?? 35}
-              minSize={25}
-              className="h-full overflow-hidden"
-              data-testid="panel-preview"
-            >
-              <div className="h-full min-h-0">
+            )}
+            {activeTab === "preview" && (
+              <div className="h-full w-full overflow-hidden">
                 <PreviewPanel
                   svg={svg}
                   error={error}
@@ -1149,95 +1252,21 @@ export function EditorWorkspace() {
                   onTriggerRepair={handleTriggerRepair}
                 />
               </div>
-            </ResizablePanel>
-
-            <ResizableHandle withHandle />
-
-            {/* Panel 3: AI Sidebar (Collapsible) */}
-            <ResizablePanel
-              id="panel-ai"
-              panelRef={aiPanelRef}
-              defaultSize={isAiCollapsed || isAiPoppedOut ? 0 : (layout["panel-ai"] ?? 20)}
-              minSize={15}
-              collapsible={true}
-              collapsedSize={0}
-              onResize={(size) => {
-                if (skipResizePersistRef.current) return;
-                if (Date.now() < suppressResizePersistUntilRef.current) return;
-                const sizeNum = typeof size === "number" ? size : (size as any)?.asPercentage ?? 20;
-                const isCurrentlyCollapsed = sizeNum <= 2;
-                if (isCurrentlyCollapsed !== isAiCollapsedRef.current) {
-                  updateAiCollapsedState(isCurrentlyCollapsed);
-                  persistLayoutState(layout, isCurrentlyCollapsed);
-                }
-              }}
-              className="h-full overflow-hidden"
-              data-testid="panel-ai"
-            >
-              <div className="h-full min-h-0">
+            )}
+            {activeTab === "ai" && (
+              <div className="h-full w-full overflow-hidden">
                 <AiSidebar
                   source={source}
                   onApplyToBuffer={handleApplyRepair}
-                  isCollapsed={isAiCollapsed}
-                  isPoppedOut={false}
-                  onPopOut={handleToggleAiPopOut}
                   masterFacts={masterFacts}
-                  onToggleCollapse={toggleAiSidebarCollapse}
                   repairContext={repairContext}
                   onDismissRepair={() => setRepairContext(null)}
                   onModeChange={setAiMode}
                 />
               </div>
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        ) : (
-          <div
-            className="hidden lg:flex h-full w-full"
-            data-testid="editor-resizable-panel-group-placeholder"
-            aria-hidden
-          />
+            )}
+          </div>
         )}
-
-        {/* Mobile Tabbed View (< lg screens) */}
-        <div className="flex h-full w-full flex-col lg:hidden">
-          {activeTab === "editor" && (
-            <div className="h-full w-full overflow-hidden">
-              <CodeEditor value={source} onChange={handleSourceChange} />
-            </div>
-          )}
-          {activeTab === "preview" && (
-            <div className="h-full w-full overflow-hidden">
-              <PreviewPanel
-                svg={svg}
-                error={error}
-                source={source}
-                isCompiling={isCompiling}
-                masterFacts={masterFacts}
-                allowUnfrozenMasterSelfExport={
-                  docMetadata.type === "MASTER_RESUME" ||
-                  (docMetadata.type === "LOCAL_FALLBACK" &&
-                    !hasAiPatchedBuffer &&
-                    !isDocumentPatched(source))
-                }
-                onApplyLayout={handleSourceChange}
-                onResetTemplate={handleResetTemplate}
-                onTriggerRepair={handleTriggerRepair}
-              />
-            </div>
-          )}
-          {activeTab === "ai" && (
-            <div className="h-full w-full overflow-hidden">
-              <AiSidebar
-                source={source}
-                onApplyToBuffer={handleApplyRepair}
-                masterFacts={masterFacts}
-                repairContext={repairContext}
-                onDismissRepair={() => setRepairContext(null)}
-                onModeChange={setAiMode}
-              />
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Floating Portaled AI Assistant Window */}

@@ -201,18 +201,6 @@ function jobIncludeForViewer(viewerUserId?: string | null): Prisma.JobInclude {
   };
 }
 
-export async function getJobs() {
-  const jobs = await prisma.job.findMany({
-    orderBy: { createdAt: "desc" },
-    include: jobListInclude,
-  });
-
-  return jobs.map((job) => ({
-    ...job,
-    extractedRequirements: parseRequirementsJson(job.extractedRequirements),
-  }));
-}
-
 export type { WorkplaceFilter };
 
 export interface JobListQuery {

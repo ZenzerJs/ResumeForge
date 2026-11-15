@@ -68,30 +68,36 @@ export function CompanyIntelDossierPanel({
 
   const slug = normalizeCompany(company);
 
-  const fetchDossier = useCallback(async () => {
+  const fetchDossier = useCallback(async (signal?: AbortSignal) => {
     if (!slug) return;
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
-      const res = await fetch(`/api/companies/${encodeURIComponent(slug)}/dossier`);
+      const res = await fetch(`/api/companies/${encodeURIComponent(slug)}/dossier`, { signal });
       const json = await res.json();
+      if (signal?.aborted) return;
       if (res.ok && json.found && json.dossier) {
         setDossier(json.dossier);
         setIsStale(Boolean(json.stale));
       } else {
         setDossier(null);
       }
-    } catch {
+    } catch (err) {
+      if (signal?.aborted || (err instanceof Error && err.name === "AbortError")) return;
       setDossier(null);
     } finally {
-      setIsLoading(false);
-      setHasAttemptedFetch(true);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+        setHasAttemptedFetch(true);
+      }
     }
   }, [slug]);
 
   useEffect(() => {
-    void fetchDossier();
+    const controller = new AbortController();
+    void fetchDossier(controller.signal);
+    return () => controller.abort();
   }, [fetchDossier]);
 
   const handleGenerate = async () => {

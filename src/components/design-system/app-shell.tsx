@@ -5,7 +5,7 @@ import Link from "next/link";
 import { TopNav } from "@/components/navigation/top-nav";
 import { WorkspaceAtmosphere } from "@/components/design-system/workspace-atmosphere";
 import { GuestMigrationModal } from "@/components/auth/guest-migration-modal";
-import { fetchSessionPayload } from "@/components/auth/session-user";
+import { fetchDemoConfig, fetchSessionPayload } from "@/components/auth/session-user";
 import { cn } from "@/lib/utils";
 import { initializeDemoSamples } from "@/lib/demo-client";
 
@@ -40,10 +40,9 @@ function GuestBanner({ inline = false }: { inline?: boolean }) {
 
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/demo-config")
-      .then((res) => res.json())
-      .then((config) => { if (!cancelled) setDemoMode(config?.demoMode === true); })
-      .catch(() => {});
+    void fetchDemoConfig().then((config) => {
+      if (!cancelled) setDemoMode(config.demoMode === true);
+    });
     void fetchSessionPayload().then((json) => {
       if (!cancelled) setGuest(Boolean(json?.guest) || !json?.data);
     });
@@ -108,23 +107,26 @@ export function AppShell({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    let cancelled = false;
 
-    void fetch("/api/demo-config")
-      .then((res) => res.json())
-      .then((config) => {
-        if (config?.demoMode !== true) return;
+    const demoPromise = fetchDemoConfig().then((config) => {
+      if (!cancelled && config.demoMode === true) {
         initializeDemoSamples();
-      })
-      .catch(() => {});
+      }
+      return config;
+    });
 
     const isDismissed = localStorage.getItem("resumeforge_migration_dismissed") === "true";
     const isMigrated = localStorage.getItem("resumeforge_draft_migrated") === "true";
-    if (isDismissed || isMigrated) return;
+    if (isDismissed || isMigrated) {
+      return () => {
+        cancelled = true;
+      };
+    }
 
-    fetchSessionPayload()
-      .then(async (json) => {
-        const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
-        if (demoConfig?.demoMode) return;
+    Promise.all([fetchSessionPayload(), demoPromise])
+      .then(async ([json, demoConfig]) => {
+        if (cancelled || demoConfig.demoMode) return;
         const isAuthUser = json?.data && !json.guest;
         if (isAuthUser) {
           const hasGuestDraft = localStorage.getItem("resumeforge_has_guest_draft") === "true";
@@ -148,6 +150,7 @@ export function AppShell({
             try {
               const res = await fetch("/api/resumes");
               const resJson = await res.json();
+              if (cancelled) return;
               if (
                 hasCustomResumeDraft &&
                 !hasGuestEvidence &&
@@ -166,6 +169,7 @@ export function AppShell({
             } catch {
               // ignore
             }
+            if (cancelled) return;
             setGuestDraft(
               stored && stored.trim().length > 0
                 ? stored
@@ -187,6 +191,10 @@ export function AppShell({
       .catch(() => {
         // ignore
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
