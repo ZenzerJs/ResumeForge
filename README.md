@@ -1,241 +1,265 @@
 <div align="center">
 
-# 🛠️ ResumeForge
+# <img src="docs/icons/forge.svg" width="28" height="28" alt="" align="absmiddle" /> ResumeForge
 
-**Self-hostable, BYOK AI workspace that creates evidence-grounded, job-specific resume variants from one protected master resume.**
+**The local-first, BYOK resume engineering workspace.**
+Generate evidence-grounded, job-specific resume variants from a protected Master Resume—complete with live Typst WASM compilation, deterministic ATS scoring, job discovery, and interview prep.
 
 [![CI](https://github.com/ZenzerJs/ResumeForge/actions/workflows/ci.yml/badge.svg)](https://github.com/ZenzerJs/ResumeForge/actions/workflows/ci.yml)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![Prisma](https://img.shields.io/badge/Prisma-PostgreSQL-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
 [![Typst](https://img.shields.io/badge/Typst-WASM_Engine-239DAD)](https://typst.app/)
 [![Tests](https://img.shields.io/badge/tests-Vitest_%2B_Playwright-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-*Zero hallucination. Zero data leaks. Every resume bullet is a reviewable, evidence-backed patch.*
+[<img src="docs/icons/video.svg" width="16" height="16" alt="" align="absmiddle" /> **Watch Demo Video**](#video-walkthrough) · [<img src="docs/icons/sparkles.svg" width="16" height="16" alt="" align="absmiddle" /> **Explore Features**](#the-workspace) · [<img src="docs/icons/architecture.svg" width="16" height="16" alt="" align="absmiddle" /> **Architecture**](#architecture--security) · [<img src="docs/icons/rocket.svg" width="16" height="16" alt="" align="absmiddle" /> **Quick Start**](#getting-started)
 
-<img src="docs/homepage-waves.gif" alt="ResumeForge homepage with animated gold, ember, and blue ASCII waves behind the resume workspace preview" width="800" />
+<br />
 
-> Built after a season of silent rejections as a first-year. This tool carried my own search into a Google technical interview as a second-year.
+<img src="docs/demo.gif" alt="Animated walkthrough of the ResumeForge landing page and Ember Ink workspace preview" width="850" />
+
+*Evidence-grounded tailoring. Encrypted browser BYOK vault. Every AI suggestion is a reviewable, cited patch.*
+
+> "Built after a season of silent rejections as a first-year. This tool carried my own search into a Google technical interview as a second-year."
+
 
 </div>
 
 ---
 
-## 📋 Table of Contents
+## <img src="docs/icons/bulb.svg" width="20" height="20" alt="" align="absmiddle" /> Why ResumeForge?
 
-- [Why ResumeForge](#-why-resumeforge)
-- [Key Features](#-key-features)
-- [Architecture](#-architecture)
-- [Tech Stack](#-tech-stack)
-- [Getting Started](#-getting-started)
-- [Available Scripts](#-available-scripts)
-- [Project Structure](#-project-structure)
-- [Philosophy](#-philosophy)
+Most AI resume builders invent experience you don't have, lock your data behind opaque subscriptions, or silently overwrite your master document. **ResumeForge treats resume tailoring like version-controlled software engineering:**
 
----
+| Typical AI Resume Tools | The ResumeForge Standard |
+| :--- | :--- |
+| <img src="docs/icons/cross.svg" width="16" height="16" alt="Problem:" align="absmiddle" /> **Invents employers, dates, or metrics** | <img src="docs/icons/check.svg" width="16" height="16" alt="Solution:" align="absmiddle" /> **Mechanical Guardrail** blocks detected unverified employers, inflated titles (or dropped level markers), widened dates, and unbacked or subject-mismatched metrics against your frozen Master Resume snapshot (derived/patched exports fail closed unless a snapshot exists). |
+| <img src="docs/icons/cross.svg" width="16" height="16" alt="Problem:" align="absmiddle" /> **Silently overwrites your base resume** | <img src="docs/icons/check.svg" width="16" height="16" alt="Solution:" align="absmiddle" /> **Write-Protected Master Resume** with `MasterHistory` pre-overwrite snapshots and undo. Tailoring writes to isolated `ResumeVariant` documents via diffable patch proposals (or manual edits in the editor). |
+| <img src="docs/icons/cross.svg" width="16" height="16" alt="Problem:" align="absmiddle" /> **Black-box "ATS score" guessed by an LLM** | <img src="docs/icons/check.svg" width="16" height="16" alt="Solution:" align="absmiddle" /> **Deterministic 100-Point ATS Engine** using auditable, rule-based checks across 6 engineering role profiles (with optional BYOK qualitative review). |
+| <img src="docs/icons/cross.svg" width="16" height="16" alt="Problem:" align="absmiddle" /> **Stores API keys and resume data on third-party SaaS servers** | <img src="docs/icons/check.svg" width="16" height="16" alt="Solution:" align="absmiddle" /> **Self-Hostable & Browser-Encrypted BYOK** using a non-extractable Web Crypto AES-GCM key inside IndexedDB (with memory fallback); keys are never persisted in PostgreSQL. |
 
-## 💡 Why ResumeForge
-
-Most AI resume tools invent experience you don't have, or silently overwrite your master document. ResumeForge does neither:
-
-| Problem with typical AI resume tools | How ResumeForge fixes it |
-|---|---|
-| ❌ LLM invents employers, seniority, dates, or metrics | ✅ **Mechanical guardrail** hard-blocks fabricated employers, inflated titles/dropped level markers, widened dates (ISO month-level containment, with year-level fallback when months are omitted), and inflated or subject-swapped metrics against your frozen Master Resume snapshot |
-| ❌ Silent overwrites destroy your original resume | ✅ Your **Master Resume** is write-protected; changes are reviewable patches written to isolated variants |
-| ❌ Opaque third-party key storage | ✅ **Self-hostable, BYOK** — keys are AES-GCM encrypted in browser `localStorage`; the app does not store or log request bodies or keys in Postgres |
-| ❌ "ATS score" is just an LLM guess | ✅ **Deterministic scoring engine** with auditable, rule-based checks |
+**Core Guardrails:**
+* **No auto-apply spam:** You review every diff and submit applications yourself.
+* **Explicit gap detection:** If a job requires a skill not in your Evidence Bank, ResumeForge flags it as a concrete *Gap* rather than inventing a bullet. Unverified skills emit soft warnings and require explicit per-skill acknowledgement before an AI patch can add them.
 
 ---
 
-### 🚫 What ResumeForge refuses to do
+## <img src="docs/icons/video.svg" width="20" height="20" alt="" align="absmiddle" /> Video Walkthrough
 
-- **Never auto-submits** an application. You press the button.
-- **Never persists your API keys in the database.** Keys are encrypted in browser `localStorage` or read from server environment variables; the app does not store or log request bodies or keys.
-- **Never invents experience.** If a job requirement has no matching evidence, you get an explicit *Gap*, not a made-up bullet. Unverified skills are flagged as soft warnings and require explicit per-skill acknowledgement before an AI patch can add them.
-- **Never overwrites your master resume silently.** It is write-protected; every change is a reviewable patch, and exporting a tailored or AI-patched variant fails closed unless a frozen Master Resume snapshot exists.
-
----
-
-## ✨ Key Features
-
-<table>
-<tr>
-<td width="50%" valign="top">
-
-### 🗂️ Master Resume & Evidence Bank
-Protected single source of truth storing verified work history, projects, skills, education, and metrics. Every resume bullet traces back to a verified evidence item.
-
-### 🎯 Job Requirement Extraction
-Import or paste job postings to automatically extract hard skills, soft skills, domain requirements, and role profiles into an editable requirements list.
-
-### 🔍 Ranked Evidence Matching
-Automatically ranks your Evidence Bank against a target job description — surfacing satisfied requirements, gaps, and reusable bullets.
-
-### 🤖 AI Patch Generator (BYOK)
-Generates evidence-grounded resume patches using your own OpenAI, Anthropic, Gemini, or Groq key. The app does not store or log request bodies or keys.
-
-</td>
-<td width="50%" valign="top">
-
-### 📊 ATS Quality Score Engine
-Deterministic, rule-based scoring across base resume health, required/preferred skill match, and role-relevant evidence — plus an optional bounded AI qualitative reviewer.
-
-### ✉️ Tailored Cover Letter Generator
-Produces cover letters grounded strictly in your verified Evidence Bank, with inline citations back to source achievements.
-
-### 📌 Job Application Tracker
-Searchable, filterable pipeline for saved/applied jobs with per-job evidence-match scoring, notes, and status history.
-
-### 📝 Typst-Powered Resume Editor
-Three-pane editor (CodeMirror 6 source, live Typst WASM preview, AI Tailoring Assistant) with instant client-side compilation.
-
-</td>
-</tr>
-</table>
-
----
-
-## 🏗️ Architecture
-
-```mermaid
-flowchart LR
-    A[Master Resume<br/>Protected Source] --> B[Evidence Bank<br/>Verified Bullets]
-    C[Job Posting] --> D[Requirement Extraction]
-    B --> E[Ranked Evidence Matching]
-    D --> E
-    E --> F[AI Patch Generator<br/>BYOK Gateway]
-    F --> G[Mechanical Guardrail<br/>Employers / Titles / Dates / Metrics]
-    G --> H[Typst WASM<br/>Live Compile]
-    E --> I[ATS Quality Score Engine]
-    F --> J[Tailored Cover Letter]
-    H --> K[(Tailored Resume Variant)]
-
-    style A fill:#0b1326,stroke:#ff8c00,color:#fff
-    style B fill:#0b1326,stroke:#4edea3,color:#fff
-    style F fill:#0b1326,stroke:#ff8c00,color:#fff
-    style G fill:#0b1326,stroke:#ff8c00,color:#fff
-    style I fill:#0b1326,stroke:#4edea3,color:#fff
-```
-
-Typst compilation (`typst.ts` WASM) runs client-side in the browser. Browser BYOK calls to OpenAI, Anthropic, and Groq route through an authenticated same-origin relay (`/api/ai/byok-proxy`) restricted to allowlisted HTTPS provider endpoints; the app does not store or log request bodies or keys (note that the underlying hosting platform may log HTTP metadata).
-
----
-
-## 🧱 Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 15 (App Router) + React 19 + TypeScript |
-| Styling | Tailwind CSS + shadcn/ui — custom **"Forge Terminal"** dark design system (obsidian background, amber/emerald accents, glassmorphic panels) |
-| Database | PostgreSQL 16 via Prisma ORM (`docker compose`) |
-| Document Engine | Typst (`typst.ts` WASM browser compiler) |
-| Code Editor | CodeMirror 6 |
-| AI Integration | BYOK gateway — OpenAI, Anthropic, Gemini, Groq — AES-GCM browser vault & error redaction |
-| Testing | Vitest (unit/integration) + Playwright (E2E) |
-
----
-
-## 🚀 Getting Started
-
-<details>
-<summary><strong>1. Clone the repository</strong></summary>
-
-```bash
-git clone https://github.com/ZenzerJs/ResumeForge.git
-cd ResumeForge
-```
-</details>
-
-<details>
-<summary><strong>2. Install dependencies</strong></summary>
-
-```bash
-npm install
-```
-</details>
-
-<details>
-<summary><strong>3. Configure environment variables</strong></summary>
-
-```bash
-cp .env.example .env
-```
-
-`DATABASE_URL` must be a Postgres URL. `APP_ACCESS_SECRET` signs the session cookie. Provider keys in this file are optional server fallbacks. The browser BYOK vault does not read them.
-</details>
-
-<details>
-<summary><strong>4. Start Postgres, migrate, and seed</strong></summary>
-
-```bash
-docker compose up -d
-npx prisma migrate deploy
-npx prisma db seed
-```
-
-`docker compose` starts Postgres 16 on `127.0.0.1:5432` with user, password, and database `resumeforge`. Seed is idempotent.
-</details>
-
-<details>
-<summary><strong>5. Start the local development server</strong></summary>
-
-```bash
-npm run dev
-```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-</details>
-
----
-
-## 📜 Available Scripts
-
-| Command | Description |
-|---|---|
-| `npm run dev` | Start the local development server |
-| `npm run build` | Generate Prisma client and build for production |
-| `npm run start` | Start the production server |
-| `npm run lint` | Run ESLint |
-| `npm run typecheck` | Run the TypeScript compiler in check-only mode |
-| `npm run test` | Run the Vitest unit/integration suite |
-| `npm run check:env` | Fail if code reads a `process.env` name missing from `.env.example` |
-| `npm run generate:fixtures` | Regenerate the synthetic PDF test fixture (`e2e/fixtures/sample-resume.pdf`) |
-
----
-
-## 📁 Project Structure
-
-```
-ResumeForge/
-├── src/
-│   ├── app/            # Next.js App Router pages & API routes
-│   ├── components/     # UI components — editor/, tailor/, tracker/, design-system/
-│   └── lib/            # Mechanical guardrail, facts extractor, BYOK vault, security guards
-├── packages/
-│   ├── core/src/       # Deterministic engines — scoring/ (ATS score), intel/
-│   └── schema/src/     # Shared schemas/types
-├── prisma/             # PostgreSQL schema and migrations
-├── e2e/ & tests/       # Playwright and Vitest test suites
-├── DESIGN.md           # Design system reference
-├── PRODUCT.md          # Product spec
-├── SECURITY.md         # Threat model and security controls
-└── AGENTS.md           # AI-agent working agreements for this repo
-```
-
----
-
-## 🎓 Philosophy & Disclosure
-
-> **Truthfulness over persuasion.**
-
-The AI never invents experience — it only rephrases, restructures, or highlights what already exists in your verified Evidence Bank. Every AI-assisted change is a **diffable, reviewable patch**, and every score or recommendation traces back to a concrete, auditable reason.
-
-*Developed with AI coding assistants (Cursor, Antigravity). The author designed the architecture, product spec and guardrail policy, and reviews and validates changes.*
+See the tailoring workflow in action—from matching real job requirements against verified evidence to reviewing cited patches on a protected Master Resume:
 
 <div align="center">
 
-*Built by [@ZenzerJs](https://github.com/ZenzerJs) · [MIT License](LICENSE)*
+https://github.com/user-attachments/assets/64820390-cd87-41f1-9e0a-42dcec21f57e
+
+</div>
+
+---
+
+## <img src="docs/icons/sparkles.svg" width="20" height="20" alt="" align="absmiddle" /> The Workspace
+
+ResumeForge is organized into five integrated modules that cover the technical job hunt (plus `/settings` for BYOK/account management and `/login` for authentication):
+
+### 1. <img src="docs/icons/editor.svg" width="18" height="18" alt="" align="absmiddle" /> Typst Resume Editor & PDF Import (`/editor`)
+* **Dual Editing Modes:** Switch seamlessly between a CodeMirror 6 Typst source editor and a **Guided Visual Form Builder** (`ResumeFormBuilder`, zero Typst syntax required).
+* **Instant Client-Side Compilation:** Live SVG/PDF preview compiled directly in the browser via `typst.ts` WASM, with one-click AI syntax repair (`/api/ai/repair-typst`) if a compile error occurs.
+* **PDF Import & Multi-Format Export:** Extract existing `.pdf` resumes into Typst (`pdf-parse` / `pdfjs-dist`, with optional BYOK structuring), and export to PDF, ATS-parsable **DOCX** (`docx`), plain text (`.txt`), `.typ` source, or a full **Application Package ZIP** (`jszip`) with a SHA-256 `manifest.json`.
+
+### 2. <img src="docs/icons/library.svg" width="18" height="18" alt="" align="absmiddle" /> Master Resume & Evidence Bank (`/library`)
+* **Single Source of Truth:** Store verified `experience`, `project`, `skill`, `education`, `award`, and `metric` items with technology-tagged bullets.
+* **Bulk Ingestion & Extraction:** Drag-and-drop past resume PDFs into the **Bulk PDF Dropzone** to deterministically extract and index historical achievements into reusable evidence records, or extract draft items directly from your Master Typst source.
+
+### 3. <img src="docs/icons/tailor.svg" width="18" height="18" alt="" align="absmiddle" /> Evidence-Grounded Tailor Engine (`/tailor`)
+* **5 Specialized Views:** Switch between **Overview**, **3-Pane**, **Job Info**, **Cover Letter**, and **Diagnostics**.
+* **Server-Validated Patch Batches:** Every AI suggestion in a `PatchProposalBatch` is Zod-validated and linked to a `PatchCitation` (`evidenceId` and/or `bulletId`), complete with rendered SVG suggestion previews and grounded cover letter generation.
+* **Read-Only Inspection Assistant:** Chat with a docked/floating AI assistant (`/api/ai/chat`) equipped with allowlisted read-only inspection tools (`search_evidence`, `get_ats_score`, `get_resume_facts`, `run_guardrail`, `get_job`, `search_saved_jobs`, `inspect_layout_budget`) that inspect without mutating your document.
+
+### 4. <img src="docs/icons/chart.svg" width="18" height="18" alt="" align="absmiddle" /> Deterministic ATS Rubric & Job Tracker (`/tracker`)
+* **100-Point Rule-Based Scoring:** `evaluateAtsScore` audits Base Health (`30 pts`), Required Skills (`40 pts`), Preferred Skills (`15 pts`), and Role Evidence (`15 pts`) across `Full-stack`, `Backend`, `AI/LLM`, `ML`, `Frontend`, and `Data/Platform` profiles. Alongside it, `calculateMatchScore` computes Evidence-Bank compatibility with framework alias inference (e.g., `Next.js → React / JavaScript / TypeScript`), and `/` includes an interactive ATS Sandbox.
+* **Multi-Source Job Discovery (`/tracker/feed`):** Syncs listings from **Greenhouse, Lever, Ashby, Adzuna CA, Jobicy, Remotive, RemoteOK**, and **Pitt CSC / SimplifyJobs**, complete with Canadian eligibility, city radius, salary, and blended match-tier filters.
+* **Funnel Analytics & Company Dossiers:** Track applications across `SAVED → APPLIED → INTERVIEWING → OFFER / REJECTED` (plus `ARCHIVED`), analyze per-variant conversion rates in `/tracker/outcomes`, export guardrail-checked bundles from the Apply Prep Sheet, and browse cached company interview dossiers (`hiring-without-whiteboards` seed + optional BYOK generation).
+
+### 5. <img src="docs/icons/terminal.svg" width="18" height="18" alt="" align="absmiddle" /> Interview Prep & Browser DSA Sandbox (`/practice`)
+* **Curated Problem Bank:** Practice **NeetCode 150**, **System Design**, and **OA Screening** questions (`ALL_QUESTIONS`), plus company-linked `InterviewProblem` records synced via `npm run sync:oa`, filterable by target company and JD requirements.
+* **Sandboxed Code Runner:** Execute **JavaScript** and **TypeScript** solutions inside an isolated Web Worker + opaque-origin sandboxed iframe (`src/lib/dsa-runner.ts`), paired with progressive hints, a **Socratic Interview Coach**, and a complexity scorecard (uses BYOK when configured, with a deterministic heuristic fallback). *Python 3 starter templates are included in the editor; executing Python reports an explicit notice that a Python/Pyodide runtime is required.*
+
+---
+
+## <img src="docs/icons/architecture.svg" width="20" height="20" alt="" align="absmiddle" /> Architecture & Security
+
+```mermaid
+flowchart LR
+    A[Master Resume<br/>Protected + History] --> B[Evidence Bank<br/>Verified Bullets]
+    C[Job Board & Connectors<br/>ATS / Job Feeds / Simplify] --> D[JD Parser & Match Score]
+    B --> D
+    D --> E[Tailor Engine<br/>Cited Patch Batches]
+    E --> F[Mechanical Guardrail<br/>Employers / Titles / Dates / Metrics]
+    F --> G[Typst WASM<br/>Live Browser Compile]
+    G --> H[Exports<br/>PDF / DOCX / ZIP]
+    D --> I[100-Pt ATS Engine]
+    E --> J[Grounded Cover Letter]
+    D --> K[Practice & DSA Sandbox]
+
+    style A fill:#1b1716,stroke:#f7bd3f,color:#f4eee7
+    style B fill:#1b1716,stroke:#6bd69a,color:#f4eee7
+    style E fill:#1b1716,stroke:#ff8b3d,color:#f4eee7
+    style F fill:#1b1716,stroke:#ff8b3d,color:#f4eee7
+    style I fill:#1b1716,stroke:#6bd69a,color:#f4eee7
+```
+
+* **Local-First & Authenticated Modes:** Try the workspace immediately in the browser (`localStorage` guest drafts with guided migration to PostgreSQL upon sign-up/login via `/api/auth/migrate-guest-drafts`), or deploy in bounded public `DEMO_MODE`. Signed-in sessions use HMAC-SHA256 `HttpOnly` `rf_session` cookies with `sessionVersion` revocation.
+* **Browser-Encrypted BYOK Vault:** API keys for **OpenAI, Anthropic, Gemini, Groq, Ollama**, or custom endpoints are encrypted in browser IndexedDB (`resumeforge-byok-vault` using a non-extractable Web Crypto AES-GCM key, with memory-only fallback). Keys are never persisted in PostgreSQL and are scrubbed from application error messages (`sanitizeError`). Browser requests to OpenAI, Anthropic, and Groq route through an authenticated same-origin relay (`/api/ai/byok-proxy`) restricted to allowlisted HTTPS endpoints, while server-mediated AI routes (`/api/ai/*`) receive the active `providerConfig` in memory to execute completions without logging keys or bodies in the app (hosting providers may still record standard HTTP metadata). Outbound server fetches enforce DNS-level private-IP/SSRF blocking (`safeFetch`).
+
+---
+
+## <img src="docs/icons/stack.svg" width="20" height="20" alt="" align="absmiddle" /> Tech Stack
+
+| Layer | Technology |
+| :--- | :--- |
+| **Framework** | Next.js 15 (App Router), React 19, TypeScript (Strict) |
+| **UI & Design System** | Tailwind CSS 3, shadcn/ui, Radix UI, Framer Motion, Lucide, `simple-icons` — *"Ember Ink"* theme (`Hanken Grotesk` & `JetBrains Mono`) |
+| **Database** | PostgreSQL 16 + Prisma ORM 6 |
+| **Document & PDF Engine** | Typst (`@myriaddreamin/typst.ts` WASM), CodeMirror 6, `pdf-parse`, `pdfjs-dist`, `docx`, `jszip` |
+| **AI & Validation** | Multi-provider gateway (`gemini`, `openai`, `anthropic`, `groq`, `ollama`, `custom`), Zod 4, Web Crypto Vault |
+| **Testing & CI** | Vitest 4 (Unit + Isolated Postgres Schema Integration), Playwright (E2E + Visual Render Verification) |
+
+---
+
+## <img src="docs/icons/rocket.svg" width="20" height="20" alt="" align="absmiddle" /> Getting Started
+
+### Prerequisites
+* **Node.js 22+** and `npm`
+* **Docker & Docker Compose** (or a local PostgreSQL 16 instance)
+
+### Option A: Local Development (Recommended)
+
+```bash
+# 1. Clone and install dependencies (auto-copies pdfjs worker assets)
+git clone https://github.com/ZenzerJs/ResumeForge.git
+cd ResumeForge
+npm install
+
+# 2. Configure environment variables (update the 'change-me-*' secrets)
+cp .env.example .env
+
+# 3. Start PostgreSQL 16, run migrations, and seed sample evidence
+docker compose up -d postgres
+npx prisma migrate deploy
+npx prisma db seed
+
+# 4. (Optional) Seed company intel dossiers and OA interview questions
+npm run seed:intel
+npm run sync:oa
+
+# 5. Launch the workspace at http://localhost:3000
+npm run dev
+```
+
+### Option B: Full-Stack Docker Compose
+
+After copying `.env.example` to `.env` and replacing the `change-me-*` placeholders:
+
+```bash
+docker compose up --build -d
+```
+
+Builds the multi-stage Node 22 Alpine image, waits for the `postgres` healthcheck, runs `npx prisma migrate deploy`, and serves the app at `http://127.0.0.1:3000` (configurable via `APP_BIND_ADDRESS` and `APP_PORT`).
+
+---
+
+## <img src="docs/icons/sliders.svg" width="20" height="20" alt="" align="absmiddle" /> Configuration & Reference
+
+<details>
+<summary><img src="docs/icons/lock.svg" width="16" height="16" alt="" align="absmiddle" /> <strong>Environment Variables (Click to expand)</strong></summary>
+
+<br />
+
+All environment variables read by the codebase are verified via `npm run check:env` against `.env.example`.
+
+| Variable | Required | Purpose |
+| :--- | :--- | :--- |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT` | Compose | PostgreSQL 16 container credentials and port (`5432` default) |
+| `APP_PORT`, `APP_BIND_ADDRESS` | Compose | App host port (`3000`) and bind address (`127.0.0.1` default) |
+| `DATABASE_URL` | **Yes** | PostgreSQL connection string (`postgresql://...`) |
+| `APP_ACCESS_SECRET` | **Yes** | Signs `rf_session` HMAC-SHA256 cookies (min 8 chars; not a login password) |
+| `APP_ACCESS_PASSWORD` | Optional | Shared-password fallback; leave empty for standard signup/login |
+| `JOB_SYNC_SECRET` | Sync/Cleanup | Bearer token protecting `POST /api/jobs/sync-pittcsc`, `/api/jobs/cleanup`, and `/api/connectors/sync` |
+| `JOB_BOARD_MAX_AGE_DAYS` | Optional | Job board expiry threshold (`30` or `60`, defaults to `60`) |
+| `NEXT_PUBLIC_APP_URL` | **Yes (Prod)** | Public origin without trailing path (determines `Secure` cookie flag) |
+| `DEMO_MODE` | Optional | `true` enables bounded public demo mode (browser-local mutations, disables signup) |
+| `TRUST_PROXY` | Optional | Set `true` behind a reverse proxy that overwrites `x-forwarded-for` / `x-real-ip` |
+| `ALLOWED_IMPORT_HOSTS`, `SIMPLIFY_JOBS_URL` | Optional | Extra allowlisted hosts for bulk import `sourceUrl` or custom SimplifyJobs URL |
+| `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, `INDEED_MCP`, `INDEED_PARTNER_KEY` | Optional | Optional job board connector / fetcher credentials |
+| `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`, `OLLAMA_BASE_URL`, `CUSTOM_OPENAI_*` | Optional | Server-side AI fallbacks (plus `*_BASE_URL` overrides) when self-hosting (never read by browser vault) |
+| `NEXT_PUBLIC_DEFAULT_AI_PROVIDER`, `NEXT_PUBLIC_DEFAULT_AI_MODEL` | Optional | Fallback provider/model labels for the Typst repair route |
+| `NEXT_PUBLIC_RESUME_LAYOUT_V2` | Optional | Set `true` to enable experimental source-backed resume layout |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/scroll.svg" width="16" height="16" alt="" align="absmiddle" /> <strong>Available Scripts & Testing (Click to expand)</strong></summary>
+
+<br />
+
+| Command | Description |
+| :--- | :--- |
+| `npm run dev` | Start the Next.js development server |
+| `npm run build` | Generate Prisma Client and build for production |
+| `npm run start` | Start the production server bound to `0.0.0.0` |
+| `npm run lint` / `npm run typecheck` | Run ESLint and strict TypeScript verification (`tsc --noEmit`) |
+| `npm run test` | Run the Vitest unit/mocked test suite (`tests/`) |
+| `npm run test:integration` | Run PostgreSQL contract tests inside an isolated, disposable `rf_it_*` schema |
+| `npm run test:e2e` / `npm run test:e2e:ui` | Run Playwright E2E suite (`playwright.config.ts`) or launch interactive UI mode |
+| `npm run check:env` | Verify parity between `process.env` references and `.env.example` |
+| `npm run generate:fixtures` | Regenerate the synthetic PDF test fixture (`e2e/fixtures/sample-resume.pdf`) |
+| `npm run sync:oa` | Sync OA problems from `Tech-OA-Interview-Questions` into Postgres |
+| `npm run seed:intel` | Seed `CompanyDossier` records from `hiring-without-whiteboards` |
+| `npm run normalize:jobs` | Backfill/normalize stored `Job` descriptions in PostgreSQL |
+
+Additional Playwright configs exist for demo-mode render verification (`playwright.demo.config.ts`, run in CI) and release-journey verification (`scripts/run-release-e2e.ts` with `playwright.release.config.ts`).
+
+</details>
+
+<details>
+<summary><img src="docs/icons/folder.svg" width="16" height="16" alt="" align="absmiddle" /> <strong>Project Structure & Deployment (Click to expand)</strong></summary>
+
+<br />
+
+```text
+ResumeForge/
+├── src/
+│   ├── app/            # Next.js App Router (/editor, /library, /tracker, /tailor, /practice, /settings, /login) & /api/*
+│   ├── components/     # Modular UI — editor/, tailor/, tracker/, interview/, practice/, evidence/, landing/, settings/, design-system/
+│   └── lib/            # Mechanical guardrail, facts engine, ATS rubric, BYOK vault, AI gateway, connectors, DSA sandbox
+├── packages/
+│   ├── core/src/       # Shared deterministic scoring (calculateMatchScore) & company intel logic
+│   └── schema/src/     # Shared Zod 4 schemas & TypeScript contracts
+├── prisma/             # PostgreSQL schema, migrations, and idempotent seed.ts
+├── prompts/            # Grounded AI system prompt templates
+├── scripts/            # Env parity checker, isolated Postgres test runner, release E2E runner, sync utilities
+└── tests/ & e2e/       # Vitest unit/integration suites and Playwright E2E specs
+```
+
+**Deployment & CI Automation:**
+* **Render Blueprint (`render.yaml`):** Provisions a Node 22 web service (`npm ci && npx prisma generate && npx prisma migrate deploy && npm run build`) + PostgreSQL 16 database (`resumeforge-db`).
+* **GitHub Actions (`.github/workflows/`):** Automated CI pipeline (`ci.yml` running `actionlint`, conflict-marker check, `check:env`, `prisma migrate deploy`, `typecheck`, `lint`, `test`, `test:integration`, `build` with `NEXT_PUBLIC_RESUME_LAYOUT_V2=true`, and Playwright V2 resume render verification), plus daily cron workflows for SimplifyJobs ingestion (`ingest-jobs.yml`) and dry-run expired job audits (`job-expiry.yml`).
+
+</details>
+
+---
+
+## <img src="docs/icons/compass.svg" width="20" height="20" alt="" align="absmiddle" /> Philosophy & Disclosure
+
+> **Truthfulness over persuasion.**
+
+The AI never invents experience—it only rephrases, restructures, or highlights what already exists in your verified Evidence Bank. Every AI-assisted change is a **diffable, reviewable patch**, and every score or recommendation traces back to a concrete, auditable rule.
+
+*Developed alongside AI coding assistants (Cursor, Antigravity). Architecture, product specification ([`PRODUCT.md`](PRODUCT.md)), design system ([`DESIGN.md`](DESIGN.md)), and security threat model ([`SECURITY.md`](SECURITY.md)) designed by [@ZenzerJs](https://github.com/ZenzerJs).*
+
+<div align="center">
+
+*Built & Designed by [@ZenzerJs](https://github.com/ZenzerJs) · [MIT License](LICENSE)*
 
 </div>
