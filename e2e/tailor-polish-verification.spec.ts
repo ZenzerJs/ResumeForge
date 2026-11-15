@@ -21,6 +21,33 @@ async function setup(page: Page) {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "resumeforge_guest_evidence",
+      JSON.stringify([
+        {
+          id: "evidence-1",
+          type: "experience",
+          title: "Product Engineer",
+          organization: "Example Studio",
+          dates: "2022–2024",
+          verifiedSummary: "Built a TypeScript product backed by PostgreSQL.",
+          tags: ["TypeScript", "PostgreSQL"],
+          status: "verified",
+          bullets: [
+            {
+              id: "b-1",
+              text: "Built a TypeScript product backed by PostgreSQL.",
+              technologies: ["TypeScript", "PostgreSQL"],
+              roleAffinity: [],
+              verified: true,
+              orderIndex: 0,
+            },
+          ],
+        },
+      ])
+    );
+  });
   await page.route("**/api/**", async route => {
     const url = new URL(route.request().url());
     const path = url.pathname;

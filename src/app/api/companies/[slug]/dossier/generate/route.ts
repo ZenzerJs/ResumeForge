@@ -20,42 +20,43 @@ export async function POST(
   req: NextRequest,
   props: { params: Promise<{ slug: string }> }
 ) {
-  const auth = await requireUserId(req);
-  if (typeof auth !== "string") {
-    return auth;
-  }
-
-  const params = await props.params;
-  const slug = params.slug;
-
-  if (!slug) {
-    return NextResponse.json({ found: false, error: "Company slug is required" }, { status: 400 });
-  }
-
-  let raw: unknown = {};
+  let slug = "";
   try {
-    raw = await req.json();
-  } catch {
-    raw = {};
-  }
+    const auth = await requireUserId(req);
+    if (typeof auth !== "string") {
+      return auth;
+    }
 
-  const parsed = GenerateDossierBodySchema.safeParse(raw && typeof raw === "object" ? raw : {});
-  if (!parsed.success) {
-    return NextResponse.json(
-      { found: false, error: "Invalid dossier request" },
-      { status: 400 }
-    );
-  }
+    const params = await props.params;
+    slug = params.slug;
 
-  const existing = await prisma.companyDossier.findUnique({
-    where: { companySlug: slug },
-  });
+    if (!slug) {
+      return NextResponse.json({ found: false, error: "Company slug is required" }, { status: 400 });
+    }
 
-  if (existing && Date.now() - new Date(existing.lastUpdated).getTime() < DOSSIER_REGEN_COOLDOWN_MS) {
-    return NextResponse.json({ found: true, dossier: existing, stale: false, cooldown: true });
-  }
+    let raw: unknown = {};
+    try {
+      raw = await req.json();
+    } catch {
+      raw = {};
+    }
 
-  try {
+    const parsed = GenerateDossierBodySchema.safeParse(raw && typeof raw === "object" ? raw : {});
+    if (!parsed.success) {
+      return NextResponse.json(
+        { found: false, error: "Invalid dossier request" },
+        { status: 400 }
+      );
+    }
+
+    const existing = await prisma.companyDossier.findUnique({
+      where: { companySlug: slug },
+    });
+
+    if (existing && Date.now() - new Date(existing.lastUpdated).getTime() < DOSSIER_REGEN_COOLDOWN_MS) {
+      return NextResponse.json({ found: true, dossier: existing, stale: false, cooldown: true });
+    }
+
     const dossier = await generateDossier({
       companyName: parsed.data.companyName || existing?.displayName || slug,
       jobTitle: parsed.data.jobTitle,

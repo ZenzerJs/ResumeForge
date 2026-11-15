@@ -13,7 +13,12 @@ import { getRequestUserId } from "@/lib/security/auth-request";
 export async function POST(req: NextRequest) {
   try {
     const userId = await getRequestUserId(req);
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON payload" }, { status: 400 });
+    }
     const parseResult = AtsEvaluateInputSchema.safeParse(body);
 
     if (!parseResult.success) {

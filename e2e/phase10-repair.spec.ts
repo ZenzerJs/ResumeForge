@@ -329,6 +329,9 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
 
     await page.mouse.move(360, 260);
     await page.setViewportSize({ width: 1600, height: 900 });
+    await expect
+      .poll(async () => waveCanvas.evaluate((el: HTMLCanvasElement) => el.width))
+      .toBeGreaterThanOrEqual(1600);
 
     const canvasMetrics = await waveCanvas.evaluate((el: HTMLCanvasElement) => {
       const ctx = el.getContext("2d");

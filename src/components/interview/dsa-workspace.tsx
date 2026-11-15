@@ -73,8 +73,10 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
   const [coachMessages, setCoachMessages] = useState<DsaChatMessage[]>([]);
   const [coachInput, setCoachInput] = useState<string>("");
   const [isAskingCoach, setIsAskingCoach] = useState<boolean>(false);
+  const [coachError, setCoachError] = useState<string | null>(null);
   const [scorecard, setScorecard] = useState<DsaScorecard | null>(null);
   const [isAuditing, setIsAuditing] = useState<boolean>(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const gutterRef = useRef<HTMLDivElement>(null);
   const runAbortRef = useRef<AbortController | null>(null);
@@ -97,7 +99,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
         setActiveTestCaseIndex(0);
         setCoachStage("CLARIFICATION");
         setCoachMessages([]);
+        setCoachError(null);
         setScorecard(null);
+        setAuditError(null);
       }
     }
     if (queryJd && !jdInput) {
@@ -120,7 +124,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
     setActiveTestCaseIndex(0);
     setCoachStage("CLARIFICATION");
     setCoachMessages([]);
+    setCoachError(null);
     setScorecard(null);
+    setAuditError(null);
   };
 
   const handleLanguageChange = (lang: DsaLanguage) => {
@@ -130,7 +136,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
     setSelectedLanguage(lang);
     setCode(selectedProblem.starterCode[lang]);
     setExecutionSummary(null);
+    setCoachError(null);
     setScorecard(null);
+    setAuditError(null);
   };
 
   const handleReset = () => {
@@ -139,7 +147,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
     setIsRunning(false);
     setCode(selectedProblem.starterCode[selectedLanguage]);
     setExecutionSummary(null);
+    setCoachError(null);
     setScorecard(null);
+    setAuditError(null);
   };
 
   const handleRecommend = () => {
@@ -159,6 +169,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
     const trimmed = coachInput.trim();
     if (!trimmed || isAskingCoach) return;
     setIsAskingCoach(true);
+    setCoachError(null);
     const userMsg: DsaChatMessage = {
       role: "user",
       content: trimmed,
@@ -187,6 +198,12 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
       };
       setCoachMessages((prev) => [...prev, assistantMsg]);
       setCoachStage(turn.suggestedNextStage);
+    } catch (err) {
+      setCoachError(
+        err instanceof Error && err.message
+          ? err.message
+          : "Unable to reach the Socratic Coach. Check your AI provider settings and try again."
+      );
     } finally {
       setIsAskingCoach(false);
     }
@@ -195,6 +212,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
   const handleAuditScorecard = async () => {
     if (!executionSummary || isAuditing) return;
     setIsAuditing(true);
+    setAuditError(null);
     try {
       const hintsUsed = Object.values(revealedHints).filter(Boolean).length;
       const result = await auditDsaSubmission({
@@ -206,6 +224,12 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
       });
       setScorecard(result);
       setCoachStage("SCORECARD");
+    } catch (err) {
+      setAuditError(
+        err instanceof Error && err.message
+          ? err.message
+          : "Unable to audit submission complexity. Check your AI provider settings and try again."
+      );
     } finally {
       setIsAuditing(false);
     }
@@ -600,6 +624,17 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               </button>
             </div>
 
+            {coachError && (
+              <div
+                role="alert"
+                data-testid="dsa-coach-error"
+                className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-950/25 px-3 py-2 text-xs text-red-300"
+              >
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" aria-hidden />
+                <span>{coachError}</span>
+              </div>
+            )}
+
             {executionSummary && (
               <div className="pt-1">
                 <button
@@ -616,6 +651,17 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                   )}
                   <span>Audit Complexity &amp; Generate Scorecard</span>
                 </button>
+              </div>
+            )}
+
+            {auditError && (
+              <div
+                role="alert"
+                data-testid="dsa-audit-error"
+                className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-950/25 px-3 py-2 text-xs text-red-300"
+              >
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" aria-hidden />
+                <span>{auditError}</span>
               </div>
             )}
 

@@ -5,8 +5,14 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2, Lock, Mail, User } from "lucide-react";
 import { fetchDemoConfig } from "@/components/auth/session-user";
+import { readApiResponse } from "@/lib/api-error";
 
 export type AuthMode = "signin" | "signup";
+
+export function resolveEffectiveAuthMode(requestedMode: string | null | undefined, signupEnabled: boolean): AuthMode {
+  if (!signupEnabled) return "signin";
+  return requestedMode === "signup" ? "signup" : "signin";
+}
 
 export interface LoginFormProps {
   initialMode?: AuthMode;
@@ -85,15 +91,21 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
   }, []);
 
   useEffect(() => {
+    if (!signupEnabled) {
+      setMode("signin");
+      return;
+    }
     const urlMode =
       searchParams.get("mode") ||
       (typeof window !== "undefined"
         ? new URLSearchParams(window.location.search).get("mode")
         : null);
     if (urlMode === "signup" || urlMode === "signin") {
-      setMode(urlMode);
+      setMode(resolveEffectiveAuthMode(urlMode, signupEnabled));
     }
-  }, [searchParams]);
+  }, [searchParams, signupEnabled]);
+
+  const effectiveMode: AuthMode = resolveEffectiveAuthMode(mode, signupEnabled);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -124,7 +136,7 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
     if (activeUsername !== username) setUsername(activeUsername);
     if (activePassword !== password) setPassword(activePassword);
 
-    if (mode === "signup") {
+    if (effectiveMode === "signup") {
       if (!activeEmail || !activeEmail.includes("@")) {
         setError("Please enter a valid email address.");
         return;
@@ -151,9 +163,9 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
     setIsSubmitting(true);
 
     try {
-      const endpoint = mode === "signup" ? "/api/auth/signup" : "/api/auth/login";
+      const endpoint = effectiveMode === "signup" ? "/api/auth/signup" : "/api/auth/login";
       const body =
-        mode === "signup"
+        effectiveMode === "signup"
           ? { email: activeEmail, username: activeUsername, password: activePassword }
           : { email: activeEmail, identifier: activeEmail, password: activePassword };
 
@@ -163,24 +175,17 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
         body: JSON.stringify(body),
       });
 
-      const json = await res.json().catch(() => ({}));
+      const defaultAuthError =
+        effectiveMode === "signup"
+          ? "Unable to create account. Please check your information."
+          : "Invalid email, username, or password.";
+      const { ok, error: apiError } = await readApiResponse<{ success?: boolean }>(
+        res,
+        defaultAuthError
+      );
 
-      if (!res.ok || !json.success) {
-        let errorMsg = json.error;
-        if (json.details && typeof json.details === "object") {
-          const fieldMsgs = Object.values(json.details)
-            .flat()
-            .filter((msg): msg is string => typeof msg === "string" && Boolean(msg.trim()));
-          if (fieldMsgs.length > 0) {
-            errorMsg = fieldMsgs.join(". ");
-          }
-        }
-        setError(
-          errorMsg ||
-            (mode === "signup"
-              ? "Unable to create account. Please check your information."
-              : "Invalid email, username, or password.")
-        );
+      if (!ok) {
+        setError(apiError || defaultAuthError);
         setIsSubmitting(false);
         return;
       }
@@ -208,16 +213,16 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
           <span className="text-xl font-bold tracking-tight text-foreground">ResumeForge</span>
         </div>
         <h1 className="text-2xl font-bold text-foreground tracking-tight">
-          {mode === "signup" ? "Create your account" : "Welcome back"}
+          {effectiveMode === "signup" ? "Create your account" : "Welcome back"}
         </h1>
         <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
-          {mode === "signup"
+          {effectiveMode === "signup"
             ? "Sign up to store evidence, tailor resumes, and sync job applications."
             : "Sign in with your email or username to access your workspace."}
         </p>
       </div>
 
-      {mode === "signup" ? (
+      {effectiveMode === "signup" ? (
         <div className="mb-4">
           <label htmlFor="username" className="block text-xs font-mono uppercase tracking-wider text-on-surface-variant font-semibold mb-1.5">
             Username
@@ -251,7 +256,7 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
 
       <div className="mb-4">
         <label htmlFor="email" className="block text-xs font-mono uppercase tracking-wider text-on-surface-variant font-semibold mb-1.5">
-          {mode === "signup" ? "Email address" : "Email or username"}
+          {effectiveMode === "signup" ? "Email address" : "Email or username"}
         </label>
         <div className="relative">
           <input
@@ -259,15 +264,15 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
             id="email"
             name="email"
             data-testid="login-email-input"
-            type={mode === "signup" ? "email" : "text"}
-            autoComplete={mode === "signup" ? "email" : "username"}
+            type={effectiveMode === "signup" ? "email" : "text"}
+            autoComplete={effectiveMode === "signup" ? "email" : "username"}
             required
             defaultValue={email}
             onChange={(event) => {
               setEmail(event.target.value);
               if (error) setError(null);
             }}
-            placeholder={mode === "signup" ? "name@example.com" : "Email or username"}
+            placeholder={effectiveMode === "signup" ? "name@example.com" : "Email or username"}
             className="h-11 w-full rounded-[6px] border border-outline/70 bg-input px-3 pl-10 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           />
           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -285,16 +290,16 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
             name="password"
             data-testid="login-password-input"
             type={showPassword ? "text" : "password"}
-            autoComplete={mode === "signup" ? "new-password" : "current-password"}
+            autoComplete={effectiveMode === "signup" ? "new-password" : "current-password"}
             spellCheck={false}
             required
-            minLength={mode === "signup" ? 8 : undefined}
+            minLength={effectiveMode === "signup" ? 8 : undefined}
             defaultValue={password}
             onChange={(event) => {
               setPassword(event.target.value);
               if (error) setError(null);
             }}
-            placeholder={mode === "signup" ? "Minimum 8 characters" : "Enter your password"}
+            placeholder={effectiveMode === "signup" ? "Minimum 8 characters" : "Enter your password"}
             className="h-11 w-full rounded-[6px] border border-outline/70 bg-input px-3 pl-10 pr-12 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           />
           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -330,9 +335,9 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
         {isSubmitting ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-            {mode === "signup" ? "Creating account…" : "Signing in…"}
+            {effectiveMode === "signup" ? "Creating account…" : "Signing in…"}
           </>
-        ) : mode === "signup" ? (
+        ) : effectiveMode === "signup" ? (
           "Create Account"
         ) : (
           "Sign In"
@@ -346,10 +351,10 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
           className="text-xs md:text-sm text-muted-foreground hover:text-primary transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded py-1 cursor-pointer"
           onClick={() => {
             setError(null);
-            setMode(mode === "signup" ? "signin" : "signup");
+            setMode(effectiveMode === "signup" ? "signin" : "signup");
           }}
         >
-          {mode === "signup"
+          {effectiveMode === "signup"
             ? "Already have an account? Sign in"
             : "Don't have an account? Create one"}
         </button> : <p className="text-xs text-muted-foreground">Public signup is disabled in the demo. Self-host ResumeForge to create an account.</p>}

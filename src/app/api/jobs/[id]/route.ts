@@ -22,7 +22,17 @@ const UpdateJobSchema = z.object({
   rawDescription: z.string().min(1).optional(),
   extractedRequirements: JobRequirementsSchema.optional(),
   status: z.enum(["SAVED", "APPLIED", "INTERVIEWING", "OFFER", "REJECTED", "ARCHIVED"]).optional(),
-  appliedAt: z.union([z.string(), z.date(), z.null()]).optional(),
+  appliedAt: z
+    .union([z.string(), z.date(), z.null()])
+    .refine(
+      (value) => {
+        if (value === null || value === "") return true;
+        const parsed = value instanceof Date ? value : new Date(value);
+        return !Number.isNaN(parsed.getTime());
+      },
+      { message: "Invalid appliedAt date" }
+    )
+    .optional(),
   variantId: z.string().nullable().optional(),
   notes: z.union([z.string(), z.null()]).optional(),
 });
@@ -61,7 +71,12 @@ export async function PATCH(
     if (userId instanceof NextResponse) return userId;
 
     const { id } = await params;
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON payload" }, { status: 400 });
+    }
 
     const validation = UpdateJobSchema.safeParse(body);
     if (!validation.success) {

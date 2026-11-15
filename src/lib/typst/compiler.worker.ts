@@ -54,10 +54,15 @@ function serialized<T>(work: () => Promise<T>): Promise<T> {
   return result;
 }
 
+type WasmBindgenModuleOption = { module_or_path: string };
+
 async function ensureTypstInitialized() {
   if (isInitialized) return;
   $typst.setCompilerInitOptions({
-    getModule: () => resolveAssetUrl("/wasm/typst_ts_web_compiler_bg.wasm"),
+    getModule: () =>
+      ({
+        module_or_path: resolveAssetUrl("/wasm/typst_ts_web_compiler_bg.wasm"),
+      }) satisfies WasmBindgenModuleOption as unknown as string,
     beforeBuild: [
       loadFonts(
         [
@@ -84,7 +89,10 @@ async function ensureTypstInitialized() {
     ],
   });
   $typst.setRendererInitOptions({
-    getModule: () => resolveAssetUrl("/wasm/typst_ts_renderer_bg.wasm"),
+    getModule: () =>
+      ({
+        module_or_path: resolveAssetUrl("/wasm/typst_ts_renderer_bg.wasm"),
+      }) satisfies WasmBindgenModuleOption as unknown as string,
   });
   isInitialized = true;
 }

@@ -41,6 +41,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { fetchDemoConfig } from "@/components/auth/session-user";
+import { readApiResponse } from "@/lib/api-error";
 import { CompanyIntelDossierPanel } from "./company-intel-dossier-panel";
 
 export interface ApplyPrepSheetModalProps {
@@ -76,6 +78,16 @@ export interface ApplyPrepSheetModalProps {
 }
 
 export type PrepTab = "oa-mock" | "star" | "intel" | "form" | "cover";
+
+export function shouldFetchInterviewPrep(jobId: string | undefined, demoMode: boolean): boolean {
+  if (demoMode) return false;
+  const trimmed = jobId?.trim();
+  if (!trimmed) return false;
+  if (trimmed.startsWith("demo-sample-") || trimmed.startsWith("guest-job-") || trimmed === "sample") {
+    return false;
+  }
+  return true;
+}
 
 export interface InterviewPrepProblem {
   id: string;
@@ -149,12 +161,24 @@ export function ApplyPrepSheetModal({
     async function loadInterviewProblems() {
       setIsFetchingOa(true);
       try {
-        const endpoint = job.id
-          ? `/api/jobs/${job.id}/interview-prep`
-          : `/api/jobs/sample/interview-prep`;
+        const demoConfig = await fetchDemoConfig();
+        if (cancelled) return;
+        const jobId = job.id?.trim();
+        if (!shouldFetchInterviewPrep(jobId, demoConfig?.demoMode === true)) {
+          setOaProblems([]);
+          setOaMatched(false);
+          setIsFallback(false);
+          return;
+        }
+        const endpoint = `/api/jobs/${encodeURIComponent(jobId!)}/interview-prep`;
         const res = await fetch(endpoint);
-        const json = await res.json();
-        if (!cancelled && res.ok && json.success) {
+        const { ok, data: json } = await readApiResponse<{
+          success?: boolean;
+          problems?: InterviewPrepProblem[];
+          matched?: boolean;
+          isFallback?: boolean;
+        }>(res);
+        if (!cancelled && ok && json?.success) {
           setOaProblems(json.problems || []);
           setOaMatched(Boolean(json.matched));
           setIsFallback(Boolean(json.isFallback));

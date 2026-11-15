@@ -62,7 +62,12 @@ export async function POST(request: Request) {
     const gated = await requireUserId(request);
     if (gated instanceof NextResponse) return gated;
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON payload" }, { status: 400 });
+    }
     const validation = CreateJobSchema.safeParse(body);
 
     if (!validation.success) {
