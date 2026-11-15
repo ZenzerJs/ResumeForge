@@ -161,7 +161,14 @@ export function LibraryWorkspace() {
         const guestItems = readGuestEvidenceFromStorage();
         if (guestItems.length > 0) {
           const existingIds = new Set(loadedItems.map((i) => i.id));
-          loadedItems = [...loadedItems, ...guestItems.filter((item) => !existingIds.has(item.id))];
+          loadedItems = [
+            ...loadedItems,
+            ...guestItems.filter(
+              (item) =>
+                !existingIds.has(item.id) &&
+                (filterStatus === "all" || item.status === filterStatus)
+            ),
+          ];
         }
       }
 
@@ -310,7 +317,7 @@ export function LibraryWorkspace() {
       const bullets = formData.bulletsInput
         .map((b) => b.trim())
         .filter((b) => b.length > 0)
-        .map((text) => ({ text, verified: true }));
+        .map((text) => ({ text, verified: formData.status === "verified" }));
 
       const payload = {
         type: formData.type,
@@ -351,9 +358,7 @@ export function LibraryWorkspace() {
             ? existing.map((item) => (item.id === editingItem.id ? updatedLocalItem : item))
             : [updatedLocalItem, ...existing];
           writeGuestEvidenceToStorage(nextStored);
-          setItems((prev) =>
-            prev.map((item) => (item.id === editingItem.id ? updatedLocalItem : item))
-          );
+          await fetchItems();
           setIsModalOpen(false);
           setNotification({
             type: "success",
@@ -454,6 +459,57 @@ export function LibraryWorkspace() {
       setNotification({
         type: "error",
         message: err instanceof Error ? err.message : "Failed to save evidence item.",
+      });
+    }
+  };
+
+  const handleVerifyItem = async (item: EvidenceItem) => {
+    try {
+      const demoConfig = await fetchDemoConfig();
+      if (demoConfig.demoMode || isLocalEvidenceId(item.id)) {
+        const verifiedItem: EvidenceItem = {
+          ...item,
+          status: "verified",
+          bullets: (item.bullets || []).map((b) => ({ ...b, verified: true })),
+          updatedAt: new Date().toISOString(),
+        };
+        const existing = readGuestEvidenceFromStorage();
+        const hasExisting = existing.some((entry) => entry.id === item.id);
+        const nextStored = hasExisting
+          ? existing.map((entry) => (entry.id === item.id ? verifiedItem : entry))
+          : [verifiedItem, ...existing];
+        writeGuestEvidenceToStorage(nextStored);
+        await fetchItems();
+        setNotification({
+          type: "success",
+          message: `Verified "${item.title}" in local workspace.`,
+        });
+        return;
+      }
+
+      const res = await fetch(`/api/evidence/${item.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "verified" }),
+      });
+      const { ok, error } = await readApiResponse(res, "Failed to verify evidence item.");
+      if (ok) {
+        await fetchItems();
+        setNotification({
+          type: "success",
+          message: `Verified "${item.title}" successfully.`,
+        });
+      } else {
+        setNotification({
+          type: "error",
+          message: error || "Failed to verify evidence item.",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to verify item:", err);
+      setNotification({
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to verify evidence item.",
       });
     }
   };
@@ -961,6 +1017,20 @@ export function LibraryWorkspace() {
                       >
                         {item.status === "verified" ? "✓ VERIFIED" : item.status}
                       </span>
+                      {item.status !== "verified" && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          data-testid="verify-evidence-btn"
+                          onClick={() => void handleVerifyItem(item)}
+                          className="h-8 gap-1.5 border-status-success/35 bg-status-success/10 px-2.5 text-[11px] font-mono font-semibold text-status-success hover:bg-status-success/20 hover:text-status-success"
+                          aria-label={`Verify ${item.title}`}
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Verify
+                        </Button>
+                      )}
                       {item.dates && (
                         <span className="text-xs font-mono text-muted-foreground">
                           {item.dates}
@@ -1272,23 +1342,41 @@ export function LibraryWorkspace() {
           </DialogHeader>
 
           <form onSubmit={handleSaveItem} className="space-y-4">
-            <div>
-              <label htmlFor="evidence-item-type" className="block text-xs font-mono text-on-surface-variant mb-1">
-                Type
-              </label>
-              <select
-                id="evidence-item-type"
-                value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                className="w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
-              >
-                <option value="experience">Experience</option>
-                <option value="project">Project</option>
-                <option value="skill">Skill</option>
-                <option value="education">Education</option>
-                <option value="award">Award</option>
-                <option value="metric">Metric</option>
-              </select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="evidence-item-type" className="block text-xs font-mono text-on-surface-variant mb-1">
+                  Type
+                </label>
+                <select
+                  id="evidence-item-type"
+                  value={formData.type}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  className="w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+                >
+                  <option value="experience">Experience</option>
+                  <option value="project">Project</option>
+                  <option value="skill">Skill</option>
+                  <option value="education">Education</option>
+                  <option value="award">Award</option>
+                  <option value="metric">Metric</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="evidence-item-status" className="block text-xs font-mono text-on-surface-variant mb-1">
+                  Status
+                </label>
+                <select
+                  id="evidence-item-status"
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  className="w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+                >
+                  <option value="verified">Verified</option>
+                  <option value="draft">Draft</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
             </div>
 
             <div>

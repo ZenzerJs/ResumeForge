@@ -23,6 +23,8 @@ import { POST as coverLetterGeneratePOST } from "@/app/api/cover-letters/generat
 import { POST as qualitativeReviewPOST } from "@/app/api/ai/qualitative-review/route";
 import { POST as generatePatchesPOST } from "@/app/api/ai/generate-patches/route";
 import { POST as atsEvaluatePOST } from "@/app/api/ats/evaluate/route";
+import { POST as evidencePOST } from "@/app/api/evidence/route";
+import { PUT as evidencePUT } from "@/app/api/evidence/[id]/route";
 import { POST as jobsPOST } from "@/app/api/jobs/route";
 import { authedNextRequest, authedRequest, createTestUser } from "./helpers/auth";
 
@@ -466,6 +468,57 @@ describe("Backend & Serverless Audit Fixes", () => {
         )
       );
       expect(qualUpstreamFail.status).toBe(502);
+    });
+
+    it("PUT /api/evidence/[id] promoting draft to verified also verifies draft bullets", async () => {
+      const { cookie } = await createTestUser("evidence-verify@example.com");
+
+      const createRes = await evidencePOST(
+        authedRequest(
+          "http://localhost:3000/api/evidence",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "project",
+              title: "Draft CLI Tool",
+              verifiedSummary: "Built a CLI tool in TypeScript.",
+              status: "draft",
+              bullets: [
+                {
+                  text: "Reduced build time by 35% across 4 packages.",
+                  verified: false,
+                },
+              ],
+            }),
+          },
+          cookie
+        )
+      );
+      expect(createRes.status).toBe(201);
+      const createdJson = await createRes.json();
+      const itemId = createdJson.data.id as string;
+      expect(createdJson.data.status).toBe("draft");
+      expect(createdJson.data.bullets[0].verified).toBe(false);
+
+      const verifyRes = await evidencePUT(
+        authedRequest(
+          `http://localhost:3000/api/evidence/${itemId}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "verified" }),
+          },
+          cookie
+        ),
+        { params: Promise.resolve({ id: itemId }) }
+      );
+      expect(verifyRes.status).toBe(200);
+      const verifiedJson = await verifyRes.json();
+      expect(verifiedJson.success).toBe(true);
+      expect(verifiedJson.data.status).toBe("verified");
+      expect(verifiedJson.data.bullets).toHaveLength(1);
+      expect(verifiedJson.data.bullets[0].verified).toBe(true);
     });
   });
 });

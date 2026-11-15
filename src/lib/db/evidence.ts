@@ -150,6 +150,13 @@ export async function updateEvidenceItem(
       });
     }
 
+    if (input.status === "verified" && input.bullets === undefined) {
+      await tx.bullet.updateMany({
+        where: { evidenceId: id, verified: false },
+        data: { verified: true },
+      });
+    }
+
     if (input.bullets !== undefined) {
       const existingBullets = await tx.bullet.findMany({
         where: { evidenceId: id },
