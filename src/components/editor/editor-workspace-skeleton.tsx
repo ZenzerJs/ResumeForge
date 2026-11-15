@@ -48,8 +48,8 @@ function PreviewBulletBlock() {
 }
 
 /**
- * High-fidelity editor loading shell matching the 3-panel workspace
- * (Typst source | Live preview paper | AI assistant).
+ * High-fidelity editor loading shell matching both the <1280px tabbed workspace
+ * and the >=1280px 3-panel workspace (Typst source | Live preview paper | AI assistant).
  */
 export function EditorWorkspaceSkeleton({
   className,
@@ -82,7 +82,7 @@ export function EditorWorkspaceSkeleton({
                   ResumeForge
                 </span>
               </div>
-              <nav className="hidden items-center gap-1 md:flex" aria-hidden>
+              <nav className="hidden items-center gap-1 xl:flex" aria-hidden>
                 {["Editor", "Evidence Bank", "Jobs", "Tailor", "Practice", "Settings"].map(
                   (label) => (
                     <span
@@ -101,10 +101,11 @@ export function EditorWorkspaceSkeleton({
               </nav>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <Skeleton className="h-9 w-9 rounded-[6px] bg-elevated xl:hidden" />
               <Skeleton className="h-7 w-16 rounded bg-elevated" />
             </div>
           </header>
-          <div className="flex h-10 shrink-0 items-center justify-between gap-3 border-b border-outline/70 bg-panel px-4 md:px-6">
+          <div className="flex min-h-10 shrink-0 items-center justify-between gap-3 border-b border-outline/70 bg-panel px-4 py-1 xl:h-10 xl:px-6">
             <div className="flex items-center gap-2">
               <Skeleton className="h-5 w-28 rounded bg-elevated" />
               <Skeleton className="h-5 w-24 rounded bg-elevated" />
@@ -123,9 +124,18 @@ export function EditorWorkspaceSkeleton({
         </>
       ) : null}
 
+      {/* Mobile / tablet panel selector bar (<1280px) */}
+      <div className="flex shrink-0 items-center border-b border-outline/70 bg-panel px-2 py-1.5 xl:hidden" aria-hidden>
+        <div className="grid w-full grid-cols-3 gap-1 rounded-[6px] border border-outline/70 bg-inset p-0.5 sm:inline-flex sm:w-auto">
+          <Skeleton className="h-9 rounded-[4px] bg-primary/75 sm:w-20" />
+          <Skeleton className="h-9 rounded-[4px] bg-elevated sm:w-20" />
+          <Skeleton className="h-9 rounded-[4px] bg-elevated sm:w-16" />
+        </div>
+      </div>
+
       <div className="flex min-h-0 flex-1 gap-1.5 overflow-hidden bg-canvas px-1.5 pb-1.5 pt-0">
         {/* Panel 1 — Typst Source Editor */}
-        <section className="flex min-w-0 flex-[1.15] flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-panel">
+        <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-panel xl:flex-[1.15]">
           <div className="flex h-8 shrink-0 items-center justify-between border-b border-outline/70 bg-panel px-2.5">
             <span className="flex items-center gap-2 text-xs font-semibold text-foreground">
               <span className="h-2 w-2 rounded-full bg-primary" />
@@ -153,12 +163,12 @@ export function EditorWorkspaceSkeleton({
         </section>
 
         {/* Resize handle cue */}
-        <div className="hidden w-1.5 shrink-0 items-center justify-center self-stretch lg:flex" aria-hidden>
+        <div className="hidden w-1.5 shrink-0 items-center justify-center self-stretch xl:flex" aria-hidden>
           <div className="h-8 w-1 rounded-full bg-outline/70" />
         </div>
 
         {/* Panel 2 — Live Document Preview */}
-        <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-inset">
+        <section className="hidden min-w-0 flex-1 flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-inset xl:flex">
           <div className="flex h-8 shrink-0 items-center justify-between border-b border-outline/70 bg-panel px-2.5">
             <span className="flex items-center gap-2 text-xs font-semibold text-foreground">
               <span className="h-2 w-2 rounded-full bg-status-success" />
@@ -196,12 +206,12 @@ export function EditorWorkspaceSkeleton({
         </section>
 
         {/* Resize handle cue */}
-        <div className="hidden w-1.5 shrink-0 items-center justify-center self-stretch lg:flex" aria-hidden>
+        <div className="hidden w-1.5 shrink-0 items-center justify-center self-stretch xl:flex" aria-hidden>
           <div className="h-8 w-1 rounded-full bg-outline/70" />
         </div>
 
         {/* Panel 3 — AI Tailoring Assistant */}
-        <section className="hidden min-w-0 flex-[0.85] flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-panel lg:flex">
+        <section className="hidden min-w-0 flex-[0.85] flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-panel xl:flex">
           <div className="flex h-8 shrink-0 items-center justify-between border-b border-outline/70 bg-panel px-2.5">
             <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
               <Wand2 className="h-3.5 w-3.5 text-primary" />

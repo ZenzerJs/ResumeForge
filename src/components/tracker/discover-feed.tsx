@@ -552,8 +552,8 @@ export function DiscoverFeed() {
         }
       />
 
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 md:p-8">
-        <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl surface-raised edge-glow p-5 sm:p-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
+        <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl surface-raised edge-glow p-4 sm:p-6">
           <div className="flex min-w-0 items-start gap-3 border-l-2 border-primary pl-3 sm:gap-4 sm:pl-4">
             <div
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary sm:h-12 sm:w-12"
@@ -661,7 +661,7 @@ export function DiscoverFeed() {
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
               <label htmlFor="discover-city-select" className="sr-only">
                 Filter by City
               </label>
@@ -669,7 +669,7 @@ export function DiscoverFeed() {
                 id="discover-city-select"
                 value={cityFilter}
                 onChange={(e) => setCityFilter(e.target.value)}
-                className={`${FILTER_CONTROL} cursor-pointer text-rf-meta`}
+                className={`${FILTER_CONTROL} min-w-0 w-full sm:w-auto cursor-pointer text-rf-meta`}
                 data-testid="discover-city-select"
               >
                 {CANADIAN_CITIES.map((c) => (
@@ -689,7 +689,7 @@ export function DiscoverFeed() {
                     id="discover-radius-select"
                     value={radiusFilter}
                     onChange={(e) => setRadiusFilter(e.target.value)}
-                    className={`${FILTER_CONTROL} cursor-pointer text-rf-meta`}
+                    className={`${FILTER_CONTROL} min-w-0 w-full sm:w-auto cursor-pointer text-rf-meta`}
                     data-testid="discover-radius-select"
                   >
                     {RADIUS_OPTIONS.map((r) => (
@@ -709,7 +709,7 @@ export function DiscoverFeed() {
                 id="discover-salary-select"
                 value={minSalaryFilter}
                 onChange={(e) => setMinSalaryFilter(e.target.value)}
-                className={`${FILTER_CONTROL} cursor-pointer text-rf-meta`}
+                className={`${FILTER_CONTROL} min-w-0 w-full sm:w-auto cursor-pointer text-rf-meta`}
                 data-testid="discover-salary-select"
               >
                 {MIN_SALARY_OPTIONS.map((s) => (
@@ -727,7 +727,7 @@ export function DiscoverFeed() {
                 id="discover-match-select"
                 value={minScoreFilter}
                 onChange={(e) => setMinScoreFilter(e.target.value)}
-                className={`${FILTER_CONTROL} cursor-pointer text-rf-meta`}
+                className={`${FILTER_CONTROL} min-w-0 w-full sm:w-auto cursor-pointer text-rf-meta`}
                 data-testid="discover-match-select"
               >
                 {MIN_SCORE_OPTIONS.map((m) => (
@@ -745,7 +745,7 @@ export function DiscoverFeed() {
                 id="discover-sort-select"
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value)}
-                className={`${FILTER_CONTROL} cursor-pointer text-rf-meta`}
+                className={`${FILTER_CONTROL} min-w-0 w-full sm:w-auto cursor-pointer text-rf-meta`}
                 data-testid="discover-sort-select"
               >
                 {SORT_OPTIONS.map((s) => (
@@ -763,7 +763,7 @@ export function DiscoverFeed() {
                 id="discover-source-select"
                 value={sourceFilter}
                 onChange={(e) => setSourceFilter(e.target.value)}
-                className={`${FILTER_CONTROL} cursor-pointer text-rf-meta`}
+                className={`${FILTER_CONTROL} min-w-0 w-full sm:w-auto cursor-pointer text-rf-meta`}
                 data-testid="discover-source-select"
               >
                 {SOURCES.map((s) => (
@@ -781,7 +781,7 @@ export function DiscoverFeed() {
                 id="discover-workplace-select"
                 value={workplaceFilter}
                 onChange={(e) => setWorkplaceFilter(e.target.value)}
-                className={`${FILTER_CONTROL} cursor-pointer text-rf-meta`}
+                className={`${FILTER_CONTROL} min-w-0 w-full sm:w-auto cursor-pointer text-rf-meta`}
                 data-testid="discover-workplace-select"
               >
                 {WORKPLACE_OPTIONS.map((w) => (
@@ -795,7 +795,7 @@ export function DiscoverFeed() {
               <button
                 type="button"
                 onClick={() => setCanadianOnly((prev) => !prev)}
-                className={`flex min-h-11 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors ${
+                className={`col-span-2 sm:col-span-1 flex min-h-11 items-center justify-center sm:justify-start gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors ${
                   canadianOnly
                     ? "border-primary/50 bg-primary/15 text-primary"
                     : "border-hairline bg-rf-elevated text-text-secondary hover:text-foreground"
@@ -899,8 +899,8 @@ export function DiscoverFeed() {
                   className="flex flex-col justify-between gap-4 rounded-xl surface-raised card-lift p-4"
                   data-testid={`job-card-${j.id}`}
                 >
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="flex min-w-0 items-center gap-2.5 text-sm font-semibold text-text-secondary">
                         <CompanyAvatar company={j.companyName} />
                         <span className="break-words">{j.companyName}</span>
@@ -1015,13 +1015,13 @@ export function DiscoverFeed() {
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between border-t border-hairline pt-3 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline pt-3 text-xs">
                     {isSafeHref(j.applyUrl) ? (
                       <a
                         href={j.applyUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-text-secondary transition-colors hover:text-foreground"
+                        className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 text-text-secondary transition-colors hover:text-foreground"
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                         Apply Link
@@ -1033,7 +1033,7 @@ export function DiscoverFeed() {
                     {isAlreadyTracked && trackedJobId ? (
                       <Link
                         href={`/tailor?jobId=${encodeURIComponent(trackedJobId)}`}
-                        className="flex items-center gap-1.5 rounded-md border border-signal/40 bg-signal/10 px-2.5 py-1 text-xs font-medium text-signal transition hover:bg-signal/20"
+                        className="flex min-h-11 sm:min-h-0 items-center gap-1.5 rounded-md border border-signal/40 bg-signal/10 px-2.5 py-1 text-xs font-medium text-signal transition hover:bg-signal/20"
                         data-testid={`in-tracker-btn-${j.id}`}
                       >
                         <CheckCircle2 className="h-3.5 w-3.5" />
@@ -1069,7 +1069,7 @@ export function DiscoverFeed() {
               type="button"
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="inline-flex items-center gap-1 rounded-md border border-hairline bg-inset px-3 py-1.5 text-xs text-rf-cloud transition hover:bg-elevated hover:text-foreground disabled:opacity-40"
+              className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 rounded-md border border-hairline bg-inset px-3 py-2 sm:py-1.5 text-xs text-rf-cloud transition hover:bg-elevated hover:text-foreground disabled:opacity-40"
               data-testid="discover-page-prev"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
@@ -1082,7 +1082,7 @@ export function DiscoverFeed() {
               type="button"
               disabled={page >= totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              className="inline-flex items-center gap-1 rounded-md border border-hairline bg-inset px-3 py-1.5 text-xs text-rf-cloud transition hover:bg-elevated hover:text-foreground disabled:opacity-40"
+              className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 rounded-md border border-hairline bg-inset px-3 py-2 sm:py-1.5 text-xs text-rf-cloud transition hover:bg-elevated hover:text-foreground disabled:opacity-40"
               data-testid="discover-page-next"
             >
               Next

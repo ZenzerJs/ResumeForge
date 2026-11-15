@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
@@ -17,7 +18,6 @@ import {
   Code2,
   Eye,
   Bot,
-  MessageSquare,
   Save,
   BookOpen,
   Check,
@@ -81,6 +81,35 @@ export interface DocumentMetadata {
   id?: string;
 }
 
+const WORKSPACE_PANEL_TABS = [
+  { id: "editor", label: "Editor", icon: Code2 },
+  { id: "preview", label: "Preview", icon: Eye },
+  { id: "ai", label: "AI", icon: Bot },
+] as const;
+
+type WorkspacePanelTab = (typeof WORKSPACE_PANEL_TABS)[number]["id"];
+
+interface EditorPaneHosts {
+  code: HTMLDivElement;
+  preview: HTMLDivElement;
+  ai: HTMLDivElement;
+}
+
+function PortalSlot({ host, className }: { host: HTMLDivElement | null; className?: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container || !host) return;
+    container.appendChild(host);
+    return () => {
+      if (host.parentNode === container) {
+        container.removeChild(host);
+      }
+    };
+  }, [host]);
+  return <div ref={containerRef} className={className} />;
+}
+
 export function EditorWorkspace() {
   const searchParams = useSearchParams();
   const variantIdParam = searchParams.get("variantId");
@@ -91,7 +120,12 @@ export function EditorWorkspace() {
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<{ message: string; line?: number; column?: number } | null>(null);
   const [isCompiling, setIsCompiling] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<"editor" | "preview" | "ai">("editor");
+  const [activeTab, setActiveTab] = useState<WorkspacePanelTab>("editor");
+  const tabRefs = useRef<Record<WorkspacePanelTab, HTMLButtonElement | null>>({
+    editor: null,
+    preview: null,
+    ai: null,
+  });
 
   // Task 10.5: Typst Repair Assist active error context state
   const [repairContext, setRepairContext] = useState<{
@@ -159,19 +193,33 @@ export function EditorWorkspace() {
   const [aiMode, setAiMode] = useState<"chat" | "tailor">("chat");
   const [isLayoutReady, setIsLayoutReady] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
+  const [hosts, setHosts] = useState<EditorPaneHosts | null>(null);
+  const isDesktopRef = useRef<boolean>(true);
   const isAiCollapsedRef = useRef<boolean>(isAiCollapsed);
+  const isAiPoppedOutRef = useRef<boolean>(isAiPoppedOut);
   const skipResizePersistRef = useRef(false);
   const suppressResizePersistUntilRef = useRef(0);
 
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
-    const sync = () => setIsDesktop(mq.matches);
+    const mq = window.matchMedia("(min-width: 1280px)");
+    const sync = () => {
+      suppressResizePersistUntilRef.current = Date.now() + 750;
+      isDesktopRef.current = mq.matches;
+      setIsDesktop(mq.matches);
+    };
     sync();
     mq.addEventListener("change", sync);
     return () => mq.removeEventListener("change", sync);
   }, []);
 
   useEffect(() => {
+    const makeHost = () => {
+      const el = document.createElement("div");
+      el.className = "h-full w-full min-h-0";
+      return el;
+    };
+    setHosts({ code: makeHost(), preview: makeHost(), ai: makeHost() });
+
     const persisted = parsePersistedLayout(
       localStorage.getItem(EDITOR_LAYOUT_STORAGE_KEY)
     );
@@ -183,6 +231,7 @@ export function EditorWorkspace() {
       const popped = localStorage.getItem("resumeforge_ai_popped_out");
       if (popped === "true") {
         setIsAiPoppedOut(true);
+        isAiPoppedOutRef.current = true;
       }
     } catch {
       // ignore
@@ -197,14 +246,18 @@ export function EditorWorkspace() {
     isAiCollapsedRef.current = isAiCollapsed;
   }, [isAiCollapsed]);
 
+  useEffect(() => {
+    isAiPoppedOutRef.current = isAiPoppedOut;
+  }, [isAiPoppedOut]);
+
   const updateAiCollapsedState = useCallback((collapsed: boolean) => {
     setIsAiCollapsed(collapsed);
     isAiCollapsedRef.current = collapsed;
   }, []);
 
-  // Collapse panel on mount if layout was persisted as collapsed or popped out
+  // Collapse panel on mount (or when returning to >=1280px) if layout was persisted as collapsed or popped out
   useEffect(() => {
-    if (!isLayoutReady) return;
+    if (!isLayoutReady || !isDesktop) return;
     if (isAiCollapsed || isAiPoppedOut) {
       suppressResizePersistUntilRef.current = Date.now() + 750;
       const timer = setTimeout(() => {
@@ -212,7 +265,7 @@ export function EditorWorkspace() {
       }, 50);
       return () => clearTimeout(timer);
     }
-  }, [aiPanelRef, isAiCollapsed, isAiPoppedOut, isLayoutReady]);
+  }, [aiPanelRef, isAiCollapsed, isAiPoppedOut, isDesktop, isLayoutReady]);
 
   const persistLayoutState = (sizes: Record<string, number>, collapsed: boolean) => {
     if (typeof window === "undefined") return;
@@ -227,6 +280,7 @@ export function EditorWorkspace() {
   };
 
   const handleLayoutChange = useCallback((layoutData: Record<string, number> | number[]) => {
+    if (!isDesktopRef.current) return;
     let layoutMap: Record<string, number>;
     if (Array.isArray(layoutData)) {
       layoutMap = {
@@ -247,6 +301,7 @@ export function EditorWorkspace() {
   const handleToggleAiPopOut = useCallback(() => {
     setIsAiPoppedOut((prev) => {
       const next = !prev;
+      isAiPoppedOutRef.current = next;
       if (typeof window !== "undefined") {
         try {
           localStorage.setItem("resumeforge_ai_popped_out", String(next));
@@ -254,12 +309,14 @@ export function EditorWorkspace() {
           // ignore
         }
       }
-      if (next) {
-        aiPanelRef.current?.collapse();
-        updateAiCollapsedState(true);
-      } else {
-        aiPanelRef.current?.expand();
-        updateAiCollapsedState(false);
+      if (isDesktopRef.current) {
+        if (next) {
+          aiPanelRef.current?.collapse();
+          updateAiCollapsedState(true);
+        } else {
+          aiPanelRef.current?.expand();
+          updateAiCollapsedState(false);
+        }
       }
       return next;
     });
@@ -590,13 +647,36 @@ export function EditorWorkspace() {
   const handleTriggerRepair = useCallback(
     (context: { compileError: string; line?: number; column?: number; sourceExcerpt?: string }) => {
       setRepairContext(context);
-      if (isAiCollapsedRef.current && aiPanelRef.current) {
+      if (isDesktopRef.current && isAiCollapsedRef.current && !isAiPoppedOutRef.current && aiPanelRef.current) {
         aiPanelRef.current.expand();
         updateAiCollapsedState(false);
       }
       setActiveTab("ai");
     },
     [aiPanelRef, updateAiCollapsedState]
+  );
+
+  const handleTabListKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      const currentIndex = WORKSPACE_PANEL_TABS.findIndex((t) => t.id === activeTab);
+      if (currentIndex === -1) return;
+      let nextIndex: number | null = null;
+      if (e.key === "ArrowRight") {
+        nextIndex = (currentIndex + 1) % WORKSPACE_PANEL_TABS.length;
+      } else if (e.key === "ArrowLeft") {
+        nextIndex = (currentIndex - 1 + WORKSPACE_PANEL_TABS.length) % WORKSPACE_PANEL_TABS.length;
+      } else if (e.key === "Home") {
+        nextIndex = 0;
+      } else if (e.key === "End") {
+        nextIndex = WORKSPACE_PANEL_TABS.length - 1;
+      }
+      if (nextIndex === null) return;
+      e.preventDefault();
+      const nextTab = WORKSPACE_PANEL_TABS[nextIndex].id;
+      setActiveTab(nextTab);
+      tabRefs.current[nextTab]?.focus();
+    },
+    [activeTab]
   );
 
   const handleApplyRepair = useCallback(
@@ -847,7 +927,7 @@ export function EditorWorkspace() {
           </div>
         }
         actions={
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             {showShortcutSaveToast && (
               <div
                 data-testid="shortcut-save-toast"
@@ -863,7 +943,7 @@ export function EditorWorkspace() {
               variant="outline"
               onClick={handleRevertToMaster}
               data-testid="revert-to-master-btn"
-              className="min-h-10 lg:min-h-0 lg:h-7 px-2.5 text-xs border-outline/70 bg-transparent text-text-secondary hover:bg-elevated hover:text-foreground gap-1.5 focus-visible:ring-2 focus-visible:ring-ring"
+              className="min-h-10 xl:min-h-0 xl:h-7 px-2.5 text-xs border-outline/70 bg-transparent text-text-secondary hover:bg-elevated hover:text-foreground gap-1.5 focus-visible:ring-2 focus-visible:ring-ring"
               title="Discard unsaved live buffer changes and reload persisted Master Resume"
             >
               <RotateCcw className="h-3.5 w-3.5" />
@@ -877,7 +957,7 @@ export function EditorWorkspace() {
               disabled={isSavingMaster || isLoadingDocument}
               data-testid="save-as-master-btn"
               className={cn(
-                "min-h-10 lg:min-h-0 lg:h-7 px-3 text-xs font-semibold gap-1.5 transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                "min-h-10 xl:min-h-0 xl:h-7 px-3 text-xs font-semibold gap-1.5 transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                 saveSuccess
                   ? "bg-status-success text-secondary-foreground hover:bg-status-success/90"
                   : "bg-primary text-primary-foreground hover:bg-primary/90"
@@ -908,7 +988,7 @@ export function EditorWorkspace() {
               }}
               data-testid={isAiCollapsed ? "expand-ai-sidebar-btn" : "toggle-ai-assistant-btn"}
               className={cn(
-                "h-7 shrink-0 gap-1.5 px-2.5 text-xs hidden lg:inline-flex transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                "h-7 shrink-0 gap-1.5 px-2.5 text-xs hidden xl:inline-flex transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                 isAiPoppedOut || !isAiCollapsed
                   ? "border-primary/60 bg-primary/15 text-primary hover:bg-primary/20"
                   : "border-outline/70 bg-elevated text-text-secondary hover:bg-muted hover:text-foreground"
@@ -929,51 +1009,6 @@ export function EditorWorkspace() {
                 </span>
               )}
             </Button>
-
-            {/* Mobile Tab Selectors (< lg screens) */}
-            <div
-              className="flex items-center gap-0.5 rounded border border-outline/70 bg-inset p-0.5 lg:hidden"
-              role="tablist"
-              aria-label="Workspace panels"
-            >
-            <Button
-              type="button"
-              size="sm"
-              variant={activeTab === "editor" ? "default" : "ghost"}
-              onClick={() => setActiveTab("editor")}
-              className="min-h-9 lg:min-h-0 lg:h-7 px-2 text-xs"
-              aria-selected={activeTab === "editor"}
-            >
-              <Code2 className="h-3.5 w-3.5" />
-              Editor
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={activeTab === "preview" ? "default" : "ghost"}
-              onClick={() => setActiveTab("preview")}
-              className="min-h-9 lg:min-h-0 lg:h-7 px-2 text-xs"
-              aria-selected={activeTab === "preview"}
-            >
-              <Eye className="h-3.5 w-3.5" />
-              Preview
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={activeTab === "ai" ? "default" : "ghost"}
-              onClick={() => setActiveTab("ai")}
-              className="min-h-9 lg:min-h-0 lg:h-7 px-2 text-xs"
-              aria-selected={activeTab === "ai"}
-            >
-              {aiMode === "chat" ? (
-                <MessageSquare className="h-3.5 w-3.5" />
-              ) : (
-                <Bot className="h-3.5 w-3.5" />
-              )}
-              {aiMode === "chat" ? "Chat" : "Tailor"}
-            </Button>
-            </div>
           </div>
         }
       >
@@ -1117,14 +1152,14 @@ export function EditorWorkspace() {
 
       {/* Main Workspace Body */}
       <div className="flex flex-1 min-h-0 overflow-hidden bg-canvas px-1.5 pb-1.5 pt-0">
-        {/* Desktop 3-Panel Resizable Layout (>= lg screens) vs Mobile Tabbed View (< lg screens) */}
+        {/* Desktop 3-Panel Resizable Layout (>= xl screens) vs Mobile/Tablet Tabbed View (< xl screens) */}
         {isDesktop ? (
-          isLayoutReady ? (
+          isLayoutReady && hosts ? (
             <ResizablePanelGroup
               id="editor-resizable-panel-group"
               orientation="horizontal"
               onLayoutChange={handleLayoutChange}
-              className="hidden lg:flex h-full w-full"
+              className="hidden xl:flex h-full w-full"
               data-testid="editor-resizable-panel-group"
             >
               {/* Panel 1: CodeMirror Editor */}
@@ -1135,9 +1170,7 @@ export function EditorWorkspace() {
                 className="h-full overflow-hidden"
                 data-testid="panel-code"
               >
-                <div className="h-full min-h-0">
-                  <CodeEditor value={source} onChange={handleSourceChange} />
-                </div>
+                <PortalSlot host={hosts.code} className="h-full min-h-0" />
               </ResizablePanel>
 
               <ResizableHandle withHandle />
@@ -1150,24 +1183,7 @@ export function EditorWorkspace() {
                 className="h-full overflow-hidden"
                 data-testid="panel-preview"
               >
-                <div className="h-full min-h-0">
-                  <PreviewPanel
-                    svg={svg}
-                    error={error}
-                    source={source}
-                    isCompiling={isCompiling}
-                    masterFacts={masterFacts}
-                    allowUnfrozenMasterSelfExport={
-                      docMetadata.type === "MASTER_RESUME" ||
-                      (docMetadata.type === "LOCAL_FALLBACK" &&
-                        !hasAiPatchedBuffer &&
-                        !isDocumentPatched(source))
-                    }
-                    onApplyLayout={handleSourceChange}
-                    onResetTemplate={handleResetTemplate}
-                    onTriggerRepair={handleTriggerRepair}
-                  />
-                </div>
+                <PortalSlot host={hosts.preview} className="h-full min-h-0" />
               </ResizablePanel>
 
               <ResizableHandle withHandle />
@@ -1181,6 +1197,7 @@ export function EditorWorkspace() {
                 collapsible={true}
                 collapsedSize={0}
                 onResize={(size) => {
+                  if (!isDesktopRef.current) return;
                   if (skipResizePersistRef.current) return;
                   if (Date.now() < suppressResizePersistUntilRef.current) return;
                   const sizeNum =
@@ -1201,80 +1218,111 @@ export function EditorWorkspace() {
                 className="h-full overflow-hidden"
                 data-testid="panel-ai"
               >
-                <div className="h-full min-h-0">
-                  {!isAiPoppedOut && (
-                    <AiSidebar
-                      source={source}
-                      onApplyToBuffer={handleApplyRepair}
-                      isCollapsed={isAiCollapsed}
-                      isPoppedOut={false}
-                      onPopOut={handleToggleAiPopOut}
-                      masterFacts={masterFacts}
-                      onToggleCollapse={toggleAiSidebarCollapse}
-                      repairContext={repairContext}
-                      onDismissRepair={() => setRepairContext(null)}
-                      onModeChange={setAiMode}
-                    />
-                  )}
-                </div>
+                {!isAiPoppedOut ? (
+                  <PortalSlot host={hosts.ai} className="h-full min-h-0" />
+                ) : (
+                  <div className="h-full min-h-0" />
+                )}
               </ResizablePanel>
             </ResizablePanelGroup>
           ) : (
             <div
-              className="hidden lg:flex h-full w-full"
+              className="hidden xl:flex h-full w-full"
               data-testid="editor-resizable-panel-group-placeholder"
               aria-hidden
             />
           )
         ) : (
-          <div className="flex h-full w-full flex-col lg:hidden">
-            {activeTab === "editor" && (
-              <div className="h-full w-full overflow-hidden">
-                <CodeEditor value={source} onChange={handleSourceChange} />
+          <div className="flex h-full w-full flex-col xl:hidden" data-testid="editor-mobile-tabs">
+            <div className="flex shrink-0 items-center border-b border-outline/70 bg-panel px-2 py-1.5">
+              <div
+                role="tablist"
+                aria-label="Workspace panels"
+                onKeyDown={handleTabListKeyDown}
+                className="grid w-full grid-cols-3 gap-1 rounded-[6px] border border-outline/70 bg-inset p-0.5 sm:inline-flex sm:w-auto"
+              >
+                {WORKSPACE_PANEL_TABS.map(({ id, label, icon: Icon }) => {
+                  const selected = activeTab === id;
+                  return (
+                    <button
+                      key={id}
+                      ref={(el) => {
+                        tabRefs.current[id] = el;
+                      }}
+                      type="button"
+                      role="tab"
+                      id={`workspace-tab-${id}`}
+                      aria-selected={selected}
+                      aria-controls={`workspace-tabpanel-${id}`}
+                      tabIndex={selected ? 0 : -1}
+                      data-state={selected ? "active" : "inactive"}
+                      data-testid={`editor-tab-${id}`}
+                      onClick={() => setActiveTab(id)}
+                      className={cn(
+                        "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[4px] px-3 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8",
+                        selected
+                          ? "bg-primary font-semibold text-primary-foreground shadow-xs"
+                          : "font-medium text-text-secondary hover:bg-elevated/60 hover:text-foreground"
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <span>{label}</span>
+                    </button>
+                  );
+                })}
               </div>
-            )}
-            {activeTab === "preview" && (
-              <div className="h-full w-full overflow-hidden">
-                <PreviewPanel
-                  svg={svg}
-                  error={error}
-                  source={source}
-                  isCompiling={isCompiling}
-                  masterFacts={masterFacts}
-                  allowUnfrozenMasterSelfExport={
-                    docMetadata.type === "MASTER_RESUME" ||
-                    (docMetadata.type === "LOCAL_FALLBACK" &&
-                      !hasAiPatchedBuffer &&
-                      !isDocumentPatched(source))
-                  }
-                  onApplyLayout={handleSourceChange}
-                  onResetTemplate={handleResetTemplate}
-                  onTriggerRepair={handleTriggerRepair}
-                />
-              </div>
-            )}
-            {activeTab === "ai" && (
-              <div className="h-full w-full overflow-hidden">
-                <AiSidebar
-                  source={source}
-                  onApplyToBuffer={handleApplyRepair}
-                  masterFacts={masterFacts}
-                  repairContext={repairContext}
-                  onDismissRepair={() => setRepairContext(null)}
-                  onModeChange={setAiMode}
-                />
-              </div>
-            )}
+            </div>
+
+            <div
+              role="tabpanel"
+              id="workspace-tabpanel-editor"
+              aria-labelledby="workspace-tab-editor"
+              hidden={activeTab !== "editor"}
+              tabIndex={activeTab === "editor" ? 0 : -1}
+              className={cn(
+                "min-h-0 flex-1 overflow-hidden focus-visible:outline-none",
+                activeTab !== "editor" && "hidden"
+              )}
+            >
+              <PortalSlot host={hosts?.code ?? null} className="h-full w-full overflow-hidden" />
+            </div>
+            <div
+              role="tabpanel"
+              id="workspace-tabpanel-preview"
+              aria-labelledby="workspace-tab-preview"
+              hidden={activeTab !== "preview"}
+              tabIndex={activeTab === "preview" ? 0 : -1}
+              className={cn(
+                "min-h-0 flex-1 overflow-hidden focus-visible:outline-none",
+                activeTab !== "preview" && "hidden"
+              )}
+            >
+              <PortalSlot host={hosts?.preview ?? null} className="h-full w-full overflow-hidden" />
+            </div>
+            <div
+              role="tabpanel"
+              id="workspace-tabpanel-ai"
+              aria-labelledby="workspace-tab-ai"
+              hidden={activeTab !== "ai"}
+              tabIndex={activeTab === "ai" ? 0 : -1}
+              className={cn(
+                "min-h-0 flex-1 overflow-hidden focus-visible:outline-none",
+                activeTab !== "ai" && "hidden"
+              )}
+            >
+              <PortalSlot host={hosts?.ai ?? null} className="h-full w-full overflow-hidden" />
+            </div>
           </div>
         )}
       </div>
 
-      {/* Floating Portaled AI Assistant Window */}
-      {isAiPoppedOut && (
+      {/* Floating Portaled AI Assistant Window (desktop >=1280px only) */}
+      {isDesktop && isAiPoppedOut && hosts && (
         <AiAssistantWindow
           open={isAiPoppedOut}
           onOpenChange={(open) => {
             setIsAiPoppedOut(open);
+            isAiPoppedOutRef.current = open;
             if (typeof window !== "undefined") {
               try {
                 localStorage.setItem("resumeforge_ai_popped_out", String(open));
@@ -1282,28 +1330,61 @@ export function EditorWorkspace() {
                 // ignore
               }
             }
-            if (!open) {
+            if (!open && isDesktopRef.current) {
               aiPanelRef.current?.expand();
               updateAiCollapsedState(false);
             }
           }}
           title={aiMode === "chat" ? "AI Chat" : "AI Tailor"}
         >
-          <div className="h-full w-full">
-            <AiSidebar
-              source={source}
-              onApplyToBuffer={handleApplyRepair}
-              isCollapsed={false}
-              isPoppedOut={true}
-              onPopOut={handleToggleAiPopOut}
-              masterFacts={masterFacts}
-              repairContext={repairContext}
-              onDismissRepair={() => setRepairContext(null)}
-              onModeChange={setAiMode}
-            />
-          </div>
+          <PortalSlot host={hosts.ai} className="h-full w-full" />
         </AiAssistantWindow>
       )}
+
+      {/* Persistent pane portals preserve CodeMirror selection/undo and AI state across tabs and resizes */}
+      {hosts &&
+        createPortal(
+          <CodeEditor value={source} onChange={handleSourceChange} />,
+          hosts.code
+        )}
+      {hosts &&
+        createPortal(
+          <PreviewPanel
+            svg={svg}
+            error={error}
+            source={source}
+            isCompiling={isCompiling}
+            masterFacts={masterFacts}
+            allowUnfrozenMasterSelfExport={
+              docMetadata.type === "MASTER_RESUME" ||
+              (docMetadata.type === "LOCAL_FALLBACK" &&
+                !hasAiPatchedBuffer &&
+                !isDocumentPatched(source))
+            }
+            onApplyLayout={handleSourceChange}
+            onResetTemplate={handleResetTemplate}
+            onTriggerRepair={handleTriggerRepair}
+          />,
+          hosts.preview
+        )}
+      {hosts &&
+        createPortal(
+          <AiSidebar
+            source={source}
+            onApplyToBuffer={handleApplyRepair}
+            isCollapsed={isDesktop ? (isAiPoppedOut ? false : isAiCollapsed) : false}
+            isPoppedOut={isDesktop ? isAiPoppedOut : false}
+            onPopOut={isDesktop ? handleToggleAiPopOut : undefined}
+            masterFacts={masterFacts}
+            onToggleCollapse={
+              isDesktop && !isAiPoppedOut ? toggleAiSidebarCollapse : undefined
+            }
+            repairContext={repairContext}
+            onDismissRepair={() => setRepairContext(null)}
+            onModeChange={setAiMode}
+          />,
+          hosts.ai
+        )}
 
       <ConfirmDialog
         open={Boolean(pendingRevertDoc)}

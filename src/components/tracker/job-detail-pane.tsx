@@ -305,7 +305,7 @@ export function JobDetailPane({
   const coverTestId = hasCoverLetter ? "open-cover-letter-btn" : "generate-cover-letter-btn";
 
   const content = (
-    <div className={isSheet ? "p-margin-desktop" : "relative z-10 min-h-0 flex-1 overflow-y-auto p-margin-desktop"}>
+    <div className={isSheet ? "p-4 sm:p-margin-desktop" : "relative z-10 min-h-0 flex-1 overflow-y-auto p-4 sm:p-margin-desktop"}>
       <div className="max-w-4xl mx-auto space-y-6 relative z-10">
         {/* Mobile close button */}
         {isSheet && (
@@ -315,7 +315,7 @@ export function JobDetailPane({
                 type="button"
                 aria-label="Close detail sheet"
                 data-testid="job-detail-close-btn"
-                className="rounded-[6px] border border-hairline bg-elevated p-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-[6px] border border-hairline bg-elevated p-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -324,11 +324,11 @@ export function JobDetailPane({
         )}
 
           {/* Detail Header Card */}
-          <div className="surface-raised edge-glow rounded-[10px] p-6">
-            <div className="flex gap-6 items-start">
-              <CompanyAvatar company={job.company} className="h-16 w-16 text-3xl" />
-              <div className="flex-1">
-                <h1 className="font-page-title-mobile text-2xl md:text-3xl text-on-surface mb-2 tracking-tighter font-bold">
+          <div className="surface-raised edge-glow rounded-[10px] p-4 sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
+              <CompanyAvatar company={job.company} className="h-14 w-14 sm:h-16 sm:w-16 text-2xl sm:text-3xl shrink-0" />
+              <div className="min-w-0 flex-1">
+                <h1 className="font-page-title-mobile text-xl sm:text-2xl md:text-3xl text-on-surface mb-2 tracking-tighter font-bold break-words">
                   {job.roleTitle || "Untitled Role"}
                 </h1>
                 <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm font-body-dense text-on-surface-variant mb-4">
@@ -351,12 +351,12 @@ export function JobDetailPane({
                 </div>
 
                 {/* Primary Actions */}
-                <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex flex-wrap gap-2.5 sm:gap-3 items-center">
                   <button
                     type="button"
                     onClick={() => setApplySheetOpen(true)}
                     data-testid="one-click-apply-btn"
-                    className="px-4 py-2 rounded-[6px] bg-surface-variant hover:bg-surface-variant/80 text-on-surface border border-outline-variant font-section-label text-xs font-semibold transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    className="min-h-11 sm:min-h-0 px-4 py-2 rounded-[6px] bg-surface-variant hover:bg-surface-variant/80 text-on-surface border border-outline-variant font-section-label text-xs font-semibold transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     <ShieldCheck className="w-4 h-4" />
                     1-Click Apply
@@ -366,7 +366,7 @@ export function JobDetailPane({
                     type="button"
                     onClick={() => setPrepSheetOpen(true)}
                     data-testid="open-prep-sheet-btn"
-                    className="px-3.5 py-2 rounded-[6px] bg-surface-variant hover:bg-surface-variant/80 text-on-surface border border-outline-variant font-section-label text-xs font-semibold transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    className="min-h-11 sm:min-h-0 px-3.5 py-2 rounded-[6px] bg-surface-variant hover:bg-surface-variant/80 text-on-surface border border-outline-variant font-section-label text-xs font-semibold transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     <ClipboardList className="w-3.5 h-3.5 text-primary" />
                     Prep Sheet
@@ -375,7 +375,7 @@ export function JobDetailPane({
                   <Link
                     href={`/tailor?jobId=${job.id}`}
                     onClick={() => sessionStorage.setItem("resumeforge_active_job_id", job.id)}
-                    className="px-5 py-2 rounded-[6px] bg-primary text-primary-foreground font-section-label text-xs font-semibold hover:bg-primary/90 transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    className="min-h-11 sm:min-h-0 px-5 py-2 rounded-[6px] bg-primary text-primary-foreground font-section-label text-xs font-semibold hover:bg-primary/90 transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     <Sparkles className="w-4 h-4" />
                     Tailor Resume
@@ -385,7 +385,7 @@ export function JobDetailPane({
                     href={`/tailor?jobId=${job.id}&tab=cover-letter`}
                     data-testid={`${coverTestId}-${job.id}`}
                     onClick={() => sessionStorage.setItem("resumeforge_active_job_id", job.id)}
-                    className="px-4 py-2 rounded-[6px] bg-transparent border border-outline text-on-surface font-section-label text-xs hover:border-primary hover:text-primary transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    className="min-h-11 sm:min-h-0 px-4 py-2 rounded-[6px] bg-transparent border border-outline text-on-surface font-section-label text-xs hover:border-primary hover:text-primary transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     <FileText className="w-4 h-4" />
                     {hasCoverLetter ? "Open Cover Letter" : "Generate Cover Letter"}
@@ -396,7 +396,7 @@ export function JobDetailPane({
                       href={applyUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-2 rounded-[6px] bg-surface-variant border border-transparent text-on-surface font-section-label text-xs hover:border-outline transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      className="min-h-11 sm:min-h-0 px-4 py-2 rounded-[6px] bg-surface-variant border border-transparent text-on-surface font-section-label text-xs hover:border-outline transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     >
                       Open Posting <ExternalLink className="w-4 h-4" />
                     </a>
@@ -404,20 +404,20 @@ export function JobDetailPane({
                     <button
                       type="button"
                       disabled
-                      className="px-4 py-2 rounded-[6px] bg-surface-variant/50 border border-transparent text-muted-foreground/60 font-section-label text-xs cursor-not-allowed"
+                      className="min-h-11 sm:min-h-0 px-4 py-2 rounded-[6px] bg-surface-variant/50 border border-transparent text-muted-foreground/60 font-section-label text-xs cursor-not-allowed"
                     >
                       Open Posting
                     </button>
                   )}
 
-                  <div className="ml-auto">
+                  <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:flex-col sm:items-end">
                     {isUpdatingStatus ? (
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     ) : (
                       <select
                         value={job.status}
                         onChange={(e) => onStatusChange(job.id, e.target.value as JobStatus)}
-                        className="bg-input border border-outline-variant rounded-[6px] px-3 py-1.5 text-xs font-mono-data text-on-surface-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-colors cursor-pointer"
+                        className="min-h-11 sm:min-h-0 max-w-full bg-input border border-outline-variant rounded-[6px] px-3 py-1.5 text-xs font-mono-data text-on-surface-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-colors cursor-pointer"
                         aria-label="Job status"
                       >
                         {ALL_STATUSES.map((s) => (
@@ -431,7 +431,7 @@ export function JobDetailPane({
                       <select
                         value={job.appliedVariantId ?? ""}
                         onChange={(e) => onVariantChange(job.id, e.target.value || null)}
-                        className="mt-2 block bg-input border border-outline-variant rounded-[6px] px-3 py-1.5 text-xs font-mono-data text-on-surface-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        className="min-h-11 sm:min-h-0 max-w-full block bg-input border border-outline-variant rounded-[6px] px-3 py-1.5 text-xs font-mono-data text-on-surface-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                         aria-label="Sent variant"
                         data-testid="sent-variant-select"
                       >
@@ -497,7 +497,7 @@ export function JobDetailPane({
 
               {/* Technical Interview & OA Practice Problems Module */}
               <div className="surface-raised rounded-[10px] p-5">
-                <div className="flex justify-between items-center mb-3 border-b border-border pb-2">
+                <div className="flex flex-wrap justify-between items-center gap-2 mb-3 border-b border-border pb-2">
                   <h3 className="font-section-label text-xs text-on-surface-variant uppercase tracking-widest flex items-center gap-1.5">
                     <Code2 className="w-3.5 h-3.5 text-primary" />
                     TECHNICAL INTERVIEW PREP

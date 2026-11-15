@@ -837,8 +837,8 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       )}
 
       {/* Filter subheader — sticky glass bar under TrackerSubNav */}
-      <div className="sticky top-11 z-10 flex shrink-0 flex-wrap items-center gap-2 border-b glass-bar px-4 py-2.5">
-        <div className="relative min-w-[180px] flex-1 sm:max-w-xs">
+      <div className="sticky top-11 z-10 flex shrink-0 flex-wrap items-center gap-2 border-b glass-bar px-3 py-2 sm:px-4 sm:py-2.5">
+        <div className="relative w-full sm:w-auto sm:min-w-[180px] sm:flex-1 sm:max-w-xs">
           <label htmlFor="tracker-job-search" className="sr-only">
             Search jobs, companies, or keywords
           </label>
@@ -854,7 +854,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           />
         </div>
 
-        <div ref={locationComboboxRef} className="relative min-w-[140px] flex-1 sm:max-w-[180px]">
+        <div ref={locationComboboxRef} className="relative min-w-0 flex-1 basis-[calc(50%-0.25rem)] sm:basis-auto sm:min-w-[140px] sm:max-w-[180px]">
           <label htmlFor="tracker-location-filter" className="sr-only">
             Filter by location
           </label>
@@ -940,7 +940,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
               id={locationListboxId}
               role="listbox"
               aria-label="Location suggestions"
-              className="absolute left-0 top-full z-50 mt-1 max-h-56 w-56 overflow-auto rounded-[10px] border border-hairline bg-elevated p-1 shadow-2xl"
+              className="absolute left-0 top-full z-50 mt-1 max-h-56 w-full min-w-[200px] max-w-[calc(100vw-1.5rem)] sm:w-56 overflow-auto rounded-[10px] border border-hairline bg-elevated p-1 shadow-2xl"
             >
               {filteredLocationCities.map((c, index) => {
                 const isActive = index === activeLocationIndex;
@@ -977,7 +977,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           data-testid="tracker-posted-select"
           value={postedWithin}
           onChange={(e) => setPostedWithin(e.target.value as PostedWithin)}
-          className={`${FILTER_CONTROL} cursor-pointer text-rf-meta`}
+          className={`${FILTER_CONTROL} min-w-0 flex-1 basis-[calc(50%-0.25rem)] sm:basis-auto sm:flex-none cursor-pointer text-rf-meta`}
           aria-label="How recently posted"
         >
           {POSTED_OPTIONS.map(({ value, label }) => (
@@ -995,7 +995,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           data-testid="tracker-workplace-filter"
           value={workplace}
           onChange={(e) => setWorkplace(e.target.value as WorkplaceFilter)}
-          className={`${FILTER_CONTROL} cursor-pointer text-rf-meta`}
+          className={`${FILTER_CONTROL} min-w-0 flex-1 basis-[calc(50%-0.25rem)] sm:basis-auto sm:flex-none cursor-pointer text-rf-meta`}
           aria-label="Workplace type"
         >
           {WORKPLACE_OPTIONS.map(({ value, label }) => (
@@ -1013,7 +1013,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           data-testid="tracker-status-filter"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as JobStatus | "ALL")}
-          className={`${FILTER_CONTROL} cursor-pointer text-rf-meta`}
+          className={`${FILTER_CONTROL} min-w-0 flex-1 basis-[calc(50%-0.25rem)] sm:basis-auto sm:flex-none cursor-pointer text-rf-meta`}
           aria-label="Filter by status"
         >
           <option value="ALL">All Statuses</option>
@@ -1024,7 +1024,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           ))}
         </select>
 
-        <div className="ml-auto flex flex-wrap items-center gap-3 text-[12.5px] text-muted-foreground">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:ml-auto sm:w-auto sm:justify-end sm:gap-3 text-[12.5px] text-muted-foreground">
           <div
             className="flex items-center rounded-md border border-hairline bg-inset p-0.5"
             role="tablist"
@@ -1089,7 +1089,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       {viewMode === "kanban" ? (
         <div
           data-testid="tracker-kanban-board"
-          className="flex min-h-0 flex-1 gap-4 overflow-x-auto bg-transparent p-4"
+          className="flex min-h-0 flex-1 gap-4 overflow-x-auto snap-x snap-mandatory md:snap-none bg-transparent p-4"
         >
           {(["SAVED", "APPLIED", "INTERVIEWING", "OFFER", "REJECTED"] as JobStatus[]).map(
             (stage) => {
@@ -1105,7 +1105,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                       setDraggedJobId(null);
                     }
                   }}
-                  className="flex h-full w-72 shrink-0 flex-col rounded-xl surface-raised overflow-hidden"
+                  className="flex h-full w-[82vw] max-w-72 sm:w-72 shrink-0 snap-start flex-col rounded-xl surface-raised overflow-hidden"
                 >
                   <div className="flex items-center justify-between border-b border-hairline bg-inset/90 px-3.5 py-2.5">
                     <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
@@ -1263,7 +1263,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                 data-testid="jobs-page-prev"
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="inline-flex items-center gap-1 rounded-md border border-hairline bg-inset px-2.5 py-1.5 text-xs text-rf-meta transition-colors duration-150 hover:text-rf-cloud disabled:opacity-40"
+                className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 rounded-md border border-hairline bg-inset px-3 py-2 sm:px-2.5 sm:py-1.5 text-xs text-rf-meta transition-colors duration-150 hover:text-rf-cloud disabled:opacity-40"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
                 Prev
@@ -1276,7 +1276,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                 data-testid="jobs-page-next"
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="inline-flex items-center gap-1 rounded-md border border-hairline bg-inset px-2.5 py-1.5 text-xs text-rf-meta transition-colors duration-150 hover:text-rf-cloud disabled:opacity-40"
+                className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 rounded-md border border-hairline bg-inset px-3 py-2 sm:px-2.5 sm:py-1.5 text-xs text-rf-meta transition-colors duration-150 hover:text-rf-cloud disabled:opacity-40"
               >
                 Next
                 <ChevronRight className="h-3.5 w-3.5" />

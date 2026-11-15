@@ -156,7 +156,7 @@ export function PracticeWorkspace() {
                 data-testid="practice-job-context-select"
                 value={selectedJobId}
                 onChange={(e) => setSelectedJobId(e.target.value)}
-                className="h-9 min-w-[220px] rounded-[6px] border border-control/70 bg-inset px-3 text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="min-h-11 sm:h-9 w-full sm:w-auto sm:min-w-[220px] max-w-full rounded-[6px] border border-control/70 bg-inset px-3 text-base sm:text-xs text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 <option value="">General Prep (All Roles)</option>
                 {trackedJobs.map((job) => (
@@ -190,7 +190,7 @@ export function PracticeWorkspace() {
                   <button
                     type="button"
                     onClick={() => openTab("runner")}
-                    className="rounded-md border border-amber-500/40 bg-amber-500/20 px-2.5 py-1 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/30"
+                    className="inline-flex min-h-11 sm:min-h-0 items-center rounded-md border border-amber-500/40 bg-amber-500/20 px-3 py-1.5 sm:px-2.5 sm:py-1 text-xs sm:text-[11px] font-semibold text-amber-200 hover:bg-amber-500/30"
                   >
                     Open Code Runner &rarr;
                   </button>
@@ -203,7 +203,7 @@ export function PracticeWorkspace() {
         <div className="border-b border-hairline mt-2">
         <div
           className={cn(
-            "flex items-center gap-6 px-4 md:px-8",
+            "flex items-center gap-4 sm:gap-6 px-4 md:px-8 overflow-x-auto scrollbar-none",
             mainTab === "questions" && "mx-auto w-full max-w-6xl"
           )}
           data-testid="practice-main-tabs"
@@ -213,7 +213,7 @@ export function PracticeWorkspace() {
             onClick={() => openTab("questions")}
             data-testid="tab-technical-questions"
             className={cn(
-              "min-h-11 border-b-2 px-1 text-xs font-medium",
+              "min-h-11 shrink-0 whitespace-nowrap border-b-2 px-1 text-xs font-medium",
               mainTab === "questions"
                 ? "border-amber-500 text-foreground"
                 : "border-transparent text-text-secondary hover:text-foreground"
@@ -226,7 +226,7 @@ export function PracticeWorkspace() {
             onClick={() => openTab("runner")}
             data-testid="tab-code-runner"
             className={cn(
-              "min-h-11 border-b-2 px-1 text-xs font-medium",
+              "min-h-11 shrink-0 whitespace-nowrap border-b-2 px-1 text-xs font-medium",
               mainTab === "runner"
                 ? "border-amber-500 text-foreground"
                 : "border-transparent text-text-secondary hover:text-foreground"

@@ -314,7 +314,7 @@ export function SettingsWorkspace() {
 
   return (
     <AppShell variant="settings" className="overflow-y-auto">
-      <div className="mx-auto w-full max-w-3xl flex-1 p-6 md:p-8">
+      <div className="mx-auto w-full max-w-3xl flex-1 p-4 sm:p-6 md:p-8">
         <div className="space-y-6">
           <PageHeader
             eyebrow="Control room"
@@ -418,7 +418,7 @@ export function SettingsWorkspace() {
                       data-testid={`provider-pill-${p.id}`}
                       aria-pressed={active}
                       onClick={() => void selectProvider(p.id)}
-                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+                      className={`inline-flex min-h-11 sm:min-h-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
                         active
                           ? "border-primary/45 bg-primary/15 font-semibold text-primary"
                           : "border-hairline bg-panel font-medium text-text-secondary hover:bg-elevated hover:text-foreground"
@@ -449,7 +449,7 @@ export function SettingsWorkspace() {
             {/* API Key Input (Hidden for Ollama) */}
             {provider !== "ollama" ? (
               <div className="rounded-lg border border-hairline bg-inset/60 p-4 card-lift">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                   <label htmlFor="api-key-input" className="block text-xs font-semibold text-text-secondary uppercase tracking-wider">
                     API Key {provider === "custom" ? "(Optional)" : ""}
                   </label>
@@ -459,7 +459,7 @@ export function SettingsWorkspace() {
                       id="clear-key-btn"
                       data-testid="clear-key-btn"
                       onClick={handleClearKey}
-                      className="flex items-center gap-1 text-xs text-rose-400 hover:text-rose-300 transition-colors"
+                      className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 text-xs text-rose-400 hover:text-rose-300 transition-colors"
                     >
                       <Trash2 className="h-3 w-3" />
                       Clear Key
@@ -472,6 +472,8 @@ export function SettingsWorkspace() {
                     type="password"
                     value={apiKey}
                     onChange={handleKeyChange}
+                    aria-invalid={testResult && !testResult.success ? true : undefined}
+                    aria-describedby={testResult && !testResult.success ? "test-result-banner" : undefined}
                     placeholder={
                       provider === "openai"
                         ? "sk-proj-..."
@@ -556,20 +558,20 @@ export function SettingsWorkspace() {
             </div>
 
             {/* Action Buttons & Status */}
-            <div className="pt-2 flex items-center justify-between border-t border-hairline">
+            <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-hairline">
               <button
                 type="button"
                 id="test-connection-btn"
                 onClick={handleTestConnection}
                 disabled={isTesting}
-                className="inline-flex items-center gap-2 rounded-md bg-amber-500 hover:bg-amber-400 text-[#121010] px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50 transition-colors"
+                className="inline-flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 rounded-md bg-amber-500 hover:bg-amber-400 text-[#121010] px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50 transition-colors"
               >
                 {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Server className="h-4 w-4" />}
                 {isTesting ? "Testing Connection..." : "Test Connection"}
               </button>
 
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <ShieldCheck className="h-4 w-4 text-emerald-400" />
+              <div className="flex items-start sm:items-center gap-2 text-xs text-muted-foreground min-w-0">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5 sm:mt-0" />
                 <span>Keys are encrypted client-side and never written to database or server logs</span>
               </div>
             </div>
@@ -578,6 +580,8 @@ export function SettingsWorkspace() {
             {testResult && (
               <div
                 id="test-result-banner"
+                role="status"
+                aria-live="polite"
                 className={`rounded-lg p-4 border text-sm ${
                   testResult.success
                     ? "border-emerald-800/50 bg-emerald-950/40 text-emerald-200"

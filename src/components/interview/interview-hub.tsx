@@ -85,7 +85,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
               <button
                 key={t.id}
                 onClick={() => setTrack(t.id)}
-                className={`px-3 py-1.5 rounded-[6px] text-xs font-semibold transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                className={`min-h-11 sm:min-h-0 px-3 py-1.5 rounded-[6px] text-xs font-semibold transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   track === t.id
                     ? "bg-primary/15 border-primary/40 text-primary"
                     : "border-border bg-elevated/60 hover:bg-elevated text-muted-foreground hover:text-foreground"
@@ -97,12 +97,12 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
           </div>
 
           {/* Difficulty Filters */}
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
             {DIFFICULTY_FILTERS.map(d => (
               <button
                 key={d}
                 onClick={() => setDifficulty(d)}
-                className={`px-2.5 py-1 rounded-[6px] text-xs font-semibold transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                className={`min-h-11 sm:min-h-0 px-2.5 py-1 rounded-[6px] text-xs font-semibold transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   difficulty === d
                     ? "bg-primary/15 border-primary/40 text-primary"
                     : "border-border bg-elevated/60 hover:bg-elevated text-muted-foreground hover:text-foreground"
@@ -122,7 +122,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
             </span>
             <button
               onClick={() => setCompany("all")}
-              className={`px-2.5 py-1 rounded-[6px] text-xs transition-colors flex-shrink-0 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+              className={`min-h-11 sm:min-h-0 px-2.5 py-1 rounded-[6px] text-xs transition-colors flex-shrink-0 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                 company === "all"
                   ? "bg-primary/15 text-primary border-primary/40 font-semibold"
                   : "bg-elevated/60 text-muted-foreground hover:text-foreground border-border hover:bg-elevated"
@@ -136,7 +136,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                 <button
                   key={c.slug}
                   onClick={() => setCompany(isSelected ? "all" : c.slug)}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-xs transition-colors flex-shrink-0 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                  className={`inline-flex min-h-11 sm:min-h-0 items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-xs transition-colors flex-shrink-0 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                     isSelected
                       ? "bg-primary/15 text-primary border-primary/40 font-semibold"
                       : "bg-elevated/60 text-muted-foreground hover:text-foreground border-border hover:bg-elevated"
@@ -226,7 +226,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
       >
         <DialogContent
           hideCloseButton
-          className="w-full max-w-2xl max-h-[90dvh] space-y-5 overflow-y-auto overscroll-contain rounded-[10px] border-hairline bg-panel p-6 text-foreground shadow-2xl"
+          className="w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[90dvh] space-y-5 overflow-y-auto overscroll-contain rounded-[10px] border-hairline bg-panel p-4 sm:p-6 text-foreground shadow-2xl"
         >
           {selectedQuestion ? (
             <>
@@ -248,7 +248,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                 <DialogClose asChild>
                   <button
                     type="button"
-                    className="rounded-[6px] p-1.5 text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    className="inline-flex min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 items-center justify-center rounded-[6px] sm:p-1.5 text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     aria-label="Close modal"
                   >
                     ✕
@@ -271,7 +271,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
 
             {/* Constraints & Complexity */}
             {(selectedQuestion.timeComplexity || selectedQuestion.spaceComplexity || selectedQuestion.constraints) && (
-              <div className="grid grid-cols-2 gap-3 p-3 bg-inset border border-border rounded-[10px] text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-inset border border-border rounded-[10px] text-xs">
                 {selectedQuestion.timeComplexity && (
                   <div>
                     <span className="text-muted-foreground font-semibold">Time Complexity:</span>
@@ -285,7 +285,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                   </div>
                 )}
                 {selectedQuestion.constraints && selectedQuestion.constraints.length > 0 && (
-                  <div className="col-span-2 pt-2 border-t border-border">
+                  <div className="col-span-1 sm:col-span-2 pt-2 border-t border-border">
                     <span className="text-muted-foreground font-semibold">Constraints:</span>
                     <ul className="list-disc list-inside mt-0.5 text-on-surface-variant space-y-0.5">
                       {selectedQuestion.constraints.map((c, i) => (

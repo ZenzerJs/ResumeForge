@@ -98,8 +98,8 @@ export function OutcomesPanel() {
               {FUNNEL.map((status) => {
                 const count = data.funnel[status] ?? 0;
                 return (
-                  <div key={status} className="grid grid-cols-[8rem_1fr_2rem] items-center gap-2 text-xs">
-                    <span className="text-text-secondary">{status}</span>
+                  <div key={status} className="grid grid-cols-[6.5rem_1fr_2rem] sm:grid-cols-[8rem_1fr_2rem] items-center gap-2 text-xs">
+                    <span className="truncate text-text-secondary">{status}</span>
                     <div className="h-2 rounded bg-elevated">
                       <div className="h-2 rounded bg-primary" style={{ width: `${(count / max) * 100}%` }} />
                     </div>
@@ -116,14 +116,14 @@ export function OutcomesPanel() {
             </section>
 
             <section className="overflow-x-auto rounded-xl surface-raised p-4" data-testid="outcome-variants">
-              <table className="w-full text-left text-xs text-on-surface-variant">
+              <table className="w-full min-w-[460px] text-left text-xs text-on-surface-variant">
                 <thead className="text-muted-foreground">
                   <tr>
-                    <th className="py-2 pr-3">Variant</th>
-                    <th className="py-2 pr-3">Job</th>
-                    <th className="py-2 pr-3">Sent</th>
-                    <th className="py-2 pr-3">Interviews</th>
-                    <th className="py-2">Rate</th>
+                    <th className="py-2 pr-3 whitespace-nowrap">Variant</th>
+                    <th className="py-2 pr-3 whitespace-nowrap">Job</th>
+                    <th className="py-2 pr-3 whitespace-nowrap">Sent</th>
+                    <th className="py-2 pr-3 whitespace-nowrap">Interviews</th>
+                    <th className="py-2 whitespace-nowrap">Rate</th>
                   </tr>
                 </thead>
                 <tbody>

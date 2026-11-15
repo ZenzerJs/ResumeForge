@@ -753,7 +753,7 @@ export function LibraryWorkspace() {
     <AppShell
       variant="library"
       actions={
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <input
             type="file"
             ref={fileInputRef}
@@ -765,7 +765,7 @@ export function LibraryWorkspace() {
             type="button"
             disabled={isImporting}
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-[6px] border border-hairline bg-elevated text-xs font-mono text-text-secondary hover:bg-muted hover:text-foreground transition-colors"
+            className="flex min-h-11 xl:min-h-0 items-center gap-2 px-3.5 py-1.5 rounded-[6px] border border-hairline bg-elevated text-xs font-mono text-text-secondary hover:bg-muted hover:text-foreground transition-colors"
           >
             {isImporting ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
@@ -777,7 +777,7 @@ export function LibraryWorkspace() {
           <button
             type="button"
             onClick={(e) => openCreateModal(e.currentTarget)}
-            className="flex items-center gap-1.5 rounded-[6px] border border-primary/40 bg-primary/10 px-3.5 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="flex min-h-11 xl:min-h-0 items-center gap-1.5 rounded-[6px] border border-primary/40 bg-primary/10 px-3.5 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <Plus className="h-3.5 w-3.5" />
             Add Evidence Item
@@ -786,12 +786,12 @@ export function LibraryWorkspace() {
       }
     >
       {/* Main Content Area with Header Margin Clearance matching preview (1).webp */}
-      <div className="mx-auto max-w-5xl w-full px-6 pt-8 pb-16 flex-1 flex flex-col gap-8">
+      <div className="mx-auto max-w-5xl w-full px-4 sm:px-6 pt-6 sm:pt-8 pb-16 flex-1 flex flex-col gap-6 sm:gap-8">
         {/* Page Title Header */}
         <div className="space-y-6">
           <div className="enter-once rounded-xl surface-raised edge-glow p-5 sm:p-6">
             <div className="border-l-2 border-primary pl-3 sm:pl-4">
-              <h1 className="text-3xl font-bold text-foreground tracking-[-0.03em]">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-[-0.03em]">
                 Verified Evidence Bank Inventory
               </h1>
             </div>
@@ -849,7 +849,7 @@ export function LibraryWorkspace() {
             role="tab"
             aria-selected={activeTab === "library"}
             onClick={() => setActiveTab("library")}
-            className={`px-4 py-2 text-sm font-semibold transition-colors ${activeTab === "library" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            className={`min-h-11 px-4 py-2 text-sm font-semibold transition-colors ${activeTab === "library" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
           >
             Library
           </button>
@@ -858,7 +858,7 @@ export function LibraryWorkspace() {
             role="tab"
             aria-selected={activeTab === "review"}
             onClick={() => setActiveTab("review")}
-            className={`px-4 py-2 text-sm font-semibold transition-colors ${activeTab === "review" ? "text-primary" : "text-muted-foreground hover:text-foreground"} flex items-center gap-2`}
+            className={`min-h-11 px-4 py-2 text-sm font-semibold transition-colors ${activeTab === "review" ? "text-primary" : "text-muted-foreground hover:text-foreground"} flex items-center gap-2`}
           >
             Review Queue
             {reviewItems.length > 0 && (
@@ -892,15 +892,15 @@ export function LibraryWorkspace() {
           </div>
 
           {/* Status Dropdown + Item Counter */}
-          <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-muted-foreground">Status:</span>
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+            <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-none">
+              <span className="shrink-0 text-xs font-mono text-muted-foreground">Status:</span>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
                 data-testid="evidence-status-filter"
                 aria-label="Filter evidence by status"
-                className="bg-inset border border-hairline text-foreground rounded-[6px] px-3 py-1.5 text-xs font-mono outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="min-h-11 sm:min-h-0 w-full sm:w-auto max-w-full min-w-0 bg-inset border border-hairline text-foreground rounded-[6px] px-3 py-1.5 text-xs font-mono outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="all">All, Verified, Draft, Archived</option>
                 <option value="verified">Verified Only</option>
@@ -909,7 +909,7 @@ export function LibraryWorkspace() {
               </select>
             </div>
 
-            <span className="text-xs font-mono tabular-nums text-muted-foreground">
+            <span className="shrink-0 text-xs font-mono tabular-nums text-muted-foreground">
               {filteredItems.length} items
             </span>
           </div>
@@ -977,12 +977,14 @@ export function LibraryWorkspace() {
                   className={`rounded-xl surface-raised card-lift ${typeEdgeClass} p-5 overflow-hidden`}
                 >
                   {/* Card Header Row */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                    <div className="flex items-start gap-2 sm:gap-3 min-w-0 flex-1">
                       <button
                         type="button"
                         onClick={() => toggleExpand(item.id)}
-                        className="text-muted-foreground hover:text-foreground mt-1 transition-colors"
+                        aria-expanded={isExpanded}
+                        aria-label={isExpanded ? `Collapse ${item.title}` : `Expand ${item.title}`}
+                        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center -ml-2 -mt-2 text-muted-foreground hover:text-foreground transition-colors"
                       >
                         {isExpanded ? (
                           <ChevronDown className="h-4 w-4" />
@@ -991,23 +993,23 @@ export function LibraryWorkspace() {
                         )}
                       </button>
 
-                      <div>
-                        <div className="flex items-center gap-3 flex-wrap">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                           <span className={`rounded-[5px] border px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider ${typeBadgeClass}`}>
                             {item.type}
                           </span>
-                          <h2 className="text-base font-bold text-foreground tracking-tight">
+                          <h2 className="text-base font-bold text-foreground tracking-tight break-words">
                             {item.title}
                             {item.organization ? ` @ ${item.organization}` : ""}
                           </h2>
                         </div>
-                        <p className="mt-2 text-xs text-text-secondary leading-relaxed max-w-3xl">
+                        <p className="mt-2 text-xs text-text-secondary leading-relaxed max-w-3xl break-words">
                           {item.verifiedSummary}
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:shrink-0">
                       <span
                         className={`rounded-[5px] px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider ${
                           item.status === "verified"
@@ -1024,7 +1026,7 @@ export function LibraryWorkspace() {
                           size="sm"
                           data-testid="verify-evidence-btn"
                           onClick={() => void handleVerifyItem(item)}
-                          className="h-8 gap-1.5 border-status-success/35 bg-status-success/10 px-2.5 text-[11px] font-mono font-semibold text-status-success hover:bg-status-success/20 hover:text-status-success"
+                          className="min-h-11 sm:min-h-8 h-auto sm:h-8 gap-1.5 border-status-success/35 bg-status-success/10 px-2.5 text-[11px] font-mono font-semibold text-status-success hover:bg-status-success/20 hover:text-status-success"
                           aria-label={`Verify ${item.title}`}
                         >
                           <CheckCircle2 className="h-3.5 w-3.5" />
@@ -1059,7 +1061,7 @@ export function LibraryWorkspace() {
 
                   {/* Tag Pills Row */}
                   {item.tags && item.tags.length > 0 && (
-                    <div className="mt-4 flex flex-wrap items-center gap-2 pl-7">
+                    <div className="mt-4 flex flex-wrap items-center gap-2 pl-0 sm:pl-7">
                       {item.tags.map((t, idx) => (
                         <span
                           key={idx}
@@ -1103,8 +1105,8 @@ export function LibraryWorkspace() {
                     data-testid={`duplicate-review-card-${item.id}`}
                     className="rounded-xl surface-raised card-lift p-5"
                   >
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-base font-bold text-foreground">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                      <h3 className="text-base font-bold text-foreground break-words">
                         Review Potential Duplicate · {item.title}
                       </h3>
                       <span className="text-xs font-mono text-muted-foreground">
@@ -1322,7 +1324,7 @@ export function LibraryWorkspace() {
       {/* Modal Dialog for Create/Edit */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent
-          className="max-w-lg max-h-[90dvh] overflow-y-auto overscroll-contain border-hairline bg-panel p-6"
+          className="max-w-lg max-h-[90dvh] overflow-y-auto overscroll-contain border-hairline bg-panel p-4 sm:p-6"
           onCloseAutoFocus={(event) => {
             const opener = modalOpenerRef.current;
             modalOpenerRef.current = null;
@@ -1342,7 +1344,7 @@ export function LibraryWorkspace() {
           </DialogHeader>
 
           <form onSubmit={handleSaveItem} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label htmlFor="evidence-item-type" className="block text-xs font-mono text-on-surface-variant mb-1">
                   Type
@@ -1351,7 +1353,7 @@ export function LibraryWorkspace() {
                   id="evidence-item-type"
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                  className="w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+                  className="min-h-10 sm:min-h-0 w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
                 >
                   <option value="experience">Experience</option>
                   <option value="project">Project</option>
@@ -1370,7 +1372,7 @@ export function LibraryWorkspace() {
                   id="evidence-item-status"
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+                  className="min-h-10 sm:min-h-0 w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
                 >
                   <option value="verified">Verified</option>
                   <option value="draft">Draft</option>
@@ -1389,12 +1391,12 @@ export function LibraryWorkspace() {
                 required
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+                className="min-h-10 sm:min-h-0 w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
                 placeholder="e.g. Software Engineer Intern"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label htmlFor="evidence-item-org" className="block text-xs font-mono text-on-surface-variant mb-1">
                   Organization
@@ -1404,7 +1406,7 @@ export function LibraryWorkspace() {
                   type="text"
                   value={formData.organization}
                   onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
-                  className="w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+                  className="min-h-10 sm:min-h-0 w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
                   placeholder="e.g. Stripe"
                 />
               </div>
@@ -1418,7 +1420,7 @@ export function LibraryWorkspace() {
                   type="text"
                   value={formData.dates}
                   onChange={(e) => setFormData({ ...formData, dates: e.target.value })}
-                  className="w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+                  className="min-h-10 sm:min-h-0 w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
                   placeholder="e.g. Jun 29, 2023"
                 />
               </div>

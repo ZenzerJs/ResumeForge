@@ -104,6 +104,16 @@ export function AppShell({
 
   const [showMigrationModal, setShowMigrationModal] = useState(false);
   const [guestDraft, setGuestDraft] = useState<string | null>(null);
+  const [isDesktopXl, setIsDesktopXl] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mediaQuery = window.matchMedia("(min-width: 1280px)");
+    setIsDesktopXl(mediaQuery.matches);
+    const listener = (event: MediaQueryListEvent) => setIsDesktopXl(event.matches);
+    mediaQuery.addEventListener("change", listener);
+    return () => mediaQuery.removeEventListener("change", listener);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -197,11 +207,13 @@ export function AppShell({
     };
   }, []);
 
+  const showCompactActionsRow = !hideNav && !useToolbar && Boolean(actions) && !isDesktopXl;
+
   return (
     <div
       className={cn(
         "relative flex flex-col bg-rf-bg text-rf-body",
-        lockViewport ? "h-dvh max-h-dvh overflow-hidden" : "min-h-screen overflow-x-hidden"
+        lockViewport ? "h-dvh max-h-dvh overflow-hidden" : "min-h-dvh overflow-x-hidden"
       )}
       data-workspace-theme={variant === "landing" ? undefined : ""}
       data-testid={`app-shell-${variant}`}
@@ -213,7 +225,7 @@ export function AppShell({
         <TopNav
           compact={variant === "editor"}
           badge={useToolbar ? undefined : badge}
-          actions={useToolbar ? undefined : actions}
+          actions={!useToolbar && isDesktopXl ? actions : undefined}
         />
       ) : null}
       <main
@@ -228,17 +240,25 @@ export function AppShell({
           className
         )}
       >
+        {showCompactActionsRow ? (
+          <div
+            className="xl:hidden relative z-30 flex min-w-0 max-w-full shrink-0 flex-wrap items-center justify-start gap-2 border-b border-outline/70 glass-bar px-4 py-2 sm:justify-end"
+            data-testid="compact-page-actions"
+          >
+            {actions}
+          </div>
+        ) : null}
         {!hideNav && !(variant === "editor" && useToolbar) ? <GuestBanner /> : null}
         {!hideNav && useToolbar ? (
           <div
-            className="relative z-40 flex min-h-10 shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-outline/70 glass-bar px-4 py-1 lg:h-10 lg:flex-nowrap lg:px-6"
+            className="relative z-40 flex min-h-10 shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-outline/70 glass-bar px-4 py-1 xl:h-10 xl:flex-nowrap xl:px-6"
             data-testid="workspace-toolbar"
           >
             <div className="flex min-w-0 items-center gap-2.5">
               {badge}
               <GuestBanner inline />
             </div>
-            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">{actions}</div>
+            <div className="flex min-w-0 max-w-full flex-wrap items-center justify-start gap-2 xl:justify-end">{actions}</div>
           </div>
         ) : null}
         {children}
