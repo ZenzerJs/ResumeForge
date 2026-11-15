@@ -35,7 +35,6 @@
     /* Direct full-color legacy aliases for var(--rf-*) consumers */
     --rf-bg: rgb(var(--surface-canvas));
     --rf-surface: rgb(var(--surface-panel));
-    --rf-surface-elevated: rgb(var(--surface-elevated));
     --rf-cloud: rgb(var(--text-primary));
     --rf-body: rgb(var(--text-primary));
     --rf-meta: rgb(var(--text-muted));
@@ -45,11 +44,15 @@
     --rf-popover-surface: rgb(var(--surface-elevated));
     --rf-popover-border: rgb(var(--border-control));
     --rf-surface-border: rgb(var(--border-hairline));
+    --scrollbar-thumb: rgb(var(--border-control));
+    --scrollbar-track: rgb(var(--surface-canvas));
   }
 
   * {
     @apply border-border;
     box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
   }
 
   html {
@@ -94,23 +97,25 @@
     }
   }
 
-  /* Smooth scrollbar */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
+  /* Smooth scrollbar (legacy WebKit fallback when scrollbar-color is unsupported) */
+  @supports not (scrollbar-color: auto) {
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
 
-  ::-webkit-scrollbar-track {
-    background: rgb(var(--surface-canvas));
-  }
+    ::-webkit-scrollbar-track {
+      background: var(--scrollbar-track);
+    }
 
-  ::-webkit-scrollbar-thumb {
-    background: rgb(var(--surface-elevated));
-    border-radius: 3px;
-  }
+    ::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: 3px;
+    }
 
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgb(var(--border-control));
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgb(var(--text-muted));
+    }
   }
 
   /* Selection highlight */
@@ -340,20 +345,12 @@
 
 /* Page transition */
 @layer utilities {
-  .ink-navy {
-    background-color: var(--rf-bg);
-  }
-
   .rf-bg {
     background-color: var(--rf-bg);
   }
 
   .rf-surface {
     background-color: var(--rf-surface);
-  }
-
-  .rf-surface-elevated {
-    background-color: var(--rf-surface-elevated);
   }
 
   .rf-cloud {
@@ -366,40 +363,6 @@
 
   .rf-meta {
     color: var(--rf-meta);
-  }
-
-  .card-ink {
-    background-color: var(--rf-surface);
-  }
-
-  .card-border {
-    border-color: var(--rf-border);
-  }
-
-  /* Gold highlighter stroke */
-  .highlight-gold {
-    background: linear-gradient(transparent 55%, rgb(var(--accent-action) / 0.2) 55%);
-    border-bottom: 2px solid rgb(var(--accent-action) / 0.5);
-    padding: 0 2px;
-    border-radius: 1px;
-  }
-
-  /* Subtle grid texture background */
-  .bg-grid {
-    background-image:
-      linear-gradient(rgb(var(--border-hairline) / 0.5) 1px, transparent 1px),
-      linear-gradient(90deg, rgb(var(--border-hairline) / 0.5) 1px, transparent 1px);
-    background-size: 40px 40px;
-  }
-
-  /* Ink spotlight hover */
-  .hover-spotlight {
-    transition: box-shadow 150ms ease, border-color 150ms ease;
-  }
-
-  .hover-spotlight:hover {
-    box-shadow: 0 0 0 1px rgb(var(--accent-action) / 0.15), 0 8px 24px rgb(0 0 0 / 0.4);
-    border-color: rgb(var(--accent-action) / 0.25);
   }
 
   /* Layered depth utilities (Ember Ink) */
@@ -471,23 +434,6 @@
     animation: skeleton-glint-sweep 2.15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   }
 
-  /* Streaming Cursor Animation */
-  @keyframes cursor-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
-  }
-
-  .streaming-cursor {
-    display: inline-block;
-    width: 6px;
-    height: 14px;
-    margin-left: 3px;
-    background-color: rgb(var(--accent-action));
-    vertical-align: middle;
-    border-radius: 2px;
-    animation: cursor-pulse 0.8s ease-in-out infinite;
-  }
-
   @media (prefers-reduced-motion: reduce) {
     html {
       scroll-behavior: auto;
@@ -495,7 +441,6 @@
 
     .skeleton-pulse,
     .skeleton-pulse::after,
-    .streaming-cursor,
     .enter-once,
     .ambient-blob-a,
     .ambient-blob-b,

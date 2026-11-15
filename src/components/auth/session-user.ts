@@ -13,6 +13,33 @@ const SESSION_TTL_MS = 3000;
 let inflight: Promise<SessionPayload> | null = null;
 let fetchedAt = 0;
 
+export type DemoConfig = {
+  demoMode: boolean;
+  signupEnabled?: boolean;
+  persistence?: string;
+  ai?: string;
+};
+
+const DEMO_CONFIG_TTL_MS = 30_000;
+const DEFAULT_DEMO_CONFIG: DemoConfig = { demoMode: false, signupEnabled: true };
+let demoInflight: Promise<DemoConfig> | null = null;
+let demoFetchedAt = 0;
+
+/** One shared /api/demo-config request across nav, shell, and workspace callers. */
+export function fetchDemoConfig(): Promise<DemoConfig> {
+  if (demoInflight && Date.now() - demoFetchedAt < DEMO_CONFIG_TTL_MS) return demoInflight;
+  demoFetchedAt = Date.now();
+  demoInflight = fetch("/api/demo-config")
+    .then(async (res) => (res.ok ? ((await res.json()) as DemoConfig) : DEFAULT_DEMO_CONFIG))
+    .catch(() => DEFAULT_DEMO_CONFIG);
+  return demoInflight;
+}
+
+export function resetDemoConfigCache(): void {
+  demoInflight = null;
+  demoFetchedAt = 0;
+}
+
 /** One shared /api/auth/me request per page load (nav, banner, and shell all read it). */
 export function fetchSessionPayload(): Promise<SessionPayload> {
   if (inflight && Date.now() - fetchedAt < SESSION_TTL_MS) return inflight;

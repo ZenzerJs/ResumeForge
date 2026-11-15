@@ -26,43 +26,69 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: any;
+    let body: unknown;
     try {
       body = await req.json();
     } catch {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { rawMarkdown, jobType = "Internship" } = body || {};
+    const parsedBody = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+    const rawMarkdown = parsedBody.rawMarkdown;
+    const jobType = typeof parsedBody.jobType === "string" && parsedBody.jobType ? parsedBody.jobType : "Internship";
     if (!rawMarkdown || typeof rawMarkdown !== "string") {
       return NextResponse.json({ error: "rawMarkdown is required" }, { status: 400 });
     }
 
     const parsedJobs = parsePittCSCMarkdown(rawMarkdown);
+    const externalIds = parsedJobs.map((j) => j.externalId);
+    const existingRows =
+      externalIds.length > 0
+        ? await prisma.discoveredJob.findMany({
+            where: { externalId: { in: externalIds } },
+            select: { externalId: true, datePosted: true, createdAt: true },
+          })
+        : [];
+    const existingByExternalId = new Map(existingRows.map((row) => [row.externalId, row]));
 
-    let upsertCount = 0;
+    const capturedAt = new Date();
+    const toCreate: Array<{
+      externalId: string;
+      company: string;
+      roleTitle: string;
+      location: string;
+      applyUrl: string;
+      datePosted: string | null;
+      jobType: string;
+      isClosed: boolean;
+    }> = [];
+    const toUpdate: Array<ReturnType<typeof prisma.discoveredJob.update>> = [];
 
     for (const job of parsedJobs) {
       const applyUrl = isSafeHref(job.applyUrl) ? job.applyUrl : "";
-      const existing = await prisma.discoveredJob.findUnique({
-        where: { externalId: job.externalId },
-        select: { datePosted: true, createdAt: true },
-      });
-      const capturedAt = new Date();
-      await prisma.discoveredJob.upsert({
-        where: { externalId: job.externalId },
-        update: {
-          company: job.company,
-          roleTitle: job.roleTitle,
-          location: job.location,
-          applyUrl,
-          datePosted: existing
-            ? stablePostingDate(existing.datePosted, job.datePosted, existing.createdAt, capturedAt)
-            : initialPostingDate(job.datePosted, capturedAt),
-          isClosed: job.isClosed,
-          updatedAt: new Date(),
-        },
-        create: {
+      const existing = existingByExternalId.get(job.externalId);
+      if (existing) {
+        toUpdate.push(
+          prisma.discoveredJob.update({
+            where: { externalId: job.externalId },
+            data: {
+              company: job.company,
+              roleTitle: job.roleTitle,
+              location: job.location,
+              applyUrl,
+              datePosted: stablePostingDate(
+                existing.datePosted,
+                job.datePosted,
+                existing.createdAt,
+                capturedAt,
+              ),
+              isClosed: job.isClosed,
+              updatedAt: capturedAt,
+            },
+          }),
+        );
+      } else {
+        toCreate.push({
           externalId: job.externalId,
           company: job.company,
           roleTitle: job.roleTitle,
@@ -71,10 +97,19 @@ export async function POST(req: Request) {
           datePosted: initialPostingDate(job.datePosted, capturedAt),
           jobType,
           isClosed: job.isClosed,
-        },
-      });
-      upsertCount++;
+        });
+      }
     }
+
+    if (toCreate.length > 0) {
+      await prisma.discoveredJob.createMany({ data: toCreate, skipDuplicates: true });
+    }
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < toUpdate.length; i += BATCH_SIZE) {
+      await prisma.$transaction(toUpdate.slice(i, i + BATCH_SIZE));
+    }
+
+    const upsertCount = parsedJobs.length;
 
 
     return NextResponse.json({

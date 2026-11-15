@@ -99,8 +99,8 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
 
     await expect(matrixSection).toContainText("ResumeForge (Guest / Postgres)");
     await expect(matrixSection).toContainText("Competitors");
-    await expect(matrixSection).toContainText("Teal");
-    await expect(matrixSection).toContainText("Simplify");
+    await expect(matrixSection).not.toContainText(/\bTeal\b/i);
+    await expect(matrixSection).not.toContainText(/\bSimplify\b/i);
   });
 
   test("2. Tailor workspace 3-Pane view renders and coordinates Left, Center, and Right panes cleanly", async ({

@@ -1,7 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../src/lib/prisma";
 import { normalizeCompany } from "../src/lib/company";
-
-const prisma = new PrismaClient();
 const HWW_URL =
   "https://raw.githubusercontent.com/poteto/hiring-without-whiteboards/main/README.md";
 

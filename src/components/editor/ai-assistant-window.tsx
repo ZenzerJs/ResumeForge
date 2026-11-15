@@ -164,11 +164,14 @@ export const AiAssistantWindow = React.memo(function AiAssistantWindow({
     }
   }, [clampFloatingGeometry, mode, persistState]);
 
+  const endPointerInteractionRef = useRef(endPointerInteraction);
+  endPointerInteractionRef.current = endPointerInteraction;
+
   useEffect(() => {
     return () => {
-      endPointerInteraction(false);
+      endPointerInteractionRef.current(false);
     };
-  }, [endPointerInteraction]);
+  }, []);
 
   useEffect(() => {
     if (mode === "maximized" && open && windowRef.current) {

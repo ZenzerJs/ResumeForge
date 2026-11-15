@@ -16,6 +16,8 @@ import {
 import type { CoverLetterResponse } from "@/lib/ai/cover-letter-schema";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
 import { getDemoContextFromBrowser } from "@/lib/demo-client";
+import { fetchDemoConfig } from "@/components/auth/session-user";
+import { downloadBlob } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface CoverLetterPanelProps {
@@ -58,6 +60,15 @@ export function CoverLetterPanel({
   const prevJobIdRef = React.useRef<string | undefined>(jobId);
   const draftCoverLetterRef = React.useRef(draftCoverLetter);
   draftCoverLetterRef.current = draftCoverLetter;
+  const copyTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, []);
 
   // Task 8.6: Load existing cover letter draft for jobId on mount or job switch
   React.useEffect(() => {
@@ -69,8 +80,7 @@ export function CoverLetterPanel({
 
     async function loadExistingDraft() {
       try {
-        const configRes = await fetch("/api/demo-config");
-        const config = await configRes.json();
+        const config = await fetchDemoConfig();
         if (cancelled) return;
         setDemoMode(config.demoMode === true);
         if (!jobChanged && draftCoverLetterRef.current) return;
@@ -119,8 +129,7 @@ export function CoverLetterPanel({
 
     try {
       const providerConfig = (await resolveClientProviderConfig()) || undefined;
-      const demoConfigRes = await fetch("/api/demo-config");
-      const demoConfig = await demoConfigRes.json();
+      const demoConfig = await fetchDemoConfig();
       const demoContext = demoConfig.demoMode ? getDemoContextFromBrowser() : undefined;
       if (demoConfig.demoMode && !demoContext) {
         setGenerateError("Add a local resume and verified evidence before generating a cover letter.");
@@ -189,7 +198,8 @@ export function CoverLetterPanel({
 
     navigator.clipboard.writeText(textToCopy);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopied(false), 2500);
   };
 
   const handleDownload = () => {
@@ -200,12 +210,7 @@ export function CoverLetterPanel({
     const filename = `Cover_Letter_${(company || "Company").replace(/\s+/g, "_")}.${ext}`;
 
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, filename);
   };
 
   const handleSaveToDatabase = async () => {
@@ -234,7 +239,8 @@ export function CoverLetterPanel({
 
       if (res.ok) {
         setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 3000);
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => setSaveSuccess(false), 3000);
       }
     } catch (err) {
       console.error("Failed to save cover letter:", err);

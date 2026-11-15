@@ -1,5 +1,6 @@
 import { JobRequirements } from "@/lib/jd-parser/types";
 import { EvidenceItemWithBullets } from "@/lib/matching/matcher";
+import { resolveSkillMatch } from "@packages/core/scoring/calculateMatchScore";
 
 export interface CompatibilityResult {
   overallScore: number; // 0 - 100
@@ -43,16 +44,23 @@ function skillsMatch(skillA: string, skillB: string): boolean {
   const a = normalizeSkill(skillA);
   const b = normalizeSkill(skillB);
 
+  if (!a || !b) return false;
   if (a === b) return true;
-  if (a.includes(b) || b.includes(a)) return true;
+
+  const emptyEvidenceMap = new Map<string, { evidenceId: string; bulletId?: string; evidenceTitle: string }>();
+  const resolved = resolveSkillMatch(b, emptyEvidenceMap, new Set([a]));
+  if (resolved.matchType !== "missing") return true;
+
+  const reverseResolved = resolveSkillMatch(a, emptyEvidenceMap, new Set([b]));
+  if (reverseResolved.matchType !== "missing") return true;
 
   const synonyms = COMMON_SYNONYMS[a] || [];
-  if (synonyms.some((syn) => normalizeSkill(syn) === b || b.includes(normalizeSkill(syn)))) {
+  if (synonyms.some((syn) => normalizeSkill(syn) === b)) {
     return true;
   }
 
   const synonymsB = COMMON_SYNONYMS[b] || [];
-  if (synonymsB.some((syn) => normalizeSkill(syn) === a || a.includes(normalizeSkill(syn)))) {
+  if (synonymsB.some((syn) => normalizeSkill(syn) === a)) {
     return true;
   }
 

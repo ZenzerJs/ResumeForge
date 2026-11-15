@@ -5,7 +5,7 @@ interface CompanyLogoProps extends React.SVGProps<SVGSVGElement> {
   size?: number;
 }
 
-export const GoogleLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
+const GoogleLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
   <svg
     width={size}
     height={size}
@@ -22,7 +22,7 @@ export const GoogleLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", 
   </svg>
 );
 
-export const MetaLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
+const MetaLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
   <svg
     width={size}
     height={size}
@@ -36,7 +36,7 @@ export const MetaLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", si
   </svg>
 );
 
-export const AmazonLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
+const AmazonLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
   <svg
     width={size}
     height={size}
@@ -52,7 +52,7 @@ export const AmazonLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", 
   </svg>
 );
 
-export const AppleLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
+const AppleLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
   <svg
     width={size}
     height={size}
@@ -66,7 +66,7 @@ export const AppleLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", s
   </svg>
 );
 
-export const NetflixLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
+const NetflixLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
   <svg
     width={size}
     height={size}
@@ -95,7 +95,7 @@ export const OpenAILogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", 
   </svg>
 );
 
-export const MicrosoftLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
+const MicrosoftLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
   <svg
     width={size}
     height={size}
@@ -112,7 +112,7 @@ export const MicrosoftLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4
   </svg>
 );
 
-export const UberLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
+const UberLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
   <svg
     width={size}
     height={size}
@@ -126,7 +126,7 @@ export const UberLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", si
   </svg>
 );
 
-export const StripeLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
+const StripeLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
   <svg
     width={size}
     height={size}
@@ -140,7 +140,7 @@ export const StripeLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", 
   </svg>
 );
 
-export const DatabricksLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
+const DatabricksLogo: React.FC<CompanyLogoProps> = ({ className = "w-4 h-4", size = 16, ...props }) => (
   <svg
     width={size}
     height={size}

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, Resume } from "@prisma/client";
 import { ProtectedResumeError } from "@/lib/security/protected-resume";
 import { extractResumeFacts } from "@/lib/facts/extract";
 
@@ -33,11 +33,11 @@ export async function createResume(input: CreateResumeInput) {
         data: { isMaster: false },
       });
 
-      const evidence = await (tx as any).evidenceItem.findMany({
+      const evidence = await tx.evidenceItem.findMany({
         where: { status: "verified", ...(input.userId ? { userId: input.userId } : {}) },
         include: { bullets: true },
       });
-      const factSnapshot = extractResumeFacts(input.typstSource, evidence);
+      const factSnapshot = extractResumeFacts(input.typstSource, evidence) as unknown as Prisma.InputJsonValue;
 
       return await tx.resume.create({
         data: {
@@ -45,7 +45,7 @@ export async function createResume(input: CreateResumeInput) {
           typstSource: input.typstSource,
           isMaster: true,
           isProtected: true,
-          factSnapshot: factSnapshot as any,
+          factSnapshot,
           userId: input.userId,
         },
       });
@@ -82,11 +82,14 @@ export async function updateResume(id: string, input: UpdateResumeInput) {
         data: { isMaster: false },
       });
 
-      const evidence = await (tx as any).evidenceItem.findMany({
+      const evidence = await tx.evidenceItem.findMany({
         where: { status: "verified", ...(existing.userId ? { userId: existing.userId } : {}) },
         include: { bullets: true },
       });
-      const factSnapshot = extractResumeFacts(input.typstSource || existing.typstSource, evidence);
+      const factSnapshot = extractResumeFacts(
+        input.typstSource || existing.typstSource,
+        evidence,
+      ) as unknown as Prisma.InputJsonValue;
 
       return await tx.resume.update({
         where: { id },
@@ -95,7 +98,7 @@ export async function updateResume(id: string, input: UpdateResumeInput) {
           typstSource: input.typstSource,
           isMaster: true,
           isProtected: true,
-          factSnapshot: factSnapshot as any,
+          factSnapshot,
         },
       });
     });
@@ -146,7 +149,7 @@ export interface SaveMasterInput {
 
 export interface SaveMasterResult {
   success: boolean;
-  data: any;
+  data: Resume;
   snapshotId?: string;
 }
 
@@ -174,14 +177,17 @@ export async function saveMasterResume(input: SaveMasterInput): Promise<SaveMast
   }
 
   return await prisma.$transaction(async (tx) => {
-    let master: any;
+    let master: Resume;
     const ownerFilter = input.userId ? { userId: input.userId } : {};
 
-    const evidence = await (tx as any).evidenceItem.findMany({
+    const evidence = await tx.evidenceItem.findMany({
       where: { status: "verified", ...ownerFilter },
       include: { bullets: true },
     });
-    const factSnapshot = extractResumeFacts(input.typstSource, evidence);
+    const factSnapshot = extractResumeFacts(
+      input.typstSource,
+      evidence,
+    ) as unknown as Prisma.InputJsonValue;
 
     if (targetId) {
       await tx.resume.updateMany({
@@ -196,7 +202,7 @@ export async function saveMasterResume(input: SaveMasterInput): Promise<SaveMast
           typstSource: input.typstSource,
           isMaster: true,
           isProtected: true,
-          factSnapshot: factSnapshot as any,
+          factSnapshot,
           ...(input.userId ? { userId: input.userId } : {}),
         },
       });
@@ -212,7 +218,7 @@ export async function saveMasterResume(input: SaveMasterInput): Promise<SaveMast
           typstSource: input.typstSource,
           isMaster: true,
           isProtected: true,
-          factSnapshot: factSnapshot as any,
+          factSnapshot,
           userId: input.userId,
         },
       });
@@ -222,7 +228,7 @@ export async function saveMasterResume(input: SaveMasterInput): Promise<SaveMast
     const snapshotSource = currentMaster ? currentMaster.typstSource : input.typstSource;
     const snapshotTitle = currentMaster ? currentMaster.title : (input.title || "Master Resume");
 
-    const snapshot = await (tx as any).masterHistory.create({
+    const snapshot = await tx.masterHistory.create({
       data: {
         resumeId: master.id,
         title: snapshotTitle,
@@ -240,14 +246,14 @@ export async function saveMasterResume(input: SaveMasterInput): Promise<SaveMast
 }
 
 export async function getLatestSnapshot(resumeId: string) {
-  return await (prisma as any).masterHistory.findFirst({
+  return await prisma.masterHistory.findFirst({
     where: { resumeId },
     orderBy: { savedAt: "desc" },
   });
 }
 
 export async function restoreMasterSnapshot(snapshotId: string, userId?: string) {
-  const snapshot = await (prisma as any).masterHistory.findUnique({
+  const snapshot = await prisma.masterHistory.findUnique({
     where: { id: snapshotId },
   });
 

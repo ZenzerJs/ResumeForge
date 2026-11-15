@@ -304,18 +304,6 @@ export function AsciiWaves({
       resizeObserver.observe(canvas.parentElement);
     }
 
-    const origGetContext = canvas.getContext.bind(canvas);
-    canvas.getContext = ((contextId: string, options?: unknown) => {
-      if (
-        !disposed &&
-        canvas.parentElement &&
-        (canvas.parentElement.clientWidth !== width || canvas.parentElement.clientHeight !== height)
-      ) {
-        handleResize();
-      }
-      return origGetContext(contextId as "2d", options as CanvasRenderingContext2DSettings);
-    }) as typeof canvas.getContext;
-
     const handleMotionChange = (e: MediaQueryListEvent) => {
       prefersReduced = e.matches;
       cancelAnimationFrame(animationFrameId);

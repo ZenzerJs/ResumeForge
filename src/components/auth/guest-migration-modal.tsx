@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -62,20 +62,33 @@ export function GuestMigrationModal({
     try {
       const raw = localStorage.getItem("resumeforge_guest_evidence");
       if (!raw) return [];
-      const parsed = JSON.parse(raw);
+      const parsed: unknown = JSON.parse(raw);
       if (!Array.isArray(parsed)) return [];
+      const isRecord = (v: unknown): v is Record<string, unknown> =>
+        typeof v === "object" && v !== null;
       return parsed
-        .filter((item: any) => item && typeof item.title === "string" && item.title.trim().length > 0)
+        .filter(
+          (item): item is Record<string, unknown> & { title: string } =>
+            isRecord(item) && typeof item.title === "string" && item.title.trim().length > 0
+        )
         .slice(0, 50)
-        .map((item: any) => ({
+        .map((item) => ({
           title: item.title.trim(),
           organization: typeof item.organization === "string" ? item.organization : undefined,
           category: typeof item.type === "string" ? item.type.toUpperCase() : "PROJECT",
-          tags: Array.isArray(item.tags) ? item.tags.filter((t: any) => typeof t === "string") : [],
+          tags: Array.isArray(item.tags)
+            ? item.tags.filter((t): t is string => typeof t === "string")
+            : [],
           bullets: Array.isArray(item.bullets)
             ? item.bullets
-                .map((b: any) => (typeof b === "string" ? b : typeof b?.text === "string" ? b.text : ""))
-                .filter((t: string) => t.trim().length > 0)
+                .map((b) =>
+                  typeof b === "string"
+                    ? b
+                    : isRecord(b) && typeof b.text === "string"
+                      ? b.text
+                      : ""
+                )
+                .filter((t) => t.trim().length > 0)
             : typeof item.verifiedSummary === "string" && item.verifiedSummary.trim()
             ? [item.verifiedSummary.trim()]
             : [],

@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { parseMarkdownTable, importTier1Jobs } from "@/lib/ingestion/tier1-importer";
-import { getJobs } from "@/lib/db/jobs";
 
 const SAMPLE_SIMPLIFY_MARKDOWN_TABLE = `
 | Company | Role | Location | Application Link | Age |

@@ -1,7 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../src/lib/prisma";
 import { normalizeCompany } from "../src/lib/company";
-
-const prisma = new PrismaClient();
 
 // Default branch unverified — try main, fall back to master.
 const REPO_RAW_URLS = [

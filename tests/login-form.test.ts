@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { LoginForm, resolvePostLoginRedirect } from "@/components/auth/login-form";
 import { CompetitiveMatrixSection } from "@/components/landing/competitive-matrix-section";
 import { AtsSandboxSection } from "@/components/landing/ats-sandbox-section";
@@ -81,10 +82,13 @@ describe("Sign In & Landing Page Polish Unit Tests", () => {
   });
 
   describe("CompetitiveMatrixSection Typography & Competitor Renaming", () => {
-    it("renders CompetitiveMatrixSection component without error", () => {
+    it("consolidates comparison columns into a single Competitors column without named competitor brands", () => {
       expect(typeof CompetitiveMatrixSection).toBe("function");
-      const element = React.createElement(CompetitiveMatrixSection);
-      expect(element).toBeTruthy();
+      const html = renderToStaticMarkup(React.createElement(CompetitiveMatrixSection));
+      expect(html).toContain("Architectural Moat");
+      expect(html).toContain("ResumeForge (Guest / Postgres)");
+      expect(html).toContain("Competitors");
+      expect(html).not.toMatch(/\b(Teal|Simplify|Jobright)\b/i);
     });
   });
 

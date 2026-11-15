@@ -14,6 +14,7 @@ import { AiMarkdownRenderer } from "@/components/editor/ai-markdown-renderer";
 import { ToolBadge } from "@/components/editor/tool-badge";
 import type { ChatMessage, ChatStreamChunk, ToolCallRecord } from "@/lib/ai/chat-types";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
+import { fetchDemoConfig } from "@/components/auth/session-user";
 
 const STORAGE_KEY = "resumeforge_chat_messages";
 
@@ -61,7 +62,19 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
   }, []);
 
   useEffect(() => {
-    void fetch("/api/demo-config").then((res) => res.json()).then((config) => setDemoMode(config.demoMode === true)).catch(() => {});
+    let cancelled = false;
+    void fetchDemoConfig().then((config) => {
+      if (!cancelled) setDemoMode(config.demoMode === true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -243,6 +256,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
   );
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       void sendMessage();

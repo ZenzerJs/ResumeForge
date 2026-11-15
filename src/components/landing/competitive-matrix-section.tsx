@@ -5,7 +5,6 @@ import {
   ShieldCheck,
   CheckCircle2,
   XCircle,
-  AlertTriangle,
   Zap,
   Lock,
   FileCode,
@@ -24,17 +23,7 @@ interface MatrixRow {
   competitors: {
     title: string;
     summary: string;
-    status: "drawback" | "warning";
-  };
-  teal: {
-    title: string;
-    summary: string;
-    status: "drawback" | "warning";
-  };
-  simplify: {
-    title: string;
-    summary: string;
-    status: "drawback" | "warning";
+    status: "drawback";
   };
 }
 
@@ -50,22 +39,10 @@ const MATRIX_DATA: MatrixRow[] = [
       status: "winner",
     },
     competitors: {
-      title: "Black-Box LLM Rewrites",
+      title: "Black-Box Rewrites & Rephrasing",
       summary:
-        "Opaque generative prompts that freely invent metrics, unverified tool experience, and phantom job responsibilities to inflate scores.",
+        "Opaque generative prompts and synonym wrappers without a candidate evidence repository or citation verification pipeline—inviting fabricated metrics and unverified skills.",
       status: "drawback",
-    },
-    teal: {
-      title: "Ungrounded Prompting",
-      summary:
-        "Basic OpenAI completion wrappers without a candidate evidence repository or citation verification pipeline.",
-      status: "drawback",
-    },
-    simplify: {
-      title: "Generic Bullet Rephraser",
-      summary:
-        "Standard synonym substitutions without semantic verification or evidence anchoring.",
-      status: "warning",
     },
   },
   {
@@ -79,22 +56,10 @@ const MATRIX_DATA: MatrixRow[] = [
       status: "winner",
     },
     competitors: {
-      title: "$39.99/mo + 4 Quota Pools",
+      title: "$20–$40/mo Paywalls & Daily Quotas",
       summary:
-        "Aggressive daily quotas split into 4 metered credit pools (Search, Tailor, Apply, Auto-apply) designed to force expensive tier upgrades.",
+        "Core ATS analysis, unlimited keyword checks, and exports gated behind recurring subscriptions or split credit pools designed to force tier upgrades.",
       status: "drawback",
-    },
-    teal: {
-      title: "$29/mo Teal+ Feature Gating",
-      summary:
-        "Core ATS analysis, unlimited keyword checks, and template exports locked behind a recurring weekly or monthly paywall.",
-      status: "drawback",
-    },
-    simplify: {
-      title: "$20/mo Premium / Daily Limits",
-      summary:
-        "Free tier throttled with artificial daily submission caps to convert job seekers into recurring subscribers.",
-      status: "warning",
     },
   },
   {
@@ -108,21 +73,9 @@ const MATRIX_DATA: MatrixRow[] = [
       status: "winner",
     },
     competitors: {
-      title: "Monetized Recruiter Talent Pool",
+      title: "Centralized Cloud & Telemetry Capture",
       summary:
-        "Terms permit candidate profiles and resume data to be indexed and resold to enterprise recruiters via search portals.",
-      status: "drawback",
-    },
-    teal: {
-      title: "Centralized Cloud Storage",
-      summary:
-        "All candidate resumes, work history, and job search targets reside in a centralized cloud database used for platform analytics.",
-      status: "warning",
-    },
-    simplify: {
-      title: "Extension Scraping & Central Sync",
-      summary:
-        "Browser extension captures and exfiltrates candidate form inputs and job application URLs to centralized servers.",
+        "Resumes, work history, and form inputs are synced to centralized servers or captured by browser extensions, with terms often permitting analytics or recruiter indexing.",
       status: "drawback",
     },
   },
@@ -137,21 +90,9 @@ const MATRIX_DATA: MatrixRow[] = [
       status: "winner",
     },
     competitors: {
-      title: "Generic HTML-to-PDF Printing",
+      title: "HTML-to-PDF & Basic Print Exports",
       summary:
-        "Headless Chromium PDF printing prone to awkward line breaks, orphan headings, and multi-page spillover.",
-      status: "drawback",
-    },
-    teal: {
-      title: "Web DOM to PDF Converter",
-      summary:
-        "Standard CSS print stylesheets with rudimentary font embedding and limited typographic control.",
-      status: "warning",
-    },
-    simplify: {
-      title: "Plaintext & Basic HTML Export",
-      summary:
-        "Basic HTML-formatted text with minimal design options, geared toward autofill copy-paste rather than publication-grade PDFs.",
+        "Headless DOM/CSS print stylesheets and basic HTML builders prone to awkward line breaks, orphan headings, limited typographic control, and multi-page spillover.",
       status: "drawback",
     },
   },
@@ -166,21 +107,9 @@ const MATRIX_DATA: MatrixRow[] = [
       status: "winner",
     },
     competitors: {
-      title: "Opaque LLM Heuristics",
+      title: "Opaque Heuristics & Raw String Matching",
       summary:
-        "Unpredictable 0-100 match score derived from non-deterministic LLM temperature with zero visible calculation steps.",
-      status: "drawback",
-    },
-    teal: {
-      title: "Naive Keyword Density Counter",
-      summary:
-        "Simple keyword frequency counter vulnerable to keyword stuffing. Ignores seniority gap deductions and framework relationships.",
-      status: "warning",
-    },
-    simplify: {
-      title: "Raw String Matching",
-      summary:
-        "Literal string matching without tech alias graph (fails to recognize that React implies JavaScript or FastAPI implies Python).",
+        "Unpredictable LLM scores or naive keyword density counters that miss tech aliases (e.g., React implies JavaScript) and ignore seniority gap deductions.",
       status: "drawback",
     },
   },
@@ -208,23 +137,17 @@ export function CompetitiveMatrixSection() {
 
       {/* Comparison Table */}
       <div className="overflow-x-auto rounded-[10px] surface-raised edge-glow">
-        <table className="w-full text-left border-collapse min-w-[920px]">
+        <table className="w-full text-left border-collapse min-w-[680px]">
           <thead>
             <tr className="border-b border-outline/70 bg-inset">
-              <th className="p-4 md:p-5 text-xs md:text-sm font-mono uppercase tracking-wider text-on-surface-variant w-[22%]">
+              <th className="p-4 md:p-5 text-xs md:text-sm font-mono uppercase tracking-wider text-on-surface-variant w-[26%]">
                 Architectural Moat
               </th>
-              <th className="p-4 md:p-5 text-xs md:text-sm font-mono uppercase tracking-wider text-primary bg-primary/10 border-x border-primary/30 w-[30%]">
+              <th className="p-4 md:p-5 text-xs md:text-sm font-mono uppercase tracking-wider text-primary bg-primary/10 border-x border-primary/30 w-[38%]">
                 ResumeForge (Guest / Postgres)
               </th>
-              <th className="p-4 md:p-5 text-xs md:text-sm font-mono uppercase tracking-wider text-on-surface-variant w-[16%]">
+              <th className="p-4 md:p-5 text-xs md:text-sm font-mono uppercase tracking-wider text-on-surface-variant w-[36%]">
                 Competitors
-              </th>
-              <th className="p-4 md:p-5 text-xs md:text-sm font-mono uppercase tracking-wider text-on-surface-variant w-[16%]">
-                Teal
-              </th>
-              <th className="p-4 md:p-5 text-xs md:text-sm font-mono uppercase tracking-wider text-on-surface-variant w-[16%]">
-                Simplify
               </th>
             </tr>
           </thead>
@@ -278,44 +201,6 @@ export function CompetitiveMatrixSection() {
                         </div>
                         <p className="text-on-surface-variant leading-relaxed text-xs md:text-sm">
                           {row.competitors.summary}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Teal Column */}
-                  <td className="p-4 md:p-5 align-top text-on-surface-variant">
-                    <div className="flex items-start gap-2">
-                      {row.teal.status === "drawback" ? (
-                        <XCircle className="h-4 w-4 text-status-danger shrink-0 mt-0.5" aria-hidden />
-                      ) : (
-                        <AlertTriangle className="h-4 w-4 text-status-warning shrink-0 mt-0.5" aria-hidden />
-                      )}
-                      <div>
-                        <div className="font-semibold text-xs md:text-sm text-foreground mb-1.5">
-                          {row.teal.title}
-                        </div>
-                        <p className="text-on-surface-variant leading-relaxed text-xs md:text-sm">
-                          {row.teal.summary}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Simplify Column */}
-                  <td className="p-4 md:p-5 align-top text-on-surface-variant">
-                    <div className="flex items-start gap-2">
-                      {row.simplify.status === "drawback" ? (
-                        <XCircle className="h-4 w-4 text-status-danger shrink-0 mt-0.5" aria-hidden />
-                      ) : (
-                        <AlertTriangle className="h-4 w-4 text-status-warning shrink-0 mt-0.5" aria-hidden />
-                      )}
-                      <div>
-                        <div className="font-semibold text-xs md:text-sm text-foreground mb-1.5">
-                          {row.simplify.title}
-                        </div>
-                        <p className="text-on-surface-variant leading-relaxed text-xs md:text-sm">
-                          {row.simplify.summary}
                         </p>
                       </div>
                     </div>

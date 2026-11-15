@@ -41,6 +41,8 @@ import { ResumeFacts } from "@/lib/facts/types";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
 import { getDemoContextFromBrowser } from "@/lib/demo-client";
 import type { Gap } from "@/lib/ai/patch-schema";
+import { fetchDemoConfig } from "@/components/auth/session-user";
+import { downloadBlob } from "@/lib/utils";
 
 export interface TrackerJobItem {
   id: string;
@@ -343,7 +345,7 @@ export function ApplySheet({
       // Generate a saved proposal batch for signed-in use, or a stateless BYOK
       // proposal set for the browser-local public demo.
       if (!patchBatch && !demoLocalPatches && (reqs.requiredSkills.length > 0 || reqs.preferredSkills.length > 0)) {
-        const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+        const demoConfig = await fetchDemoConfig();
         const isDemo = demoConfig?.demoMode === true;
         const aiConfig = await resolveClientProviderConfig();
         if (!aiConfig) {
@@ -442,15 +444,8 @@ export function ApplySheet({
 
       const pdfBytes = await compileTypstToPdf(workingTypst);
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
       const safeName = (job.company || "Job").replace(/[^a-zA-Z0-9_-]/g, "_");
-      a.download = `${safeName}_Resume.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `${safeName}_Resume.pdf`);
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "Failed to download PDF");
     }
@@ -468,15 +463,8 @@ export function ApplySheet({
       const blob = new Blob([docxBytes.buffer as ArrayBuffer], {
         type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
       const safeName = (job.company || "Job").replace(/[^a-zA-Z0-9_-]/g, "_");
-      a.download = `${safeName}_Resume.docx`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `${safeName}_Resume.docx`);
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "Failed to download DOCX");
     }
@@ -505,14 +493,7 @@ export function ApplySheet({
       const blob = new Blob([zipBytes.buffer as ArrayBuffer], {
         type: "application/zip",
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = sanitizeZipFilename(job.company, job.roleTitle);
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, sanitizeZipFilename(job.company, job.roleTitle));
     } catch (err) {
       setExportError(
         err instanceof Error

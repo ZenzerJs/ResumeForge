@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Briefcase, Sparkles } from "lucide-react";
 import { ALL_QUESTIONS } from "@/lib/interview/questionDatabase";
@@ -9,8 +10,19 @@ import { PageHeader } from "@/components/design-system/page-header";
 import { StatusPill } from "@/components/design-system/status-pill";
 import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
 import { InterviewHub } from "@/components/interview/interview-hub";
-import { DsaWorkspace } from "@/components/interview/dsa-workspace";
 import { cn } from "@/lib/utils";
+
+const DsaWorkspace = dynamic(
+  () => import("@/components/interview/dsa-workspace").then((m) => m.DsaWorkspace),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex flex-1 items-center justify-center p-8 text-xs font-mono text-muted-foreground">
+        Loading DSA runner…
+      </div>
+    ),
+  }
+);
 
 interface TrackedJobOption {
   id: string;

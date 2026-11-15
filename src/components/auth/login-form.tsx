@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2, Lock, Mail, User } from "lucide-react";
+import { fetchDemoConfig } from "@/components/auth/session-user";
 
 export type AuthMode = "signin" | "signup";
 
@@ -71,12 +72,16 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    void fetch("/api/demo-config").then((res) => res.json()).then((config) => {
-      if (config?.signupEnabled === false) {
+    let cancelled = false;
+    void fetchDemoConfig().then((config) => {
+      if (!cancelled && config?.signupEnabled === false) {
         setSignupEnabled(false);
         setMode("signin");
       }
-    }).catch(() => {});
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {

@@ -24,6 +24,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
+  fetchDemoConfig,
   fetchSessionUser,
   signOutAndRedirect,
   usernameInitial,
@@ -149,9 +150,13 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
   const mobileMenuTriggerRef = React.useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    void fetch("/api/demo-config").then((res) => res.json()).then((config) => {
-      if (config?.signupEnabled === false) setSignupEnabled(false);
-    }).catch(() => {});
+    let cancelled = false;
+    void fetchDemoConfig().then((config) => {
+      if (!cancelled && config?.signupEnabled === false) setSignupEnabled(false);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {

@@ -1,13 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Plus,
   Edit2,
   Archive,
   Loader2,
-  Tag,
   Upload,
   Search,
   CheckCircle2,
@@ -19,11 +17,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/design-system/app-shell";
+import { fetchDemoConfig } from "@/components/auth/session-user";
 import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ExtractedPdfEvidence } from "@/lib/evidence/pdfExtractor";
-import { convertExtractedPdfToEvidenceItems, type CreateEvidencePayload } from "@/lib/evidence/evidence-transform";
+import { convertExtractedPdfToEvidenceItems } from "@/lib/evidence/evidence-transform";
 import { initializeDemoSamples } from "@/lib/demo-client";
 import {
   Dialog,
@@ -108,10 +107,17 @@ export function LibraryWorkspace() {
     bulletsInput: [""],
   });
 
+  const fetchAbortRef = useRef<AbortController | null>(null);
+
   const fetchItems = useCallback(async () => {
+    fetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
+
     try {
       setIsLoading(true);
-      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      const demoConfig = await fetchDemoConfig();
+      if (controller.signal.aborted) return;
       let loadedItems: EvidenceItem[] = [];
       if (demoConfig.demoMode) {
         initializeDemoSamples();
@@ -120,8 +126,9 @@ export function LibraryWorkspace() {
         loadedItems = filterStatus === "all" ? localItems : localItems.filter((item) => item.status === filterStatus);
       } else {
         const url = filterStatus === "all" ? "/api/evidence" : `/api/evidence?status=${filterStatus}`;
-        const res = await fetch(url);
+        const res = await fetch(url, { signal: controller.signal });
         const json = await res.json();
+        if (controller.signal.aborted) return;
         if (!json.success) throw new Error("Failed to fetch evidence items.");
         loadedItems = json.data || [];
         try {
@@ -169,6 +176,7 @@ export function LibraryWorkspace() {
         return item;
       });
 
+      if (controller.signal.aborted) return;
       setItems(annotated);
       // Expand first item by default while preserving existing expanded items
       if (annotated.length > 0) {
@@ -178,14 +186,20 @@ export function LibraryWorkspace() {
         }));
       }
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       console.error("Failed to fetch evidence items:", err);
     } finally {
-      setIsLoading(false);
+      if (!controller.signal.aborted) {
+        setIsLoading(false);
+      }
     }
   }, [filterStatus]);
 
   useEffect(() => {
-    fetchItems();
+    void fetchItems();
+    return () => {
+      fetchAbortRef.current?.abort();
+    };
   }, [fetchItems]);
 
   useEffect(() => {
@@ -200,15 +214,22 @@ export function LibraryWorkspace() {
     setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const filteredItems = items.filter((item) => {
-    if (!searchQuery.trim()) return true;
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return items;
     const query = searchQuery.toLowerCase();
-    const matchTitle = item.title.toLowerCase().includes(query);
-    const matchOrg = item.organization?.toLowerCase().includes(query) ?? false;
-    const matchSummary = item.verifiedSummary.toLowerCase().includes(query);
-    const matchTags = item.tags.some((t) => t.toLowerCase().includes(query));
-    return matchTitle || matchOrg || matchSummary || matchTags;
-  });
+    return items.filter((item) => {
+      const matchTitle = item.title.toLowerCase().includes(query);
+      const matchOrg = item.organization?.toLowerCase().includes(query) ?? false;
+      const matchSummary = item.verifiedSummary.toLowerCase().includes(query);
+      const matchTags = item.tags.some((t) => t.toLowerCase().includes(query));
+      return matchTitle || matchOrg || matchSummary || matchTags;
+    });
+  }, [items, searchQuery]);
+
+  const reviewItems = useMemo(
+    () => items.filter((item) => item.needsReview),
+    [items]
+  );
 
   const openCreateModal = (opener?: HTMLElement | null) => {
     modalOpenerRef.current =
@@ -492,6 +513,11 @@ export function LibraryWorkspace() {
           continue;
         }
 
+        const normalizedBullets: Bullet[] = Array.isArray(rawItem.bullets)
+          ? rawItem.bullets.map((b: string | Bullet) =>
+              typeof b === "string" ? { text: b, verified: true } : b
+            )
+          : [];
         const payload = {
           type: rawItem.type || "experience",
           title: rawItem.title,
@@ -500,11 +526,7 @@ export function LibraryWorkspace() {
           verifiedSummary: rawItem.verifiedSummary,
           tags: Array.isArray(rawItem.tags) ? rawItem.tags : [],
           status: rawItem.status || "verified",
-          bullets: Array.isArray(rawItem.bullets)
-            ? rawItem.bullets.map((b: string | Bullet) =>
-                typeof b === "string" ? { text: b, verified: true } : b
-              )
-            : [],
+          bullets: normalizedBullets,
         };
 
         const res = await fetch("/api/evidence", {
@@ -526,7 +548,7 @@ export function LibraryWorkspace() {
             verifiedSummary: payload.verifiedSummary,
             tags: payload.tags,
             status: payload.status,
-            bullets: payload.bullets.map((b: any, idx: number) => ({
+            bullets: payload.bullets.map((b, idx) => ({
               id: `b-${idx}-${Date.now()}`,
               evidenceItemId: "",
               text: b.text,
@@ -634,37 +656,32 @@ export function LibraryWorkspace() {
         </div>
 
         {/* Toast Notification Banner */}
-        <AnimatePresence>
-          {notification && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className={`p-3.5 rounded-lg border flex items-center justify-between text-xs font-medium ${
-                notification.type === "success"
-                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                  : "bg-red-500/10 border-red-500/30 text-red-400"
-              }`}
+        {notification && (
+          <div
+            className={`p-3.5 rounded-lg border flex items-center justify-between text-xs font-medium transition-all duration-150 ease-out ${
+              notification.type === "success"
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                : "bg-red-500/10 border-red-500/30 text-red-400"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {notification.type === "success" ? (
+                <CheckCircle2 className="h-4 w-4" />
+              ) : (
+                <AlertCircle className="h-4 w-4" />
+              )}
+              <span>{notification.message}</span>
+            </div>
+            <button
+              type="button"
+              aria-label="Dismiss notification"
+              onClick={() => setNotification(null)}
+              className="inline-flex min-h-11 min-w-11 items-center justify-center text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <div className="flex items-center gap-2">
-                {notification.type === "success" ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <AlertCircle className="h-4 w-4" />
-                )}
-                <span>{notification.message}</span>
-              </div>
-              <button
-                type="button"
-                aria-label="Dismiss notification"
-                onClick={() => setNotification(null)}
-                className="inline-flex min-h-11 min-w-11 items-center justify-center text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <X className="h-4 w-4" aria-hidden />
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
+        )}
 
         {/* Tabs */}
         <div
@@ -700,9 +717,9 @@ export function LibraryWorkspace() {
             className={`px-4 py-2 text-sm font-semibold transition-colors ${activeTab === "review" ? "text-primary" : "text-muted-foreground hover:text-foreground"} flex items-center gap-2`}
           >
             Review Queue
-            {items.filter(i => i.needsReview).length > 0 && (
+            {reviewItems.length > 0 && (
               <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums">
-                {items.filter(i => i.needsReview).length}
+                {reviewItems.length}
               </span>
             )}
           </button>
@@ -898,24 +915,17 @@ export function LibraryWorkspace() {
                   )}
 
                   {/* Expanded Bullets List */}
-                  <AnimatePresence>
-                    {isExpanded && item.bullets && item.bullets.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mt-4 pt-4 border-t border-hairline pl-7"
-                      >
-                        <ul className="space-y-2 text-xs text-text-secondary list-disc pl-4 font-sans">
-                          {item.bullets.map((b, idx) => (
-                            <li key={b.id || idx} className="leading-relaxed">
-                              {b.text}
-                            </li>
-                          ))}
-                        </ul>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  {isExpanded && item.bullets && item.bullets.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-hairline pl-7 transition-all duration-150 ease-out">
+                      <ul className="space-y-2 text-xs text-text-secondary list-disc pl-4 font-sans">
+                        {item.bullets.map((b, idx) => (
+                          <li key={b.id || idx} className="leading-relaxed">
+                            {b.text}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -924,14 +934,12 @@ export function LibraryWorkspace() {
         </>
         ) : (
           <div className="grid gap-4" data-testid="duplicate-review-queue">
-            {items.filter((item) => item.needsReview).length === 0 ? (
+            {reviewItems.length === 0 ? (
               <div className="rounded-xl border-dashed surface-raised text-center p-10 text-muted-foreground text-xs font-mono">
                 No duplicate or overlapping evidence items need review.
               </div>
             ) : (
-              items
-                .filter((item) => item.needsReview)
-                .map((item) => (
+              reviewItems.map((item) => (
                   <div
                     key={item.id}
                     data-testid={`duplicate-review-card-${item.id}`}

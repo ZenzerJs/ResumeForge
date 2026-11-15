@@ -19,6 +19,7 @@ import { RoleProfile, ROLE_PROFILES, AtsEvaluationResult } from "@/lib/ats-evalu
 import { auditResume } from "@/lib/diagnostics/auditResume";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
 import { getDemoContextFromBrowser, initializeDemoSamples } from "@/lib/demo-client";
+import { fetchDemoConfig } from "@/components/auth/session-user";
 import { DEMO_JOB } from "@/lib/demo-samples";
 import dynamic from "next/dynamic";
 import { PatchDiffReview } from "./patch-diff-review";
@@ -262,7 +263,7 @@ export function TailorWorkspace() {
   useEffect(() => {
     async function loadMasterOrStarterResume() {
       try {
-        const config = await (await fetch("/api/demo-config")).json();
+        const config = await fetchDemoConfig();
         if (config?.demoMode) {
           initializeDemoSamples();
           setCompany(DEMO_JOB.company);
@@ -366,7 +367,7 @@ export function TailorWorkspace() {
     setCoverLetterDraft(null);
     async function loadJobById() {
       try {
-        const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+        const demoConfig = await fetchDemoConfig();
         if (demoConfig?.demoMode) {
           const rawJobs = localStorage.getItem("resumeforge_guest_jobs");
           const jobs = rawJobs ? JSON.parse(rawJobs) : [];
@@ -528,7 +529,7 @@ export function TailorWorkspace() {
     setPatchReviewGeneration((generation) => generation + 1);
 
     try {
-      const demoConfig = await (await fetch("/api/demo-config")).json().catch(() => ({}));
+      const demoConfig = await fetchDemoConfig();
       const isDemo = demoConfig?.demoMode === true;
       let jobId: string | null = null;
       let demoContext: ReturnType<typeof getDemoContextFromBrowser>;
@@ -697,33 +698,51 @@ export function TailorWorkspace() {
     fetchMatches(updated);
   };
 
-  const skillIsCovered = (skill: string) => {
-    const needle = skill.toLowerCase();
-    return matches.some(
-      (m) =>
-        m.matchedRequirements.some((r) => r.toLowerCase().includes(needle) || needle.includes(r.toLowerCase())) ||
-        m.verifiedSummary.toLowerCase().includes(needle) ||
-        m.matchedBullets.some((b) => b.text.toLowerCase().includes(needle))
-    );
-  };
+  const coveredSkills = useMemo(() => {
+    const skills = [
+      ...(extractedRequirements?.requiredSkills ?? []),
+      ...(extractedRequirements?.preferredSkills ?? []),
+    ];
+    const covered = new Set<string>();
+    if (skills.length === 0 || matches.length === 0) return covered;
+    for (const skill of skills) {
+      const needle = skill.toLowerCase();
+      const isMatch = matches.some(
+        (m) =>
+          m.matchedRequirements.some(
+            (r) => r.toLowerCase().includes(needle) || needle.includes(r.toLowerCase())
+          ) ||
+          m.verifiedSummary.toLowerCase().includes(needle) ||
+          m.matchedBullets.some((b) => b.text.toLowerCase().includes(needle))
+      );
+      if (isMatch) covered.add(skill);
+    }
+    return covered;
+  }, [extractedRequirements, matches]);
 
-  // Ensure a job record exists so CoverLetterPanel can generate,
-  // and keep company / role / description / requirements synced in PostgreSQL.
+  const { verifiedRequiredSkills, missingRequiredSkills } = useMemo(() => {
+    const required = extractedRequirements?.requiredSkills ?? [];
+    return {
+      verifiedRequiredSkills: required.filter((s) => coveredSkills.has(s)),
+      missingRequiredSkills: required.filter((s) => !coveredSkills.has(s)),
+    };
+  }, [extractedRequirements, coveredSkills]);
+
+  const highlightedJdView = useMemo(
+    () => renderHighlightedJd(rawDescription, extractedRequirements?.requiredSkills ?? []),
+    [rawDescription, extractedRequirements?.requiredSkills]
+  );
+
+  const pendingRescanRef = useRef(false);
+
+  // Auto-rescan debounce when rawDescription changes (runs before auto-save to prevent double DB writes)
   useEffect(() => {
-    if (!userEditedRef.current) return;
-    if (!rawDescription.trim()) return;
-    const timer = setTimeout(() => {
-      void ensureJobSaved({ forceUpdate: true });
-    }, 900);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawDescription, company, roleTitle, extractedRequirements]);
+    if (!userEditedRef.current || !rawDescription.trim() || rawDescription.length < 50) {
+      pendingRescanRef.current = false;
+      return;
+    }
 
-  // Auto-rescan debounce when rawDescription changes
-  useEffect(() => {
-    if (!userEditedRef.current) return;
-    if (!rawDescription.trim() || rawDescription.length < 50) return;
-
+    pendingRescanRef.current = true;
     const generation = ++scanGenerationRef.current;
     const controller = new AbortController();
     const timer = setTimeout(async () => {
@@ -738,8 +757,10 @@ export function TailorWorkspace() {
         });
         const json = await res.json();
         if (generation !== scanGenerationRef.current) return;
+        pendingRescanRef.current = false;
         if (res.status === 401) {
           setErrorMessage(json.error || "Sign in to extract job requirements.");
+          void ensureJobSaved({ forceUpdate: true });
           return;
         }
         if (res.ok && json.success && json.data) {
@@ -748,21 +769,42 @@ export function TailorWorkspace() {
             setRoleTitle(json.data.roleTitle);
           }
           await fetchMatches(json.data, controller.signal);
+        } else {
+          void ensureJobSaved({ forceUpdate: true });
         }
       } catch (err) {
         if (controller.signal.aborted) return;
+        pendingRescanRef.current = false;
+        void ensureJobSaved({ forceUpdate: true });
         console.error("Auto-rescan error:", err);
       } finally {
-        if (generation === scanGenerationRef.current) setIsAutoScanning(false);
+        if (generation === scanGenerationRef.current) {
+          pendingRescanRef.current = false;
+          setIsAutoScanning(false);
+        }
       }
     }, 1200);
 
     return () => {
+      pendingRescanRef.current = false;
       controller.abort();
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawDescription]);
+
+  // Ensure a job record exists so CoverLetterPanel can generate,
+  // and keep company / role / description / requirements synced in PostgreSQL.
+  useEffect(() => {
+    if (!userEditedRef.current) return;
+    if (!rawDescription.trim()) return;
+    if (pendingRescanRef.current) return;
+    const timer = setTimeout(() => {
+      void ensureJobSaved({ forceUpdate: true });
+    }, 900);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawDescription, company, roleTitle, extractedRequirements]);
 
   // Refresh matches when requirements present on mount
   useEffect(() => {
@@ -1084,8 +1126,8 @@ export function TailorWorkspace() {
                   </span>
                   <TechDiffPillList
                     allRequiredSkills={extractedRequirements.requiredSkills}
-                    verifiedSkillNames={extractedRequirements.requiredSkills.filter(skillIsCovered)}
-                    missingSkillNames={extractedRequirements.requiredSkills.filter((s) => !skillIsCovered(s))}
+                    verifiedSkillNames={verifiedRequiredSkills}
+                    missingSkillNames={missingRequiredSkills}
                     maxDisplay={10}
                   />
                 </div>
@@ -1099,10 +1141,7 @@ export function TailorWorkspace() {
                   data-testid="tailor-jd-highlighted-view"
                   className="flex-1 overflow-y-auto max-h-[600px] p-4 bg-inset border border-hairline rounded-lg text-sm text-on-surface-variant space-y-2 leading-relaxed break-words"
                 >
-                  {renderHighlightedJd(
-                    rawDescription,
-                    extractedRequirements?.requiredSkills ?? []
-                  )}
+                  {highlightedJdView}
                 </div>
               </div>
             </section>
@@ -1314,8 +1353,8 @@ export function TailorWorkspace() {
                 </span>
                 <TechDiffPillList
                   allRequiredSkills={extractedRequirements.requiredSkills}
-                  verifiedSkillNames={extractedRequirements.requiredSkills.filter(skillIsCovered)}
-                  missingSkillNames={extractedRequirements.requiredSkills.filter((s) => !skillIsCovered(s))}
+                  verifiedSkillNames={verifiedRequiredSkills}
+                  missingSkillNames={missingRequiredSkills}
                   maxDisplay={8}
                 />
               </div>
@@ -1732,7 +1771,7 @@ export function TailorWorkspace() {
                         <h3 className="font-mono text-xs text-muted-foreground mb-2">Required Skills</h3>
                         <div className="flex flex-wrap gap-2">
                           {extractedRequirements.requiredSkills.map((skill) => {
-                            const covered = skillIsCovered(skill);
+                            const covered = coveredSkills.has(skill);
                             return (
                               <div
                                 key={skill}

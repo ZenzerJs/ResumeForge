@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useLayoutEffect } from "react";
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react";
 import Link from "next/link";
 import {
   X,
@@ -114,6 +114,13 @@ export function ApplyPrepSheetModal({
   const [isFetchingOa, setIsFetchingOa] = useState(false);
   const [oaMatched, setOaMatched] = useState(false);
   const [isFallback, setIsFallback] = useState(false);
+  const copyTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (isOpen && initialTab) {
@@ -247,7 +254,8 @@ export function ApplyPrepSheetModal({
         await navigator.clipboard.writeText(text);
         setCopiedKey(key);
         setFallbackText(null);
-        setTimeout(() => setCopiedKey(null), 2000);
+        if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = window.setTimeout(() => setCopiedKey(null), 2000);
       } else {
         setFallbackText(text);
         setCopiedKey(null);

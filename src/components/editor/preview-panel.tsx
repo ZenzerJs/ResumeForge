@@ -6,6 +6,7 @@ import { sanitizeTypstSvg } from "@/lib/typst/svg-sanitize";
 import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2, BarChart3, Sparkles, FileText, ChevronDown, Package, MoreHorizontal } from "lucide-react";
 import dynamic from "next/dynamic";
 import { cleanTypstToText, sanitizeZipFilename } from "@/lib/export/zip";
+import { downloadBlob } from "@/lib/utils";
 import { assertCanExport } from "@/lib/guardrail/policy";
 import { ResumeFacts } from "@/lib/facts/types";
 import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
@@ -403,14 +404,7 @@ export function PreviewPanel({
       const pdfBytes = resolvedExport?.pdf || await compileTypstToPdf(source, { mode: "export" });
       if (sourceRef.current !== source) throw new Error("The document changed during export. Try again.");
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "resume.pdf";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, "resume.pdf");
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "Failed to export PDF");
     } finally {
@@ -431,14 +425,7 @@ export function PreviewPanel({
       const blob = new Blob([docxBytes.buffer as ArrayBuffer], {
         type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "resume.docx";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, "resume.docx");
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "Failed to export DOCX");
     } finally {
@@ -449,14 +436,7 @@ export function PreviewPanel({
   const handleExportTypst = () => {
     try {
       const blob = new Blob([source], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "resume.typ";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, "resume.typ");
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "Failed to export Typst source");
     }
@@ -467,14 +447,7 @@ export function PreviewPanel({
       const cleanTxt = cleanTypstToText(source);
 
       const blob = new Blob([cleanTxt], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "resume.txt";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, "resume.txt");
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "Failed to export Text resume");
     }
@@ -500,14 +473,7 @@ export function PreviewPanel({
       const blob = new Blob([JSON.stringify(jsonResume, null, 2)], {
         type: "application/json;charset=utf-8",
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "resume.json";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, "resume.json");
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "Failed to export JSON resume");
     }
@@ -541,14 +507,7 @@ export function PreviewPanel({
       const blob = new Blob([zipBytes.buffer as ArrayBuffer], {
         type: "application/zip",
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = sanitizeZipFilename("Target_Company", roleTitle || "Resume");
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, sanitizeZipFilename("Target_Company", roleTitle || "Resume"));
     } catch (err) {
       setExportError(
         err instanceof Error

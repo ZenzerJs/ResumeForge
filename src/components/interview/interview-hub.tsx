@@ -45,14 +45,18 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
     }
   }, [targetCompany]);
 
-  useEffect(() => {
-    if (!selectedQuestion) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSelectedQuestion(null);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [selectedQuestion]);
+  const TRACK_FILTERS: ReadonlyArray<{ id: InterviewTrack | "all"; label: string }> = [
+    { id: "all", label: "All Tracks" },
+    { id: "algorithms", label: "Algorithms (NeetCode 150)" },
+    { id: "system_design", label: "System Design" },
+    { id: "oa_screening", label: "OA Screening" },
+  ];
+  const DIFFICULTY_FILTERS: ReadonlyArray<"all" | "Easy" | "Medium" | "Hard"> = [
+    "all",
+    "Easy",
+    "Medium",
+    "Hard",
+  ];
 
   const filteredQuestions = ALL_QUESTIONS.filter(q => {
     if (track !== "all" && q.track !== track) return false;
@@ -77,15 +81,10 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Track Filters */}
           <div className="flex flex-wrap gap-1.5">
-            {[
-              { id: "all", label: "All Tracks" },
-              { id: "algorithms", label: "Algorithms (NeetCode 150)" },
-              { id: "system_design", label: "System Design" },
-              { id: "oa_screening", label: "OA Screening" }
-            ].map(t => (
+            {TRACK_FILTERS.map(t => (
               <button
                 key={t.id}
-                onClick={() => setTrack(t.id as any)}
+                onClick={() => setTrack(t.id)}
                 className={`px-3 py-1.5 rounded-[6px] text-xs font-semibold transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   track === t.id
                     ? "bg-primary/15 border-primary/40 text-primary"
@@ -99,10 +98,10 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
 
           {/* Difficulty Filters */}
           <div className="flex gap-1.5">
-            {["all", "Easy", "Medium", "Hard"].map(d => (
+            {DIFFICULTY_FILTERS.map(d => (
               <button
                 key={d}
-                onClick={() => setDifficulty(d as any)}
+                onClick={() => setDifficulty(d)}
                 className={`px-2.5 py-1 rounded-[6px] text-xs font-semibold transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   difficulty === d
                     ? "bg-primary/15 border-primary/40 text-primary"
