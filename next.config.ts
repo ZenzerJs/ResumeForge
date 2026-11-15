@@ -25,7 +25,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self'",
-      "connect-src 'self' blob: https://generativelanguage.googleapis.com",
+      "connect-src 'self' blob: https://generativelanguage.googleapis.com http://localhost:* http://127.0.0.1:*",
       "worker-src 'self' blob:",
       "child-src 'self' blob:",
       "frame-ancestors 'none'",

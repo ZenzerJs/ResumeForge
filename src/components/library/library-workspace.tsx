@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { ExtractedPdfEvidence } from "@/lib/evidence/pdfExtractor";
 import { convertExtractedPdfToEvidenceItems } from "@/lib/evidence/evidence-transform";
 import { initializeDemoSamples } from "@/lib/demo-client";
+import { parseApiError, readApiResponse } from "@/lib/api-error";
 import {
   Dialog,
   DialogContent,
@@ -71,6 +72,28 @@ export interface EvidenceItem {
   similarityScore?: number;
   candidateBullet?: string;
   existingBullet?: string;
+}
+
+export function isLocalEvidenceId(id: string): boolean {
+  return id.startsWith("guest-") || id.startsWith("demo-sample-");
+}
+
+function readGuestEvidenceFromStorage(): EvidenceItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem("resumeforge_guest_evidence");
+    const parsed = stored ? JSON.parse(stored) : [];
+    return Array.isArray(parsed) ? (parsed as EvidenceItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeGuestEvidenceToStorage(items: EvidenceItem[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("resumeforge_guest_evidence", JSON.stringify(items));
+  } catch {}
 }
 
 export function LibraryWorkspace() {
@@ -121,25 +144,24 @@ export function LibraryWorkspace() {
       let loadedItems: EvidenceItem[] = [];
       if (demoConfig.demoMode) {
         initializeDemoSamples();
-        const stored = localStorage.getItem("resumeforge_guest_evidence");
-        const localItems: EvidenceItem[] = stored ? JSON.parse(stored) : [];
+        const localItems = readGuestEvidenceFromStorage();
         loadedItems = filterStatus === "all" ? localItems : localItems.filter((item) => item.status === filterStatus);
       } else {
         const url = filterStatus === "all" ? "/api/evidence" : `/api/evidence?status=${filterStatus}`;
         const res = await fetch(url, { signal: controller.signal });
-        const json = await res.json();
+        const { ok, data: json, error } = await readApiResponse<{
+          success?: boolean;
+          data?: EvidenceItem[];
+        }>(res, "Failed to fetch evidence items.");
         if (controller.signal.aborted) return;
-        if (!json.success) throw new Error("Failed to fetch evidence items.");
+        if (!ok || !json?.success) {
+          throw new Error(error || "Failed to fetch evidence items.");
+        }
         loadedItems = json.data || [];
-        try {
-          const stored = typeof window !== "undefined" ? localStorage.getItem("resumeforge_guest_evidence") : null;
-          if (stored) {
-            const guestItems: EvidenceItem[] = JSON.parse(stored);
-            const existingIds = new Set(loadedItems.map((i) => i.id));
-            loadedItems = [...loadedItems, ...guestItems.filter((item) => !existingIds.has(item.id))];
-          }
-        } catch (e) {
-          console.error("Failed to read guest evidence from localStorage:", e);
+        const guestItems = readGuestEvidenceFromStorage();
+        if (guestItems.length > 0) {
+          const existingIds = new Set(loadedItems.map((i) => i.id));
+          loadedItems = [...loadedItems, ...guestItems.filter((item) => !existingIds.has(item.id))];
         }
       }
 
@@ -188,6 +210,10 @@ export function LibraryWorkspace() {
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
       console.error("Failed to fetch evidence items:", err);
+      setNotification({
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to fetch evidence items.",
+      });
     } finally {
       if (!controller.signal.aborted) {
         setIsLoading(false);
@@ -297,128 +323,217 @@ export function LibraryWorkspace() {
         bullets,
       };
 
+      const demoConfig = await fetchDemoConfig();
+
       if (editingItem) {
+        if (demoConfig.demoMode || isLocalEvidenceId(editingItem.id)) {
+          const updatedLocalItem: EvidenceItem = {
+            ...editingItem,
+            type: payload.type,
+            title: payload.title,
+            organization: payload.organization || null,
+            dates: payload.dates || null,
+            verifiedSummary: payload.verifiedSummary,
+            tags: payload.tags,
+            status: payload.status,
+            bullets: payload.bullets.map((b, idx) => ({
+              id: editingItem.bullets?.[idx]?.id || `b-${idx}-${Date.now()}`,
+              text: b.text,
+              technologies: editingItem.bullets?.[idx]?.technologies || [],
+              roleAffinity: editingItem.bullets?.[idx]?.roleAffinity || [],
+              verified: b.verified,
+            })),
+            updatedAt: new Date().toISOString(),
+          };
+          const existing = readGuestEvidenceFromStorage();
+          const hasExisting = existing.some((item) => item.id === editingItem.id);
+          const nextStored = hasExisting
+            ? existing.map((item) => (item.id === editingItem.id ? updatedLocalItem : item))
+            : [updatedLocalItem, ...existing];
+          writeGuestEvidenceToStorage(nextStored);
+          setItems((prev) =>
+            prev.map((item) => (item.id === editingItem.id ? updatedLocalItem : item))
+          );
+          setIsModalOpen(false);
+          setNotification({
+            type: "success",
+            message: `Updated "${formData.title}" in local workspace.`,
+          });
+          return;
+        }
+
         const res = await fetch(`/api/evidence/${editingItem.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        if (res.ok) {
+        const { ok, error } = await readApiResponse(res, "Failed to update evidence item.");
+        if (ok) {
           setIsModalOpen(false);
           await fetchItems();
           setNotification({
             type: "success",
             message: `Updated "${formData.title}" successfully.`,
           });
+        } else {
+          setNotification({
+            type: "error",
+            message: error || "Failed to update evidence item.",
+          });
         }
       } else {
+        const buildGuestItem = (): EvidenceItem => ({
+          id: `guest-evi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          userId: "guest",
+          type: payload.type,
+          title: payload.title,
+          organization: payload.organization || null,
+          dates: payload.dates || null,
+          verifiedSummary: payload.verifiedSummary,
+          tags: payload.tags,
+          status: payload.status,
+          bullets: payload.bullets.map((b, idx) => ({
+            id: `b-${idx}-${Date.now()}`,
+            evidenceItemId: "",
+            text: b.text,
+            technologies: [],
+            roleAffinity: [],
+            verified: b.verified,
+            orderIndex: idx,
+          })),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+
+        if (demoConfig.demoMode) {
+          const guestItem = buildGuestItem();
+          writeGuestEvidenceToStorage([guestItem, ...readGuestEvidenceFromStorage()]);
+          setItems((prev) => [guestItem, ...prev]);
+          setIsModalOpen(false);
+          setNotification({
+            type: "success",
+            message: `Created evidence item "${formData.title}" in local workspace.`,
+          });
+          return;
+        }
+
         const res = await fetch("/api/evidence", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        if (res.ok) {
+        const { ok, status, data: json, error } = await readApiResponse<{ code?: string }>(
+          res,
+          "Failed to save evidence item."
+        );
+        if (ok) {
           setIsModalOpen(false);
           await fetchItems();
           setNotification({
             type: "success",
             message: `Created evidence item "${formData.title}".`,
           });
+        } else if (status === 401 || json?.code === "GUEST_READ_ONLY") {
+          const guestItem = buildGuestItem();
+          writeGuestEvidenceToStorage([guestItem, ...readGuestEvidenceFromStorage()]);
+          setItems((prev) => [guestItem, ...prev]);
+          setIsModalOpen(false);
+          setNotification({
+            type: "success",
+            message: `Created evidence item "${formData.title}" in local workspace.`,
+          });
         } else {
-          const json = await res.json().catch(() => ({}));
-          if (res.status === 401 || json.code === "GUEST_READ_ONLY") {
-            const guestItem: EvidenceItem = {
-              id: `guest-evi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-              userId: "guest",
-              type: payload.type,
-              title: payload.title,
-              organization: payload.organization || null,
-              dates: payload.dates || null,
-              verifiedSummary: payload.verifiedSummary,
-              tags: payload.tags,
-              status: payload.status,
-              bullets: payload.bullets.map((b, idx) => ({
-                id: `b-${idx}-${Date.now()}`,
-                evidenceItemId: "",
-                text: b.text,
-                technologies: [],
-                roleAffinity: [],
-                verified: b.verified,
-                orderIndex: idx,
-              })),
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-            try {
-              const stored = typeof window !== "undefined" ? localStorage.getItem("resumeforge_guest_evidence") : null;
-              const existing: EvidenceItem[] = stored ? JSON.parse(stored) : [];
-              localStorage.setItem("resumeforge_guest_evidence", JSON.stringify([guestItem, ...existing]));
-            } catch (e) {}
-            setItems((prev) => [guestItem, ...prev]);
-            setIsModalOpen(false);
-            setNotification({
-              type: "success",
-              message: `Created evidence item "${formData.title}" in local workspace.`,
-            });
-          } else {
-            setNotification({
-              type: "error",
-              message: json.error || "Failed to save evidence item.",
-            });
-          }
+          setNotification({
+            type: "error",
+            message: error || "Failed to save evidence item.",
+          });
         }
       }
     } catch (err) {
       console.error("Failed to save evidence item:", err);
       setNotification({
         type: "error",
-        message: "Failed to save evidence item.",
+        message: err instanceof Error ? err.message : "Failed to save evidence item.",
       });
     }
   };
 
   const handleArchiveItem = async (id: string) => {
-    if (id.startsWith("guest-evi-")) {
-      try {
-        const stored = typeof window !== "undefined" ? localStorage.getItem("resumeforge_guest_evidence") : null;
-        if (stored) {
-          const existing: EvidenceItem[] = JSON.parse(stored);
-          const filtered = existing.filter((item) => item.id !== id);
-          localStorage.setItem("resumeforge_guest_evidence", JSON.stringify(filtered));
-        }
-      } catch (e) {}
-      setItems((prev) => prev.filter((item) => item.id !== id));
-      setNotification({
-        type: "success",
-        message: "Item archived successfully.",
-      });
-      return;
-    }
-
     try {
-      const res = await fetch(`/api/evidence/${id}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        fetchItems();
+      const demoConfig = await fetchDemoConfig();
+      if (demoConfig.demoMode || isLocalEvidenceId(id)) {
+        const filtered = readGuestEvidenceFromStorage().filter((item) => item.id !== id);
+        writeGuestEvidenceToStorage(filtered);
+        setItems((prev) => prev.filter((item) => item.id !== id));
         setNotification({
           type: "success",
           message: "Item archived successfully.",
         });
+        return;
+      }
+
+      const res = await fetch(`/api/evidence/${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        await fetchItems();
+        setNotification({
+          type: "success",
+          message: "Item archived successfully.",
+        });
+      } else {
+        const errorMessage = await parseApiError(res, "Failed to archive evidence item.");
+        setNotification({
+          type: "error",
+          message: errorMessage,
+        });
       }
     } catch (err) {
       console.error("Failed to archive item:", err);
+      setNotification({
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to archive evidence item.",
+      });
     }
   };
 
   const handlePdfIngestComplete = async (extractedItems: ExtractedPdfEvidence[]) => {
     let createdCount = 0;
     const guestItemsToAdd: EvidenceItem[] = [];
+    const demoConfig = await fetchDemoConfig();
 
     for (const extracted of extractedItems) {
       const itemsToCreate = convertExtractedPdfToEvidenceItems(extracted);
 
       for (const itemPayload of itemsToCreate) {
+        const toGuestItem = (): EvidenceItem => ({
+          id: `guest-evi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          userId: "guest",
+          type: itemPayload.type,
+          title: itemPayload.title,
+          organization: itemPayload.organization || null,
+          dates: itemPayload.dates || null,
+          verifiedSummary: itemPayload.verifiedSummary,
+          tags: itemPayload.tags || [],
+          status: itemPayload.status || "verified",
+          bullets: (itemPayload.bullets || []).map((b, idx) => ({
+            id: `b-${idx}-${Date.now()}`,
+            evidenceItemId: "",
+            text: b.text,
+            technologies: [],
+            roleAffinity: [],
+            verified: b.verified ?? true,
+            orderIndex: idx,
+          })),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+
+        if (demoConfig.demoMode) {
+          guestItemsToAdd.push(toGuestItem());
+          continue;
+        }
+
         try {
           const res = await fetch("/api/evidence", {
             method: "POST",
@@ -429,29 +544,7 @@ export function LibraryWorkspace() {
           if (res.ok) {
             createdCount++;
           } else {
-            const guestItem: EvidenceItem = {
-              id: `guest-evi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-              userId: "guest",
-              type: itemPayload.type,
-              title: itemPayload.title,
-              organization: itemPayload.organization || null,
-              dates: itemPayload.dates || null,
-              verifiedSummary: itemPayload.verifiedSummary,
-              tags: itemPayload.tags || [],
-              status: itemPayload.status || "verified",
-              bullets: (itemPayload.bullets || []).map((b, idx) => ({
-                id: `b-${idx}-${Date.now()}`,
-                evidenceItemId: "",
-                text: b.text,
-                technologies: [],
-                roleAffinity: [],
-                verified: b.verified ?? true,
-                orderIndex: idx,
-              })),
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-            guestItemsToAdd.push(guestItem);
+            guestItemsToAdd.push(toGuestItem());
           }
         } catch (err) {
           console.error("Failed to save extracted evidence item:", err);
@@ -460,18 +553,9 @@ export function LibraryWorkspace() {
     }
 
     if (guestItemsToAdd.length > 0) {
-      try {
-        const stored = typeof window !== "undefined" ? localStorage.getItem("resumeforge_guest_evidence") : null;
-        const existing: EvidenceItem[] = stored ? JSON.parse(stored) : [];
-        const combined = [...guestItemsToAdd, ...existing];
-        localStorage.setItem("resumeforge_guest_evidence", JSON.stringify(combined));
-        setItems((prev) => [...guestItemsToAdd, ...prev]);
-        createdCount += guestItemsToAdd.length;
-      } catch (err) {
-        console.error("Failed to write to localStorage:", err);
-        setItems((prev) => [...guestItemsToAdd, ...prev]);
-        createdCount += guestItemsToAdd.length;
-      }
+      writeGuestEvidenceToStorage([...guestItemsToAdd, ...readGuestEvidenceFromStorage()]);
+      setItems((prev) => [...guestItemsToAdd, ...prev]);
+      createdCount += guestItemsToAdd.length;
     }
 
     await fetchItems();
@@ -506,6 +590,7 @@ export function LibraryWorkspace() {
       let successCount = 0;
       let failCount = 0;
       const guestItemsToImport: EvidenceItem[] = [];
+      const demoConfig = await fetchDemoConfig();
 
       for (const rawItem of itemsToImport) {
         if (!rawItem.title || !rawItem.verifiedSummary) {
@@ -529,6 +614,35 @@ export function LibraryWorkspace() {
           bullets: normalizedBullets,
         };
 
+        const toGuestItem = (): EvidenceItem => ({
+          id: `guest-evi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          userId: "guest",
+          type: payload.type,
+          title: payload.title,
+          organization: payload.organization || null,
+          dates: payload.dates || null,
+          verifiedSummary: payload.verifiedSummary,
+          tags: payload.tags,
+          status: payload.status,
+          bullets: payload.bullets.map((b, idx) => ({
+            id: `b-${idx}-${Date.now()}`,
+            evidenceItemId: "",
+            text: b.text,
+            technologies: [],
+            roleAffinity: [],
+            verified: b.verified,
+            orderIndex: idx,
+          })),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+
+        if (demoConfig.demoMode) {
+          guestItemsToImport.push(toGuestItem());
+          successCount++;
+          continue;
+        }
+
         const res = await fetch("/api/evidence", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -538,29 +652,7 @@ export function LibraryWorkspace() {
         if (res.ok) {
           successCount++;
         } else if (res.status === 401) {
-          const guestItem: EvidenceItem = {
-            id: `guest-evi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            userId: "guest",
-            type: payload.type,
-            title: payload.title,
-            organization: payload.organization || null,
-            dates: payload.dates || null,
-            verifiedSummary: payload.verifiedSummary,
-            tags: payload.tags,
-            status: payload.status,
-            bullets: payload.bullets.map((b, idx) => ({
-              id: `b-${idx}-${Date.now()}`,
-              evidenceItemId: "",
-              text: b.text,
-              technologies: [],
-              roleAffinity: [],
-              verified: b.verified,
-              orderIndex: idx,
-            })),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          guestItemsToImport.push(guestItem);
+          guestItemsToImport.push(toGuestItem());
           successCount++;
         } else {
           failCount++;
@@ -568,12 +660,8 @@ export function LibraryWorkspace() {
       }
 
       if (guestItemsToImport.length > 0) {
-        try {
-          const stored = typeof window !== "undefined" ? localStorage.getItem("resumeforge_guest_evidence") : null;
-          const existing: EvidenceItem[] = stored ? JSON.parse(stored) : [];
-          localStorage.setItem("resumeforge_guest_evidence", JSON.stringify([...guestItemsToImport, ...existing]));
-          setItems((prev) => [...guestItemsToImport, ...prev]);
-        } catch (e) {}
+        writeGuestEvidenceToStorage([...guestItemsToImport, ...readGuestEvidenceFromStorage()]);
+        setItems((prev) => [...guestItemsToImport, ...prev]);
       }
 
       await fetchItems();
@@ -994,27 +1082,39 @@ export function LibraryWorkspace() {
                               JSON.stringify(Array.from(new Set([...list, item.id])))
                             );
                           } catch {}
-                          if (!item.id.startsWith("guest-")) {
+                          const demoConfig = await fetchDemoConfig();
+                          const isLocalItem = demoConfig.demoMode || isLocalEvidenceId(item.id);
+                          if (!isLocalItem) {
                             if (item.status !== "verified") {
-                              await fetch(`/api/evidence/${item.id}`, {
-                                method: "PUT",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ status: "verified" }),
-                              }).catch(() => {});
+                              try {
+                                const res = await fetch(`/api/evidence/${item.id}`, {
+                                  method: "PUT",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ status: "verified" }),
+                                });
+                                if (!res.ok) {
+                                  const errMsg = await parseApiError(
+                                    res,
+                                    `Failed to verify "${item.title}".`
+                                  );
+                                  setNotification({ type: "error", message: errMsg });
+                                  return;
+                                }
+                              } catch {
+                                setNotification({
+                                  type: "error",
+                                  message: `Network error verifying "${item.title}".`,
+                                });
+                                return;
+                              }
                             }
                           } else {
-                            try {
-                              const rawGuest = localStorage.getItem("resumeforge_guest_evidence");
-                              const list: EvidenceItem[] = rawGuest ? JSON.parse(rawGuest) : [];
-                              localStorage.setItem(
-                                "resumeforge_guest_evidence",
-                                JSON.stringify(
-                                  list.map((g) =>
-                                    g.id === item.id ? { ...g, status: "verified", needsReview: false } : g
-                                  )
-                                )
-                              );
-                            } catch {}
+                            const list = readGuestEvidenceFromStorage();
+                            writeGuestEvidenceToStorage(
+                              list.map((g) =>
+                                g.id === item.id ? { ...g, status: "verified", needsReview: false } : g
+                              )
+                            );
                           }
                           setItems((prev) =>
                             prev.map((i) =>
@@ -1059,7 +1159,11 @@ export function LibraryWorkspace() {
                               .map((b) => ({ text: b.text, verified: true })),
                           ];
 
-                          if (!target.id.startsWith("guest-")) {
+                          const demoConfig = await fetchDemoConfig();
+                          const isTargetLocal = demoConfig.demoMode || isLocalEvidenceId(target.id);
+                          const isItemLocal = demoConfig.demoMode || isLocalEvidenceId(item.id);
+
+                          if (!isTargetLocal) {
                             const updateRes = await fetch(`/api/evidence/${target.id}`, {
                               method: "PUT",
                               headers: { "Content-Type": "application/json" },
@@ -1070,54 +1174,62 @@ export function LibraryWorkspace() {
                               }),
                             }).catch(() => null);
                             if (!updateRes || !updateRes.ok) {
+                              const errMsg = updateRes
+                                ? await parseApiError(
+                                    updateRes,
+                                    `Failed to merge into "${target.title}". Duplicate was preserved.`
+                                  )
+                                : `Failed to merge into "${target.title}". Duplicate was preserved.`;
                               setNotification({
                                 type: "error",
-                                message: `Failed to merge into "${target.title}". Duplicate was preserved.`,
+                                message: errMsg,
                               });
                               return;
                             }
                           } else {
-                            try {
-                              const rawGuest = localStorage.getItem("resumeforge_guest_evidence");
-                              const list: EvidenceItem[] = rawGuest ? JSON.parse(rawGuest) : [];
-                              const updatedGuestList = list.map((g) =>
-                                g.id === target.id
-                                  ? {
-                                      ...g,
-                                      tags: mergedTags,
-                                      status: "verified" as const,
-                                      bullets: mergedBullets.map((b, idx) => ({
-                                        id: `b-${idx}-${Date.now()}`,
-                                        evidenceItemId: target.id,
-                                        text: b.text,
-                                        technologies: [],
-                                        roleAffinity: [],
-                                        verified: true,
-                                        orderIndex: idx,
-                                      })),
-                                    }
-                                  : g
-                              );
-                              localStorage.setItem(
-                                "resumeforge_guest_evidence",
-                                JSON.stringify(updatedGuestList)
-                              );
-                            } catch {}
+                            const list = readGuestEvidenceFromStorage();
+                            const updatedGuestList = list.map((g) =>
+                              g.id === target.id
+                                ? {
+                                    ...g,
+                                    tags: mergedTags,
+                                    status: "verified" as const,
+                                    bullets: mergedBullets.map((b, idx) => ({
+                                      id: `b-${idx}-${Date.now()}`,
+                                      evidenceItemId: target.id,
+                                      text: b.text,
+                                      technologies: [],
+                                      roleAffinity: [],
+                                      verified: true,
+                                      orderIndex: idx,
+                                    })),
+                                  }
+                                : g
+                            );
+                            writeGuestEvidenceToStorage(updatedGuestList);
                           }
 
-                          if (!item.id.startsWith("guest-")) {
-                            await fetch(`/api/evidence/${item.id}`, {
+                          if (!isItemLocal) {
+                            const delRes = await fetch(`/api/evidence/${item.id}`, {
                               method: "DELETE",
-                            }).catch(() => {});
+                            }).catch(() => null);
+                            if (!delRes || !delRes.ok) {
+                              const errMsg = delRes
+                                ? await parseApiError(
+                                    delRes,
+                                    `Merged into "${target.title}", but failed to remove duplicate item.`
+                                  )
+                                : `Merged into "${target.title}", but failed to remove duplicate item.`;
+                              await fetchItems();
+                              setNotification({
+                                type: "error",
+                                message: errMsg,
+                              });
+                              return;
+                            }
                           } else {
-                            try {
-                              const rawGuest = localStorage.getItem("resumeforge_guest_evidence");
-                              const list: EvidenceItem[] = rawGuest ? JSON.parse(rawGuest) : [];
-                              localStorage.setItem(
-                                "resumeforge_guest_evidence",
-                                JSON.stringify(list.filter((g) => g.id !== item.id))
-                              );
-                            } catch {}
+                            const list = readGuestEvidenceFromStorage();
+                            writeGuestEvidenceToStorage(list.filter((g) => g.id !== item.id));
                           }
                           await fetchItems();
                           setNotification({

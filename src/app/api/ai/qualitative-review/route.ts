@@ -96,9 +96,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: gatewayResult.error || "Failed to generate qualitative review.",
+          error: sanitizeError(gatewayResult.error || "Failed to generate qualitative review."),
         },
-        { status: 500 }
+        { status: 502 }
       );
     }
 

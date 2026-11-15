@@ -8,6 +8,8 @@ import { ProviderConfigSchema } from "@/lib/ai/types";
 import { formatJobDescriptionWithAi } from "@/lib/ai/gateway";
 import { parseJobDescriptionDocument } from "@/lib/jd/document-pipeline";
 import { requireUserId } from "@/lib/security/auth-request";
+import { isDemoMode } from "@/lib/demo-mode";
+import { originAllowed } from "@/lib/security/session";
 
 const ExtractRequestSchema = z
   .object({
@@ -24,11 +26,23 @@ const ExtractRequestSchema = z
   });
 
 export async function POST(req: Request) {
-  const auth = await requireUserId(req);
-  if (auth instanceof Response) return auth;
+  if (isDemoMode()) {
+    const hasOrigin = Boolean(req.headers.get("origin") || req.headers.get("referer"));
+    if (!hasOrigin || !originAllowed(req)) {
+      return NextResponse.json({ success: false, error: "Invalid request origin" }, { status: 403 });
+    }
+  } else {
+    const auth = await requireUserId(req);
+    if (auth instanceof Response) return auth;
+  }
 
   try {
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON payload" }, { status: 400 });
+    }
     const validation = ExtractRequestSchema.safeParse(body);
 
     if (!validation.success) {

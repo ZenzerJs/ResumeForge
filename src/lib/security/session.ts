@@ -108,16 +108,30 @@ export function passwordsMatch(provided: string): boolean {
 }
 
 /**
- * `Secure` follows the scheme of the app's public URL, not NODE_ENV.
- * `NEXT_PUBLIC_APP_URL=https://...` (deployed) sets it; `http://localhost`
- * (local dev and local `next start`) does not. This stays correct behind a
- * TLS-terminating proxy, which forwards plain HTTP internally.
+ * `Secure` follows `NEXT_PUBLIC_APP_URL` when configured as HTTPS, and otherwise
+ * falls back to the request's TLS-terminating proxy (`x-forwarded-proto`) or
+ * request URL scheme so Vercel Previews and reverse proxies receive `Secure`
+ * cookies even when `NEXT_PUBLIC_APP_URL` is unset.
  */
-export function cookieSecure(_request?: Request): boolean {
+export function cookieSecure(request?: Request): boolean {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (!appUrl) return false;
+  if (appUrl) {
+    try {
+      if (new URL(appUrl).protocol === "https:") return true;
+    } catch {
+      // Fall through to request-derived scheme when NEXT_PUBLIC_APP_URL is invalid.
+    }
+  }
+  if (!request) return false;
+  const forwardedProto = (request.headers.get("x-forwarded-proto") || "")
+    .split(",")[0]
+    .trim()
+    .toLowerCase();
+  if (forwardedProto) {
+    return forwardedProto === "https";
+  }
   try {
-    return new URL(appUrl).protocol === "https:";
+    return new URL(request.url).protocol === "https:";
   } catch {
     return false;
   }
@@ -159,6 +173,7 @@ export function isPublicPath(pathname: string): boolean {
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/wasm/") ||
     pathname.startsWith("/fonts/") ||
+    pathname.startsWith("/workers/") ||
     pathname === "/icon" ||
     pathname === "/apple-icon" ||
     pathname === "/opengraph-image" ||
@@ -167,7 +182,7 @@ export function isPublicPath(pathname: string): boolean {
   ) {
     return true;
   }
-  return /\.(?:js|css|map|png|jpg|jpeg|gif|svg|webp|woff2?|ttf|otf|ico|txt|wasm)$/i.test(pathname);
+  return /\.(?:js|mjs|css|map|png|jpg|jpeg|gif|svg|webp|woff2?|ttf|otf|ico|txt|wasm)$/i.test(pathname);
 }
 
 export function isMutationMethod(method: string): boolean {

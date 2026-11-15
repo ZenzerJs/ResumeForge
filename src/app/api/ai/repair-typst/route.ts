@@ -5,14 +5,31 @@ import { repairTypstSource } from "@/lib/ai/gateway";
 import { sanitizeError } from "@/lib/ai/redact";
 import { requireUserId } from "@/lib/security/auth-request";
 import { isDemoMode } from "@/lib/demo-mode";
+import { originAllowed } from "@/lib/security/session";
 
 export async function POST(request: Request) {
-  const auth = await requireUserId(request);
-  if (auth instanceof Response) return auth;
+  const demoMode = isDemoMode();
+  if (demoMode) {
+    const hasOrigin = Boolean(request.headers.get("origin") || request.headers.get("referer"));
+    if (!hasOrigin || !originAllowed(request)) {
+      return NextResponse.json({ success: false, error: "Invalid request origin" }, { status: 403 });
+    }
+  } else {
+    const auth = await requireUserId(request);
+    if (auth instanceof Response) return auth;
+  }
 
   try {
-    const body = await request.json();
-    const { providerConfig, ...inputData } = body || {};
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON payload" }, { status: 400 });
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ success: false, error: "Invalid request payload" }, { status: 400 });
+    }
+    const { providerConfig, ...inputData } = body as Record<string, unknown>;
 
     if (!inputData.source || typeof inputData.source !== "string") {
       return NextResponse.json({ success: false, error: "source string is required" }, { status: 400 });
@@ -53,8 +70,11 @@ export async function POST(request: Request) {
       );
     }
 
-    let providerConfigToUse = providerConfig;
-    if ((!providerConfigToUse || !providerConfigToUse.provider) && !isDemoMode()) {
+    let providerConfigToUse =
+      providerConfig && typeof providerConfig === "object" && !Array.isArray(providerConfig)
+        ? (providerConfig as Record<string, unknown>)
+        : undefined;
+    if ((!providerConfigToUse || !providerConfigToUse.provider) && !demoMode) {
       if (process.env.OPENAI_API_KEY) {
         providerConfigToUse = { provider: "openai", apiKey: process.env.OPENAI_API_KEY, model: "gpt-4o" };
       } else if (process.env.ANTHROPIC_API_KEY) {
@@ -71,7 +91,12 @@ export async function POST(request: Request) {
         };
       }
     }
-    if (isDemoMode() && (!providerConfigToUse || !providerConfigToUse.apiKey)) {
+    if (
+      demoMode &&
+      (!providerConfigToUse ||
+        typeof providerConfigToUse.apiKey !== "string" ||
+        !providerConfigToUse.apiKey.trim())
+    ) {
       return NextResponse.json({ success: false, error: "Provide your own AI provider key in Settings to use AI in the demo." }, { status: 400 });
     }
 

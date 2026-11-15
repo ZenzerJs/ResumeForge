@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { X, Plus, Loader2, Database } from "lucide-react";
+import { fetchDemoConfig } from "@/components/auth/session-user";
+import { readApiResponse } from "@/lib/api-error";
 import {
   Dialog,
   DialogClose,
@@ -10,6 +12,69 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
+const CATEGORY_TO_TYPE: Record<string, "experience" | "project" | "skill" | "education"> = {
+  PROJECT: "project",
+  WORK: "experience",
+  SKILL: "skill",
+  EDUCATION: "education",
+};
+
+export function buildQuickAddEvidencePayload(input: {
+  title: string;
+  organization?: string;
+  category: string;
+  bulletPoint?: string;
+  initialSkill?: string;
+}) {
+  const trimmedTitle = input.title.trim();
+  const evidenceType = CATEGORY_TO_TYPE[input.category] ?? "project";
+  const trimmedOrg = (input.organization || "").trim();
+  const trimmedBullet = (input.bulletPoint || "").trim();
+  const trimmedSkill = (input.initialSkill || "").trim();
+  const verifiedSummary =
+    trimmedBullet ||
+    (trimmedOrg ? `${trimmedTitle} at ${trimmedOrg}` : trimmedTitle) ||
+    (trimmedSkill ? `Evidence for ${trimmedSkill}` : "Added evidence item");
+
+  const tags = Array.from(
+    new Set([trimmedSkill.toLowerCase(), evidenceType].filter(Boolean))
+  );
+
+  const bullets = trimmedBullet
+    ? [
+        {
+          text: trimmedBullet,
+          technologies: trimmedSkill ? [trimmedSkill] : [],
+          roleAffinity: [] as string[],
+          verified: false,
+          orderIndex: 0,
+        },
+      ]
+    : undefined;
+
+  return {
+    type: evidenceType,
+    title: trimmedTitle,
+    organization: trimmedOrg || undefined,
+    verifiedSummary,
+    status: "draft" as const,
+    tags,
+    bullets,
+  };
+}
+
+function appendGuestEvidenceItem(item: Record<string, unknown>): void {
+  if (typeof window === "undefined") return;
+  try {
+    const stored = localStorage.getItem("resumeforge_guest_evidence");
+    const parsed = stored ? JSON.parse(stored) : [];
+    const existing = Array.isArray(parsed) ? parsed : [];
+    localStorage.setItem("resumeforge_guest_evidence", JSON.stringify([item, ...existing]));
+  } catch {
+    localStorage.setItem("resumeforge_guest_evidence", JSON.stringify([item]));
+  }
+}
 
 interface QuickAddEvidenceModalProps {
   isOpen: boolean;
@@ -34,13 +99,17 @@ export function QuickAddEvidenceModal({
   useEffect(() => {
     if (isOpen) {
       setTitle(initialSkill ? `${initialSkill} Experience` : "");
+      setOrganization("");
+      setBulletPoint("");
+      setCategory("PROJECT");
       setError(null);
     }
   }, [isOpen, initialSkill]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
       setError("Please provide a title or project name");
       return;
     }
@@ -49,36 +118,66 @@ export function QuickAddEvidenceModal({
       setIsSaving(true);
       setError(null);
 
-      // Create evidence item
+      const payload = buildQuickAddEvidencePayload({
+        title: trimmedTitle,
+        organization,
+        category,
+        bulletPoint,
+        initialSkill,
+      });
+
+      const buildGuestItem = () => ({
+        id: `guest-evi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        userId: "guest",
+        type: payload.type,
+        title: payload.title,
+        organization: payload.organization || null,
+        dates: null,
+        verifiedSummary: payload.verifiedSummary,
+        tags: payload.tags,
+        status: payload.status,
+        bullets: payload.bullets
+          ? payload.bullets.map((b, idx) => ({
+              id: `b-${idx}-${Date.now()}`,
+              text: b.text,
+              technologies: b.technologies,
+              roleAffinity: b.roleAffinity,
+              verified: b.verified,
+              orderIndex: idx,
+            }))
+          : [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const demoConfig = await fetchDemoConfig();
+      if (demoConfig?.demoMode) {
+        appendGuestEvidenceItem(buildGuestItem());
+        onEvidenceCreated();
+        onClose();
+        return;
+      }
+
       const res = await fetch("/api/evidence", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title.trim(),
-          organization: organization.trim() || undefined,
-          category,
-          status: "DRAFT",
-          tags: [initialSkill.toLowerCase(), category.toLowerCase()],
-        }),
+        body: JSON.stringify(payload),
       });
 
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error?.message || "Failed to create evidence item");
-      }
+      const { ok, status, data: json, error: apiError } = await readApiResponse<{
+        success?: boolean;
+        code?: string;
+        data?: { id?: string };
+      }>(res, "Failed to create evidence item");
 
-      const itemId = json.data.id;
-
-      // If bullet point provided, add it
-      if (bulletPoint.trim() && itemId) {
-        await fetch(`/api/evidence/${itemId}/bullets`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            content: bulletPoint.trim(),
-            status: "DRAFT",
-          }),
-        });
+      if (!ok) {
+        if (status === 401 || json?.code === "GUEST_READ_ONLY") {
+          appendGuestEvidenceItem(buildGuestItem());
+          onEvidenceCreated();
+          onClose();
+          return;
+        }
+        throw new Error(apiError || "Failed to create evidence item");
       }
 
       onEvidenceCreated();

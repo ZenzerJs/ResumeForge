@@ -165,6 +165,18 @@ function getPdfParseModule() {
   ensurePdfJsNodeGlobals();
   if (!cachedPdfParseModule) {
     cachedPdfParseModule = require("pdf-parse");
+    if (typeof cachedPdfParseModule?.PDFParse?.setWorker === "function") {
+      try {
+        // Inline the pdfjs worker as a data URI so serverless bundles (e.g. Vercel)
+        // don't fail resolving the default "./pdf.worker.mjs" path at runtime.
+        const workerMod = require("pdf-parse/worker");
+        if (typeof workerMod?.getData === "function") {
+          cachedPdfParseModule.PDFParse.setWorker(workerMod.getData());
+        }
+      } catch {
+        // Ignore if pdf-parse/worker is unavailable (e.g. pdf-parse v1)
+      }
+    }
   }
   return cachedPdfParseModule;
 }

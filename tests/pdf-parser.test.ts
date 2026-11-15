@@ -218,6 +218,8 @@ Engineering: Next.js, React, FastAPI, REST APIs, PostgreSQL, Prisma, Docker, Git
       const parsed = await parsePdfBuffer(samplePdf);
       expect(parsed.text).toContain("Hello ResumeForge");
       expect(parsed.numpages).toBe(1);
+      const { PDFParse } = require("pdf-parse");
+      expect(PDFParse.setWorker()).toMatch(/^data:text\/javascript;base64,/);
     } finally {
       if (prevDOMMatrix === undefined) delete g.DOMMatrix;
       else g.DOMMatrix = prevDOMMatrix;

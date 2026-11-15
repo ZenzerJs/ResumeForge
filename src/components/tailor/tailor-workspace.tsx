@@ -21,6 +21,9 @@ import { resolveClientProviderConfig } from "@/lib/byok-vault";
 import { getDemoContextFromBrowser, initializeDemoSamples } from "@/lib/demo-client";
 import { fetchDemoConfig } from "@/components/auth/session-user";
 import { DEMO_JOB } from "@/lib/demo-samples";
+import { readApiResponse } from "@/lib/api-error";
+import { parseJobDescription } from "@/lib/jd-parser/parser";
+import { matchEvidenceToRequirements, type EvidenceItemWithBullets } from "@/lib/matching/matcher";
 import dynamic from "next/dynamic";
 import { PatchDiffReview } from "./patch-diff-review";
 import { AtsScorePanel } from "./ats-score-panel";
@@ -144,6 +147,43 @@ function renderHighlightedJd(text: string, skills: string[]) {
       })}
     </span>
   );
+}
+
+export function isLocalOrDemoJobId(jobId: string | null | undefined, demoMode: boolean): boolean {
+  if (demoMode) return true;
+  if (!jobId) return false;
+  return jobId.startsWith("guest-job-") || jobId.startsWith("demo-sample-");
+}
+
+export function matchGuestEvidenceItems(
+  rawItems: unknown[],
+  reqs: JobRequirements
+): RankedMatch[] {
+  const evidenceItems: EvidenceItemWithBullets[] = rawItems
+    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
+    .map((item) => ({
+      id: String(item.id || ""),
+      type: String(item.type || "project"),
+      title: String(item.title || ""),
+      organization: item.organization ? String(item.organization) : null,
+      dates: item.dates ? String(item.dates) : null,
+      verifiedSummary: String(item.verifiedSummary || ""),
+      tags: Array.isArray(item.tags) ? item.tags.map(String) : [],
+      status: String(item.status || "draft"),
+      bullets: Array.isArray(item.bullets)
+        ? item.bullets
+            .filter((b): b is Record<string, unknown> => Boolean(b && typeof b === "object"))
+            .map((b, idx) => ({
+              id: String(b.id || `b-${idx}`),
+              text: String(b.text || ""),
+              technologies: Array.isArray(b.technologies) ? b.technologies.map(String) : [],
+              roleAffinity: Array.isArray(b.roleAffinity) ? b.roleAffinity.map(String) : [],
+              verified: Boolean(b.verified),
+              orderIndex: typeof b.orderIndex === "number" ? b.orderIndex : idx,
+            }))
+        : [],
+    }));
+  return matchEvidenceToRequirements(evidenceItems, reqs);
 }
 
 export function TailorWorkspace() {
@@ -294,9 +334,12 @@ export function TailorWorkspace() {
       } catch {}
       try {
         const res = await fetch("/api/resumes");
-        const json = await res.json();
-        if (res.ok && json.success && json.data.length > 0) {
-          const master = json.data.find((r: { isMaster: boolean }) => r.isMaster) || json.data[0];
+        const { ok, data: json } = await readApiResponse<{
+          success?: boolean;
+          data?: { id: string; isMaster: boolean; typstSource: string; factSnapshot?: ResumeFacts | null }[];
+        }>(res);
+        if (ok && json?.success && Array.isArray(json.data) && json.data.length > 0) {
+          const master = json.data.find((r) => r.isMaster) || json.data[0];
           setMasterResumeId(master.id);
           setMasterTypstSource(master.typstSource);
           setActiveVariantContent(master.typstSource);
@@ -334,9 +377,16 @@ export function TailorWorkspace() {
       const res = await fetch(`/api/jobs/${jobIdToFetch}/fetch-fulltext`, {
         method: "POST",
       });
-      const json = await res.json();
+      const { ok, data: json, error } = await readApiResponse<{
+        success?: boolean;
+        cached?: boolean;
+        data?: { rawDescription: string };
+      }>(
+        res,
+        "Couldn't extract automatically (page requires JavaScript rendering or login). Paste using the Role / Company / Requirements format below."
+      );
 
-      if (res.ok && json.success && json.data) {
+      if (ok && json?.success && json.data) {
         setRawDescription(convertHtmlToCleanMarkdown(json.data.rawDescription));
         setTier2Status({
           type: "success",
@@ -348,7 +398,7 @@ export function TailorWorkspace() {
         setTier2Status({
           type: "error",
           message:
-            json.error ||
+            error ||
             "Couldn't extract automatically (page requires JavaScript rendering or login). Paste using the Role / Company / Requirements format below.",
         });
       }
@@ -368,10 +418,17 @@ export function TailorWorkspace() {
     async function loadJobById() {
       try {
         const demoConfig = await fetchDemoConfig();
-        if (demoConfig?.demoMode) {
+        const isLocalJobParam =
+          demoConfig?.demoMode === true ||
+          jobIdParam!.startsWith("guest-job-") ||
+          jobIdParam!.startsWith("demo-sample-");
+        if (isLocalJobParam) {
+          if (demoConfig?.demoMode) initializeDemoSamples();
           const rawJobs = localStorage.getItem("resumeforge_guest_jobs");
           const jobs = rawJobs ? JSON.parse(rawJobs) : [];
-          const localJob = Array.isArray(jobs) ? jobs.find((item) => item?.id === jobIdParam) : null;
+          const localJob =
+            (Array.isArray(jobs) ? jobs.find((item) => item?.id === jobIdParam) : null) ||
+            (jobIdParam === DEMO_JOB.id ? DEMO_JOB : null);
           setSavedJobId(null);
           savedJobIdRef.current = null;
           if (localJob) {
@@ -384,8 +441,11 @@ export function TailorWorkspace() {
         savedJobIdRef.current = jobIdParam;
         setSavedJobId(jobIdParam);
         const res = await fetch(`/api/jobs/${jobIdParam}`);
-        const json = await res.json();
-        if (res.ok && json.success && json.data) {
+        const { ok, data: json } = await readApiResponse<{
+          success?: boolean;
+          data?: { id: string; company?: string; roleTitle?: string; rawDescription?: string };
+        }>(res);
+        if (ok && json?.success && json.data) {
           const job = json.data;
           if (job.company) setCompany(job.company);
           if (job.roleTitle) setRoleTitle(job.roleTitle);
@@ -396,7 +456,7 @@ export function TailorWorkspace() {
           }
           sessionStorage.setItem("resumeforge_active_job_id", job.id);
 
-          if (isPlaceholderDescription(job.rawDescription)) {
+          if (job.rawDescription && isPlaceholderDescription(job.rawDescription)) {
             triggerTier2Fetch(job.id);
           }
         }
@@ -419,6 +479,39 @@ export function TailorWorkspace() {
     };
 
     const existingId = savedJobIdRef.current;
+    const demoConfig = await fetchDemoConfig();
+
+    if (isLocalOrDemoJobId(existingId, demoConfig?.demoMode === true)) {
+      const localId = existingId || `guest-job-${Date.now()}`;
+      savedJobIdRef.current = localId;
+      setSavedJobId(localId);
+      sessionStorage.setItem("resumeforge_active_job_id", localId);
+      try {
+        const raw = localStorage.getItem("resumeforge_guest_jobs");
+        const parsed = raw ? JSON.parse(raw) : [];
+        const list = Array.isArray(parsed) ? parsed : [];
+        const idx = list.findIndex((item) => item?.id === localId);
+        const existingRecord = idx >= 0 ? list[idx] : {};
+        const nextRecord = {
+          ...existingRecord,
+          id: localId,
+          company: payload.company || "Target Company",
+          roleTitle: payload.roleTitle || "Target Role",
+          rawDescription: payload.rawDescription,
+          requirements: payload.extractedRequirements,
+          status: existingRecord?.status || "SAVED",
+        };
+        if (idx >= 0) {
+          list[idx] = nextRecord;
+        } else {
+          list.unshift(nextRecord);
+        }
+        localStorage.setItem("resumeforge_guest_jobs", JSON.stringify(list));
+      } catch {}
+      setSaveStatus("Job saved to local workspace.");
+      return localId;
+    }
+
     if (existingId) {
       if (opts?.forceUpdate !== false) {
         try {
@@ -427,16 +520,20 @@ export function TailorWorkspace() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
-          const updateJson = await updateRes.json().catch(() => ({}));
-          if (updateRes.ok && updateJson.success) {
+          const { ok: updateOk, status: updateStatus, data: updateJson, error: updateError } =
+            await readApiResponse<{ success?: boolean }>(
+              updateRes,
+              "Unable to update saved job posting."
+            );
+          if (updateOk && updateJson?.success) {
             setSaveStatus("Job posting saved to database.");
             return existingId;
           }
-          if (updateRes.status === 404) {
+          if (updateStatus === 404) {
             setSaveStatus("Shared catalog postings are read-only; using your edits in-session.");
             return existingId;
           }
-          setSaveStatus(updateJson?.error || "Unable to update saved job posting.");
+          setSaveStatus(updateError || "Unable to update saved job posting.");
           return existingId;
         } catch {
           setSaveStatus("Network error updating job posting.");
@@ -456,15 +553,20 @@ export function TailorWorkspace() {
           personal: true,
         }),
       });
-      const saveJson = await saveRes.json().catch(() => ({}));
-      if (saveRes.ok && saveJson.success) {
+      const { ok: saveOk, status: saveStatusCode, data: saveJson, error: saveError } =
+        await readApiResponse<{
+          success?: boolean;
+          code?: string;
+          data?: { id: string };
+        }>(saveRes, "Failed to save job posting.");
+      if (saveOk && saveJson?.success && saveJson.data?.id) {
         savedJobIdRef.current = saveJson.data.id;
         setSavedJobId(saveJson.data.id);
         sessionStorage.setItem("resumeforge_active_job_id", saveJson.data.id);
         setSaveStatus("Job posting saved to database.");
-        return saveJson.data.id as string;
+        return saveJson.data.id;
       }
-      if (saveRes.status === 401 || saveJson?.code === "GUEST_READ_ONLY") {
+      if (saveStatusCode === 401 || saveJson?.code === "GUEST_READ_ONLY") {
         const guestId = `guest-job-${Date.now()}`;
         savedJobIdRef.current = guestId;
         setSavedJobId(guestId);
@@ -478,12 +580,16 @@ export function TailorWorkspace() {
             company: payload.company || "Target Company",
             roleTitle: payload.roleTitle || "Target Role",
             rawDescription: payload.rawDescription,
+            requirements: payload.extractedRequirements,
             status: "SAVED",
           });
           localStorage.setItem("resumeforge_guest_jobs", JSON.stringify(next));
         } catch {}
         setSaveStatus("Job saved to local workspace.");
         return guestId;
+      }
+      if (saveError) {
+        setErrorMessage(saveError);
       }
     } catch {}
     return null;
@@ -567,10 +673,20 @@ export function TailorWorkspace() {
         }),
       });
 
-      const json = await res.json();
+      const { ok: patchOk, data: json, error: patchApiError } = await readApiResponse<{
+        success?: boolean;
+        data?: {
+          verified?: PatchProposal[];
+          rejected?: RejectedPatch[];
+          gaps?: Gap[];
+          batch?: { batchId: string; revisionToken: string; baseTypstSource: string; jobId: string } | null;
+          masterResumeId?: string | null;
+          demo?: boolean;
+        };
+      }>(res, "Failed to generate patches.");
 
-      if (!res.ok || !json.success) {
-        setPatchError(json.error || "Failed to generate patches.");
+      if (!patchOk || !json?.success || !json.data) {
+        setPatchError(patchApiError || "Failed to generate patches.");
         setPatchStage("error");
         setIsGeneratingPatches(false);
         return;
@@ -598,6 +714,19 @@ export function TailorWorkspace() {
     }
   };
 
+  const matchGuestEvidenceLocally = (reqs: JobRequirements): RankedMatch[] => {
+    if (typeof window === "undefined") return [];
+    try {
+      initializeDemoSamples();
+      const raw = localStorage.getItem("resumeforge_guest_evidence");
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(parsed)) return [];
+      return matchGuestEvidenceItems(parsed, reqs);
+    } catch {
+      return [];
+    }
+  };
+
   const handleExtract = async () => {
     if (!rawDescription.trim()) {
       setErrorMessage("Please paste a job description before extracting requirements.");
@@ -610,16 +739,32 @@ export function TailorWorkspace() {
     setIsExtracting(true);
 
     try {
+      const demoConfig = await fetchDemoConfig();
+      if (extractGeneration !== scanGenerationRef.current) return;
+
       const res = await fetch("/api/jobs/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rawDescription }),
       });
 
-      const json = await res.json();
+      const { ok, status, data: json, error } = await readApiResponse<{
+        success?: boolean;
+        data?: JobRequirements;
+      }>(res, "Failed to extract requirements.");
       if (extractGeneration !== scanGenerationRef.current) return;
-      if (!res.ok || !json.success) {
-        setErrorMessage(json.error || "Failed to extract requirements.");
+      if (!ok || !json?.success || !json.data) {
+        if (status === 401 || demoConfig?.demoMode) {
+          const parsed = parseJobDescription(rawDescription);
+          setExtractedRequirements(parsed);
+          if (parsed.roleTitle && !roleTitle) {
+            setRoleTitle(parsed.roleTitle);
+          }
+          await ensureJobSaved({ forceUpdate: true, requirements: parsed });
+          await fetchMatches(parsed);
+          return;
+        }
+        setErrorMessage(error || "Failed to extract requirements.");
         setIsExtracting(false);
         return;
       }
@@ -629,13 +774,13 @@ export function TailorWorkspace() {
         setRoleTitle(json.data.roleTitle);
       }
 
-      // Persist posting + extracted requirements into SQLite (safe to keep)
+      // Persist posting + extracted requirements into PostgreSQL
       await ensureJobSaved({ forceUpdate: true, requirements: json.data });
 
       await fetchMatches(json.data);
     } catch (err) {
       if (extractGeneration !== scanGenerationRef.current) return;
-      setErrorMessage(String(err));
+      setErrorMessage(err instanceof Error ? err.message : String(err));
     } finally {
       if (extractGeneration === scanGenerationRef.current) {
         setIsExtracting(false);
@@ -655,6 +800,13 @@ export function TailorWorkspace() {
   const fetchMatches = async (reqs: JobRequirements, signal?: AbortSignal) => {
     setIsMatching(true);
     try {
+      const demoConfig = await fetchDemoConfig();
+      if (signal?.aborted) return;
+      if (demoConfig?.demoMode) {
+        setMatches(matchGuestEvidenceLocally(reqs));
+        return;
+      }
+
       const res = await fetch("/api/jobs/match", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -663,9 +815,14 @@ export function TailorWorkspace() {
       });
       if (signal?.aborted) return;
 
-      const json = await res.json();
-      if (res.ok && json.success) {
+      const { ok, status, data: json } = await readApiResponse<{
+        success?: boolean;
+        data?: RankedMatch[];
+      }>(res);
+      if (ok && json?.success && Array.isArray(json.data)) {
         setMatches(json.data);
+      } else if (status === 401) {
+        setMatches(matchGuestEvidenceLocally(reqs));
       }
     } catch (err) {
       if (signal?.aborted) return;
@@ -749,27 +906,51 @@ export function TailorWorkspace() {
       if (generation !== scanGenerationRef.current) return;
       try {
         setIsAutoScanning(true);
+        const demoConfig = await fetchDemoConfig();
+        if (generation !== scanGenerationRef.current || controller.signal.aborted) return;
+
+        if (demoConfig?.demoMode) {
+          const parsed = parseJobDescription(rawDescription);
+          pendingRescanRef.current = false;
+          setExtractedRequirements(parsed);
+          if (parsed.roleTitle && !roleTitleRef.current) {
+            setRoleTitle(parsed.roleTitle);
+          }
+          await fetchMatches(parsed, controller.signal);
+          void ensureJobSaved({ forceUpdate: true, requirements: parsed });
+          return;
+        }
+
         const res = await fetch("/api/jobs/extract", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ rawDescription }),
           signal: controller.signal,
         });
-        const json = await res.json();
+        const { ok, status, data: json, error } = await readApiResponse<{
+          success?: boolean;
+          data?: JobRequirements;
+        }>(res, "Sign in to extract job requirements.");
         if (generation !== scanGenerationRef.current) return;
         pendingRescanRef.current = false;
-        if (res.status === 401) {
-          setErrorMessage(json.error || "Sign in to extract job requirements.");
-          void ensureJobSaved({ forceUpdate: true });
+        if (status === 401) {
+          const parsed = parseJobDescription(rawDescription);
+          setExtractedRequirements(parsed);
+          if (parsed.roleTitle && !roleTitleRef.current) {
+            setRoleTitle(parsed.roleTitle);
+          }
+          await fetchMatches(parsed, controller.signal);
+          void ensureJobSaved({ forceUpdate: true, requirements: parsed });
           return;
         }
-        if (res.ok && json.success && json.data) {
+        if (ok && json?.success && json.data) {
           setExtractedRequirements(json.data);
           if (json.data.roleTitle && !roleTitleRef.current) {
             setRoleTitle(json.data.roleTitle);
           }
           await fetchMatches(json.data, controller.signal);
         } else {
+          if (error) setErrorMessage(error);
           void ensureJobSaved({ forceUpdate: true });
         }
       } catch (err) {

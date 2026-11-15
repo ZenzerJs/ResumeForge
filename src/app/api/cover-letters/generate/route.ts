@@ -16,7 +16,16 @@ export async function POST(req: NextRequest) {
     const userId = await requireUserId(req);
     if (userId instanceof NextResponse) return userId;
 
-    const body = await req.json();
+    let rawBody: unknown;
+    try {
+      rawBody = await req.json();
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON payload" }, { status: 400 });
+    }
+    if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) {
+      return NextResponse.json({ success: false, error: "Invalid request payload" }, { status: 400 });
+    }
+    const body = rawBody as Record<string, unknown>;
 
     const { jobId, variantId, providerConfig: rawProviderConfig } = body;
 
@@ -35,7 +44,7 @@ export async function POST(req: NextRequest) {
     if (!job) {
       return NextResponse.json(
         { success: false, error: `Job record not found: ${jobId}` },
-        { status: 400 }
+        { status: 404 }
       );
     }
 
@@ -47,7 +56,7 @@ export async function POST(req: NextRequest) {
       if (!variant) {
         return NextResponse.json(
           { success: false, error: `ResumeVariant record not found: ${variantId}` },
-          { status: 400 }
+          { status: 404 }
         );
       }
     }
@@ -102,13 +111,13 @@ export async function POST(req: NextRequest) {
 
     const inputPayload = {
       jobId: job.id,
-      variantId: variantId || undefined,
+      variantId: typeof variantId === "string" ? variantId : undefined,
       company: job.company || "Hiring Organization",
       roleTitle: job.roleTitle || "Target Position",
       rawDescription: job.rawDescription,
       extractedRequirements: extractedReqs,
-      candidateName: body.candidateName || "Candidate",
-      activeRoleProfile: body.activeRoleProfile || "Full-stack",
+      candidateName: typeof body.candidateName === "string" && body.candidateName ? body.candidateName : "Candidate",
+      activeRoleProfile: typeof body.activeRoleProfile === "string" && body.activeRoleProfile ? body.activeRoleProfile : "Full-stack",
     };
 
     const master = await getMasterResume(userId);
@@ -125,9 +134,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: gatewayResult.error || "Failed to generate cover letter from AI provider.",
+          error: sanitizeError(gatewayResult.error || "Failed to generate cover letter from AI provider."),
         },
-        { status: 500 }
+        { status: 502 }
       );
     }
 
@@ -182,7 +191,7 @@ export async function POST(req: NextRequest) {
     // Persist draft in database
     const persisted = await createCoverLetter({
       jobId: job.id,
-      variantId: variantId || undefined,
+      variantId: typeof variantId === "string" ? variantId : undefined,
       title: coverLetterData.title || `Cover Letter — ${job.company || "Company"} ${job.roleTitle || "Role"}`,
       salutation: coverLetterData.salutation,
       openingParagraph: coverLetterData.openingParagraph,

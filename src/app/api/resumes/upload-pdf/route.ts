@@ -13,8 +13,9 @@ import { isDemoMode } from "@/lib/demo-mode";
 import { originAllowed } from "@/lib/security/session";
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
-const MAX_DEMO_REQUEST_BYTES = MAX_PDF_BYTES + 64 * 1024;
-const MAX_AUTH_REQUEST_BYTES = Math.ceil(MAX_PDF_BYTES * 4 / 3) + 64 * 1024;
+const MAX_MULTIPART_DEMO_REQUEST_BYTES = MAX_PDF_BYTES + 64 * 1024;
+const MAX_DEMO_REQUEST_BYTES = Math.ceil((MAX_PDF_BYTES * 4) / 3) + 64 * 1024;
+const MAX_AUTH_REQUEST_BYTES = Math.ceil((MAX_PDF_BYTES * 4) / 3) + 64 * 1024;
 const REQUEST_BODY_TIMEOUT_MS = 30_000;
 
 class RequestBodyTimeoutError extends Error {}
@@ -76,12 +77,16 @@ export async function POST(request: Request) {
       if (!hasOrigin || !originAllowed(request)) {
         return NextResponse.json({ success: false, error: "Invalid request origin" }, { status: 403 });
       }
+      const requestContentType = request.headers.get("content-type") || "";
+      const demoMaxBytes = requestContentType.includes("multipart/form-data")
+        ? MAX_MULTIPART_DEMO_REQUEST_BYTES
+        : MAX_DEMO_REQUEST_BYTES;
       const contentLengthHeader = request.headers.get("content-length");
       const contentLength = contentLengthHeader ? Number(contentLengthHeader) : Number.NaN;
-      if (Number.isFinite(contentLength) && contentLength > MAX_DEMO_REQUEST_BYTES) {
+      if (Number.isFinite(contentLength) && contentLength > demoMaxBytes) {
         return NextResponse.json({ success: false, error: "Upload exceeds the 10 MB request limit" }, { status: 413 });
       }
-      const boundedRequest = await readBodyWithinLimit(request, MAX_DEMO_REQUEST_BYTES);
+      const boundedRequest = await readBodyWithinLimit(request, demoMaxBytes);
       if (!boundedRequest) {
         return NextResponse.json({ success: false, error: "Upload exceeds the 10 MB request limit" }, { status: 413 });
       }

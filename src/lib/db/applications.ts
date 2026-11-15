@@ -54,7 +54,15 @@ export async function upsertApplication(
   const nextStatus = input.status ?? existing?.status ?? "SAVED";
   let appliedAt = existing?.appliedAt ?? null;
   if (input.appliedAt !== undefined) {
-    appliedAt = input.appliedAt ? new Date(input.appliedAt) : null;
+    if (input.appliedAt === null || input.appliedAt === "") {
+      appliedAt = null;
+    } else {
+      const parsedDate = input.appliedAt instanceof Date ? input.appliedAt : new Date(input.appliedAt);
+      if (Number.isNaN(parsedDate.getTime())) {
+        throw new ApplicationInputError("Invalid appliedAt date");
+      }
+      appliedAt = parsedDate;
+    }
   } else if (nextStatus === "APPLIED" && !appliedAt) {
     appliedAt = new Date();
   }

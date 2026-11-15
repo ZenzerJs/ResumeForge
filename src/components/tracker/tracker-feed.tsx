@@ -104,6 +104,45 @@ const MIN_SALARY_OPTIONS: { value: string; label: string }[] = [
 const FILTER_CONTROL =
   "min-h-11 rounded-md border border-hairline bg-inset px-2.5 text-[12.5px] text-rf-cloud placeholder-muted-foreground transition-colors duration-150 focus:border-primary/60";
 
+type ApiPayload<T = unknown> = {
+  success?: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+  meta?: {
+    total?: number;
+    totalPages?: number;
+    counts?: { applied: number; interviewing: number };
+  };
+  cached?: boolean;
+  createdCount?: number;
+  skippedCount?: number;
+  results?: Array<{
+    id?: string;
+    status?: string;
+    rawDescription?: string;
+    source?: string;
+    skipped?: boolean;
+    success?: boolean;
+  }>;
+};
+
+async function readJsonSafe<T = unknown>(res: Response): Promise<ApiPayload<T> | null> {
+  try {
+    return (await res.json()) as ApiPayload<T>;
+  } catch {
+    return null;
+  }
+}
+
+export function mergePatchedGuestJobs<T extends { id: string }>(prev: T[], next: T[]): T[] {
+  return prev.map((job) => next.find((item) => item.id === job.id) ?? job);
+}
+
+function formatApiError(res: Response, json: ApiPayload | null, fallback: string): string {
+  return json?.message || json?.error || `${fallback} (HTTP ${res.status}).`;
+}
+
 interface TrackerFeedProps {
   filterStatuses?: JobStatus[];
 }
@@ -274,8 +313,8 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       const res = await fetch(`/api/jobs?${params.toString()}`, {
         signal: controller.signal,
       });
-      const json = await res.json();
-      if (!controller.signal.aborted && res.ok && json.success) {
+      const json = await readJsonSafe<JobItem[]>(res);
+      if (!controller.signal.aborted && res.ok && json?.success && Array.isArray(json.data)) {
         setJobs(json.data);
         setTotalJobs(json.meta?.total ?? json.data.length);
         setTotalPages(json.meta?.totalPages ?? 1);
@@ -287,16 +326,23 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           notesMap[j.id] = j.notes || "";
         });
         setEditingNotes((prev) => ({ ...prev, ...notesMap }));
+      } else if (!controller.signal.aborted && (!res.ok || !json?.success)) {
+        setImportNotice(formatApiError(res, json, "Failed to load jobs"));
+        scheduleNoticeClear();
       }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
       console.error("Failed to fetch jobs:", err);
+      if (!controller.signal.aborted) {
+        setImportNotice("Network error loading jobs.");
+        scheduleNoticeClear();
+      }
     } finally {
       if (!controller.signal.aborted) {
         setIsLoading(false);
       }
     }
-  }, [page, postedWithin, debouncedSearch, debouncedLocation, workplace, statusFilter, filterStatuses, minSalary]);
+  }, [page, postedWithin, debouncedSearch, debouncedLocation, workplace, statusFilter, filterStatuses, minSalary, scheduleNoticeClear]);
 
   useEffect(() => {
     void fetchJobs();
@@ -354,12 +400,12 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ ids }),
           });
-          const json = await res.json();
+          const json = await readJsonSafe(res);
           if (!mountedRef.current) return;
           if (res.status === 401 || res.status === 429) {
             break;
           }
-          if (res.ok && json.success) {
+          if (res.ok && json?.success) {
             const results = (json.results ?? []) as Array<{ id: string; status: string; rawDescription?: string }>;
             const filled = new Map<string, string>(
               results
@@ -400,7 +446,9 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       if (cancelled) return;
       setIsDemoMode(demoConfig?.demoMode === true);
       if (demoConfig?.demoMode === true) return;
-      const json = await fetch("/api/connectors/status").then((res) => res.json());
+      const statusRes = await fetch("/api/connectors/status");
+      if (!statusRes.ok) return;
+      const json = await readJsonSafe<{ providers?: Array<{ lastSyncAt?: string | null }> }>(statusRes);
       {
         if (cancelled || !json?.success) return;
         const times = (json.data?.providers ?? [])
@@ -463,7 +511,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           ...(body.variantId !== undefined ? { appliedVariantId: body.variantId } : {}),
         } : job);
         localStorage.setItem("resumeforge_guest_jobs", JSON.stringify(next));
-        setJobs((prev) => prev.map((job) => next.find((item) => item.id === jobId) ?? job));
+        setJobs((prev) => mergePatchedGuestJobs(prev, next));
         return;
       }
       const res = await fetch(`/api/jobs/${jobId}`, {
@@ -471,23 +519,44 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const json = await res.json();
-      if (res.ok && json.success) {
+      const json = await readJsonSafe<{
+        status: JobStatus;
+        appliedAt: string | null;
+        appliedVariantId?: string | null;
+      }>(res);
+      if (res.ok && json?.success && json.data) {
+        const updated = json.data;
         setJobs((prev) =>
           prev.map((j) =>
             j.id === jobId
               ? {
                   ...j,
-                  status: json.data.status,
-                  appliedAt: json.data.appliedAt,
-                  appliedVariantId: json.data.appliedVariantId ?? null,
+                  status: updated.status,
+                  appliedAt: updated.appliedAt,
+                  appliedVariantId: updated.appliedVariantId ?? null,
                 }
               : j,
           ),
         );
+        setTier2Notice((p) => ({ ...p, [jobId]: "" }));
+      } else {
+        const msg =
+          res.status === 404
+            ? "Shared catalog postings are read-only and cannot be updated."
+            : formatApiError(res, json, "Failed to update application");
+        setTier2Notice((p) => ({ ...p, [jobId]: msg }));
+        setImportNotice(msg);
+        scheduleNoticeClear();
       }
-    } catch {
-      console.error("Failed to update application");
+    } catch (err) {
+      console.error("Failed to update application", err);
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : "Network error updating application.";
+      setTier2Notice((p) => ({ ...p, [jobId]: msg }));
+      setImportNotice(msg);
+      scheduleNoticeClear();
     } finally {
       setIsUpdatingStatus((p) => ({ ...p, [jobId]: false }));
     }
@@ -594,12 +663,13 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
 
     try {
       const res = await fetch(`/api/jobs/${jobId}/fetch-fulltext`, { method: "POST" });
-      const json = await res.json();
-      if (res.ok && json.success && json.data) {
+      const json = await readJsonSafe<{ rawDescription: string }>(res);
+      if (res.ok && json?.success && json.data) {
+        const rawDescription = json.data.rawDescription;
         setJobs((prev) =>
           prev.map((j) =>
             j.id === jobId
-              ? { ...j, rawDescription: json.data.rawDescription, isPlaceholder: false }
+              ? { ...j, rawDescription, isPlaceholder: false }
               : j,
           ),
         );
@@ -613,7 +683,8 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         setTier2Notice((p) => ({
           ...p,
           [jobId]:
-            json.error ||
+            json?.message ||
+            json?.error ||
             "Couldn't extract automatically. Click Tailor Resume and paste using the Role / Company / Requirements format.",
         }));
       }
@@ -646,26 +717,32 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       ]);
 
       let trackerPart = "Tracker: import failed.";
-      if (bulkRes.status === "fulfilled" && bulkRes.value.ok) {
-        const bulkJson = await bulkRes.value.json();
-        trackerPart = bulkJson.success
-          ? `Tracker: ${bulkJson.createdCount} new (${bulkJson.skippedCount} already saved).`
-          : "Tracker: import failed.";
+      if (bulkRes.status === "fulfilled") {
+        const bulkJson = await readJsonSafe(bulkRes.value);
+        if (bulkRes.value.ok && bulkJson?.success) {
+          trackerPart = `Tracker: ${bulkJson.createdCount} new (${bulkJson.skippedCount} already saved).`;
+        } else {
+          trackerPart = `Tracker: ${formatApiError(bulkRes.value, bulkJson, "import failed")}`;
+        }
       }
 
       let feedPart = "Discover feed: sync failed.";
-      if (syncRes.status === "fulfilled" && syncRes.value.ok) {
-        const syncJson = await syncRes.value.json();
-        const summary = syncJson.data?.summary;
-        const results: Array<{ source: string; skipped?: boolean; success?: boolean }> =
-          syncJson.data?.results ?? [];
+      if (syncRes.status === "fulfilled") {
+        const syncJson = await readJsonSafe<{
+          summary?: { totalInserted: number; totalFound: number; providerCount: number };
+          results?: Array<{ source: string; skipped?: boolean; success?: boolean }>;
+        }>(syncRes.value);
+        const summary = syncJson?.data?.summary;
+        const results = syncJson?.data?.results ?? [];
         const skipped = results.filter((result) => result.skipped);
-        if (syncJson.success && summary) {
+        if (syncRes.value.ok && syncJson?.success && summary) {
           const ran = Math.max(0, summary.providerCount - skipped.length);
           feedPart = `Discover feed: ${summary.totalInserted} new of ${summary.totalFound} from ${ran} sources.`;
           if (skipped.length > 0) {
             feedPart += ` Skipped: ${skipped.map((result) => result.source).join(", ")}.`;
           }
+        } else {
+          feedPart = `Discover feed: ${formatApiError(syncRes.value, syncJson, "sync failed")}`;
         }
       }
 

@@ -22,6 +22,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { isSafeHref } from "@/lib/security/safe-url";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
+import { fetchDemoConfig } from "@/components/auth/session-user";
+import { readApiResponse } from "@/lib/api-error";
 
 export interface CompanyDossierData {
   id?: string;
@@ -75,9 +77,13 @@ export function CompanyIntelDossierPanel({
 
     try {
       const res = await fetch(`/api/companies/${encodeURIComponent(slug)}/dossier`, { signal });
-      const json = await res.json();
+      const { ok, data: json } = await readApiResponse<{
+        found?: boolean;
+        dossier?: CompanyDossierData;
+        stale?: boolean;
+      }>(res);
       if (signal?.aborted) return;
-      if (res.ok && json.found && json.dossier) {
+      if (ok && json?.found && json.dossier) {
         setDossier(json.dossier);
         setIsStale(Boolean(json.stale));
       } else {
@@ -106,6 +112,12 @@ export function CompanyIntelDossierPanel({
     setErrorMessage(null);
 
     try {
+      const demoConfig = await fetchDemoConfig();
+      if (demoConfig?.demoMode) {
+        setErrorMessage("Company dossier generation requires a signed-in account. Public demo mode is read-only for server-saved dossiers.");
+        return;
+      }
+
       const providerConfig = (await resolveClientProviderConfig()) || undefined;
       const res = await fetch(`/api/companies/${encodeURIComponent(slug)}/dossier/generate`, {
         method: "POST",
@@ -116,12 +128,15 @@ export function CompanyIntelDossierPanel({
           providerConfig,
         }),
       });
-      const json = await res.json();
-      if (res.ok && json.found && json.dossier) {
+      const { ok, data: json, error } = await readApiResponse<{
+        found?: boolean;
+        dossier?: CompanyDossierData;
+      }>(res, "Failed to generate company dossier. Please check your AI API key.");
+      if (ok && json?.found && json.dossier) {
         setDossier(json.dossier);
         setIsStale(false);
       } else {
-        setErrorMessage(json.error || "Failed to generate company dossier. Please check your AI API key.");
+        setErrorMessage(error || "Failed to generate company dossier. Please check your AI API key.");
       }
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Network error during dossier generation.");

@@ -174,7 +174,7 @@ describe("AI Provider Gateway Connection Tests", () => {
         }),
       })
     );
-    expect(repairDemoRes.status).toBe(401);
+    expect(repairDemoRes.status).toBe(403);
     expect(fetchSpy).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
   });

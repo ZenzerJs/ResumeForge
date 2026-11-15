@@ -51,6 +51,15 @@ import { ChatPanel } from "@/components/editor/chat-panel";
 import { AiProgress, type AiJobStage } from "@/components/ui/ai-progress";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
 import { getDemoContextFromBrowser } from "@/lib/demo-client";
+import { parseJobDescription } from "@/lib/jd-parser/parser";
+
+async function readJsonSafe<T = Record<string, unknown>>(res: Response): Promise<T | null> {
+  try {
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
 
 interface AiSidebarProps {
   /** Current Typst source in the editor buffer */
@@ -213,8 +222,10 @@ export function AiSidebar({
       }
       try {
         const res = await fetch(`/api/jobs/${urlJobId}`);
-        const json = await res.json();
-        if (!cancelled && json.success && json.data?.rawDescription) setJdText(json.data.rawDescription);
+        const json = await readJsonSafe<{ success?: boolean; data?: { rawDescription?: string } }>(res);
+        if (!cancelled && res.ok && json?.success && json.data?.rawDescription) {
+          setJdText(json.data.rawDescription);
+        }
       } catch {}
     })();
     return () => {
@@ -256,35 +267,56 @@ export function AiSidebar({
     setDemoBaseTypstSource(null);
 
     try {
-      // Step 1: Extract requirements from JD text
-      setTailorStage("extracting");
-      const extractRes = await fetch("/api/jobs/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rawDescription: jdText }),
-        signal,
-      });
-      const extractJson = await extractRes.json();
-      if (signal.aborted) return;
-
-      if (!extractRes.ok || !extractJson.success) {
-        const errMsg =
-          extractRes.status === 401
-            ? extractJson.error || "Sign in to extract job requirements."
-            : extractJson.error || "Failed to extract job requirements.";
-        setError(errMsg);
-        setTailorStage("error");
-        return;
-      }
-
-      const jobRequirements = extractJson.data;
-
       const demoConfig = await fetchDemoConfig();
       if (signal.aborted) return;
       const isDemo = demoConfig?.demoMode === true;
       const demoContext = isDemo ? getDemoContextFromBrowser() : undefined;
       if (isDemo && (!demoContext?.masterTypst || demoContext.masterTypst !== source || localStorage.getItem("resumeforge_typst_source") !== source)) {
         throw new Error("The browser resume changed. Reload the demo draft before generating patches.");
+      }
+
+      // Step 1: Extract requirements from JD text (client-side in DEMO_MODE)
+      setTailorStage("extracting");
+      let jobRequirements: {
+        requiredSkills: string[];
+        preferredSkills: string[];
+        domainTerms: string[];
+      };
+
+      if (isDemo) {
+        jobRequirements = parseJobDescription(jdText);
+      } else {
+        const extractRes = await fetch("/api/jobs/extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rawDescription: jdText }),
+          signal,
+        });
+        const extractJson = await readJsonSafe<{
+          success?: boolean;
+          error?: string;
+          message?: string;
+          data?: {
+            requiredSkills: string[];
+            preferredSkills: string[];
+            domainTerms: string[];
+          };
+        }>(extractRes);
+        if (signal.aborted) return;
+
+        if (!extractRes.ok || !extractJson?.success || !extractJson.data) {
+          const errMsg =
+            extractRes.status === 401
+              ? extractJson?.error || "Sign in to extract job requirements."
+              : extractJson?.message ||
+                extractJson?.error ||
+                `Failed to extract job requirements (HTTP ${extractRes.status}).`;
+          setError(errMsg);
+          setTailorStage("error");
+          return;
+        }
+
+        jobRequirements = extractJson.data;
       }
 
       // Persist pasted job descriptions for signed-in users so accepted
@@ -297,9 +329,9 @@ export function AiSidebar({
           body: JSON.stringify({ rawDescription: jdText, source: "pasted", personal: true }),
           signal,
         });
-        const saveJson = await saveRes.json();
+        const saveJson = await readJsonSafe<{ success?: boolean; data?: { id?: string } }>(saveRes);
         if (signal.aborted) return;
-        if (saveRes.ok && saveJson.success && typeof saveJson.data?.id === "string") {
+        if (saveRes.ok && saveJson?.success && typeof saveJson.data?.id === "string") {
           jobId = saveJson.data.id;
         }
       }
@@ -332,17 +364,27 @@ export function AiSidebar({
         }),
       });
 
-      const patchJson = await patchRes.json();
+      const patchJson = await readJsonSafe<{
+        success?: boolean;
+        error?: string;
+        message?: string;
+        data?: {
+          verified?: PatchSuggestion[];
+          batch?: { batchId: string; revisionToken: string; baseTypstSource: string; jobId: string } | null;
+          demo?: boolean;
+          gaps?: GapItem[];
+        };
+      }>(patchRes);
       if (signal.aborted) return;
 
-      if (!patchRes.ok || !patchJson.success) {
+      if (!patchRes.ok || !patchJson?.success || !patchJson.data) {
         const isProxyProvider = ["openai", "anthropic", "groq"].includes(
           String(aiSettings.provider).toLowerCase()
         );
         const errMsg =
           patchRes.status === 401 && isProxyProvider
             ? isDemo ? "Use your own provider API key in Settings to generate a demo response." : "Sign in to use this provider, or switch to Gemini."
-            : patchJson.error || "AI generation failed.";
+            : patchJson?.message || patchJson?.error || `AI generation failed (HTTP ${patchRes.status}).`;
         setError(errMsg);
         setTailorStage("error");
         if (errMsg.toLowerCase().includes("api key") || errMsg.toLowerCase().includes("provider")) {
@@ -511,8 +553,15 @@ export function AiSidebar({
           variantTitle: `AI Tailored Variant — ${new Date().toLocaleDateString()}`,
         }),
       });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || "Failed to save tailored variant.");
+      const json = await readJsonSafe<{
+        success?: boolean;
+        error?: string;
+        message?: string;
+        data?: { typstContent: string };
+      }>(res);
+      if (!res.ok || !json?.success || !json.data) {
+        throw new Error(json?.message || json?.error || `Failed to save tailored variant (HTTP ${res.status}).`);
+      }
       onApplyToBuffer(json.data.typstContent);
       setHasApplied(true);
     } catch (err) {
@@ -581,9 +630,14 @@ export function AiSidebar({
         }),
       });
 
-      const json = await res.json();
+      const json = await readJsonSafe<{
+        success?: boolean;
+        error?: string;
+        message?: string;
+        data?: TypstRepairProposal;
+      }>(res);
       if (signal.aborted) return;
-      if (res.ok && json.success && json.data) {
+      if (res.ok && json?.success && json.data) {
         const prop: TypstRepairProposal = json.data;
         setRepairProposal(prop);
 
@@ -601,7 +655,10 @@ export function AiSidebar({
         }
         setRepairStage("done");
       } else {
-        const errMsg = json.error || "Failed to generate Typst repair proposal";
+        const errMsg =
+          json?.message ||
+          json?.error ||
+          `Failed to generate Typst repair proposal (HTTP ${res.status}).`;
         setRepairError(errMsg);
         setRepairStage("error");
       }

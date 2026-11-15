@@ -19,11 +19,13 @@ import {
   Globe2,
   Compass,
   SlidersHorizontal,
+  AlertTriangle,
 } from "lucide-react";
 import { AppShell } from "@/components/design-system/app-shell";
 import { CommandButton } from "@/components/design-system/command-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrackerSubNav } from "@/components/tracker/tracker-sub-nav";
+import { fetchDemoConfig } from "@/components/auth/session-user";
 import { isSafeHref } from "@/lib/security/safe-url";
 import { type PostedWithin } from "@/lib/jobs/posted-within";
 import type { ScoreBreakdown } from "@/lib/scoring/blended-sort";
@@ -151,6 +153,34 @@ const CURATED_COMPANIES: { label: string; query: string }[] = [
 const FILTER_CONTROL =
   "min-h-11 rounded-md border border-hairline bg-rf-elevated px-2.5 text-sm text-rf-cloud placeholder:text-muted-foreground transition-colors duration-150 focus:border-primary/60";
 
+type FeedNotification = {
+  message: string;
+  tone: "success" | "error" | "info";
+};
+
+export function extractPromotedJobId(data: unknown): { id: string | null; status: string } {
+  if (!data || typeof data !== "object") return { id: null, status: "SAVED" };
+  const record = data as {
+    id?: unknown;
+    status?: unknown;
+    job?: { id?: unknown; status?: unknown };
+  };
+  const rawId = record.id ?? record.job?.id;
+  const rawStatus = record.status ?? record.job?.status;
+  return {
+    id: typeof rawId === "string" && rawId.length > 0 ? rawId : null,
+    status: typeof rawStatus === "string" && rawStatus.length > 0 ? rawStatus : "SAVED",
+  };
+}
+
+async function readJsonSafe(res: Response): Promise<Record<string, unknown> | null> {
+  try {
+    return (await res.json()) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 export function DiscoverFeed() {
   const [jobs, setJobs] = useState<IngestedJobItem[]>([]);
   const [totalJobs, setTotalJobs] = useState(0);
@@ -174,7 +204,7 @@ export function DiscoverFeed() {
 
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [notification, setNotification] = useState<string | null>(null);
+  const [notification, setNotification] = useState<FeedNotification | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchQuery.trim()), 250);
@@ -186,12 +216,15 @@ export function DiscoverFeed() {
     async function loadSkills() {
       const skillSet = new Set<string>();
       try {
-        const res = await fetch("/api/evidence");
-        const json = await res.json();
-        if (json?.success && Array.isArray(json.data)) {
-          for (const item of json.data) {
-            if (Array.isArray(item.tags)) {
-              item.tags.forEach((t: string) => skillSet.add(t.toLowerCase()));
+        const demoConfig = await fetchDemoConfig();
+        if (!demoConfig?.demoMode) {
+          const res = await fetch("/api/evidence");
+          const json = await readJsonSafe(res);
+          if (res.ok && json?.success && Array.isArray(json.data)) {
+            for (const item of json.data as Array<{ tags?: string[] }>) {
+              if (Array.isArray(item.tags)) {
+                item.tags.forEach((t: string) => skillSet.add(t.toLowerCase()));
+              }
             }
           }
         }
@@ -248,16 +281,26 @@ export function DiscoverFeed() {
       const res = await fetch(`/api/connectors/jobs?${params.toString()}`, {
         signal: controller.signal,
       });
-      const json = await res.json();
-      if (!controller.signal.aborted && res.ok && json.success) {
-        setJobs(json.data || []);
-        setTotalJobs(json.meta?.total ?? 0);
-        setTotalPages(json.meta?.totalPages ?? 1);
+      const json = await readJsonSafe(res);
+      if (!controller.signal.aborted && res.ok && json?.success) {
+        const meta = json.meta as { total?: number; totalPages?: number } | undefined;
+        setJobs((json.data as IngestedJobItem[]) || []);
+        setTotalJobs(meta?.total ?? 0);
+        setTotalPages(meta?.totalPages ?? 1);
         setHasEvidence(Boolean(json.hasEvidence));
+      } else if (!controller.signal.aborted && (!res.ok || !json?.success)) {
+        const errMsg =
+          (typeof json?.message === "string" && json.message) ||
+          (typeof json?.error === "string" && json.error) ||
+          `Failed to load discovered jobs (HTTP ${res.status}).`;
+        setNotification({ message: errMsg, tone: "error" });
       }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
       console.error("Failed to fetch connector jobs:", err);
+      if (!controller.signal.aborted) {
+        setNotification({ message: "Network error loading discovered jobs.", tone: "error" });
+      }
     } finally {
       if (!controller.signal.aborted) {
         setIsLoading(false);
@@ -338,23 +381,39 @@ export function DiscoverFeed() {
     try {
       setIsSyncing(true);
       setNotification(null);
+      const demoConfig = await fetchDemoConfig();
+      if (demoConfig?.demoMode) {
+        setNotification({
+          message:
+            "Demo feed uses preloaded public jobs. Live connector sync requires signing in or self-hosting.",
+          tone: "info",
+        });
+        return;
+      }
       const res = await fetch("/api/connectors/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
-      const json = await res.json();
-      if (res.ok && json.success) {
-        const summary = json.data?.summary;
+      const json = await readJsonSafe(res);
+      if (res.ok && json?.success) {
+        const data = json.data as { summary?: { totalFound: number; totalInserted: number; providerCount: number } } | undefined;
+        const summary = data?.summary;
         const msg = summary
           ? `Synced ${summary.totalFound} jobs (${summary.totalInserted} new) from ${summary.providerCount} public connectors!`
           : "Sync completed successfully!";
-        setNotification(msg);
+        setNotification({ message: msg, tone: "success" });
         fetchIngestedJobs();
       } else {
-        setNotification(json.error || "Sync failed.");
+        const errMsg =
+          (typeof json?.message === "string" && json.message) ||
+          (typeof json?.error === "string" && json.error) ||
+          (res.status === 401
+            ? "Sign in to sync public job connectors."
+            : `Sync failed (HTTP ${res.status}).`);
+        setNotification({ message: errMsg, tone: "error" });
       }
-    } catch (err) {
-      setNotification("Failed to connect to ingestion service.");
+    } catch {
+      setNotification({ message: "Failed to connect to ingestion service.", tone: "error" });
     } finally {
       setIsSyncing(false);
     }
@@ -368,27 +427,92 @@ export function DiscoverFeed() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ingestedJobId: job.id }),
       });
-      const json = await res.json();
-      if (res.ok && json.success) {
+      const json = await readJsonSafe(res);
+      const { id: promotedId, status: promotedStatus } = extractPromotedJobId(json?.data);
+
+      if (res.ok && json?.success && promotedId) {
         setJobs((prev) =>
           prev.map((item) =>
             item.id === job.id
               ? {
                   ...item,
                   trackedJob: {
-                    id: json.data?.job?.id || "tracked",
-                    status: "SAVED",
+                    id: promotedId,
+                    status: promotedStatus,
                   },
                 }
               : item
           )
         );
-        setNotification(`Promoted "${job.title}" at ${job.companyName} to your Job Tracker!`);
+        setNotification({
+          message: `Promoted "${job.title}" at ${job.companyName} to your Job Tracker!`,
+          tone: "success",
+        });
+      } else if (res.ok && json?.success) {
+        setNotification({
+          message: "Failed to save job to tracker: missing job ID in response.",
+          tone: "error",
+        });
       } else {
-        setNotification(json.error || "Failed to save job to tracker.");
+        const demoConfig = await fetchDemoConfig();
+        if (demoConfig?.demoMode && res.status === 401 && typeof window !== "undefined") {
+          const guestId = `guest-job-${Date.now()}`;
+          try {
+            const raw = localStorage.getItem("resumeforge_guest_jobs");
+            const existing = raw ? JSON.parse(raw) : [];
+            const list = Array.isArray(existing) ? existing : [];
+            list.unshift({
+              id: guestId,
+              company: job.companyName,
+              roleTitle: job.title,
+              rawDescription: job.description || "",
+              source: job.source || "connector",
+              status: "SAVED",
+              createdAt: new Date().toISOString(),
+              notes: [job.location ? `Location: ${job.location}` : "", job.applyUrl ? `Apply: ${job.applyUrl}` : ""]
+                .filter(Boolean)
+                .join("\n"),
+              extractedRequirements: { requiredSkills: [], preferredSkills: [], domainTerms: [] },
+              variants: [],
+              coverLetters: [],
+            });
+            localStorage.setItem("resumeforge_guest_jobs", JSON.stringify(list));
+            setJobs((prev) =>
+              prev.map((item) =>
+                item.id === job.id
+                  ? {
+                      ...item,
+                      trackedJob: {
+                        id: guestId,
+                        status: "SAVED",
+                      },
+                    }
+                  : item
+              )
+            );
+            setNotification({
+              message: `Saved "${job.title}" at ${job.companyName} to your local demo tracker!`,
+              tone: "success",
+            });
+            return;
+          } catch {
+            setNotification({
+              message: "Demo mode: unable to save job to local browser storage.",
+              tone: "error",
+            });
+            return;
+          }
+        }
+        const errMsg =
+          (typeof json?.message === "string" && json.message) ||
+          (typeof json?.error === "string" && json.error) ||
+          (res.status === 401
+            ? "Sign in to save discovered jobs to your tracker."
+            : `Failed to save job to tracker (HTTP ${res.status}).`);
+        setNotification({ message: errMsg, tone: "error" });
       }
-    } catch (err) {
-      setNotification("Error promoting job to tracker.");
+    } catch {
+      setNotification({ message: "Error promoting job to tracker.", tone: "error" });
     } finally {
       setPromotingId(null);
     }
@@ -456,13 +580,24 @@ export function DiscoverFeed() {
 
         {notification ? (
           <div
-            role="status"
-            aria-live="polite"
-            className="flex items-center justify-between rounded-lg border border-signal/35 bg-signal/10 p-3 text-xs font-medium text-signal"
+            role={notification.tone === "error" ? "alert" : "status"}
+            aria-live={notification.tone === "error" ? "assertive" : "polite"}
+            data-testid="discover-notification"
+            className={`flex items-center justify-between rounded-lg border p-3 text-xs font-medium ${
+              notification.tone === "error"
+                ? "border-red-500/40 bg-red-950/30 text-red-300"
+                : notification.tone === "info"
+                  ? "border-amber-500/40 bg-amber-950/30 text-amber-200"
+                  : "border-signal/35 bg-signal/10 text-signal"
+            }`}
           >
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4" />
-              <span>{notification}</span>
+              {notification.tone === "error" || notification.tone === "info" ? (
+                <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
+              )}
+              <span>{notification.message}</span>
             </div>
             <button
               type="button"
@@ -753,7 +888,8 @@ export function DiscoverFeed() {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {jobs.map((j) => {
               const salaryStr = formatSalary(j);
-              const isAlreadyTracked = Boolean(j.trackedJob);
+              const trackedJobId = j.trackedJob?.id;
+              const isAlreadyTracked = Boolean(trackedJobId);
               const matchScore = displayScore(j.blendedScore);
               const requiredCount = j.compatibility?.totalRequiredCount ?? 0;
 
@@ -894,9 +1030,9 @@ export function DiscoverFeed() {
                       <span className="font-mono text-muted-foreground">No Link</span>
                     )}
 
-                    {isAlreadyTracked ? (
+                    {isAlreadyTracked && trackedJobId ? (
                       <Link
-                        href={`/tailor?jobId=${j.trackedJob?.id}`}
+                        href={`/tailor?jobId=${encodeURIComponent(trackedJobId)}`}
                         className="flex items-center gap-1.5 rounded-md border border-signal/40 bg-signal/10 px-2.5 py-1 text-xs font-medium text-signal transition hover:bg-signal/20"
                         data-testid={`in-tracker-btn-${j.id}`}
                       >

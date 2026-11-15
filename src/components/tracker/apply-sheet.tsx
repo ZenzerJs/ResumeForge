@@ -43,6 +43,8 @@ import { getDemoContextFromBrowser } from "@/lib/demo-client";
 import type { Gap } from "@/lib/ai/patch-schema";
 import { fetchDemoConfig } from "@/components/auth/session-user";
 import { downloadBlob } from "@/lib/utils";
+import { readApiResponse, parseApiError } from "@/lib/api-error";
+import { parseJobDescription } from "@/lib/jd-parser/parser";
 
 export interface TrackerJobItem {
   id: string;
@@ -162,13 +164,20 @@ export function ApplySheet({
         let cancelled = false;
         (async () => {
           try {
-            const res = await fetch("/api/resumes");
-            const json = await res.json();
-            if (!cancelled && res.ok && json.success && Array.isArray(json.data) && json.data.length > 0) {
-              const master = json.data.find((r: { isMaster?: boolean }) => r.isMaster) || json.data[0];
-              if (master?.typstSource) {
-                setTailoredTypst(master.typstSource);
-                return;
+            const demoConfig = await fetchDemoConfig();
+            if (cancelled) return;
+            if (!demoConfig?.demoMode) {
+              const res = await fetch("/api/resumes");
+              const { ok, data: json } = await readApiResponse<{
+                success?: boolean;
+                data?: { isMaster?: boolean; typstSource?: string }[];
+              }>(res);
+              if (!cancelled && ok && json?.success && Array.isArray(json.data) && json.data.length > 0) {
+                const master = json.data.find((r) => r.isMaster) || json.data[0];
+                if (master?.typstSource) {
+                  setTailoredTypst(master.typstSource);
+                  return;
+                }
               }
             }
           } catch {}
@@ -203,14 +212,34 @@ export function ApplySheet({
       return;
     }
     try {
+      const demoConfig = await fetchDemoConfig();
+      const isLocalJob =
+        demoConfig?.demoMode === true ||
+        job.id.startsWith("guest-job-") ||
+        job.id.startsWith("demo-sample-");
+      if (isLocalJob) {
+        try {
+          const raw = localStorage.getItem("resumeforge_guest_jobs");
+          const parsed = raw ? JSON.parse(raw) : [];
+          if (Array.isArray(parsed)) {
+            const updated = parsed.map((item) =>
+              item && item.id === job.id ? { ...item, appliedVariantId: variantId } : item
+            );
+            localStorage.setItem("resumeforge_guest_jobs", JSON.stringify(updated));
+          }
+        } catch {}
+        return;
+      }
+
       const res = await fetch(`/api/jobs/${job.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ variantId }),
       });
       if (!res.ok) {
+        const msg = await parseApiError(res, "Failed to update sent variant.");
         setSelectedVariantId(prevVariant);
-        setVariantError("Failed to update sent variant.");
+        setVariantError(msg);
       }
     } catch {
       setSelectedVariantId(prevVariant);
@@ -301,8 +330,13 @@ export function ApplySheet({
             variantTitle: `AI Tailored Variant — ${new Date().toLocaleDateString()}`,
           }),
         });
-        const applyJson = await applyRes.json();
-        if (!applyRes.ok || !applyJson.success) throw new Error(applyJson.error || "Failed to save tailored variant.");
+        const { ok: applyOk, data: applyJson, error: applyError } = await readApiResponse<{
+          success?: boolean;
+          data?: { typstContent: string };
+        }>(applyRes, "Failed to save tailored variant.");
+        if (!applyOk || !applyJson?.success || !applyJson.data) {
+          throw new Error(applyError || "Failed to save tailored variant.");
+        }
         workingTypst = applyJson.data.typstContent;
         setTailoredTypst(workingTypst);
         setAppliedPatchCount(acceptedPatchIds.length);
@@ -317,36 +351,54 @@ export function ApplySheet({
         domainTerms: [],
       };
 
+      const demoConfig = await fetchDemoConfig();
+      const isDemo = demoConfig?.demoMode === true;
+
       if (
         reqs.requiredSkills.length === 0 &&
         reqs.preferredSkills.length === 0 &&
         job.rawDescription &&
         job.rawDescription.trim().length > 20
       ) {
-        try {
-          const extRes = await fetch("/api/jobs/extract", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ rawDescription: job.rawDescription }),
-          });
-          const extJson = await extRes.json();
-          if (extRes.status === 401) {
-            setTailoringNotice(extJson?.error || "Sign in to extract job requirements.");
-          } else if (extRes.ok && extJson.success && extJson.data) {
-            reqs = {
-              requiredSkills: extJson.data.requiredSkills || [],
-              preferredSkills: extJson.data.preferredSkills || [],
-              domainTerms: extJson.data.domainTerms || [],
-            };
-          }
-        } catch {}
+        if (isDemo) {
+          const parsed = parseJobDescription(job.rawDescription);
+          reqs = {
+            requiredSkills: parsed.requiredSkills || [],
+            preferredSkills: parsed.preferredSkills || [],
+            domainTerms: parsed.domainTerms || [],
+          };
+        } else {
+          try {
+            const extRes = await fetch("/api/jobs/extract", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ rawDescription: job.rawDescription }),
+            });
+            const { ok: extOk, status: extStatus, data: extJson, error: extError } =
+              await readApiResponse<{
+                success?: boolean;
+                data?: {
+                  requiredSkills?: string[];
+                  preferredSkills?: string[];
+                  domainTerms?: string[];
+                };
+              }>(extRes, "Failed to extract job requirements.");
+            if (extStatus === 401) {
+              setTailoringNotice(extError || "Sign in to extract job requirements.");
+            } else if (extOk && extJson?.success && extJson.data) {
+              reqs = {
+                requiredSkills: extJson.data.requiredSkills || [],
+                preferredSkills: extJson.data.preferredSkills || [],
+                domainTerms: extJson.data.domainTerms || [],
+              };
+            }
+          } catch {}
+        }
       }
 
       // Generate a saved proposal batch for signed-in use, or a stateless BYOK
       // proposal set for the browser-local public demo.
       if (!patchBatch && !demoLocalPatches && (reqs.requiredSkills.length > 0 || reqs.preferredSkills.length > 0)) {
-        const demoConfig = await fetchDemoConfig();
-        const isDemo = demoConfig?.demoMode === true;
         const aiConfig = await resolveClientProviderConfig();
         if (!aiConfig) {
           setTailoringNotice(isDemo
@@ -373,8 +425,15 @@ export function ApplySheet({
               ...(isDemo ? (demoContext || {}) : { jobId: job.id }),
             }),
           });
-          const patchJson = await patchRes.json();
-          if (patchRes.ok && patchJson.success && Array.isArray(patchJson.data?.verified)) {
+          const { ok: patchOk, data: patchJson, error: patchError } = await readApiResponse<{
+            success?: boolean;
+            data?: {
+              verified?: PatchProposal[];
+              gaps?: Gap[];
+              batch?: { batchId: string; revisionToken: string; baseTypstSource: string; jobId: string };
+            };
+          }>(patchRes, "AI patch generation failed.");
+          if (patchOk && patchJson?.success && Array.isArray(patchJson.data?.verified)) {
             const verified = patchJson.data.verified as PatchProposal[];
             setPatchGaps(Array.isArray(patchJson.data.gaps) ? patchJson.data.gaps as Gap[] : []);
             if (verified.length > 0) {
@@ -406,7 +465,7 @@ export function ApplySheet({
               return;
             }
           }
-          if (!patchRes.ok) throw new Error(patchJson.error || "AI patch generation failed.");
+          if (!patchOk) throw new Error(patchError || "AI patch generation failed.");
         }
       }
 
