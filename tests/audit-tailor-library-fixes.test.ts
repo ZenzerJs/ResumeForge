@@ -255,5 +255,19 @@ describe("audit tailor, library, tracker & auth fixes", () => {
         expect(content, `${file} should not call raw res.json()`).not.toMatch(/\bawait\s+\w+\.json\s*\(/);
       }
     });
+
+    it("provides both a status selector and a one-click Verify action to promote draft evidence to verified", () => {
+      const librarySource = fs.readFileSync(
+        path.resolve("src/components/library/library-workspace.tsx"),
+        "utf8"
+      );
+      expect(librarySource).toContain('id="evidence-item-status"');
+      expect(librarySource).toContain('data-testid="verify-evidence-btn"');
+      expect(librarySource).toContain("handleVerifyItem");
+
+      const dbSource = fs.readFileSync(path.resolve("src/lib/db/evidence.ts"), "utf8");
+      expect(dbSource).toContain('input.status === "verified"');
+      expect(dbSource).toContain("tx.bullet.updateMany");
+    });
   });
 });
