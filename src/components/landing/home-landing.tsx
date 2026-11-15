@@ -109,7 +109,22 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
         body: formData,
       });
 
-      const json = await res.json();
+      const rawText = await res.text();
+      let json: {
+        success?: boolean;
+        error?: string;
+        data?: { id?: string; typstSource?: string };
+      };
+      try {
+        json = rawText ? (JSON.parse(rawText) as typeof json) : {};
+      } catch {
+        const message =
+          res.status === 413
+            ? "PDF upload exceeds the hosted 4.5 MB request size limit."
+            : `PDF upload failed (HTTP ${res.status || 500}). Please try again.`;
+        setNotification({ type: "error", message });
+        return;
+      }
       if (res.ok && json.success && json.data?.typstSource && !json.data?.id) {
         clearDemoSamplesForPersonalResume(json.data.typstSource);
         localStorage.setItem("resumeforge_typst_source", json.data.typstSource);
