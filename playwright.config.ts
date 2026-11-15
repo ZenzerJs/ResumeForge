@@ -9,6 +9,7 @@ const testSecret = "playwright-test-secret";
 const DEMO_SPECS = [
   "contrast-logos-verification.spec.ts",
   "jobs-polish-verification.spec.ts",
+  "mobile-tablet-verification.spec.ts",
   "resume-layout-v2-verification.spec.ts",
   "suggestion-preview-verification.spec.ts",
   "tailor-polish-verification.spec.ts",

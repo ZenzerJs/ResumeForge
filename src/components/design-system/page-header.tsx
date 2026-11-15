@@ -23,32 +23,34 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "enter-once relative flex flex-col gap-4 rounded-xl surface-raised edge-glow p-5 sm:p-6 md:flex-row md:items-center md:justify-between",
+        "enter-once relative flex min-w-0 flex-col gap-4 rounded-xl surface-raised edge-glow p-4 sm:p-6 md:flex-row md:items-center md:justify-between",
         className,
       )}
     >
-      <div className="space-y-1.5 border-l-2 border-primary pl-3 sm:pl-4">
+      <div className="min-w-0 flex-1 space-y-1.5 border-l-2 border-primary pl-3 sm:pl-4">
         {eyebrow ? (
-          <div className="inline-flex w-fit items-center gap-2 rounded-full border border-hairline bg-inset/80 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
-            <span>{eyebrow}</span>
+          <div className="inline-flex max-w-full w-fit items-center gap-2 rounded-full border border-hairline bg-inset/80 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+            <span className="truncate">{eyebrow}</span>
           </div>
         ) : null}
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold tracking-tight text-rf-cloud md:text-2xl">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+          <h1 className="min-w-0 break-words text-xl font-bold tracking-tight text-rf-cloud md:text-2xl">
             {title}
           </h1>
-          {statusBadge}
+          {statusBadge ? <div className="max-w-full shrink-0">{statusBadge}</div> : null}
         </div>
         {description ? (
-          <p className="max-w-2xl font-sans text-xs text-rf-meta md:text-sm">
+          <p className="max-w-2xl break-words font-sans text-xs text-rf-meta md:text-sm">
             {description}
           </p>
         ) : null}
       </div>
 
       {actions ? (
-        <div className="flex shrink-0 items-center gap-2.5">{actions}</div>
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2.5 md:max-w-[50%] md:justify-end xl:max-w-none xl:shrink-0">
+          {actions}
+        </div>
       ) : null}
     </div>
   );

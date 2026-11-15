@@ -72,7 +72,7 @@ function SignOutButton({ className }: { className?: string }) {
 
 function GuestAuthLinks({ className, signupEnabled }: { className?: string; signupEnabled: boolean }) {
   return (
-    <div className={cn("hidden md:flex items-center gap-2", className)}>
+    <div className={cn("hidden xl:flex items-center gap-2", className)}>
       <Link
         href="/login"
         className="inline-flex min-h-9 items-center rounded-[7px] border border-outline/80 bg-transparent px-3.5 text-xs font-medium text-foreground/90 transition-colors hover:border-outline hover:bg-elevated/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -89,7 +89,7 @@ function GuestAuthLinks({ className, signupEnabled }: { className?: string; sign
   );
 }
 
-function NavUtilities({ pathname }: { pathname: string }) {
+function useAiStatus(pathname: string) {
   const [aiStatus, setAiStatus] = useState<{ provider: string; hasKey: boolean } | null>(null);
 
   useEffect(() => {
@@ -106,37 +106,54 @@ function NavUtilities({ pathname }: { pathname: string }) {
     };
   }, [pathname]);
 
+  return aiStatus;
+}
+
+function AiStatusPill({
+  aiStatus,
+  testId,
+  className,
+  onClick,
+}: {
+  aiStatus: { provider: string; hasKey: boolean };
+  testId?: string;
+  className?: string;
+  onClick?: () => void;
+}) {
   return (
-    <div className="hidden md:flex items-center gap-1.5">
-      {aiStatus && (
-        <Link
-          href="/settings"
-          data-testid="nav-ai-status-pill"
-          title={
-            aiStatus.hasKey
-              ? `AI Connected (${aiStatus.provider.toUpperCase()}) — Click to manage in Settings`
-              : "No AI API key configured — Click to connect in Settings"
-          }
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-            aiStatus.hasKey
-              ? "border-signal/35 bg-signal/10 text-signal hover:bg-signal/20"
-              : "border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
-          )}
-        >
-          {aiStatus.hasKey && hasBrandIcon(aiStatus.provider) ? (
-            <BrandIcon name={aiStatus.provider} className="h-3.5 w-3.5 shrink-0" />
-          ) : (
-            <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          )}
-          <span className="hidden xl:inline">
-            {aiStatus.hasKey ? `AI · ${aiStatus.provider.toUpperCase()}` : "Connect AI Key"}
-          </span>
-          <span className="xl:hidden">
-            {aiStatus.hasKey ? aiStatus.provider.toUpperCase() : "AI Key"}
-          </span>
-        </Link>
+    <Link
+      href="/settings"
+      data-testid={testId}
+      onClick={onClick}
+      title={
+        aiStatus.hasKey
+          ? `AI Connected (${aiStatus.provider.toUpperCase()}) — Click to manage in Settings`
+          : "No AI API key configured — Click to connect in Settings"
+      }
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        aiStatus.hasKey
+          ? "border-signal/35 bg-signal/10 text-signal hover:bg-signal/20"
+          : "border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20",
+        className
       )}
+    >
+      {aiStatus.hasKey && hasBrandIcon(aiStatus.provider) ? (
+        <BrandIcon name={aiStatus.provider} className="h-3.5 w-3.5 shrink-0" />
+      ) : (
+        <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      )}
+      <span>
+        {aiStatus.hasKey ? `AI · ${aiStatus.provider.toUpperCase()}` : "Connect AI Key"}
+      </span>
+    </Link>
+  );
+}
+
+function NavUtilities({ aiStatus }: { aiStatus: { provider: string; hasKey: boolean } | null }) {
+  return (
+    <div className="hidden xl:flex items-center gap-1.5">
+      {aiStatus && <AiStatusPill aiStatus={aiStatus} testId="nav-ai-status-pill" />}
     </div>
   );
 }
@@ -146,6 +163,7 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined);
   const [signupEnabled, setSignupEnabled] = useState(true);
+  const aiStatus = useAiStatus(pathname);
   const menuId = useId();
   const mobileMenuTriggerRef = React.useRef<HTMLButtonElement>(null);
 
@@ -173,18 +191,39 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
     setMobileOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mediaQuery = window.matchMedia("(min-width: 1280px)");
+    const closeIfDesktop = (matches: boolean) => {
+      if (matches) {
+        setMobileOpen(false);
+      }
+    };
+    closeIfDesktop(mediaQuery.matches);
+    const listener = (event: MediaQueryListEvent) => closeIfDesktop(event.matches);
+    mediaQuery.addEventListener("change", listener);
+    return () => mediaQuery.removeEventListener("change", listener);
+  }, []);
+
   const isGuest = user === null;
 
   return (
-    <header className={`bg-rf-bg/90 backdrop-blur-xl border-b border-border fixed top-0 w-full z-50 flex items-center justify-between gap-3 pt-[env(safe-area-inset-top)] max-w-full overflow-visible ${compact ? "h-12 px-4 md:px-6" : "h-16 px-4 md:px-8"}`}>
-      <div className={`flex items-center min-w-0 ${compact ? "gap-6" : "gap-8"}`}>
+    <header
+      className={cn(
+        "bg-rf-bg/90 backdrop-blur-xl border-b border-border fixed top-0 w-full z-50 flex items-center justify-between gap-2 sm:gap-3 pt-[env(safe-area-inset-top)] max-w-full overflow-visible",
+        compact
+          ? "h-[calc(3rem+env(safe-area-inset-top))] px-4 xl:px-6"
+          : "h-[calc(4rem+env(safe-area-inset-top))] px-4 xl:px-8"
+      )}
+    >
+      <div className={cn("flex items-center min-w-0", compact ? "gap-3 sm:gap-6" : "gap-4 sm:gap-8")}>
         <Link
           href="/"
-          className="flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-[6px]"
+          className="flex min-w-0 items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-[6px]"
           aria-label="ResumeForge home"
         >
           <div
-            className={`rounded-[8px] flex items-center justify-center font-bold text-primary-foreground ${compact ? "w-7 h-7 text-base" : "w-8 h-8 text-lg"}`}
+            className={`shrink-0 rounded-[8px] flex items-center justify-center font-bold text-primary-foreground ${compact ? "w-7 h-7 text-base" : "w-8 h-8 text-lg"}`}
             style={{
               background: "linear-gradient(135deg, rgb(var(--accent-action)), rgb(var(--accent-secondary)))",
               boxShadow: "0 0 0 1px rgb(255 255 255 / 0.12) inset, 0 6px 20px rgb(var(--accent-action) / 0.35)",
@@ -192,21 +231,21 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
           >
             R
           </div>
-          <span className="font-bold text-xl text-foreground tracking-[-0.04em]">
+          <span className="truncate font-bold text-xl text-foreground tracking-[-0.04em]">
             ResumeForge
           </span>
         </Link>
 
         {badge ? (
           <>
-            <span className="hidden sm:block h-4 w-px bg-border" aria-hidden />
-            {badge}
+            <span className="hidden sm:block h-4 w-px shrink-0 bg-border" aria-hidden />
+            <div className="min-w-0 truncate">{badge}</div>
           </>
         ) : null}
       </div>
 
       <nav
-        className="hidden md:flex flex-1 items-center justify-center gap-1 lg:gap-2 text-sm"
+        className="hidden xl:flex flex-1 items-center justify-center gap-1 xl:gap-2 text-sm"
         aria-label="Primary navigation"
       >
         {NAV_LINKS.map(({ href, label }) => {
@@ -234,7 +273,7 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
         <button
           ref={mobileMenuTriggerRef}
           type="button"
-          className="md:hidden inline-flex min-h-11 min-w-11 items-center justify-center rounded-[6px] text-on-surface-variant hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="xl:hidden inline-flex min-h-11 min-w-11 items-center justify-center rounded-[6px] text-on-surface-variant hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           aria-expanded={mobileOpen}
           aria-controls={mobileOpen ? menuId : undefined}
           aria-label={mobileOpen ? "Close menu" : "Open menu"}
@@ -242,21 +281,21 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
         >
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
-        {actions}
-        <NavUtilities pathname={pathname} />
+        {actions ? <div className="hidden xl:flex items-center gap-2">{actions}</div> : null}
+        <NavUtilities aiStatus={aiStatus} />
         {user ? (
           <>
             <Link
               href="/settings"
               title={user.username}
-              className="hidden lg:inline-flex max-w-[10rem] items-center gap-2 rounded-[6px] px-2 py-1 text-xs text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="hidden xl:inline-flex max-w-[10rem] items-center gap-2 rounded-[6px] px-2 py-1 text-xs text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-outline bg-elevated font-bold text-primary">
                 {usernameInitial(user.username)}
               </span>
               <span className="truncate">@{user.username}</span>
             </Link>
-            <SignOutButton className="hidden md:inline-flex" />
+            <SignOutButton className="hidden xl:inline-flex" />
           </>
         ) : isGuest ? (
           <GuestAuthLinks signupEnabled={signupEnabled} />
@@ -267,9 +306,17 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
         <SheetContent
           id={menuId}
           side="left"
-          className="w-72 border-r border-hairline bg-panel p-6 text-foreground md:hidden overscroll-contain"
+          className="w-72 border-r border-hairline bg-panel px-6 pb-6 pt-[calc(1.5rem+env(safe-area-inset-top))] text-foreground xl:hidden overscroll-contain overflow-y-auto"
+          onEscapeKeyDown={() => setMobileOpen(false)}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
+            if (
+              typeof window !== "undefined" &&
+              typeof window.matchMedia === "function" &&
+              window.matchMedia("(min-width: 1280px)").matches
+            ) {
+              return;
+            }
             mobileMenuTriggerRef.current?.focus();
           }}
         >
@@ -288,6 +335,7 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
                 <Link
                   key={href}
                   href={href}
+                  onClick={() => setMobileOpen(false)}
                   className={cn(
                     "flex min-h-11 items-center gap-3 rounded-[6px] px-3 py-2 text-sm border border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     isActive ? "bg-primary/10 text-primary border-primary/30 font-semibold" : "text-on-surface-variant hover:bg-elevated"
@@ -298,6 +346,16 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
                 </Link>
               );
             })}
+            {aiStatus ? (
+              <div className="mt-3 border-t border-hairline pt-3">
+                <AiStatusPill
+                  aiStatus={aiStatus}
+                  testId="mobile-nav-ai-status-pill"
+                  className="min-h-11 w-full justify-start rounded-[6px] px-3 py-2 text-xs"
+                  onClick={() => setMobileOpen(false)}
+                />
+              </div>
+            ) : null}
             {user ? (
               <>
                 <p className="mt-2 px-3 text-xs text-muted-foreground">@{user.username}</p>
@@ -305,6 +363,7 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
                   type="button"
                   className="flex min-h-11 items-center gap-3 rounded-[6px] px-3 py-2 text-sm text-on-surface-variant hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   onClick={() => {
+                    setMobileOpen(false);
                     void signOutAndRedirect();
                   }}
                 >
@@ -316,12 +375,14 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
               <>
                 <Link
                   href="/login"
+                  onClick={() => setMobileOpen(false)}
                   className="mt-2 flex min-h-11 items-center gap-3 rounded-[6px] px-3 py-2 text-sm text-on-surface-variant hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   Sign In
                 </Link>
                 {signupEnabled ? <Link
                   href="/login?mode=signup"
+                  onClick={() => setMobileOpen(false)}
                   className="flex min-h-11 items-center gap-3 rounded-[6px] px-3 py-2 text-sm text-primary hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   Sign Up

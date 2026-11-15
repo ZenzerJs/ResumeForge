@@ -51,7 +51,7 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
 
   return (
     <div className="sticky top-0 z-20 shrink-0 border-b glass-bar">
-      <div className="flex h-11 items-center justify-between gap-2 px-4">
+      <div className="flex h-11 items-center justify-between gap-2 px-3 sm:px-4">
         <div
           ref={navListRef}
           className="relative flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto sm:gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -71,7 +71,7 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
           />
           <h1
             data-testid="tracker-page-title"
-            className="flex shrink-0 items-center gap-1.5 border-r border-hairline pr-3 text-xs font-bold text-foreground"
+            className="flex shrink-0 items-center gap-1.5 border-r border-hairline pr-2.5 sm:pr-3 text-xs font-bold text-foreground"
           >
             <Briefcase className="h-3.5 w-3.5 text-primary" />
             Jobs
@@ -144,7 +144,7 @@ export function TrackerRefreshButton({
       disabled={isImporting}
       aria-label={isImporting ? "Refreshing from source" : "Refresh from source"}
       data-testid="refresh-from-source-btn"
-      className="flex items-center gap-1.5 rounded-lg border border-hairline bg-inset px-3 py-1.5 text-xs font-medium text-text-secondary transition hover:bg-elevated hover:text-foreground disabled:opacity-50"
+      className="flex min-h-9 items-center gap-1.5 rounded-lg border border-hairline bg-inset px-2.5 sm:px-3 py-1.5 text-xs font-medium text-text-secondary transition hover:bg-elevated hover:text-foreground disabled:opacity-50"
       title={syncLabel}
     >
       {isImporting ? (
