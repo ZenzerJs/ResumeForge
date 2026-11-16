@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useDeferredValue, useMemo } from "react";
+import React, { useState, useEffect, useRef, useDeferredValue, useMemo, useCallback } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   Sparkles,
@@ -13,6 +14,10 @@ import {
   FileText,
   Database,
   XCircle,
+  ChevronDown,
+  Code2,
+  Eye,
+  RefreshCw,
 } from "lucide-react";
 import { JobRequirements } from "@/lib/jd-parser/types";
 import { RoleProfile, ROLE_PROFILES, AtsEvaluationResult } from "@/lib/ats-evaluator/types";
@@ -51,9 +56,27 @@ const TailorDiagnosticPanel = dynamic(
     ssr: false,
   }
 );
-import type { PatchProposal, Gap, RejectedPatch } from "@/lib/ai/patch-schema";
+import {
+  PatchErrorCategorySchema,
+  getPatchRecoveryAction,
+  type PatchProposal,
+  type Gap,
+  type RejectedPatch,
+} from "@/lib/ai/patch-schema";
 import type { CoverLetterResponse } from "@/lib/ai/cover-letter-schema";
-import type { PatchDecision } from "./patch-diff-review";
+import type {
+  PatchDecision,
+  EvidenceMetadataEntry,
+  StructuredPatchError,
+} from "./patch-diff-review";
+import { SuggestionPreview } from "./suggestion-preview";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { AppShell } from "@/components/design-system/app-shell";
 import { PageSkeleton } from "@/components/design-system/page-skeleton";
 import { isPlaceholderDescription } from "@/lib/ingestion/helpers";
@@ -70,7 +93,7 @@ import { Plus, Columns3 } from "lucide-react";
 import { TechDiffPillList } from "@/components/tracker/tech-diff-pill-list";
 import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
 import { tokenizeHighlightedJd } from "@/lib/jd/highlight-keywords";
-import type { ResumeFacts } from "@/lib/facts/types";
+import type { ResumeFacts, TailoringValidationContext } from "@/lib/facts/types";
 
 interface RankedMatch {
   id: string;
@@ -261,14 +284,28 @@ export function TailorWorkspace() {
   const [patchDecisions, setPatchDecisions] = useState<Record<string, PatchDecision>>({});
   const [acknowledgedSkills, setAcknowledgedSkills] = useState<Set<string>>(new Set());
   const [coverLetterDraft, setCoverLetterDraft] = useState<CoverLetterResponse | null>(null);
-  const [patchBatch, setPatchBatch] = useState<{ batchId: string; revisionToken: string; baseTypstSource: string; jobId: string } | null>(null);
+  const [patchBatch, setPatchBatch] = useState<{
+    batchId: string;
+    revisionToken: string;
+    baseTypstSource: string;
+    jobId: string;
+    evidenceRevision?: string;
+  } | null>(null);
   const [patchReviewGeneration, setPatchReviewGeneration] = useState(0);
   const [demoPatchBaseSource, setDemoPatchBaseSource] = useState<string | null>(null);
   const [masterResumeId, setMasterResumeId] = useState<string | null>(null);
   const [masterTypstSource, setMasterTypstSource] = useState<string>("");
   const [masterFactsSnapshot, setMasterFactsSnapshot] = useState<ResumeFacts | null>(null);
+  const [validationContext, setValidationContext] = useState<TailoringValidationContext | null>(null);
+  const [evidenceMetadata, setEvidenceMetadata] = useState<Record<string, EvidenceMetadataEntry>>({});
   const [activeVariantContent, setActiveVariantContent] = useState<string>("");
   const [patchError, setPatchError] = useState<string | null>(null);
+  const [structuredPatchError, setStructuredPatchError] = useState<StructuredPatchError | null>(null);
+  const [selectedPatchId, setSelectedPatchId] = useState<string | null>(null);
+  const [secondaryDeskTab, setSecondaryDeskTab] = useState<"preview" | "ats" | "job">("preview");
+  const [showJobContextSheet, setShowJobContextSheet] = useState(false);
+  const [showTypstSource, setShowTypstSource] = useState(false);
+  const [showErrorTechDetails, setShowErrorTechDetails] = useState(false);
   const [savedJobId, setSavedJobId] = useState<string | null>(null);
   const savedJobIdRef = useRef<string | null>(null);
   const userEditedRef = useRef(false);
@@ -290,6 +327,83 @@ export function TailorWorkspace() {
   const [isBootstrapping, setIsBootstrapping] = useState(true);
 
   const [atsResult, setAtsResult] = useState<AtsEvaluationResult | null>(null);
+
+  const loadEvidenceMetadata = useCallback(async (isDemoMode?: boolean) => {
+    const buildMap = (items: Array<{
+      id: string;
+      title?: string;
+      organization?: string | null;
+      dates?: string | null;
+      status?: string;
+      verifiedSummary?: string;
+      bullets?: Array<{ id: string; text: string }>;
+    }>) => {
+      const next: Record<string, EvidenceMetadataEntry> = {};
+      for (const item of items) {
+        if (!item?.id) continue;
+        const bulletTexts: Record<string, string> = {};
+        if (Array.isArray(item.bullets)) {
+          for (const bullet of item.bullets) {
+            if (bullet?.id && bullet.text) {
+              bulletTexts[bullet.id] = bullet.text;
+            }
+          }
+        }
+        next[item.id] = {
+          id: item.id,
+          title: item.title || item.id,
+          organization: item.organization ?? null,
+          dates: item.dates ?? null,
+          status: item.status || "verified",
+          verifiedSummary: item.verifiedSummary || "",
+          bulletTexts,
+        };
+      }
+      return next;
+    };
+
+    try {
+      if (isDemoMode && typeof window !== "undefined") {
+        initializeDemoSamples();
+        const raw = localStorage.getItem("resumeforge_guest_evidence");
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(parsed)) {
+          setEvidenceMetadata(buildMap(parsed));
+        }
+        return;
+      }
+
+      const res = await fetch("/api/evidence");
+      const { ok, data: json } = await readApiResponse<{
+        success?: boolean;
+        guest?: boolean;
+        data?: Array<{
+          id: string;
+          title?: string;
+          organization?: string | null;
+          dates?: string | null;
+          status?: string;
+          verifiedSummary?: string;
+          bullets?: Array<{ id: string; text: string }>;
+        }>;
+      }>(res);
+
+      if (ok && json?.success && Array.isArray(json.data) && !json.guest) {
+        setEvidenceMetadata(buildMap(json.data));
+        return;
+      }
+
+      if (typeof window !== "undefined") {
+        const raw = localStorage.getItem("resumeforge_guest_evidence");
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(parsed)) {
+          setEvidenceMetadata(buildMap(parsed));
+        }
+      }
+    } catch {
+      // Keep existing metadata map on transient fetch failure
+    }
+  }, []);
 
   const diagnosticReport = useMemo(() => {
     if (activeTab !== "diagnostic") return undefined;
@@ -329,21 +443,25 @@ export function TailorWorkspace() {
           setActiveVariantContent(localSource);
           const frozen = localStorage.getItem("resumeforge_demo_master_facts");
           setMasterFactsSnapshot(frozen ? JSON.parse(frozen) as ResumeFacts : null);
+          void loadEvidenceMetadata(true);
           return;
         }
       } catch {}
       try {
+        void loadEvidenceMetadata(false);
         const res = await fetch("/api/resumes");
         const { ok, data: json } = await readApiResponse<{
           success?: boolean;
           data?: { id: string; isMaster: boolean; typstSource: string; factSnapshot?: ResumeFacts | null }[];
+          validationContext?: TailoringValidationContext | null;
         }>(res);
         if (ok && json?.success && Array.isArray(json.data) && json.data.length > 0) {
           const master = json.data.find((r) => r.isMaster) || json.data[0];
           setMasterResumeId(master.id);
           setMasterTypstSource(master.typstSource);
           setActiveVariantContent(master.typstSource);
-          setMasterFactsSnapshot(master.factSnapshot ?? null);
+          setMasterFactsSnapshot(master.factSnapshot ?? json.validationContext?.masterBaseline ?? null);
+          setValidationContext(json.validationContext ?? null);
           return;
         }
       } catch {}
@@ -364,7 +482,7 @@ export function TailorWorkspace() {
     }
 
     void loadMasterOrStarterResume().finally(() => setIsBootstrapping(false));
-  }, []);
+  }, [loadEvidenceMetadata]);
 
   const triggerTier2Fetch = async (jobIdToFetch: string) => {
     setIsTier2Fetching(true);
@@ -625,6 +743,9 @@ export function TailorWorkspace() {
     setIsGeneratingPatches(true);
     setPatchStage("connecting");
     setPatchError(null);
+    setStructuredPatchError(null);
+    setShowErrorTechDetails(false);
+    setSelectedPatchId(null);
     setPatchVerified([]);
     setPatchRejected([]);
     setPatchGaps([]);
@@ -675,18 +796,39 @@ export function TailorWorkspace() {
 
       const { ok: patchOk, data: json, error: patchApiError } = await readApiResponse<{
         success?: boolean;
+        error?: string;
+        errorCategory?: string;
+        recoveryAction?: string;
+        details?: Record<string, unknown>;
         data?: {
           verified?: PatchProposal[];
           rejected?: RejectedPatch[];
           gaps?: Gap[];
-          batch?: { batchId: string; revisionToken: string; baseTypstSource: string; jobId: string } | null;
+          batch?: {
+            batchId: string;
+            revisionToken: string;
+            baseTypstSource: string;
+            jobId: string;
+            evidenceRevision?: string;
+          } | null;
           masterResumeId?: string | null;
+          validationContext?: TailoringValidationContext | null;
           demo?: boolean;
         };
       }>(res, "Failed to generate patches.");
 
       if (!patchOk || !json?.success || !json.data) {
-        setPatchError(patchApiError || "Failed to generate patches.");
+        const message = json?.error || patchApiError || "Failed to generate patches.";
+        const parsedCategory = PatchErrorCategorySchema.safeParse(json?.errorCategory);
+        if (parsedCategory.success) {
+          setStructuredPatchError({
+            category: parsedCategory.data,
+            message,
+            recoveryAction: json?.recoveryAction || getPatchRecoveryAction(parsedCategory.data),
+            details: json?.details,
+          });
+        }
+        setPatchError(message);
         setPatchStage("error");
         setIsGeneratingPatches(false);
         return;
@@ -698,6 +840,12 @@ export function TailorWorkspace() {
       for (const patch of verifiedList) {
         initialDecisions[patch.id] = "pending";
       }
+      if (json.data.validationContext) {
+        setValidationContext(json.data.validationContext);
+        if (json.data.validationContext.masterBaseline) {
+          setMasterFactsSnapshot(json.data.validationContext.masterBaseline);
+        }
+      }
       setPatchDecisions(initialDecisions);
       setAcknowledgedSkills(new Set());
       setPatchVerified(verifiedList);
@@ -705,6 +853,11 @@ export function TailorWorkspace() {
       setPatchGaps(json.data.gaps || []);
       setPatchBatch(json.data.batch || null);
       setMasterResumeId(json.data.masterResumeId || (json.data.demo ? "demo-local" : null));
+      setSelectedPatchId(verifiedList[0]?.id ?? null);
+      if (verifiedList.length > 0) {
+        setSecondaryDeskTab("preview");
+      }
+      void loadEvidenceMetadata(isDemo);
       setPatchStage("done");
     } catch (err) {
       setPatchError(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -1034,13 +1187,24 @@ export function TailorWorkspace() {
         : "text-muted-foreground hover:text-foreground"
     }`;
 
+  const evidenceTitlesMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const [id, entry] of Object.entries(evidenceMetadata)) {
+      map[id] = entry.organization ? `${entry.title} (${entry.organization})` : entry.title;
+    }
+    return map;
+  }, [evidenceMetadata]);
+
+  const effectiveSecondaryTab: "preview" | "ats" | "job" =
+    patchVerified.length === 0 && secondaryDeskTab === "preview" ? "ats" : secondaryDeskTab;
+
   if (isBootstrapping) {
     return <PageSkeleton variant="tailor" />;
   }
 
   return (
     <AppShell variant="tailor">
-      <div className="relative z-10 flex-1 pt-8 pb-12 px-4 md:px-8 max-w-[1280px] mx-auto w-full font-body-regular motion-reduce:[&_*]:transition-none motion-reduce:[&_.animate-spin]:animate-none motion-reduce:[&_.animate-pulse]:animate-none">
+      <div className="relative z-10 flex-1 pt-8 pb-12 px-4 md:px-8 max-w-[1600px] mx-auto w-full font-body-regular motion-reduce:[&_*]:transition-none motion-reduce:[&_.animate-spin]:animate-none motion-reduce:[&_.animate-pulse]:animate-none">
         <div className="flex justify-between items-end mb-6 gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-3">
@@ -1109,6 +1273,11 @@ export function TailorWorkspace() {
             <span className="rounded-md border border-hairline bg-elevated px-2.5 py-1 text-on-surface-variant">
               {savedJobId ? "Saved posting" : "Working draft"}
             </span>
+            {atsResult && (
+              <span className="rounded-md border border-hairline bg-inset px-2.5 py-1 text-foreground">
+                ATS {atsResult.overallScore}%
+              </span>
+            )}
             {extractedRequirements && (
               <span className="rounded-md border border-hairline bg-inset px-2.5 py-1 text-muted-foreground">
                 {extractedRequirements.requiredSkills.length} req skills
@@ -1118,16 +1287,73 @@ export function TailorWorkspace() {
         </div>
 
         {(isGeneratingPatches || (patchStage !== "done" && patchStage !== "queued") || patchError) && (
-          <div className="mb-4">
+          <div className="mb-4 space-y-2">
             <AiProgress
               stage={patchStage}
               stages={["connecting", "writing", "verifying", "done"]}
               error={patchError}
               onDismissError={() => {
                 setPatchError(null);
+                setStructuredPatchError(null);
                 setPatchStage("done");
               }}
             />
+            {structuredPatchError && (
+              <div
+                role="alert"
+                data-testid="generate-patches-structured-error"
+                className="rounded-xl border border-red-800/60 bg-red-950/35 p-4 text-sm text-red-200 transition-opacity duration-150 motion-reduce:transition-none space-y-3"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <p className="font-semibold text-red-100 break-words">{structuredPatchError.message}</p>
+                    <p className="text-xs text-red-200/85 break-words">
+                      Suggested recovery:{" "}
+                      {structuredPatchError.recoveryAction === "review_evidence"
+                        ? "Verify or restore evidence citations in your Evidence Bank."
+                        : "Regenerate suggestions against your current master resume and evidence."}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    {structuredPatchError.recoveryAction === "review_evidence" && (
+                      <Link
+                        href="/library"
+                        className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-red-700/60 bg-red-950/60 px-3 text-xs font-semibold text-red-100 hover:bg-red-900/50"
+                      >
+                        Review evidence
+                      </Link>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void handleGeneratePatches()}
+                      disabled={isGeneratingPatches}
+                      className="inline-flex min-h-10 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+                      Generate updated suggestions
+                    </button>
+                  </div>
+                </div>
+                {structuredPatchError.details && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setShowErrorTechDetails((prev) => !prev)}
+                      aria-expanded={showErrorTechDetails}
+                      className="inline-flex items-center gap-1 text-xs font-mono text-red-300 hover:underline"
+                    >
+                      <ChevronDown className={`h-3.5 w-3.5 ${showErrorTechDetails ? "rotate-180" : ""}`} aria-hidden />
+                      Technical details ({structuredPatchError.category})
+                    </button>
+                    {showErrorTechDetails && (
+                      <pre className="mt-2 overflow-x-auto rounded border border-red-800/50 bg-inset p-2.5 font-mono text-[11px] text-red-200 break-all whitespace-pre-wrap">
+                        {JSON.stringify(structuredPatchError.details, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1139,8 +1365,8 @@ export function TailorWorkspace() {
               </div>
             )}
             {saveStatus && (
-              <div className="rounded-lg border border-emerald-800/60 bg-emerald-950/40 px-3 py-2 text-xs text-emerald-300 flex items-center gap-2">
-                <CheckCircle2 className="h-3.5 w-3.5" /> {saveStatus}
+              <div className="rounded-lg border status-success-surface px-3 py-2 text-xs flex items-center gap-2">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> {saveStatus}
               </div>
             )}
           </div>
@@ -1152,7 +1378,7 @@ export function TailorWorkspace() {
               tier2Status.type === "error"
                 ? "border-red-800/60 bg-red-950/40 text-red-300"
                 : tier2Status.type === "success"
-                ? "border-emerald-800/60 bg-emerald-950/40 text-emerald-300"
+                ? "status-success-surface"
                 : "border-hairline bg-panel text-text-secondary"
             }`}
           >
@@ -1273,20 +1499,56 @@ export function TailorWorkspace() {
 
         <div id="tailor-view-panel" role="tabpanel" tabIndex={0} aria-labelledby={`tailor-tab-${activeTab}`}>
         {activeTab === "3-pane" ? (
-          /* 3-Pane Ergonomic Workspace View */
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6" data-testid="tailor-3pane-container">
-            {/* Left Pane: Job Description with keyword highlights & TechDiffPillList */}
-            <section
-              className="min-w-0 rounded-xl surface-raised p-5 flex flex-col gap-4"
-              data-testid="tailor-pane-left"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-hairline">
+          /* Workstream 2 Review-First Workspace (~60% Primary Review / ~40% Resume Preview) */
+          <div className="space-y-4" data-testid="tailor-3pane-container">
+            {/* Compact Context Bar */}
+            <div className="rounded-xl surface-raised px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2.5 min-w-0">
                 <div className="flex items-center gap-2 min-w-0">
                   <Briefcase className="h-4 w-4 text-primary shrink-0" aria-hidden />
-                  <h2 className="text-lg leading-snug text-foreground font-semibold">
-                    Job Description &amp; Requirements
-                  </h2>
+                  <span className="text-sm font-semibold text-foreground break-words">
+                    {roleTitle || "Untitled role"}
+                  </span>
+                  {company && (
+                    <span className="text-xs text-muted-foreground break-words">· {company}</span>
+                  )}
                 </div>
+                {atsResult && (
+                  <span className="rounded-md border border-hairline bg-elevated px-2 py-0.5 text-xs font-mono tabular-nums text-foreground">
+                    ATS {atsResult.overallScore}%
+                  </span>
+                )}
+                {extractedRequirements && (
+                  <span className="rounded-md border border-hairline bg-inset px-2 py-0.5 text-xs font-mono tabular-nums text-muted-foreground">
+                    {verifiedRequiredSkills.length}/{extractedRequirements.requiredSkills.length} req skills
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowJobContextSheet(true)}
+                  data-testid="workspace-job-details-btn"
+                  className="min-h-10 px-3 rounded-md border border-control bg-inset text-xs font-medium text-foreground hover:bg-elevated flex items-center gap-1.5"
+                >
+                  <Briefcase className="h-3.5 w-3.5 text-primary" aria-hidden />
+                  Requirements &amp; JD
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowTypstSource((prev) => !prev)}
+                  data-testid="toggle-typst-source-btn"
+                  aria-pressed={showTypstSource}
+                  className={`min-h-10 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${
+                    showTypstSource
+                      ? "border-primary/40 bg-primary/10 text-primary"
+                      : "border-control bg-inset text-foreground hover:bg-elevated"
+                  }`}
+                >
+                  <Code2 className="h-3.5 w-3.5" aria-hidden />
+                  {showTypstSource ? "Hide Typst Source" : "Typst Source"}
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -1294,140 +1556,267 @@ export function TailorWorkspace() {
                     setActiveTab("job-info");
                   }}
                   data-testid="edit-job-info-btn"
-                  className="min-h-11 text-sm text-primary hover:underline shrink-0"
+                  className="min-h-10 px-2.5 text-xs text-primary hover:underline shrink-0"
                 >
                   Edit Job &amp; Reqs →
                 </button>
               </div>
+            </div>
 
-              {extractedRequirements && extractedRequirements.requiredSkills.length > 0 && (
-                <div className="space-y-1.5 pb-3 border-b border-hairline">
-                  <span className="text-xs text-muted-foreground font-medium block">
-                    Required Skills &amp; Gaps
-                  </span>
-                  <TechDiffPillList
-                    allRequiredSkills={extractedRequirements.requiredSkills}
-                    verifiedSkillNames={verifiedRequiredSkills}
-                    missingSkillNames={missingRequiredSkills}
-                    maxDisplay={10}
-                  />
-                </div>
-              )}
-
-              <div className="flex-1 min-h-0 flex flex-col">
-                <span className="text-xs text-muted-foreground font-medium mb-2 block">
-                  Job Description (Keywords Highlighted)
-                </span>
-                <div
-                  data-testid="tailor-jd-highlighted-view"
-                  className="flex-1 overflow-y-auto max-h-[600px] p-4 bg-inset border border-hairline rounded-lg text-sm text-on-surface-variant space-y-2 leading-relaxed break-words"
-                >
-                  {highlightedJdView}
-                </div>
-              </div>
-            </section>
-
-            {/* Center Pane: Typst AST / source preview & PatchDiffReview */}
-            <section
-              className="min-w-0 rounded-xl surface-raised p-5 flex flex-col gap-4"
-              data-testid="tailor-pane-center"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-hairline">
-                <div className="flex items-center gap-2 min-w-0">
-                  <FileText className="h-4 w-4 text-primary shrink-0" aria-hidden />
-                  <h2 className="text-lg text-foreground font-semibold">
-                    Typst AST &amp; Tailoring
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleGeneratePatches}
-                  disabled={isGeneratingPatches}
-                  className="min-h-11 text-sm px-3 rounded-md border border-control text-foreground font-medium hover:bg-elevated transition-colors flex items-center gap-1.5"
-                >
-                  {isGeneratingPatches ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                  Generate Patches
-                </button>
-              </div>
-
-              {(patchVerified.length > 0 || patchRejected.length > 0 || patchGaps.length > 0) &&
-              masterResumeId &&
-              (savedJobId || masterResumeId === "demo-local") ? (
-                <PatchDiffReview
-                  key={`${patchReviewGeneration}-${patchBatch?.batchId || "local"}`}
-                  verified={patchVerified}
-                  rejected={patchRejected}
-                  gaps={patchGaps}
-                  masterTypstSource={masterTypstSource || activeVariantContent}
-                  jobId={savedJobId || "demo-local-job"}
-                  batch={patchBatch}
-                  localOnly={masterResumeId === "demo-local"}
-                  localBaseTypstSource={demoPatchBaseSource}
-                  masterFactsSnapshot={masterFactsSnapshot}
-                  decisions={patchDecisions}
-                  onDecisionsChange={setPatchDecisions}
-                  acknowledgedSkills={acknowledgedSkills}
-                  onAcknowledgedSkillsChange={setAcknowledgedSkills}
-                  onApplySuccess={(_variantId, mergedContent) => {
-                    setActiveVariantContent(mergedContent);
-                    setSaveStatus("Tailored variant applied — ATS will re-score against updated content.");
-                    if (masterResumeId === "demo-local") {
-                      setMasterTypstSource(mergedContent);
-                      localStorage.setItem("resumeforge_typst_source", mergedContent);
-                    }
-                  }}
-                />
-              ) : (
-                <div className="flex-1 min-h-0 flex flex-col space-y-2">
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono tabular-nums">
-                    <span>Active Buffer ({activeVariantContent ? "Tailored Variant" : "Master Resume"})</span>
-                    <span>{(activeVariantContent || masterTypstSource).split("\n").length} lines</span>
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-6 items-start">
+              {/* Primary Review Pane (~60% desktop, full-width below xl) */}
+              <section
+                className="min-w-0 rounded-xl surface-raised p-4 sm:p-5 flex flex-col gap-4"
+                data-testid="tailor-pane-center"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-hairline">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                    <h2 className="text-lg text-foreground font-semibold">
+                      Suggestion Review
+                    </h2>
                   </div>
-                  <pre
-                    data-testid="typst-ast-preview"
-                    className="flex-1 overflow-y-auto max-h-[600px] p-4 bg-inset border border-hairline rounded font-mono text-[11px] text-on-surface-variant leading-relaxed whitespace-pre-wrap selection:bg-primary/30"
+                  <button
+                    type="button"
+                    onClick={handleGeneratePatches}
+                    disabled={isGeneratingPatches}
+                    className="min-h-10 text-xs sm:text-sm px-3 rounded-md border border-control text-foreground font-medium hover:bg-elevated transition-colors flex items-center gap-1.5 disabled:opacity-60"
                   >
-                    {activeVariantContent || masterTypstSource || "// Loading Typst source..."}
-                  </pre>
+                    {isGeneratingPatches ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    Generate Patches
+                  </button>
                 </div>
-              )}
-            </section>
 
-            {/* Right Pane: Real-time deterministic AtsScorePanel (single evaluator mount) */}
-            <section
-              className="min-w-0 rounded-xl surface-raised p-5 flex flex-col gap-4"
-              data-testid="tailor-pane-right"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-hairline">
-                <div className="flex items-center gap-2 min-w-0">
-                  <ClipboardCheck className="h-4 w-4 text-primary shrink-0" aria-hidden />
-                  <h2 className="text-lg text-foreground font-semibold">
-                    ATS Score &amp; Verification
-                  </h2>
-                </div>
-              </div>
-
-              {extractedRequirements && (activeVariantContent || masterTypstSource) ? (
-                <div className="flex-1 min-h-0 overflow-y-auto max-h-[700px] pr-1">
-                  <AtsScorePanel
-                    appearance="tailor"
-                    typstContent={activeVariantContent || masterTypstSource}
-                    extractedRequirements={extractedRequirements}
-                    roleTitle={roleTitle}
-                    rawDescription={rawDescription}
-                    initialProfile={selectedRoleProfile}
-                    onProfileChange={setSelectedRoleProfile}
-                    onEvaluationComplete={setAtsResult}
-                    includeEvidenceBank
-                    className="!bg-transparent !border-0 !shadow-none !p-0"
+                {(patchVerified.length > 0 || patchRejected.length > 0 || patchGaps.length > 0) &&
+                masterResumeId &&
+                (savedJobId || masterResumeId === "demo-local") ? (
+                  <PatchDiffReview
+                    key={`${patchReviewGeneration}-${patchBatch?.batchId || "local"}`}
+                    verified={patchVerified}
+                    rejected={patchRejected}
+                    gaps={patchGaps}
+                    masterTypstSource={masterTypstSource || activeVariantContent}
+                    jobId={savedJobId || "demo-local-job"}
+                    batch={patchBatch}
+                    localOnly={masterResumeId === "demo-local"}
+                    localBaseTypstSource={demoPatchBaseSource}
+                    masterFactsSnapshot={masterFactsSnapshot}
+                    validationContext={validationContext}
+                    onValidationContextUpdate={(nextCtx) => {
+                      setValidationContext(nextCtx);
+                      if (nextCtx.masterBaseline) {
+                        setMasterFactsSnapshot(nextCtx.masterBaseline);
+                      }
+                    }}
+                    evidenceMetadata={evidenceMetadata}
+                    decisions={patchDecisions}
+                    onDecisionsChange={setPatchDecisions}
+                    acknowledgedSkills={acknowledgedSkills}
+                    onAcknowledgedSkillsChange={setAcknowledgedSkills}
+                    selectedPatch={selectedPatchId}
+                    onSelectedPatchChange={setSelectedPatchId}
+                    onRegeneratePatches={() => void handleGeneratePatches()}
+                    renderInlinePreview={false}
+                    onApplySuccess={(_variantId, mergedContent) => {
+                      setActiveVariantContent(mergedContent);
+                      setSaveStatus("Tailored variant applied — ATS will re-score against updated content.");
+                      if (masterResumeId === "demo-local") {
+                        setMasterTypstSource(mergedContent);
+                        localStorage.setItem("resumeforge_typst_source", mergedContent);
+                      }
+                    }}
                   />
+                ) : (
+                  <div className="rounded-xl border border-hairline bg-inset p-5 space-y-4">
+                    <div className="space-y-1.5">
+                      <h3 className="text-base font-semibold text-foreground">
+                        Ready to review evidence-grounded suggestions
+                      </h3>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Generate patches to compare proposed wording against your master resume side by side with live paper preview and citation checks.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      <span className="rounded-md border border-hairline bg-panel px-2.5 py-1 font-mono tabular-nums">
+                        {extractedRequirements ? `${extractedRequirements.requiredSkills.length} required skills` : "No requirements extracted yet"}
+                      </span>
+                      <span className="rounded-md border border-hairline bg-panel px-2.5 py-1 font-mono tabular-nums">
+                        {matches.length} evidence matches
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleGeneratePatches}
+                        disabled={isGeneratingPatches || !extractedRequirements}
+                        className="min-h-11 inline-flex items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                      >
+                        {isGeneratingPatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                        Generate AI patches
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowTypstSource((prev) => !prev)}
+                        className="min-h-11 inline-flex items-center gap-1.5 rounded-md border border-control bg-panel px-3 text-xs font-medium text-foreground hover:bg-elevated"
+                      >
+                        <Code2 className="h-3.5 w-3.5" aria-hidden />
+                        {showTypstSource ? "Hide Typst source" : "View Typst source"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {showTypstSource && (
+                  <div className="flex flex-col space-y-2 pt-3 border-t border-hairline">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground font-mono tabular-nums">
+                      <span>Raw Typst AST ({activeVariantContent ? "Tailored Variant" : "Master Resume"})</span>
+                      <span>{(activeVariantContent || masterTypstSource).split("\n").length} lines</span>
+                    </div>
+                    <pre
+                      data-testid="typst-ast-preview"
+                      className="overflow-y-auto max-h-[420px] p-4 bg-inset border border-hairline rounded font-mono text-xs text-on-surface-variant leading-relaxed whitespace-pre-wrap break-words selection:bg-primary/30"
+                    >
+                      {activeVariantContent || masterTypstSource || "// Loading Typst source..."}
+                    </pre>
+                  </div>
+                )}
+              </section>
+
+              {/* Secondary Pane (~40% desktop): Live Paper Preview + ATS + On-Demand Job Context */}
+              <aside
+                className="min-w-0 xl:sticky xl:top-6 rounded-xl surface-raised p-4 sm:p-5 flex flex-col gap-4"
+                data-testid="tailor-pane-right"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-hairline">
+                  <div className="flex items-center gap-1 rounded-lg border border-hairline bg-inset p-1" role="tablist" aria-label="Secondary workspace panels">
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={effectiveSecondaryTab === "preview"}
+                      disabled={patchVerified.length === 0}
+                      onClick={() => setSecondaryDeskTab("preview")}
+                      data-testid="workspace-secondary-preview-tab"
+                      className={`min-h-9 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 disabled:opacity-45 ${
+                        effectiveSecondaryTab === "preview"
+                          ? "bg-elevated text-foreground border border-hairline"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Eye className="h-3.5 w-3.5" aria-hidden />
+                      Preview {patchVerified.length > 0 ? `(${patchVerified.length})` : ""}
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={effectiveSecondaryTab === "ats"}
+                      onClick={() => setSecondaryDeskTab("ats")}
+                      data-testid="workspace-secondary-ats-tab"
+                      className={`min-h-9 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${
+                        effectiveSecondaryTab === "ats"
+                          ? "bg-elevated text-foreground border border-hairline"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <ClipboardCheck className="h-3.5 w-3.5" aria-hidden />
+                      ATS {atsResult ? `${atsResult.overallScore}%` : "Score"}
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={effectiveSecondaryTab === "job"}
+                      onClick={() => setSecondaryDeskTab("job")}
+                      data-testid="workspace-secondary-job-tab"
+                      className={`min-h-9 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${
+                        effectiveSecondaryTab === "job"
+                          ? "bg-elevated text-foreground border border-hairline"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Briefcase className="h-3.5 w-3.5" aria-hidden />
+                      Job Details
+                    </button>
+                  </div>
                 </div>
-              ) : (
-                <div className="p-4 rounded border border-hairline bg-inset text-xs text-muted-foreground font-mono">
-                  Extract job requirements to calculate deterministic ATS match score.
+
+                {effectiveSecondaryTab === "preview" && patchVerified.length > 0 && (
+                  <div className="transition-opacity duration-150 motion-reduce:transition-none">
+                    <SuggestionPreview
+                      base={masterResumeId === "demo-local" ? demoPatchBaseSource : patchBatch?.baseTypstSource}
+                      current={masterTypstSource || activeVariantContent}
+                      validBatch={
+                        masterResumeId === "demo-local"
+                          ? Boolean(demoPatchBaseSource)
+                          : Boolean(patchBatch && patchBatch.baseTypstSource && patchBatch.jobId === (savedJobId || "demo-local-job"))
+                      }
+                      localStorageSourceKey={masterResumeId === "demo-local" ? "resumeforge_typst_source" : undefined}
+                      patches={patchVerified}
+                      decisions={patchDecisions}
+                      selected={selectedPatchId}
+                      onSelect={setSelectedPatchId}
+                      onDecision={(id, decision) =>
+                        setPatchDecisions((prev) => ({
+                          ...prev,
+                          [id]: decision,
+                        }))
+                      }
+                      evidenceTitles={evidenceTitlesMap}
+                    />
+                  </div>
+                )}
+
+                <div className={effectiveSecondaryTab === "ats" ? "transition-opacity duration-150 motion-reduce:transition-none" : "hidden"}>
+                  {extractedRequirements && (activeVariantContent || masterTypstSource) ? (
+                    <div className="overflow-y-auto max-h-[720px] pr-1">
+                      <AtsScorePanel
+                        appearance="tailor"
+                        typstContent={activeVariantContent || masterTypstSource}
+                        extractedRequirements={extractedRequirements}
+                        roleTitle={roleTitle}
+                        rawDescription={rawDescription}
+                        initialProfile={selectedRoleProfile}
+                        onProfileChange={setSelectedRoleProfile}
+                        onEvaluationComplete={setAtsResult}
+                        includeEvidenceBank
+                        className="!bg-transparent !border-0 !shadow-none !p-0"
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded border border-hairline bg-inset text-xs text-muted-foreground font-mono">
+                      Extract job requirements to calculate deterministic ATS match score.
+                    </div>
+                  )}
                 </div>
-              )}
-            </section>
+
+                {effectiveSecondaryTab === "job" && (
+                  <div className="space-y-4 transition-opacity duration-150 motion-reduce:transition-none">
+                    {extractedRequirements && extractedRequirements.requiredSkills.length > 0 && (
+                      <div className="space-y-1.5 pb-3 border-b border-hairline">
+                        <span className="text-xs text-muted-foreground font-medium block">
+                          Required Skills &amp; Gaps
+                        </span>
+                        <TechDiffPillList
+                          allRequiredSkills={extractedRequirements.requiredSkills}
+                          verifiedSkillNames={verifiedRequiredSkills}
+                          missingSkillNames={missingRequiredSkills}
+                          maxDisplay={10}
+                        />
+                      </div>
+                    )}
+                    <div className="space-y-1.5">
+                      <span className="text-xs text-muted-foreground font-medium block">
+                        Job Description (Keywords Highlighted)
+                      </span>
+                      <div
+                        data-testid="tailor-jd-highlighted-view"
+                        className="overflow-y-auto max-h-[540px] p-4 bg-inset border border-hairline rounded-lg text-sm text-on-surface-variant space-y-2 leading-relaxed break-words"
+                      >
+                        {highlightedJdView}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </aside>
+            </div>
           </div>
         ) : activeTab === "overview" ? (
           <section className="rounded-xl surface-raised p-5 space-y-6" data-testid="tailor-overview-panel">
@@ -1589,6 +1978,13 @@ export function TailorWorkspace() {
             typstAst={activeVariantContent}
             evidence={matches}
             variantContext={{ masterResumeId, jobId: savedJobId }}
+            validationContext={validationContext}
+            onValidationContextUpdate={(nextCtx) => {
+              setValidationContext(nextCtx);
+              if (nextCtx.masterBaseline) {
+                setMasterFactsSnapshot(nextCtx.masterBaseline);
+              }
+            }}
             onPatchApplied={(patchedTypstAst) => {
               setActiveVariantContent(patchedTypstAst);
               setSaveStatus("Deterministic fix applied to working copy — review, then save or re-run guardrail.");
@@ -1620,9 +2016,9 @@ export function TailorWorkspace() {
                     {jobDoc.diagnostics.status === "VERIFIED_ATS" && (
                       <div
                         data-testid="confidence-banner-verified-ats"
-                        className="p-3 rounded-lg bg-emerald-950/60 border border-emerald-800 text-sm text-emerald-300 flex items-start gap-2"
+                        className="p-3 rounded-lg status-success-surface border text-sm flex items-start gap-2"
                       >
-                        <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
+                        <CheckCircle2 className="size-4 text-status-success shrink-0" />
                         <span>Verified ATS Source: Loaded directly from official ATS endpoint. No action needed.</span>
                       </div>
                     )}
@@ -1916,13 +2312,13 @@ export function TailorWorkspace() {
                         </div>
                         <div className="space-y-1">
                           <span className="text-muted-foreground block">Content Hash (SHA-256):</span>
-                          <code className="block p-1.5 rounded bg-panel border border-hairline text-[10px] text-emerald-400 break-all">
+                          <code className="block p-1.5 rounded bg-panel border border-hairline text-[10px] text-status-success break-all">
                             {jobDoc.contentHash}
                           </code>
                         </div>
                         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                           <span className="text-muted-foreground">Diagnostics Status:</span>
-                          <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold text-[10px]">
+                          <span className="px-2 py-0.5 rounded status-success-surface border font-bold text-[10px]">
                             {jobDoc.diagnostics.status}
                           </span>
                         </div>
@@ -2086,11 +2482,47 @@ export function TailorWorkspace() {
         )}
         </div>
       </div>
+      <Sheet open={showJobContextSheet} onOpenChange={setShowJobContextSheet}>
+        <SheetContent side="right" className="w-[min(100vw,30rem)] overflow-y-auto bg-panel border-hairline text-foreground">
+          <SheetHeader className="pb-3 border-b border-hairline">
+            <SheetTitle className="text-foreground">
+              {roleTitle || "Target Role"}
+            </SheetTitle>
+            <SheetDescription className="text-muted-foreground">
+              {company ? `${company} · ` : ""}Job description &amp; extracted requirements
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-4 space-y-4">
+            {extractedRequirements && extractedRequirements.requiredSkills.length > 0 && (
+              <div className="space-y-1.5 pb-3 border-b border-hairline">
+                <span className="text-xs text-muted-foreground font-medium block">
+                  Required Skills &amp; Gaps
+                </span>
+                <TechDiffPillList
+                  allRequiredSkills={extractedRequirements.requiredSkills}
+                  verifiedSkillNames={verifiedRequiredSkills}
+                  missingSkillNames={missingRequiredSkills}
+                  maxDisplay={12}
+                />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <span className="text-xs text-muted-foreground font-medium block">
+                Job Description (Keywords Highlighted)
+              </span>
+              <div className="p-4 bg-inset border border-hairline rounded-lg text-sm text-on-surface-variant space-y-2 leading-relaxed break-words">
+                {highlightedJdView}
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
       <QuickAddEvidenceModal
         isOpen={Boolean(gapSkillToResolve)}
         onClose={() => setGapSkillToResolve(null)}
         initialSkill={gapSkillToResolve || ""}
         onEvidenceCreated={async () => {
+          void loadEvidenceMetadata();
           if (extractedRequirements) {
             await fetchMatches(extractedRequirements);
           }

@@ -1069,16 +1069,16 @@ export function EditorWorkspace() {
       {!isConversionBannerDismissed && source.includes("// @conversion-path: ai") && (
         <div
           data-testid="pdf-conversion-ai-banner"
-          className="flex items-center justify-between px-4 py-2 bg-emerald-950/80 border-b border-emerald-800 text-xs text-emerald-200"
+          className="flex items-center justify-between px-4 py-2 bg-status-success/15 border-b border-status-success/35 text-xs text-status-success-soft"
         >
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 shrink-0 text-emerald-400" />
+            <Sparkles className="h-4 w-4 shrink-0 text-status-success" />
             <span>AI-Converted Draft — Converted using BYOK AI provider</span>
           </div>
           <button
             type="button"
             onClick={handleDismissConversionBanner}
-            className="p-2 text-emerald-300 hover:text-white transition min-h-11 min-w-11 inline-flex items-center justify-center"
+            className="p-2 text-status-success-soft hover:text-foreground transition min-h-11 min-w-11 inline-flex items-center justify-center"
             title="Dismiss banner"
             data-testid="dismiss-conversion-banner-btn"
           >
@@ -1114,9 +1114,9 @@ export function EditorWorkspace() {
       {undoSuccess && (
         <div
           data-testid="undo-success-banner"
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-950/90 border-b border-emerald-800 text-xs text-emerald-300"
+          className="flex items-center gap-2 px-4 py-2 bg-status-success/15 border-b border-status-success/35 text-xs text-status-success-soft"
         >
-          <Check className="h-4 w-4 text-emerald-400" />
+          <Check className="h-4 w-4 text-status-success" />
           <span>Restored Master Resume to pre-overwrite snapshot!</span>
         </div>
       )}

@@ -1,4 +1,12 @@
-import { FactDateRange, FactEmployer, FactMetric, FactTitle, ResumeFacts } from "./types";
+import {
+  FactDateRange,
+  FactEmployer,
+  FactMetric,
+  FactTitle,
+  ResumeFacts,
+  TailoringValidationContext,
+  VerifiedEvidenceRegistry,
+} from "./types";
 import {
   extractEmployerAliases,
   extractMetricsFromText,
@@ -10,6 +18,7 @@ import {
 
 export interface VerifiedEvidenceInput {
   id: string;
+  userId?: string | null;
   type: string;
   title: string;
   organization?: string | null;
@@ -19,6 +28,7 @@ export interface VerifiedEvidenceInput {
   status: string;
   bullets?: Array<{
     id: string;
+    evidenceId?: string;
     text: string;
     technologies?: string[] | string;
     verified: boolean;
@@ -149,6 +159,209 @@ export function extractResumeFacts(
     metrics: dedupedMetrics,
     skills: Array.from(skillsSet).sort(),
     evidenceIds: Array.from(evidenceIdsSet),
+  };
+}
+
+export function isTailoringValidationContext(
+  value: unknown
+): value is TailoringValidationContext {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as { version?: unknown }).version === 2 &&
+    typeof (value as { revision?: unknown }).revision === "string" &&
+    typeof (value as { facts?: unknown }).facts === "object" &&
+    (value as { facts?: unknown }).facts !== null &&
+    typeof (value as { masterBaseline?: unknown }).masterBaseline === "object" &&
+    (value as { masterBaseline?: unknown }).masterBaseline !== null &&
+    typeof (value as { registry?: unknown }).registry === "object" &&
+    (value as { registry?: unknown }).registry !== null
+  );
+}
+
+export function resolveValidationFacts(
+  input: ResumeFacts | TailoringValidationContext
+): ResumeFacts {
+  return isTailoringValidationContext(input) ? input.facts : input;
+}
+
+function stableContextDigest(input: unknown): string {
+  const text = JSON.stringify(input);
+  let h1 = 0x811c9dc5;
+  let h2 = 0xcbf29ce4;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 0x01000193);
+    h2 = Math.imul(h2 ^ ch, 0x01000193);
+  }
+  return `ctx_${(h1 >>> 0).toString(16).padStart(8, "0")}${(h2 >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+/**
+ * Builds one versioned tailoring validation context combining the protected frozen master
+ * baseline with current owned verified evidence/bullets without mutating the master snapshot.
+ */
+export function buildTailoringValidationContext(
+  masterBaseline: ResumeFacts,
+  evidenceBank: readonly VerifiedEvidenceInput[] = [],
+  options?: {
+    ownerId?: string;
+    revision?: string;
+    authoritativeEvidence?: boolean;
+  }
+): TailoringValidationContext {
+  const verifiedItems: VerifiedEvidenceInput[] = [];
+  const retiredIds = new Set<string>();
+  const evidenceIds: string[] = [];
+  const bulletIds: string[] = [];
+  const bulletToEvidenceId: Record<string, string> = {};
+
+  for (const item of evidenceBank) {
+    const owned = options?.ownerId === undefined || item.userId === options.ownerId;
+    if (!owned || item.status !== "verified") {
+      retiredIds.add(item.id);
+      for (const b of item.bullets || []) {
+        retiredIds.add(b.id);
+      }
+      continue;
+    }
+
+    const verifiedBullets = (item.bullets || []).filter((b) => {
+      const ok = b.verified && (b.evidenceId === undefined || b.evidenceId === item.id);
+      if (!ok) retiredIds.add(b.id);
+      return ok;
+    });
+
+    verifiedItems.push({ ...item, bullets: verifiedBullets });
+    evidenceIds.push(item.id);
+    for (const b of verifiedBullets) {
+      bulletIds.push(b.id);
+      bulletToEvidenceId[b.id] = item.id;
+    }
+  }
+
+  const evidenceFacts = extractResumeFacts("", verifiedItems);
+
+  const employersMap = new Map<string, FactEmployer>();
+  for (const emp of masterBaseline.employers || []) {
+    const key = emp.normalized || normalizeEmployer(emp.raw);
+    if (!key) continue;
+    employersMap.set(key, {
+      ...emp,
+      aliases: [...(emp.aliases || [])],
+    });
+  }
+  for (const emp of evidenceFacts.employers) {
+    const key = emp.normalized || normalizeEmployer(emp.raw);
+    if (!key) continue;
+    const existing = employersMap.get(key);
+    if (!existing) {
+      employersMap.set(key, { ...emp, aliases: [...(emp.aliases || [])] });
+    } else {
+      const mergedAliases = new Set([...(existing.aliases || []), ...(emp.aliases || [])]);
+      existing.aliases = Array.from(mergedAliases);
+    }
+  }
+
+  const titlesMap = new Map<string, FactTitle>();
+  for (const t of [...(masterBaseline.titles || []), ...evidenceFacts.titles]) {
+    const key = `${t.normalized}::${t.employerNormalized || ""}`;
+    if (!titlesMap.has(key)) {
+      titlesMap.set(key, { ...t });
+    }
+  }
+
+  const dateRangesMap = new Map<string, FactDateRange>();
+  for (const d of [...(masterBaseline.dateRanges || []), ...evidenceFacts.dateRanges]) {
+    const key = `${d.employerNormalized || ""}::${d.raw}`;
+    if (!dateRangesMap.has(key)) {
+      dateRangesMap.set(key, { ...d });
+    }
+  }
+
+  const seenMetrics = new Set<string>();
+  const mergedMetrics: FactMetric[] = [];
+  for (const m of [...(masterBaseline.metrics || []), ...evidenceFacts.metrics]) {
+    const key = `${m.value}:${m.unit.toLowerCase()}:${m.subject || ""}`;
+    if (!seenMetrics.has(key)) {
+      seenMetrics.add(key);
+      mergedMetrics.push({ ...m });
+    }
+  }
+
+  const skillsSet = new Set<string>();
+  for (const s of [...(masterBaseline.skills || []), ...evidenceFacts.skills]) {
+    const norm = normalizeSkillToken(s);
+    if (norm) skillsSet.add(norm);
+  }
+
+  const mergedEvidenceIds = new Set<string>();
+  if (!options?.authoritativeEvidence) {
+    for (const id of masterBaseline.evidenceIds || []) {
+      if (!retiredIds.has(id)) mergedEvidenceIds.add(id);
+    }
+  }
+  for (const id of evidenceIds) mergedEvidenceIds.add(id);
+  for (const id of bulletIds) mergedEvidenceIds.add(id);
+
+  const facts: ResumeFacts = {
+    version: 1,
+    snapshotAt: masterBaseline.snapshotAt,
+    employers: Array.from(employersMap.values()),
+    titles: Array.from(titlesMap.values()),
+    dateRanges: Array.from(dateRangesMap.values()),
+    metrics: mergedMetrics,
+    skills: Array.from(skillsSet).sort(),
+    evidenceIds: Array.from(mergedEvidenceIds),
+  };
+
+  const registry: VerifiedEvidenceRegistry = {
+    evidenceIds: [...evidenceIds].sort(),
+    bulletIds: [...bulletIds].sort(),
+    bulletToEvidenceId,
+  };
+
+  const revision =
+    options?.revision ??
+    stableContextDigest({
+      baseline: {
+        employers: masterBaseline.employers,
+        titles: masterBaseline.titles,
+        dateRanges: masterBaseline.dateRanges,
+        metrics: masterBaseline.metrics,
+        skills: masterBaseline.skills,
+        evidenceIds: masterBaseline.evidenceIds,
+      },
+      evidence: verifiedItems.map((item) => ({
+        id: item.id,
+        title: item.title,
+        organization: item.organization ?? null,
+        dates: item.dates ?? null,
+        verifiedSummary: item.verifiedSummary,
+        tags: parseArrayField(item.tags),
+        bullets: (item.bullets || []).map((b) => ({
+          id: b.id,
+          text: b.text,
+          technologies: parseArrayField(b.technologies),
+        })),
+      })),
+    });
+
+  return {
+    version: 2,
+    revision,
+    masterBaseline: {
+      ...masterBaseline,
+      employers: (masterBaseline.employers || []).map((e) => ({ ...e, aliases: [...(e.aliases || [])] })),
+      titles: (masterBaseline.titles || []).map((t) => ({ ...t })),
+      dateRanges: (masterBaseline.dateRanges || []).map((d) => ({ ...d })),
+      metrics: (masterBaseline.metrics || []).map((m) => ({ ...m })),
+      skills: [...(masterBaseline.skills || [])],
+      evidenceIds: [...(masterBaseline.evidenceIds || [])],
+    },
+    facts,
+    registry,
+    assembledAt: new Date().toISOString(),
   };
 }
 

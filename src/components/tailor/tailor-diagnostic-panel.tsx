@@ -7,6 +7,8 @@ import { validateMetricGrounding } from "@/lib/diagnostics/deterministicPatcher"
 import { hasSkillWordBoundary } from "@/lib/diagnostics/auditResume";
 import { applyPatchProposals } from "@/lib/ai/patch-application";
 import { markDocumentAsPatched } from "@/lib/guardrail/policy";
+import type { TailoringValidationContext } from "@/lib/facts/types";
+import type { PatchErrorCategory } from "@/lib/ai/patch-schema";
 import { BadgeCheck, TriangleAlert, Save } from "lucide-react";
 
 interface RankedMatchLite {
@@ -31,6 +33,10 @@ interface TailorDiagnosticPanelProps {
   onPatchApplied?: (patchedTypstAst: string) => void;
   /** Context required to persist a patched working copy as a ResumeVariant. */
   variantContext?: DiagnosticVariantContext;
+  /** Versioned tailoring validation context from 1A. */
+  validationContext?: TailoringValidationContext | null;
+  /** Notify parent when diagnostic-patches or apply-patches returns an updated validationContext. */
+  onValidationContextUpdate?: (ctx: TailoringValidationContext) => void;
 }
 
 /** Pure gating helper — exported for unit testing. */
@@ -152,6 +158,8 @@ export const TailorDiagnosticPanel = ({
   evidence = [],
   onPatchApplied,
   variantContext,
+  validationContext,
+  onValidationContextUpdate,
 }: TailorDiagnosticPanelProps) => {
   const [patchResult, setPatchResult] = useState<string | null>(null);
   const [patchError, setPatchError] = useState<string | null>(null);
@@ -160,7 +168,11 @@ export const TailorDiagnosticPanel = ({
   const [baseSource, setBaseSource] = useState<string | null>(null);
   const [isPersisting, setIsPersisting] = useState(false);
   const [persistedVariantId, setPersistedVariantId] = useState<string | null>(null);
-  const [persistError, setPersistError] = useState<string | null>(null);
+  const [persistError, setPersistError] = useState<{
+    message: string;
+    category?: PatchErrorCategory;
+    recoveryAction?: string;
+  } | null>(null);
 
   if (!report) return <div>No diagnostics</div>;
 
@@ -194,14 +206,19 @@ export const TailorDiagnosticPanel = ({
     setPersistError(null);
     const gate = canPersistDiagnosticVariant(variantContext, patchResult);
     if (!gate.allowed) {
-      setPersistError(gate.reason || "Cannot save variant.");
+      setPersistError({ message: gate.reason || "Cannot save variant." });
       return;
     }
 
     setIsPersisting(true);
     try {
       if (!baseSource || typstAst !== baseSource) {
-        throw new Error("The resume changed after these fixes were selected. Reapply the fixes to the current text before saving.");
+        setPersistError({
+          category: "stale_resume_or_job",
+          message: "The resume changed after these fixes were selected. Reapply the fixes to the current text before saving.",
+          recoveryAction: "Reapply the diagnostic fixes against your current Master Resume before saving.",
+        });
+        return;
       }
       const proposalRes = await fetch("/api/ai/diagnostic-patches", {
         method: "POST",
@@ -210,26 +227,53 @@ export const TailorDiagnosticPanel = ({
       });
       const proposalJson = await proposalRes.json().catch(() => ({}));
       if (!proposalRes.ok || !proposalJson.success || !proposalJson.data?.batch) {
-        throw new Error(proposalJson.error || "Could not create a saved diagnostic proposal batch.");
+        setPersistError({
+          category: proposalJson.errorCategory,
+          message: proposalJson.error || "Could not create a saved diagnostic proposal batch.",
+          recoveryAction: proposalJson.recoveryAction,
+        });
+        return;
+      }
+      if (proposalJson.data.validationContext) {
+        onValidationContextUpdate?.(proposalJson.data.validationContext as TailoringValidationContext);
       }
       const batch = proposalJson.data.batch;
       if (batch.baseTypstSource !== baseSource) {
-        throw new Error("The saved resume changed while preparing these fixes. Reapply the fixes before saving.");
+        setPersistError({
+          category: "stale_resume_or_job",
+          message: "The saved resume changed while preparing these fixes. Reapply the fixes before saving.",
+          recoveryAction: "Reload and reapply diagnostic fixes against your updated Master Resume.",
+        });
+        return;
       }
       const reconstructed = applyPatchProposals(batch.baseTypstSource, proposalJson.data.verified || []);
       const acceptedPatchIds = reconstructed.appliedIds;
-      if (acceptedPatchIds.length === 0) throw new Error("No verified diagnostic fixes were returned.");
+      if (acceptedPatchIds.length === 0) {
+        setPersistError({
+          category: "evidence_unavailable",
+          message: "No verified diagnostic fixes were returned.",
+          recoveryAction: "Verify the supporting Evidence Bank item before saving.",
+        });
+        return;
+      }
       const preview = markDocumentAsPatched(reconstructed.typstSource);
       const { compileTypstToSvg } = await import("@/lib/typst/compiler");
       const compileResult = await compileTypstToSvg(preview);
       if (!compileResult.success) {
         const errorMsg =
           "error" in compileResult ? compileResult.error.message : "Unknown compilation error";
-        setPersistError(
-          `Typst compilation failed — variant not saved. Error: ${errorMsg}`
-        );
+        setPersistError({
+          category: "compile_failed",
+          message: `Typst compilation failed — variant not saved. Error: ${errorMsg}`,
+          recoveryAction: "Review or adjust the conflicting fix before saving.",
+        });
         return;
       }
+
+      const expectedEvidenceRevision =
+        batch.evidenceRevision ??
+        proposalJson.data.validationContext?.revision ??
+        validationContext?.revision;
 
       const res = await fetch("/api/ai/apply-patches", {
         method: "POST",
@@ -240,12 +284,20 @@ export const TailorDiagnosticPanel = ({
           acceptedPatchIds,
           acknowledgedSkills: [],
           variantTitle: buildDiagnosticVariantTitle(),
+          ...(expectedEvidenceRevision ? { expectedEvidenceRevision } : {}),
         }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.success) {
-        setPersistError(json.error || "Failed to save deterministic fix variant.");
+        setPersistError({
+          category: json.errorCategory,
+          message: json.error || "Failed to save deterministic fix variant.",
+          recoveryAction: json.recoveryAction,
+        });
         return;
+      }
+      if (json.data?.validationContext) {
+        onValidationContextUpdate?.(json.data.validationContext as TailoringValidationContext);
       }
       setPersistedVariantId(json.data.variantId ?? null);
       if (typeof json.data.typstContent === "string") {
@@ -253,7 +305,10 @@ export const TailorDiagnosticPanel = ({
         onPatchApplied?.(json.data.typstContent);
       }
     } catch (err) {
-      setPersistError(err instanceof Error ? err.message : "Failed to save deterministic fix variant.");
+      setPersistError({
+        category: "save_failed",
+        message: err instanceof Error ? err.message : "Failed to save deterministic fix variant.",
+      });
     } finally {
       setIsPersisting(false);
     }
@@ -308,9 +363,15 @@ export const TailorDiagnosticPanel = ({
             <div
               data-testid="diagnostic-variant-save-error"
               role="alert"
-              className="rounded-md border border-status-danger/40 bg-status-danger/15 p-2.5 text-xs text-status-danger"
+              className="space-y-1 rounded-md border border-status-danger/40 bg-status-danger/15 p-2.5 text-xs text-status-danger"
             >
-              {persistError}
+              <p className="font-semibold">
+                {persistError.category ? `[${persistError.category}] ` : ""}
+                {persistError.message}
+              </p>
+              {persistError.recoveryAction && (
+                <p className="text-text-secondary">{persistError.recoveryAction}</p>
+              )}
             </div>
           )}
         </div>

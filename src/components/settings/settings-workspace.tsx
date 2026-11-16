@@ -363,7 +363,7 @@ export function SettingsWorkspace() {
                   </div>
                 </div>
                 {usernameStatus ? (
-                  <p className={`text-xs ${usernameStatus.type === "success" ? "text-emerald-400" : "text-rose-400"}`} role="status">
+                  <p className={`text-xs ${usernameStatus.type === "success" ? "text-status-success-soft" : "text-rose-400"}`} role="status">
                     {usernameStatus.message}
                   </p>
                 ) : null}
@@ -497,8 +497,8 @@ export function SettingsWorkspace() {
                 {/* Visual Status Indicator */}
                 <div data-testid="vault-status" className="mt-2 flex items-center gap-2 text-xs">
                   {hasVaultKey ? (
-                    <div className="flex items-center gap-1.5 text-emerald-400">
-                      <Lock className="h-4 w-4" />
+                    <div className="flex items-center gap-1.5 text-status-success-soft">
+                      <Lock className="h-4 w-4 text-status-success" />
                       <span>Key encrypted in browser IndexedDB (AES-GCM vault)</span>
                     </div>
                   ) : (
@@ -512,8 +512,8 @@ export function SettingsWorkspace() {
             ) : (
               <div className="rounded-lg border border-hairline bg-inset/60 p-4 card-lift">
                 {/* Ollama Visual Status Indicator */}
-                <div data-testid="vault-status" className="flex items-center gap-2 text-xs text-emerald-400">
-                  <Server className="h-4 w-4" />
+                <div data-testid="vault-status" className="flex items-center gap-2 text-xs text-status-success-soft">
+                  <Server className="h-4 w-4 text-status-success" />
                   <span>Local daemon endpoint (no API key required)</span>
                 </div>
               </div>
@@ -571,7 +571,7 @@ export function SettingsWorkspace() {
               </button>
 
               <div className="flex items-start sm:items-center gap-2 text-xs text-muted-foreground min-w-0">
-                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5 sm:mt-0" />
+                <ShieldCheck className="h-4 w-4 shrink-0 text-status-success mt-0.5 sm:mt-0" />
                 <span>Keys are encrypted client-side and never written to database or server logs</span>
               </div>
             </div>
@@ -584,13 +584,13 @@ export function SettingsWorkspace() {
                 aria-live="polite"
                 className={`rounded-lg p-4 border text-sm ${
                   testResult.success
-                    ? "border-emerald-800/50 bg-emerald-950/40 text-emerald-200"
+                    ? "status-success-surface"
                     : "border-rose-800/50 bg-rose-950/40 text-rose-200"
                 }`}
               >
                 <div className="flex items-start gap-3">
                   {testResult.success ? (
-                    <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400 mt-0.5" />
+                    <CheckCircle2 className="h-5 w-5 shrink-0 text-status-success mt-0.5" />
                   ) : (
                     <XCircle className="h-5 w-5 shrink-0 text-rose-400 mt-0.5" />
                   )}

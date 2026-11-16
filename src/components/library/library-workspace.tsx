@@ -14,8 +14,15 @@ import {
   ChevronDown,
   ChevronRight,
   FileJson,
+  RotateCcw,
+  Trash2,
+  MoreVertical,
+  CheckSquare,
+  Minus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AppShell } from "@/components/design-system/app-shell";
 import { fetchDemoConfig } from "@/components/auth/session-user";
 import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
@@ -74,6 +81,188 @@ export interface EvidenceItem {
   existingBullet?: string;
 }
 
+export interface UndoArchiveEntry {
+  id: string;
+  title: string;
+  previousStatus: "verified" | "draft";
+  updatedAt: string;
+}
+
+export interface LocalBulkDirective {
+  id: string;
+  restoreStatus?: "verified" | "draft";
+  expectedUpdatedAt?: string;
+}
+
+export interface LocalBulkResultItem {
+  id: string;
+  title: string;
+  outcome: "succeeded" | "skipped" | "conflict";
+  reason?: string;
+  previousStatus?: string;
+  updatedAt?: string;
+}
+
+export function archiveEvidenceItemsLocally(
+  items: EvidenceItem[],
+  targetIds: string[],
+  nowIso = new Date().toISOString()
+): {
+  nextItems: EvidenceItem[];
+  results: LocalBulkResultItem[];
+  undoEntries: UndoArchiveEntry[];
+} {
+  const targetSet = new Set(targetIds);
+  const results: LocalBulkResultItem[] = [];
+  const undoEntries: UndoArchiveEntry[] = [];
+  const nextItems = items.map((item) => {
+    if (!targetSet.has(item.id)) return item;
+    if (item.status === "archived") {
+      results.push({
+        id: item.id,
+        title: item.title,
+        outcome: "skipped",
+        reason: "Already archived.",
+      });
+      return item;
+    }
+    const previousStatus: "verified" | "draft" =
+      item.status === "verified" ? "verified" : "draft";
+    undoEntries.push({
+      id: item.id,
+      title: item.title,
+      previousStatus,
+      updatedAt: nowIso,
+    });
+    results.push({
+      id: item.id,
+      title: item.title,
+      outcome: "succeeded",
+      previousStatus,
+      updatedAt: nowIso,
+    });
+    return {
+      ...item,
+      status: "archived",
+      updatedAt: nowIso,
+    };
+  });
+  return { nextItems, results, undoEntries };
+}
+
+export function restoreEvidenceItemsLocally(
+  items: EvidenceItem[],
+  directives: LocalBulkDirective[],
+  nowIso = new Date().toISOString()
+): {
+  nextItems: EvidenceItem[];
+  results: LocalBulkResultItem[];
+} {
+  const directiveById = new Map(directives.map((d) => [d.id, d]));
+  const results: LocalBulkResultItem[] = [];
+  const nextItems = items.map((item) => {
+    const directive = directiveById.get(item.id);
+    if (!directive) return item;
+    if (
+      directive.expectedUpdatedAt &&
+      item.updatedAt &&
+      new Date(directive.expectedUpdatedAt).getTime() !==
+        new Date(item.updatedAt).getTime()
+    ) {
+      results.push({
+        id: item.id,
+        title: item.title,
+        outcome: "conflict",
+        reason: "Item was modified since archiving; newer edits preserved.",
+      });
+      return item;
+    }
+    if (item.status !== "archived") {
+      results.push({
+        id: item.id,
+        title: item.title,
+        outcome: "skipped",
+        reason: "Item is not archived.",
+      });
+      return item;
+    }
+    const nextStatus = directive.restoreStatus ?? "draft";
+    results.push({
+      id: item.id,
+      title: item.title,
+      outcome: "succeeded",
+      previousStatus: item.status,
+      updatedAt: nowIso,
+    });
+    return {
+      ...item,
+      status: nextStatus,
+      updatedAt: nowIso,
+    };
+  });
+  return { nextItems, results };
+}
+
+export function verifyEvidenceItemsLocally(
+  items: EvidenceItem[],
+  targetIds: string[],
+  nowIso = new Date().toISOString()
+): {
+  nextItems: EvidenceItem[];
+  results: LocalBulkResultItem[];
+} {
+  const targetSet = new Set(targetIds);
+  const results: LocalBulkResultItem[] = [];
+  const nextItems = items.map((item) => {
+    if (!targetSet.has(item.id)) return item;
+    if (item.status === "archived") {
+      results.push({
+        id: item.id,
+        title: item.title,
+        outcome: "skipped",
+        reason: "Archived items must be restored before verifying.",
+      });
+      return item;
+    }
+    const hasUnverifiedBullets = (item.bullets || []).some((b) => !b.verified);
+    if (item.status === "verified" && !hasUnverifiedBullets) {
+      results.push({
+        id: item.id,
+        title: item.title,
+        outcome: "skipped",
+        reason: "Already verified.",
+      });
+      return item;
+    }
+    results.push({
+      id: item.id,
+      title: item.title,
+      outcome: "succeeded",
+      previousStatus: item.status,
+      updatedAt: nowIso,
+    });
+    return {
+      ...item,
+      status: "verified",
+      bullets: (item.bullets || []).map((b) => ({ ...b, verified: true })),
+      updatedAt: nowIso,
+    };
+  });
+  return { nextItems, results };
+}
+
+function invalidateDependentEvidenceState(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("resumeforge_evidence_revision", String(Date.now()));
+    window.dispatchEvent(
+      new CustomEvent("resumeforge:evidence-changed", {
+        detail: { at: Date.now() },
+      })
+    );
+  } catch {}
+}
+
 export function isLocalEvidenceId(id: string): boolean {
   return id.startsWith("guest-") || id.startsWith("demo-sample-");
 }
@@ -107,11 +296,35 @@ export function LibraryWorkspace() {
   const [notification, setNotification] = useState<{
     type: "success" | "error";
     message: string;
+    undoArchive?: UndoArchiveEntry[];
   } | null>(null);
+  const [isSelectMode, setIsSelectMode] = useState<boolean>(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectionAnnouncement, setSelectionAnnouncement] = useState<string>("");
+  const [isBulkSubmitting, setIsBulkSubmitting] = useState<boolean>(false);
+  const [bulkMoreOpen, setBulkMoreOpen] = useState<boolean>(false);
+  const [openItemMenuId, setOpenItemMenuId] = useState<string | null>(null);
+  const [deleteDialogState, setDeleteDialogState] = useState<{
+    open: boolean;
+    eligibleItems: EvidenceItem[];
+    blockedItems: Array<{
+      id: string;
+      title: string;
+      reason: string;
+      citationCount?: number;
+    }>;
+    isDeleting: boolean;
+  }>({
+    open: false,
+    eligibleItems: [],
+    blockedItems: [],
+    isDeleting: false,
+  });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalOpenerRef = useRef<HTMLElement | null>(null);
   const tabListRef = useRef<HTMLDivElement>(null);
+  const bulkSubmittingRef = useRef<boolean>(false);
   const [tabIndicator, setTabIndicator] = useState<{ left: number; width: number } | null>(null);
 
   // Modal State
@@ -263,6 +476,97 @@ export function LibraryWorkspace() {
     () => items.filter((item) => item.needsReview),
     [items]
   );
+
+  const clearSelection = useCallback((announcement?: string) => {
+    setSelectedIds((prev) => {
+      if (prev.length === 0) return prev;
+      if (announcement) setSelectionAnnouncement(announcement);
+      return [];
+    });
+    setBulkMoreOpen(false);
+  }, []);
+
+  const handleSearchQueryChange = (nextQuery: string) => {
+    setSearchQuery(nextQuery);
+    clearSelection("Selection cleared because the search filter changed.");
+  };
+
+  const handleFilterStatusChange = (nextStatus: string) => {
+    setFilterStatus(nextStatus);
+    clearSelection("Selection cleared because the status filter changed.");
+  };
+
+  const handleTabChange = (nextTab: "library" | "review") => {
+    setActiveTab(nextTab);
+    setOpenItemMenuId(null);
+    clearSelection("Selection cleared because the active view changed.");
+  };
+
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const selectedFilteredCount = useMemo(
+    () => filteredItems.filter((item) => selectedIdSet.has(item.id)).length,
+    [filteredItems, selectedIdSet]
+  );
+  const allFilteredSelected =
+    filteredItems.length > 0 && selectedFilteredCount === filteredItems.length;
+  const someFilteredSelected =
+    selectedFilteredCount > 0 && !allFilteredSelected;
+
+  const selectedItems = useMemo(
+    () => items.filter((item) => selectedIdSet.has(item.id)),
+    [items, selectedIdSet]
+  );
+
+  const eligibleToVerifyCount = useMemo(
+    () =>
+      selectedItems.filter(
+        (item) =>
+          item.status !== "archived" &&
+          (item.status !== "verified" ||
+            (item.bullets || []).some((b) => !b.verified))
+      ).length,
+    [selectedItems]
+  );
+
+  const eligibleToArchiveCount = useMemo(
+    () => selectedItems.filter((item) => item.status !== "archived").length,
+    [selectedItems]
+  );
+
+  const selectedArchivedCount = useMemo(
+    () => selectedItems.filter((item) => item.status === "archived").length,
+    [selectedItems]
+  );
+
+  const toggleItemSelected = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      if (checked) {
+        return prev.includes(id) ? prev : [...prev, id];
+      }
+      return prev.filter((entry) => entry !== id);
+    });
+  };
+
+  const toggleSelectAllFiltered = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(filteredItems.map((item) => item.id));
+    } else {
+      setSelectedIds([]);
+      setBulkMoreOpen(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!openItemMenuId && !bulkMoreOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpenItemMenuId(null);
+        setBulkMoreOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [openItemMenuId, bulkMoreOpen]);
 
   const openCreateModal = (opener?: HTMLElement | null) => {
     modalOpenerRef.current =
@@ -479,6 +783,7 @@ export function LibraryWorkspace() {
           ? existing.map((entry) => (entry.id === item.id ? verifiedItem : entry))
           : [verifiedItem, ...existing];
         writeGuestEvidenceToStorage(nextStored);
+        invalidateDependentEvidenceState();
         await fetchItems();
         setNotification({
           type: "success",
@@ -494,6 +799,7 @@ export function LibraryWorkspace() {
       });
       const { ok, error } = await readApiResponse(res, "Failed to verify evidence item.");
       if (ok) {
+        invalidateDependentEvidenceState();
         await fetchItems();
         setNotification({
           type: "success",
@@ -515,15 +821,32 @@ export function LibraryWorkspace() {
   };
 
   const handleArchiveItem = async (id: string) => {
+    setOpenItemMenuId(null);
+    const targetItem = items.find((entry) => entry.id === id);
+    const previousStatus: "verified" | "draft" =
+      targetItem?.status === "verified" ? "verified" : "draft";
+
     try {
       const demoConfig = await fetchDemoConfig();
       if (demoConfig.demoMode || isLocalEvidenceId(id)) {
-        const filtered = readGuestEvidenceFromStorage().filter((item) => item.id !== id);
-        writeGuestEvidenceToStorage(filtered);
-        setItems((prev) => prev.filter((item) => item.id !== id));
+        const stored = readGuestEvidenceFromStorage();
+        const sourceList = stored.some((entry) => entry.id === id)
+          ? stored
+          : targetItem
+            ? [targetItem, ...stored]
+            : stored;
+        const { nextItems, undoEntries } = archiveEvidenceItemsLocally(
+          sourceList,
+          [id]
+        );
+        writeGuestEvidenceToStorage(nextItems);
+        invalidateDependentEvidenceState();
+        await fetchItems();
+        setSelectedIds((prev) => prev.filter((entry) => entry !== id));
         setNotification({
           type: "success",
-          message: "Item archived successfully.",
+          message: `"${targetItem?.title || "Item"}" moved to Archived.`,
+          undoArchive: undoEntries,
         });
         return;
       }
@@ -531,17 +854,36 @@ export function LibraryWorkspace() {
       const res = await fetch(`/api/evidence/${id}`, {
         method: "DELETE",
       });
-      if (res.ok) {
+      const { ok, data: json, error } = await readApiResponse<{
+        success?: boolean;
+        data?: { updatedAt?: string; previousStatus?: string };
+      }>(res, "Failed to archive evidence item.");
+      if (ok) {
+        invalidateDependentEvidenceState();
         await fetchItems();
+        setSelectedIds((prev) => prev.filter((entry) => entry !== id));
+        const restoredStatus: "verified" | "draft" =
+          json?.data?.previousStatus === "verified"
+            ? "verified"
+            : previousStatus;
         setNotification({
           type: "success",
-          message: "Item archived successfully.",
+          message: `"${targetItem?.title || "Item"}" moved to Archived.`,
+          undoArchive: json?.data?.updatedAt
+            ? [
+                {
+                  id,
+                  title: targetItem?.title || "Item",
+                  previousStatus: restoredStatus,
+                  updatedAt: json.data.updatedAt,
+                },
+              ]
+            : undefined,
         });
       } else {
-        const errorMessage = await parseApiError(res, "Failed to archive evidence item.");
         setNotification({
           type: "error",
-          message: errorMessage,
+          message: error || "Failed to archive evidence item.",
         });
       }
     } catch (err) {
@@ -550,6 +892,581 @@ export function LibraryWorkspace() {
         type: "error",
         message: err instanceof Error ? err.message : "Failed to archive evidence item.",
       });
+    }
+  };
+
+  const handleRestoreItem = async (
+    item: EvidenceItem,
+    restoreStatus: "verified" | "draft" = "draft"
+  ) => {
+    setOpenItemMenuId(null);
+    if (bulkSubmittingRef.current) return;
+    bulkSubmittingRef.current = true;
+    setIsBulkSubmitting(true);
+
+    try {
+      const demoConfig = await fetchDemoConfig();
+      if (demoConfig.demoMode || isLocalEvidenceId(item.id)) {
+        const { nextItems, results } = restoreEvidenceItemsLocally(
+          readGuestEvidenceFromStorage(),
+          [
+            {
+              id: item.id,
+              restoreStatus,
+              expectedUpdatedAt: item.updatedAt,
+            },
+          ]
+        );
+        const outcome = results[0]?.outcome;
+        if (outcome === "conflict") {
+          setNotification({
+            type: "error",
+            message: results[0]?.reason || "Newer edits prevented restore.",
+          });
+          return;
+        }
+        writeGuestEvidenceToStorage(nextItems);
+        invalidateDependentEvidenceState();
+        await fetchItems();
+        setNotification({
+          type: "success",
+          message: `Restored "${item.title}" to ${restoreStatus}.`,
+        });
+        return;
+      }
+
+      const res = await fetch(`/api/evidence/${item.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: restoreStatus,
+          expectedUpdatedAt: item.updatedAt,
+        }),
+      });
+      const { ok, error } = await readApiResponse(
+        res,
+        "Failed to restore evidence item."
+      );
+      if (ok) {
+        invalidateDependentEvidenceState();
+        await fetchItems();
+        setNotification({
+          type: "success",
+          message: `Restored "${item.title}" to ${restoreStatus}.`,
+        });
+      } else {
+        setNotification({
+          type: "error",
+          message: error || "Failed to restore evidence item.",
+        });
+      }
+    } catch (err) {
+      setNotification({
+        type: "error",
+        message:
+          err instanceof Error ? err.message : "Failed to restore evidence item.",
+      });
+    } finally {
+      bulkSubmittingRef.current = false;
+      setIsBulkSubmitting(false);
+    }
+  };
+
+  const handleUndoArchive = async (entries: UndoArchiveEntry[]) => {
+    if (entries.length === 0 || bulkSubmittingRef.current) return;
+    bulkSubmittingRef.current = true;
+    setIsBulkSubmitting(true);
+
+    try {
+      const demoConfig = await fetchDemoConfig();
+      const localEntries = entries.filter(
+        (entry) => demoConfig.demoMode || isLocalEvidenceId(entry.id)
+      );
+      const serverEntries = entries.filter(
+        (entry) => !demoConfig.demoMode && !isLocalEvidenceId(entry.id)
+      );
+
+      let restoredCount = 0;
+      let conflictCount = 0;
+
+      if (localEntries.length > 0) {
+        const { nextItems, results } = restoreEvidenceItemsLocally(
+          readGuestEvidenceFromStorage(),
+          localEntries.map((entry) => ({
+            id: entry.id,
+            restoreStatus: entry.previousStatus,
+            expectedUpdatedAt: entry.updatedAt,
+          }))
+        );
+        const localSucceeded = results.filter((r) => r.outcome === "succeeded").length;
+        conflictCount += results.filter((r) => r.outcome === "conflict").length;
+        restoredCount += localSucceeded;
+        if (localSucceeded > 0) {
+          writeGuestEvidenceToStorage(nextItems);
+        }
+      }
+
+      if (serverEntries.length > 0) {
+        const res = await fetch("/api/evidence/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "restore",
+            ids: serverEntries.map((e) => e.id),
+            items: serverEntries.map((e) => ({
+              id: e.id,
+              restoreStatus: e.previousStatus,
+              expectedUpdatedAt: e.updatedAt,
+            })),
+          }),
+        });
+        const { ok, data: json, error } = await readApiResponse<{
+          success?: boolean;
+          data?: {
+            summary?: { succeeded: number; conflict: number };
+          };
+        }>(res, "Failed to undo archive.");
+        if (!ok || !json?.success) {
+          setNotification({
+            type: "error",
+            message: error || "Failed to undo archive.",
+          });
+          return;
+        }
+        restoredCount += json.data?.summary?.succeeded ?? 0;
+        conflictCount += json.data?.summary?.conflict ?? 0;
+      }
+
+      if (restoredCount > 0) {
+        invalidateDependentEvidenceState();
+        await fetchItems();
+      }
+
+      if (conflictCount > 0) {
+        setNotification({
+          type: "error",
+          message:
+            restoredCount > 0
+              ? `Restored ${restoredCount} item(s), but ${conflictCount} had newer edits and were left untouched.`
+              : `Could not undo archive for ${conflictCount} item(s) because newer edits were saved.`,
+        });
+      } else if (restoredCount > 0) {
+        setNotification({
+          type: "success",
+          message: `Undid archive for ${restoredCount} item${restoredCount === 1 ? "" : "s"}.`,
+        });
+      } else {
+        setNotification({
+          type: "error",
+          message: "No items were eligible to undo.",
+        });
+      }
+    } catch (err) {
+      setNotification({
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to undo archive.",
+      });
+    } finally {
+      bulkSubmittingRef.current = false;
+      setIsBulkSubmitting(false);
+    }
+  };
+
+  const handleBulkAction = async (
+    action: "verify" | "archive" | "restore"
+  ) => {
+    if (selectedItems.length === 0 || bulkSubmittingRef.current) return;
+    bulkSubmittingRef.current = true;
+    setIsBulkSubmitting(true);
+    setBulkMoreOpen(false);
+
+    try {
+      const demoConfig = await fetchDemoConfig();
+      const localTargets = selectedItems.filter(
+        (item) => demoConfig.demoMode || isLocalEvidenceId(item.id)
+      );
+      const serverTargets = selectedItems.filter(
+        (item) => !demoConfig.demoMode && !isLocalEvidenceId(item.id)
+      );
+
+      let succeededCount = 0;
+      let skippedCount = 0;
+      const failedIds: string[] = [];
+      const undoEntries: UndoArchiveEntry[] = [];
+      const failureReasons: string[] = [];
+
+      if (localTargets.length > 0) {
+        const stored = readGuestEvidenceFromStorage();
+        const storedIds = new Set(stored.map((s) => s.id));
+        const mergedLocal = [
+          ...stored,
+          ...localTargets.filter((t) => !storedIds.has(t.id)),
+        ];
+        const targetIds = localTargets.map((t) => t.id);
+
+        if (action === "verify") {
+          const { nextItems, results } = verifyEvidenceItemsLocally(
+            mergedLocal,
+            targetIds
+          );
+          const okCount = results.filter((r) => r.outcome === "succeeded").length;
+          succeededCount += okCount;
+          skippedCount += results.filter((r) => r.outcome === "skipped").length;
+          if (okCount > 0) writeGuestEvidenceToStorage(nextItems);
+        } else if (action === "archive") {
+          const { nextItems, results, undoEntries: localUndo } =
+            archiveEvidenceItemsLocally(mergedLocal, targetIds);
+          const okCount = results.filter((r) => r.outcome === "succeeded").length;
+          succeededCount += okCount;
+          skippedCount += results.filter((r) => r.outcome === "skipped").length;
+          undoEntries.push(...localUndo);
+          if (okCount > 0) writeGuestEvidenceToStorage(nextItems);
+        } else {
+          const { nextItems, results } = restoreEvidenceItemsLocally(
+            mergedLocal,
+            localTargets.map((item) => ({
+              id: item.id,
+              restoreStatus: "draft",
+              expectedUpdatedAt: item.updatedAt,
+            }))
+          );
+          const okCount = results.filter((r) => r.outcome === "succeeded").length;
+          succeededCount += okCount;
+          skippedCount += results.filter((r) => r.outcome === "skipped").length;
+          for (const resItem of results) {
+            if (resItem.outcome === "conflict") {
+              failedIds.push(resItem.id);
+              if (resItem.reason) failureReasons.push(resItem.reason);
+            }
+          }
+          if (okCount > 0) writeGuestEvidenceToStorage(nextItems);
+        }
+      }
+
+      if (serverTargets.length > 0) {
+        const res = await fetch("/api/evidence/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action,
+            ids: serverTargets.map((item) => item.id),
+            items: serverTargets.map((item) => ({
+              id: item.id,
+              ...(action === "restore" ? { restoreStatus: "draft" as const } : {}),
+              ...(item.updatedAt ? { expectedUpdatedAt: item.updatedAt } : {}),
+            })),
+          }),
+        });
+        const { ok, data: json, error } = await readApiResponse<{
+          success?: boolean;
+          data?: {
+            results?: Array<{
+              id: string;
+              title?: string;
+              outcome: "succeeded" | "skipped" | "conflict" | "blocked";
+              reason?: string;
+              previousStatus?: string;
+              updatedAt?: string;
+            }>;
+          };
+        }>(res, `Failed to ${action} selected items.`);
+
+        if (!ok || !json?.success || !json.data?.results) {
+          failedIds.push(...serverTargets.map((t) => t.id));
+          failureReasons.push(error || `Failed to ${action} selected items.`);
+        } else {
+          for (const row of json.data.results) {
+            if (row.outcome === "succeeded") {
+              succeededCount += 1;
+              if (action === "archive" && row.updatedAt) {
+                undoEntries.push({
+                  id: row.id,
+                  title: row.title || "Item",
+                  previousStatus:
+                    row.previousStatus === "verified" ? "verified" : "draft",
+                  updatedAt: row.updatedAt,
+                });
+              }
+            } else if (row.outcome === "skipped") {
+              skippedCount += 1;
+            } else {
+              failedIds.push(row.id);
+              if (row.reason) failureReasons.push(row.reason);
+            }
+          }
+        }
+      }
+
+      if (succeededCount > 0) {
+        invalidateDependentEvidenceState();
+        await fetchItems();
+      }
+
+      // Retain failed/conflicted items in selection so the user can retry cleanly.
+      setSelectedIds(failedIds);
+
+      if (failedIds.length > 0 || succeededCount === 0) {
+        const actionLabel =
+          action === "verify"
+            ? "verified"
+            : action === "archive"
+              ? "archived"
+              : "restored";
+        setNotification({
+          type: "error",
+          message:
+            succeededCount > 0
+              ? `${succeededCount} ${actionLabel}, ${failedIds.length} failed (${failureReasons[0] || "conflict detected"}). Failed items remain selected.`
+              : failureReasons[0] ||
+                (skippedCount > 0
+                  ? `No selected items were eligible to ${action}.`
+                  : `Failed to ${action} selected items.`),
+        });
+      } else {
+        const verb =
+          action === "verify"
+            ? "Verified"
+            : action === "archive"
+              ? "Archived"
+              : "Restored";
+        setNotification({
+          type: "success",
+          message: `${verb} ${succeededCount} item${succeededCount === 1 ? "" : "s"}${skippedCount > 0 ? ` (${skippedCount} skipped)` : ""}.`,
+          undoArchive:
+            action === "archive" && undoEntries.length > 0
+              ? undoEntries
+              : undefined,
+        });
+      }
+    } catch (err) {
+      setNotification({
+        type: "error",
+        message:
+          err instanceof Error ? err.message : `Failed to ${action} items.`,
+      });
+    } finally {
+      bulkSubmittingRef.current = false;
+      setIsBulkSubmitting(false);
+    }
+  };
+
+  const handleRequestPermanentDelete = async (targets: EvidenceItem[]) => {
+    setOpenItemMenuId(null);
+    setBulkMoreOpen(false);
+    if (targets.length === 0 || bulkSubmittingRef.current) return;
+
+    try {
+      const demoConfig = await fetchDemoConfig();
+      const localTargets = targets.filter(
+        (item) => demoConfig.demoMode || isLocalEvidenceId(item.id)
+      );
+      const serverTargets = targets.filter(
+        (item) => !demoConfig.demoMode && !isLocalEvidenceId(item.id)
+      );
+
+      const eligibleItems: EvidenceItem[] = [...localTargets];
+      const blockedItems: Array<{
+        id: string;
+        title: string;
+        reason: string;
+        citationCount?: number;
+      }> = [];
+
+      if (serverTargets.length > 0) {
+        const res = await fetch("/api/evidence/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "preflight_delete",
+            ids: serverTargets.map((t) => t.id),
+          }),
+        });
+        const { ok, data: json, error } = await readApiResponse<{
+          success?: boolean;
+          data?: {
+            results?: Array<{
+              id: string;
+              title?: string;
+              outcome: "succeeded" | "skipped" | "conflict" | "blocked";
+              reason?: string;
+              citationCount?: number;
+            }>;
+          };
+        }>(res, "Failed to verify citation references before deletion.");
+
+        if (!ok || !json?.success || !json.data?.results) {
+          setNotification({
+            type: "error",
+            message:
+              error || "Failed to check citation references before deletion.",
+          });
+          return;
+        }
+
+        const serverById = new Map(serverTargets.map((item) => [item.id, item]));
+        for (const row of json.data.results) {
+          const item = serverById.get(row.id);
+          if (!item) continue;
+          if (row.outcome === "blocked") {
+            blockedItems.push({
+              id: row.id,
+              title: row.title || item.title,
+              reason:
+                row.reason ||
+                "Cited by a saved resume patch and cannot be permanently deleted.",
+              citationCount: row.citationCount,
+            });
+          } else if (row.outcome === "succeeded") {
+            eligibleItems.push(item);
+          }
+        }
+      }
+
+      setDeleteDialogState({
+        open: true,
+        eligibleItems,
+        blockedItems,
+        isDeleting: false,
+      });
+    } catch (err) {
+      setNotification({
+        type: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to check citation references before deletion.",
+      });
+    }
+  };
+
+  const handleConfirmPermanentDelete = async () => {
+    const { eligibleItems, blockedItems } = deleteDialogState;
+    if (eligibleItems.length === 0) {
+      setDeleteDialogState((prev) => ({ ...prev, open: false }));
+      return;
+    }
+    if (bulkSubmittingRef.current) return;
+    bulkSubmittingRef.current = true;
+    setIsBulkSubmitting(true);
+    setDeleteDialogState((prev) => ({ ...prev, isDeleting: true }));
+
+    try {
+      const demoConfig = await fetchDemoConfig();
+      const localTargets = eligibleItems.filter(
+        (item) => demoConfig.demoMode || isLocalEvidenceId(item.id)
+      );
+      const serverTargets = eligibleItems.filter(
+        (item) => !demoConfig.demoMode && !isLocalEvidenceId(item.id)
+      );
+
+      let deletedCount = 0;
+      const failedIds: string[] = blockedItems.map((b) => b.id);
+      const failureReasons: string[] = [];
+
+      if (localTargets.length > 0) {
+        const localSet = new Set(localTargets.map((i) => i.id));
+        const remaining = readGuestEvidenceFromStorage().filter(
+          (entry) => !localSet.has(entry.id)
+        );
+        writeGuestEvidenceToStorage(remaining);
+        deletedCount += localTargets.length;
+      }
+
+      if (serverTargets.length === 1) {
+        const target = serverTargets[0];
+        const res = await fetch(`/api/evidence/${target.id}?mode=purge`, {
+          method: "DELETE",
+        });
+        const { ok, error } = await readApiResponse(
+          res,
+          `Failed to delete "${target.title}".`
+        );
+        if (ok) {
+          deletedCount += 1;
+        } else {
+          failedIds.push(target.id);
+          failureReasons.push(error || `Failed to delete "${target.title}".`);
+        }
+      } else if (serverTargets.length > 1) {
+        const res = await fetch("/api/evidence/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "delete",
+            ids: serverTargets.map((t) => t.id),
+          }),
+        });
+        const { ok, data: json, error } = await readApiResponse<{
+          success?: boolean;
+          data?: {
+            results?: Array<{
+              id: string;
+              outcome: "succeeded" | "skipped" | "conflict" | "blocked";
+              reason?: string;
+            }>;
+          };
+        }>(res, "Failed to permanently delete evidence items.");
+        if (!ok || !json?.success || !json.data?.results) {
+          failedIds.push(...serverTargets.map((t) => t.id));
+          failureReasons.push(
+            error || "Failed to permanently delete evidence items."
+          );
+        } else {
+          for (const row of json.data.results) {
+            if (row.outcome === "succeeded") {
+              deletedCount += 1;
+            } else if (row.outcome !== "skipped") {
+              failedIds.push(row.id);
+              if (row.reason) failureReasons.push(row.reason);
+            }
+          }
+        }
+      }
+
+      if (deletedCount > 0) {
+        invalidateDependentEvidenceState();
+        await fetchItems();
+      }
+
+      const deletedSet = new Set(
+        eligibleItems
+          .map((item) => item.id)
+          .filter((id) => !failedIds.includes(id))
+      );
+      setSelectedIds((prev) => prev.filter((id) => !deletedSet.has(id)));
+      setDeleteDialogState({
+        open: false,
+        eligibleItems: [],
+        blockedItems: [],
+        isDeleting: false,
+      });
+
+      if (failureReasons.length > 0 || deletedCount === 0) {
+        setNotification({
+          type: "error",
+          message:
+            deletedCount > 0
+              ? `Permanently deleted ${deletedCount} item(s), but ${failureReasons.length} could not be deleted: ${failureReasons[0]}`
+              : failureReasons[0] || "No items were permanently deleted.",
+        });
+      } else {
+        setNotification({
+          type: "success",
+          message: `Permanently deleted ${deletedCount} item${deletedCount === 1 ? "" : "s"}${blockedItems.length > 0 ? ` (${blockedItems.length} cited item${blockedItems.length === 1 ? "" : "s"} kept)` : ""}.`,
+        });
+      }
+    } catch (err) {
+      setDeleteDialogState((prev) => ({ ...prev, isDeleting: false, open: false }));
+      setNotification({
+        type: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to permanently delete evidence items.",
+      });
+    } finally {
+      bulkSubmittingRef.current = false;
+      setIsBulkSubmitting(false);
     }
   };
 
@@ -786,7 +1703,14 @@ export function LibraryWorkspace() {
       }
     >
       {/* Main Content Area with Header Margin Clearance matching preview (1).webp */}
-      <div className="mx-auto max-w-5xl w-full px-4 sm:px-6 pt-6 sm:pt-8 pb-16 flex-1 flex flex-col gap-6 sm:gap-8">
+      <div
+        className={`mx-auto max-w-5xl w-full px-4 sm:px-6 pt-6 sm:pt-8 ${
+          isSelectMode && selectedIds.length > 0 ? "pb-32 sm:pb-24" : "pb-16"
+        } flex-1 flex flex-col gap-6 sm:gap-8`}
+      >
+        <div className="sr-only" aria-live="polite" data-testid="selection-announcement">
+          {selectionAnnouncement}
+        </div>
         {/* Page Title Header */}
         <div className="space-y-6">
           <div className="enter-once rounded-xl surface-raised edge-glow p-5 sm:p-6">
@@ -802,28 +1726,46 @@ export function LibraryWorkspace() {
         {/* Toast Notification Banner */}
         {notification && (
           <div
-            className={`p-3.5 rounded-lg border flex items-center justify-between text-xs font-medium transition-all duration-150 ease-out ${
+            role="status"
+            data-testid="evidence-notification"
+            className={`p-3.5 rounded-lg border flex flex-wrap items-center justify-between gap-2 text-xs font-medium transition-colors duration-150 ease-out motion-reduce:transition-none ${
               notification.type === "success"
-                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                ? "bg-status-success/15 border-status-success/35 text-status-success-soft"
                 : "bg-red-500/10 border-red-500/30 text-red-400"
             }`}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               {notification.type === "success" ? (
-                <CheckCircle2 className="h-4 w-4" />
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success" />
               ) : (
-                <AlertCircle className="h-4 w-4" />
+                <AlertCircle className="h-4 w-4 shrink-0" />
               )}
-              <span>{notification.message}</span>
+              <span className="break-words">{notification.message}</span>
             </div>
-            <button
-              type="button"
-              aria-label="Dismiss notification"
-              onClick={() => setNotification(null)}
-              className="inline-flex min-h-11 min-w-11 items-center justify-center text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <X className="h-4 w-4" aria-hidden />
-            </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {notification.undoArchive && notification.undoArchive.length > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={isBulkSubmitting}
+                  data-testid="undo-archive-btn"
+                  onClick={() => void handleUndoArchive(notification.undoArchive!)}
+                  className="min-h-11 sm:min-h-7 h-auto sm:h-7 px-2.5 text-[11px] font-mono border-status-success/40 bg-status-success/15 text-status-success-soft hover:bg-status-success/25"
+                >
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Undo
+                </Button>
+              )}
+              <button
+                type="button"
+                aria-label="Dismiss notification"
+                onClick={() => setNotification(null)}
+                className="inline-flex min-h-11 min-w-11 items-center justify-center text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
           </div>
         )}
 
@@ -848,7 +1790,7 @@ export function LibraryWorkspace() {
             type="button"
             role="tab"
             aria-selected={activeTab === "library"}
-            onClick={() => setActiveTab("library")}
+            onClick={() => handleTabChange("library")}
             className={`min-h-11 px-4 py-2 text-sm font-semibold transition-colors ${activeTab === "library" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
           >
             Library
@@ -857,7 +1799,7 @@ export function LibraryWorkspace() {
             type="button"
             role="tab"
             aria-selected={activeTab === "review"}
-            onClick={() => setActiveTab("review")}
+            onClick={() => handleTabChange("review")}
             className={`min-h-11 px-4 py-2 text-sm font-semibold transition-colors ${activeTab === "review" ? "text-primary" : "text-muted-foreground hover:text-foreground"} flex items-center gap-2`}
           >
             Review Queue
@@ -871,48 +1813,123 @@ export function LibraryWorkspace() {
 
         {activeTab === "library" ? (
         <>
-        {/* Search Input Bar + Status Select Dropdown + Item Count Bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border glass-bar px-4 py-3">
-          {/* Search Input Box */}
-          <div className="relative flex-1 w-full max-w-md">
-            <label htmlFor="evidence-search" className="sr-only">
-              Search evidence by title, org, summary, or tags
-            </label>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
-            <input
-              id="evidence-search"
-              type="search"
-              name="evidence-search"
-              autoComplete="off"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search evidence by title, org, summary, or tags…"
-              className="w-full h-11 pl-9 pr-4 rounded-[6px] bg-inset border border-hairline text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring text-xs font-mono"
-            />
-          </div>
-
-          {/* Status Dropdown + Item Counter */}
-          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-            <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-none">
-              <span className="shrink-0 text-xs font-mono text-muted-foreground">Status:</span>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                data-testid="evidence-status-filter"
-                aria-label="Filter evidence by status"
-                className="min-h-11 sm:min-h-0 w-full sm:w-auto max-w-full min-w-0 bg-inset border border-hairline text-foreground rounded-[6px] px-3 py-1.5 text-xs font-mono outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="all">All, Verified, Draft, Archived</option>
-                <option value="verified">Verified Only</option>
-                <option value="draft">Draft Only</option>
-                <option value="archived">Archived Only</option>
-              </select>
+        {/* Search Input Bar + Status Select Dropdown + Select Toggle + Item Count Bar */}
+        <div className="flex flex-col gap-3 rounded-xl border glass-bar px-4 py-3">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            {/* Search Input Box */}
+            <div className="relative flex-1 w-full max-w-md">
+              <label htmlFor="evidence-search" className="sr-only">
+                Search evidence by title, org, summary, or tags
+              </label>
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
+              <input
+                id="evidence-search"
+                type="search"
+                name="evidence-search"
+                autoComplete="off"
+                value={searchQuery}
+                onChange={(e) => handleSearchQueryChange(e.target.value)}
+                placeholder="Search evidence by title, org, summary, or tags…"
+                className="w-full h-11 pl-9 pr-4 rounded-[6px] bg-inset border border-hairline text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring text-xs font-mono"
+              />
             </div>
 
-            <span className="shrink-0 text-xs font-mono tabular-nums text-muted-foreground">
-              {filteredItems.length} items
-            </span>
+            {/* Status Dropdown + Select Toggle + Item Counter */}
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+              <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-none">
+                <span className="shrink-0 text-xs font-mono text-muted-foreground">Status:</span>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => handleFilterStatusChange(e.target.value)}
+                  data-testid="evidence-status-filter"
+                  aria-label="Filter evidence by status"
+                  className="min-h-11 sm:min-h-0 w-full sm:w-auto max-w-full min-w-0 bg-inset border border-hairline text-foreground rounded-[6px] px-3 py-1.5 text-xs font-mono outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="all">All, Verified, Draft, Archived</option>
+                  <option value="verified">Verified Only</option>
+                  <option value="draft">Draft Only</option>
+                  <option value="archived">Archived Only</option>
+                </select>
+              </div>
+
+              <Button
+                type="button"
+                variant={isSelectMode ? "default" : "outline"}
+                size="sm"
+                data-testid="toggle-select-mode-btn"
+                aria-pressed={isSelectMode}
+                onClick={() => {
+                  if (isSelectMode) {
+                    setIsSelectMode(false);
+                    clearSelection();
+                  } else {
+                    setIsSelectMode(true);
+                  }
+                }}
+                className="min-h-11 sm:min-h-8 h-auto sm:h-8 gap-1.5 text-xs font-mono"
+              >
+                <CheckSquare className="h-3.5 w-3.5" />
+                {isSelectMode ? "Done" : "Select"}
+              </Button>
+
+              <span className="shrink-0 text-xs font-mono tabular-nums text-muted-foreground">
+                {filteredItems.length} items
+              </span>
+            </div>
           </div>
+
+          {isSelectMode && filteredItems.length > 0 && (
+            <div
+              data-testid="select-all-bar"
+              className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline pt-2.5 text-xs font-mono transition-opacity duration-150 ease-out motion-reduce:transition-none"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="relative inline-flex items-center">
+                  <Checkbox
+                    id="select-all-filtered"
+                    data-testid="select-all-filtered-checkbox"
+                    checked={
+                      allFilteredSelected
+                        ? true
+                        : someFilteredSelected
+                          ? "indeterminate"
+                          : false
+                    }
+                    onCheckedChange={(checked) =>
+                      toggleSelectAllFiltered(checked === true)
+                    }
+                    className={`transition-colors duration-100 ease-out motion-reduce:transition-none ${
+                      someFilteredSelected && !allFilteredSelected
+                        ? "[&>span]:opacity-0"
+                        : ""
+                    }`}
+                  />
+                  {someFilteredSelected && !allFilteredSelected && (
+                    <Minus
+                      aria-hidden="true"
+                      className="pointer-events-none absolute left-0.5 top-0.5 h-3 w-3 text-primary-foreground"
+                    />
+                  )}
+                </div>
+                <label
+                  htmlFor="select-all-filtered"
+                  className="cursor-pointer select-none text-text-secondary hover:text-foreground"
+                >
+                  Select all {filteredItems.length} filtered items
+                </label>
+              </div>
+              {selectedIds.length > 0 && (
+                <button
+                  type="button"
+                  data-testid="select-all-clear-btn"
+                  onClick={() => clearSelection("Selection cleared.")}
+                  className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Clear ({selectedIds.length})
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Evidence Items List matching preview (1).webp */}
@@ -957,6 +1974,9 @@ export function LibraryWorkspace() {
           <div className="grid gap-4">
             {filteredItems.map((item) => {
               const isExpanded = expandedIds[item.id] ?? false;
+              const isSelected = selectedIdSet.has(item.id);
+              const isArchived = item.status === "archived";
+              const isItemMenuOpen = openItemMenuId === item.id;
               const typeLower = (item.type || "").toLowerCase();
               const isEducation = typeLower === "education" || typeLower === "award";
               const isSkill = typeLower === "skill" || typeLower === "metric";
@@ -974,11 +1994,32 @@ export function LibraryWorkspace() {
                 <div
                   key={item.id}
                   data-testid="evidence-item-card"
-                  className={`rounded-xl surface-raised card-lift ${typeEdgeClass} p-5 overflow-hidden`}
+                  className={`rounded-xl surface-raised card-lift ${typeEdgeClass} ${
+                    isSelected ? "ring-1 ring-primary/60" : ""
+                  } ${isArchived ? "opacity-85" : ""} p-5 overflow-visible transition-colors duration-150 ease-out motion-reduce:transition-none`}
                 >
                   {/* Card Header Row */}
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                     <div className="flex items-start gap-2 sm:gap-3 min-w-0 flex-1">
+                      {isSelectMode && (
+                        <div className="flex items-center pt-0.5 shrink-0">
+                          <label
+                            htmlFor={`select-evidence-${item.id}`}
+                            className="sr-only"
+                          >
+                            Select {item.title}
+                          </label>
+                          <Checkbox
+                            id={`select-evidence-${item.id}`}
+                            data-testid={`select-evidence-${item.id}`}
+                            checked={isSelected}
+                            onCheckedChange={(checked) =>
+                              toggleItemSelected(item.id, checked === true)
+                            }
+                            className="transition-colors duration-100 ease-out motion-reduce:transition-none"
+                          />
+                        </div>
+                      )}
                       <button
                         type="button"
                         onClick={() => toggleExpand(item.id)}
@@ -1017,9 +2058,13 @@ export function LibraryWorkspace() {
                             : "bg-inset border border-hairline text-muted-foreground"
                         }`}
                       >
-                        {item.status === "verified" ? "✓ VERIFIED" : item.status}
+                        {item.status === "verified"
+                          ? "✓ VERIFIED"
+                          : isArchived
+                            ? "ARCHIVED"
+                            : item.status}
                       </span>
-                      {item.status !== "verified" && (
+                      {item.status !== "verified" && !isArchived && (
                         <Button
                           type="button"
                           variant="outline"
@@ -1031,6 +2076,21 @@ export function LibraryWorkspace() {
                         >
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           Verify
+                        </Button>
+                      )}
+                      {isArchived && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isBulkSubmitting}
+                          data-testid={`restore-evidence-btn-${item.id}`}
+                          onClick={() => void handleRestoreItem(item, "draft")}
+                          className="min-h-11 sm:min-h-8 h-auto sm:h-8 gap-1.5 border-hairline bg-inset px-2.5 text-[11px] font-mono font-semibold text-foreground hover:bg-elevated"
+                          aria-label={`Restore ${item.title}`}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Restore
                         </Button>
                       )}
                       {item.dates && (
@@ -1047,15 +2107,73 @@ export function LibraryWorkspace() {
                       >
                         <Edit2 className="h-3.5 w-3.5" />
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleArchiveItem(item.id)}
-                        className="text-muted-foreground hover:text-status-danger p-2 rounded-[6px] hover:bg-elevated transition-colors min-h-11 min-w-11 inline-flex items-center justify-center"
-                        title="Archive Item"
-                        aria-label="Archive Item"
-                      >
-                        <Archive className="h-3.5 w-3.5" />
-                      </button>
+                      {!isArchived && (
+                        <button
+                          type="button"
+                          onClick={() => void handleArchiveItem(item.id)}
+                          className="text-muted-foreground hover:text-status-danger p-2 rounded-[6px] hover:bg-elevated transition-colors min-h-11 min-w-11 inline-flex items-center justify-center"
+                          title="Archive Item"
+                          aria-label="Archive Item"
+                        >
+                          <Archive className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          aria-haspopup="menu"
+                          aria-expanded={isItemMenuOpen}
+                          aria-label={`More actions for ${item.title}`}
+                          data-testid={`item-more-btn-${item.id}`}
+                          onClick={() =>
+                            setOpenItemMenuId((prev) =>
+                              prev === item.id ? null : item.id
+                            )
+                          }
+                          className="text-muted-foreground hover:text-foreground p-2 rounded-[6px] hover:bg-elevated transition-colors min-h-11 min-w-11 inline-flex items-center justify-center"
+                        >
+                          <MoreVertical className="h-3.5 w-3.5" />
+                        </button>
+                        {isItemMenuOpen && (
+                          <div
+                            role="menu"
+                            aria-label={`Actions for ${item.title}`}
+                            className="absolute right-0 top-full mt-1 z-30 min-w-48 rounded-lg border border-hairline bg-panel p-1 shadow-xl"
+                          >
+                            {isArchived ? (
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => void handleRestoreItem(item, "draft")}
+                                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-foreground hover:bg-elevated transition-colors"
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                Restore to Draft
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => void handleArchiveItem(item.id)}
+                                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-foreground hover:bg-elevated transition-colors"
+                              >
+                                <Archive className="h-3.5 w-3.5" />
+                                Archive
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              role="menuitem"
+                              data-testid={`item-delete-permanently-${item.id}`}
+                              onClick={() => void handleRequestPermanentDelete([item])}
+                              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-status-danger hover:bg-red-500/10 transition-colors"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete permanently…
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -1076,7 +2194,7 @@ export function LibraryWorkspace() {
 
                   {/* Expanded Bullets List */}
                   {isExpanded && item.bullets && item.bullets.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-hairline pl-7 transition-all duration-150 ease-out">
+                    <div className="mt-4 pt-4 border-t border-hairline pl-7">
                       <ul className="space-y-2 text-xs text-text-secondary list-disc pl-4 font-sans">
                         {item.bullets.map((b, idx) => (
                           <li key={b.id || idx} className="leading-relaxed">
@@ -1319,7 +2437,145 @@ export function LibraryWorkspace() {
             )}
           </div>
         )}
+
+        {activeTab === "library" && isSelectMode && selectedIds.length > 0 && (
+          <div
+            role="region"
+            aria-label="Bulk evidence actions"
+            data-testid="evidence-bulk-toolbar"
+            className="sticky bottom-4 z-30 rounded-xl border border-hairline bg-panel/95 backdrop-blur-md p-3 shadow-2xl transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none animate-in fade-in slide-in-from-bottom-2 motion-reduce:animate-none"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2.5">
+              <span className="text-xs font-mono font-semibold text-foreground tabular-nums">
+                {selectedIds.length} selected
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={eligibleToVerifyCount === 0 || isBulkSubmitting}
+                  data-testid="bulk-verify-btn"
+                  onClick={() => void handleBulkAction("verify")}
+                  className="min-h-10 sm:min-h-8 gap-1.5 border-status-success/35 bg-status-success/10 text-xs font-mono text-status-success-soft hover:bg-status-success/20 disabled:opacity-50"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Verify eligible ({eligibleToVerifyCount})
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={eligibleToArchiveCount === 0 || isBulkSubmitting}
+                  data-testid="bulk-archive-btn"
+                  onClick={() => void handleBulkAction("archive")}
+                  className="min-h-10 sm:min-h-8 gap-1.5 border-hairline bg-inset text-xs font-mono text-foreground hover:bg-elevated disabled:opacity-50"
+                >
+                  <Archive className="h-3.5 w-3.5" />
+                  Archive
+                </Button>
+                <div className="relative">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={isBulkSubmitting}
+                    aria-haspopup="menu"
+                    aria-expanded={bulkMoreOpen}
+                    data-testid="bulk-more-btn"
+                    onClick={() => setBulkMoreOpen((prev) => !prev)}
+                    className="min-h-10 sm:min-h-8 gap-1 border-hairline bg-inset text-xs font-mono text-foreground hover:bg-elevated"
+                  >
+                    More
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </Button>
+                  {bulkMoreOpen && (
+                    <div
+                      role="menu"
+                      aria-label="More bulk evidence actions"
+                      className="absolute bottom-full right-0 mb-2 z-40 min-w-52 rounded-lg border border-hairline bg-panel p-1 shadow-xl"
+                    >
+                      {selectedArchivedCount > 0 && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          data-testid="bulk-restore-btn"
+                          onClick={() => void handleBulkAction("restore")}
+                          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-foreground hover:bg-elevated transition-colors"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Restore selected ({selectedArchivedCount})
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        role="menuitem"
+                        data-testid="bulk-delete-permanently-btn"
+                        onClick={() => void handleRequestPermanentDelete(selectedItems)}
+                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-status-danger hover:bg-red-500/10 transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete permanently…
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={isBulkSubmitting}
+                  data-testid="bulk-clear-btn"
+                  onClick={() => clearSelection("Selection cleared.")}
+                  className="min-h-10 sm:min-h-8 text-xs font-mono text-muted-foreground hover:text-foreground"
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Permanent Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialogState.open}
+        onOpenChange={(open) =>
+          setDeleteDialogState((prev) => ({ ...prev, open }))
+        }
+        tone={deleteDialogState.eligibleItems.length > 0 ? "destructive" : "default"}
+        isConfirming={deleteDialogState.isDeleting}
+        dialogTestId="permanent-delete-dialog"
+        confirmTestId="confirm-permanent-delete-btn"
+        cancelTestId="cancel-permanent-delete-btn"
+        title={
+          deleteDialogState.eligibleItems.length === 0
+            ? "Cannot permanently delete cited evidence"
+            : deleteDialogState.blockedItems.length > 0
+              ? `Permanently delete ${deleteDialogState.eligibleItems.length} eligible item${deleteDialogState.eligibleItems.length === 1 ? "" : "s"}?`
+              : deleteDialogState.eligibleItems.length === 1
+                ? "Delete evidence item permanently?"
+                : `Permanently delete ${deleteDialogState.eligibleItems.length} evidence items?`
+        }
+        description={
+          deleteDialogState.eligibleItems.length === 0
+            ? `Permanent deletion is blocked because the selected evidence is cited by saved resume patches: ${deleteDialogState.blockedItems.map((b) => `${b.title} (${b.reason})`).join("; ")}. Archive them instead to preserve citation history.`
+            : deleteDialogState.blockedItems.length > 0
+              ? `Will permanently delete ${deleteDialogState.eligibleItems.length} unreferenced item(s): ${deleteDialogState.eligibleItems.map((item) => item.title).join(", ")}. Blocked by patch citations and left untouched (${deleteDialogState.blockedItems.length}): ${deleteDialogState.blockedItems.map((b) => `${b.title} — ${b.reason}`).join("; ")}.`
+              : `This will permanently delete ${deleteDialogState.eligibleItems.length === 1 ? `"${deleteDialogState.eligibleItems[0]?.title}"` : `${deleteDialogState.eligibleItems.length} evidence items`} and cannot be undone.`
+        }
+        confirmLabel={
+          deleteDialogState.eligibleItems.length === 0
+            ? "Close"
+            : deleteDialogState.blockedItems.length > 0
+              ? `Delete ${deleteDialogState.eligibleItems.length} eligible`
+              : "Delete permanently"
+        }
+        cancelLabel={deleteDialogState.eligibleItems.length === 0 ? "Dismiss" : "Cancel"}
+        onConfirm={() => {
+          void handleConfirmPermanentDelete();
+        }}
+      />
 
       {/* Modal Dialog for Create/Edit */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

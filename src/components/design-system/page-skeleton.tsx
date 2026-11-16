@@ -151,7 +151,7 @@ function ShellFrame({
 function TailorSkeleton() {
   return (
     <ShellFrame variant="tailor">
-      <div className="mx-auto w-full max-w-[1280px] space-y-6 px-4 pt-8 pb-12 md:px-8">
+      <div className="mx-auto w-full max-w-[1600px] space-y-5 px-4 pt-8 pb-12 md:px-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0 space-y-2">
             <Skeleton className="h-8 w-28" />
@@ -163,66 +163,85 @@ function TailorSkeleton() {
           </div>
         </div>
 
-        {/* Active job context card matching tailor-workspace.tsx */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl surface-raised edge-glow px-4 py-4 sm:px-5">
-          <div className="min-w-0 space-y-2">
-            <Skeleton className="h-3.5 w-28" />
-            <Skeleton className="h-6 w-56 max-w-full" />
+        {/* Compact job header matching Workstream 2 tailor-workspace.tsx */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl surface-raised edge-glow px-4 py-3.5 sm:px-5">
+          <div className="min-w-0 flex items-center gap-3">
+            <Skeleton className="h-5 w-48 max-w-full" />
+            <Skeleton className="h-5 w-20 rounded-full" />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Skeleton className="h-6 w-24 rounded-md" />
-            <Skeleton className="h-6 w-24 rounded-md" />
+            <Skeleton className="h-9 w-36 rounded-md" />
+            <Skeleton className="h-9 w-28 rounded-md" />
+            <Skeleton className="h-9 w-28 rounded-md" />
           </div>
         </div>
 
-        {/* 5-tab segmented control pill strip matching tailor-workspace.tsx */}
+        {/* Tab strip */}
         <div className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-xl border p-1 glass-bar">
-          <Skeleton className="h-8 w-24 rounded-lg" />
+          <Skeleton className="h-8 w-28 rounded-lg" />
           <Skeleton className="h-8 w-24 rounded-lg" />
           <Skeleton className="h-8 w-20 rounded-lg" />
           <Skeleton className="h-8 w-28 rounded-lg" />
           <Skeleton className="h-8 w-24 rounded-lg" />
         </div>
 
-        {/* 2-column workbench matching initial job-info layout */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+        {/* 60% / 40% Review-first workbench */}
+        <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          {/* Primary Review Pane (~60%) */}
           <div className="min-w-0 space-y-4 rounded-xl surface-raised edge-glow p-4 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline pb-3">
-              <Skeleton className="h-5 w-44 max-w-full" />
-              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-6 w-40 max-w-full" />
+              <Skeleton className="h-9 w-36 rounded-md" />
             </div>
-            <Skeleton className="h-11 w-full rounded-lg" />
-            <div className="flex flex-wrap gap-2 rounded-lg bg-inset p-1">
-              <Skeleton className="h-9 w-28 rounded-md" />
-              <Skeleton className="h-9 w-28 rounded-md" />
+
+            {/* Counted review tabs */}
+            <div className="flex flex-wrap gap-2">
+              <Skeleton className="h-9 w-32 rounded-lg" />
+              <Skeleton className="h-9 w-24 rounded-lg" />
+              <Skeleton className="h-9 w-28 rounded-lg" />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Skeleton className="h-10 w-full rounded-md" />
-              <Skeleton className="h-10 w-full rounded-md" />
+
+            {/* Patch diff review cards */}
+            <div className="space-y-3">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="space-y-3 rounded-xl border border-hairline bg-inset p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-5 w-24 rounded-full" />
+                      <Skeleton className="h-4 w-44 max-w-full" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-8 w-20 rounded-md" />
+                      <Skeleton className="h-8 w-20 rounded-md" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <Skeleton className="h-24 w-full rounded-lg" />
+                    <Skeleton className="h-24 w-full rounded-lg" />
+                  </div>
+                  <Skeleton className="h-4 w-3/4" />
+                </div>
+              ))}
             </div>
-            <Skeleton className="h-52 w-full rounded-lg" />
+
+            {/* Sticky bottom action bar */}
+            <div className="flex flex-col justify-between gap-3 rounded-xl border border-hairline glass-bar p-3 sm:flex-row sm:items-center sm:p-4">
+              <Skeleton className="h-4 w-44" />
+              <Skeleton className="h-10 w-full rounded-md sm:w-44" />
+            </div>
           </div>
 
-          <div className="min-w-0 space-y-4">
-            <div className="space-y-3 rounded-xl surface-raised edge-glow p-5">
-              <div className="flex items-center justify-between gap-2">
-                <Skeleton className="h-5 w-36" />
-                <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
+          {/* Secondary Resume Preview Pane (~40%) */}
+          <div className="min-w-0 space-y-4 rounded-xl surface-raised edge-glow p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline pb-3">
+              <div className="flex gap-2">
+                <Skeleton className="h-8 w-24 rounded-md" />
+                <Skeleton className="h-8 w-24 rounded-md" />
+                <Skeleton className="h-8 w-24 rounded-md" />
               </div>
-              <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-3 w-5/6" />
-              <div className="flex flex-wrap gap-1.5 pt-2">
-                <Skeleton className="h-6 w-16 rounded-full" />
-                <Skeleton className="h-6 w-20 rounded-full" />
-                <Skeleton className="h-6 w-14 rounded-full" />
-                <Skeleton className="h-6 w-24 rounded-full" />
-              </div>
+              <Skeleton className="h-6 w-16 rounded-full" />
             </div>
-            <div className="space-y-3 rounded-xl surface-raised edge-glow p-5">
-              <Skeleton className="h-5 w-40" />
-              <Skeleton className="h-24 w-full rounded-lg" />
-              <Skeleton className="h-11 w-full rounded-md sm:h-9" />
-            </div>
+            <Skeleton className="aspect-[8.5/11] w-full rounded-lg" />
           </div>
         </div>
       </div>

@@ -297,9 +297,9 @@ export function ApplyPrepSheetModal({
           <Badge
             variant="outline"
             data-testid="grounding-badge-direct"
-            className="border-emerald-500/60 text-emerald-300 bg-emerald-950/40 text-[10px] font-semibold gap-1"
+            className="border-status-success/45 text-status-success-soft bg-status-success/15 text-[10px] font-semibold gap-1"
           >
-            <CheckCircle2 className="size-3 text-emerald-400" />
+            <CheckCircle2 className="size-3 text-status-success" />
             <span>✓ Direct Verified Evidence</span>
           </Badge>
         );
@@ -415,7 +415,7 @@ export function ApplyPrepSheetModal({
             className={cn(
               "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 shrink-0",
               activeTab === "intel"
-                ? "bg-emerald-500 text-primary-foreground font-bold"
+                ? "bg-status-success text-contrast-ink font-bold"
                 : "text-muted-foreground hover:text-foreground hover:bg-elevated"
             )}
           >
@@ -490,7 +490,7 @@ export function ApplyPrepSheetModal({
                 className={cn(
                   "p-3.5 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs",
                   oaMatched && oaProblems.length > 0
-                    ? "bg-emerald-950/40 border-emerald-800/60 text-emerald-300"
+                    ? "bg-status-success/15 border-status-success/35 text-status-success-soft"
                     : "bg-inset/80 border-hairline text-text-secondary"
                 )}
               >
@@ -520,7 +520,7 @@ export function ApplyPrepSheetModal({
                     <ExternalLink className="size-3" />
                   </Link>
                   {oaMatched && oaProblems.length > 0 ? (
-                    <Badge variant="outline" className="border-emerald-500/50 bg-emerald-950/60 text-emerald-300 text-[10px] shrink-0">
+                    <Badge variant="outline" className="border-status-success/45 bg-status-success/15 text-status-success-soft text-[10px] shrink-0">
                       ✓ Verified {job.company} Bank ({oaProblems.length})
                     </Badge>
                   ) : (
@@ -629,7 +629,7 @@ export function ApplyPrepSheetModal({
                                   className={cn(
                                     "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded",
                                     prob.difficulty.toLowerCase().includes("easy")
-                                      ? "bg-emerald-950/80 text-emerald-400 border border-emerald-800/60"
+                                      ? "bg-status-success/15 text-status-success-soft border border-status-success/35"
                                       : prob.difficulty.toLowerCase().includes("hard")
                                       ? "bg-red-950/80 text-red-400 border border-red-800/60"
                                       : "bg-amber-950/80 text-amber-400 border border-amber-800/60"
@@ -674,7 +674,7 @@ export function ApplyPrepSheetModal({
                               title="Copy problem title"
                             >
                               {copiedKey === `prob-${prob.id || idx}` ? (
-                                <Check className="size-3.5 text-emerald-400" />
+                                <Check className="size-3.5 text-status-success" />
                               ) : (
                                 <Copy className="size-3.5" />
                               )}
@@ -775,8 +775,8 @@ export function ApplyPrepSheetModal({
                           >
                             {copiedKey === `star-${idx}` ? (
                               <>
-                                <Check className="size-3.5 text-emerald-400" />
-                                <span className="text-emerald-400">Copied!</span>
+                                <Check className="size-3.5 text-status-success" />
+                                <span className="text-status-success-soft">Copied!</span>
                               </>
                             ) : (
                               <>
@@ -822,7 +822,7 @@ export function ApplyPrepSheetModal({
                             </div>
 
                             <div className="p-2.5 rounded bg-panel border border-hairline">
-                              <span className="font-bold text-emerald-400 uppercase tracking-wide text-[10px] block mb-0.5">
+                              <span className="font-bold text-status-success uppercase tracking-wide text-[10px] block mb-0.5">
                                 R — Result
                               </span>
                               <p className="text-text-secondary leading-relaxed">{story.result}</p>
@@ -955,7 +955,7 @@ export function ApplyPrepSheetModal({
                           className="shrink-0 p-1 text-muted-foreground hover:text-primary transition-colors"
                           title={`Copy ${key}`}
                         >
-                          {isCopied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                          {isCopied ? <Check className="h-3.5 w-3.5 text-status-success" /> : <Copy className="h-3.5 w-3.5" />}
                         </button>
                       </div>
                     );
@@ -995,7 +995,7 @@ export function ApplyPrepSheetModal({
                           title="Copy bullet point"
                         >
                           {copiedKey === `hl-${idx}` ? (
-                            <Check className="h-3.5 w-3.5 text-emerald-400" />
+                            <Check className="h-3.5 w-3.5 text-status-success" />
                           ) : (
                             <Copy className="h-3.5 w-3.5" />
                           )}

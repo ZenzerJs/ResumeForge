@@ -2,11 +2,13 @@
 
 import { CompanyAvatar } from "@/components/tracker/company-avatar";
 import { fetchDemoConfig } from "@/components/auth/session-user";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  AlertCircle,
   ExternalLink,
   Loader2,
+  RotateCcw,
   Save,
   X,
   DownloadCloud,
@@ -95,6 +97,7 @@ interface JobDetailPaneProps {
   isSavingNotes: boolean;
   isUpdatingStatus: boolean;
   isFetchingFullText: boolean;
+  isHydrating?: boolean;
   tier2Notice?: string;
   showNotes: boolean;
   isSheet?: boolean;
@@ -114,6 +117,7 @@ export function JobDetailPane({
   isSavingNotes,
   isUpdatingStatus,
   isFetchingFullText,
+  isHydrating = false,
   tier2Notice,
   showNotes,
   isSheet = false,
@@ -127,88 +131,193 @@ export function JobDetailPane({
   onJobLoaded,
 }: JobDetailPaneProps) {
   const [evidence, setEvidence] = useState<EvidenceItemWithBullets[]>([]);
-  const [evidenceLoaded, setEvidenceLoaded] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
-  const [detailJob, setDetailJob] = useState<JobItem>(() => {
-    return job;
-  });
+  const [detailJob, setDetailJob] = useState<JobItem>(() => job);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [applySheetOpen, setApplySheetOpen] = useState(false);
   const [prepSheetOpen, setPrepSheetOpen] = useState(false);
+  const activeJobIdRef = useRef(job.id);
+  activeJobIdRef.current = job.id;
+  const onJobLoadedRef = useRef(onJobLoaded);
+  onJobLoadedRef.current = onJobLoaded;
+
+  // Keep detailJob synchronized with parent list updates for the currently selected job.
+  useEffect(() => {
+    setDetailJob((prev) => {
+      if (prev.id !== job.id) {
+        return job;
+      }
+      return {
+        ...prev,
+        ...job,
+        rawDescription: job.rawDescription ?? prev.rawDescription,
+      };
+    });
+  }, [job]);
+
+  const needsDetailFetch = job.rawDescription === undefined;
 
   useEffect(() => {
-    let cancelled = false;
-    if (job.rawDescription && !isPlaceholderDescription(job.rawDescription)) {
-      setDetailJob(job);
+    const requestedJobId = job.id;
+    const controller = new AbortController();
+
+    if (!needsDetailFetch) {
+      setIsLoadingDetail(false);
       void fetchDemoConfig().then((config) => {
-        if (!cancelled) setDemoMode(config?.demoMode === true);
+        if (!controller.signal.aborted && activeJobIdRef.current === requestedJobId) {
+          setDemoMode(config?.demoMode === true);
+        }
       });
       return () => {
-        cancelled = true;
+        controller.abort();
       };
     }
-    setDetailJob(job);
+
+    setIsLoadingDetail(true);
     (async () => {
       try {
         const config = await fetchDemoConfig();
-        if (cancelled) return;
+        if (controller.signal.aborted || activeJobIdRef.current !== requestedJobId) return;
         const localDemo = config?.demoMode === true;
         setDemoMode(localDemo);
         if (localDemo) return;
-        const res = await fetch(`/api/jobs/${job.id}`);
+        const res = await fetch(`/api/jobs/${requestedJobId}`, {
+          signal: controller.signal,
+        });
         const json = await res.json();
-        if (!cancelled && res.ok && json.success && json.data) {
+        if (
+          !controller.signal.aborted &&
+          activeJobIdRef.current === requestedJobId &&
+          res.ok &&
+          json.success &&
+          json.data
+        ) {
           const merged: JobItem = { ...job, ...json.data };
           setDetailJob(merged);
-          onJobLoaded?.(merged);
+          onJobLoadedRef.current?.(merged);
         }
       } catch {
-        // keep slim list row
+        // Ignore aborted or transient fetch errors; keep list row state.
+      } finally {
+        if (!controller.signal.aborted && activeJobIdRef.current === requestedJobId) {
+          setIsLoadingDetail(false);
+        }
       }
     })();
     return () => {
-      cancelled = true;
+      controller.abort();
     };
-  }, [job, onJobLoaded]);
+    // Only re-fetch when selecting a different job or when rawDescription is missing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job.id, needsDetailFetch]);
 
   const location = extractLocationFromNotes(detailJob.notes);
   const applyUrl = extractApplyUrlFromNotes(detailJob.notes);
   const datePosted = extractPostingDateFromNotes(detailJob.notes);
   const salary = extractSalaryFromNotes(detailJob.notes, detailJob.rawDescription);
-  const isPlaceholder = isPlaceholderDescription(detailJob.rawDescription);
+  const isPlaceholder =
+    detailJob.hasFullDescription !== undefined
+      ? !detailJob.hasFullDescription
+      : detailJob.isPlaceholder ?? isPlaceholderDescription(detailJob.rawDescription);
 
+  const parsedRequirements = useMemo(() => {
+    const raw = detailJob.extractedRequirements;
+    if (!raw) return null;
+    if (typeof raw === "string") {
+      try {
+        return JSON.parse(raw) as {
+          requiredSkills: string[];
+          preferredSkills: string[];
+          domainTerms: string[];
+        };
+      } catch {
+        return null;
+      }
+    }
+    return raw as {
+      requiredSkills: string[];
+      preferredSkills: string[];
+      domainTerms: string[];
+    };
+  }, [detailJob.extractedRequirements]);
 
   const checklist: EvidenceMatchChecklist = useMemo(
-    () => buildEvidenceMatchChecklist(detailJob.extractedRequirements, evidence),
-    [detailJob.extractedRequirements, evidence]
+    () =>
+      buildEvidenceMatchChecklist(
+        parsedRequirements ?? { requiredSkills: [], preferredSkills: [], domainTerms: [] },
+        evidence
+      ),
+    [parsedRequirements, evidence]
   );
 
+  const requiredSkills = parsedRequirements?.requiredSkills ?? [];
+  const preferredSkills = parsedRequirements?.preferredSkills ?? [];
+  const domainTerms = parsedRequirements?.domainTerms ?? [];
+  const totalRequirements =
+    requiredSkills.length + preferredSkills.length + domainTerms.length;
+
+  const extractionState: "analyzing" | "unavailable" | "empty" | "ready" = useMemo(() => {
+    const activelyHydrating =
+      isFetchingFullText ||
+      isHydrating ||
+      (isLoadingDetail && detailJob.requirementsStatus !== "ready");
+    if (activelyHydrating && totalRequirements === 0) {
+      return "analyzing";
+    }
+    if (
+      detailJob.requirementsStatus === "unavailable" ||
+      (isPlaceholder && Boolean(detailJob.extractFailure) && totalRequirements === 0)
+    ) {
+      return "unavailable";
+    }
+    if (totalRequirements > 0) {
+      return "ready";
+    }
+    if (detailJob.requirementsStatus === "ready") {
+      return "empty";
+    }
+    if (isPlaceholder) {
+      return demoMode ? "unavailable" : "analyzing";
+    }
+    return "analyzing";
+  }, [
+    isFetchingFullText,
+    isHydrating,
+    isLoadingDetail,
+    detailJob.requirementsStatus,
+    detailJob.extractFailure,
+    totalRequirements,
+    isPlaceholder,
+    demoMode,
+  ]);
+
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     (async () => {
       try {
         const config = await fetchDemoConfig();
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         const localDemo = config?.demoMode === true;
         setDemoMode(localDemo);
         if (localDemo) {
           const raw = localStorage.getItem("resumeforge_guest_evidence");
           const parsed = raw ? JSON.parse(raw) : [];
-          if (!cancelled && Array.isArray(parsed)) setEvidence(parsed as EvidenceItemWithBullets[]);
+          if (!controller.signal.aborted && Array.isArray(parsed)) {
+            setEvidence(parsed as EvidenceItemWithBullets[]);
+          }
           return;
         }
-        const res = await fetch("/api/evidence");
+        const res = await fetch("/api/evidence", { signal: controller.signal });
         const json = await res.json();
-        if (!cancelled && res.ok && json.success) {
+        if (!controller.signal.aborted && res.ok && json.success) {
           setEvidence(json.data as EvidenceItemWithBullets[]);
         }
       } catch {
         // non-blocking
-      } finally {
-        if (!cancelled) setEvidenceLoaded(true);
       }
     })();
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, []);
 
@@ -258,36 +367,29 @@ export function JobDetailPane({
 
   const candidateInfo = useMemo(() => parseCandidateInfoFromTypst(masterTypst), [masterTypst]);
 
-  const parsedRequirements = useMemo(() => {
-    const raw = detailJob.extractedRequirements;
-    if (!raw) return null;
-    if (typeof raw === "string") {
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return null;
-      }
-    }
-    return raw as {
-      requiredSkills: string[];
-      preferredSkills: string[];
-      domainTerms: string[];
-    };
-  }, [detailJob.extractedRequirements]);
-
   const [oaProblems, setOaProblems] = useState<Array<{ id: string; title: string; category?: string; sourceUrl?: string; difficulty?: string }>>([]);
   const [oaMatched, setOaMatched] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    if (!detailJob.id) return;
+    const requestedJobId = detailJob.id;
+    const controller = new AbortController();
+    if (!requestedJobId) return;
+    setOaProblems([]);
+    setOaMatched(false);
     (async () => {
       try {
         const config = await fetchDemoConfig();
-        if (cancelled || config?.demoMode === true) return;
-        const res = await fetch(`/api/jobs/${detailJob.id}/interview-prep`);
+        if (controller.signal.aborted || config?.demoMode === true) return;
+        const res = await fetch(`/api/jobs/${requestedJobId}/interview-prep`, {
+          signal: controller.signal,
+        });
         const json = await res.json();
-        if (!cancelled && res.ok && json.success) {
+        if (
+          !controller.signal.aborted &&
+          activeJobIdRef.current === requestedJobId &&
+          res.ok &&
+          json.success
+        ) {
           setOaProblems(json.problems || []);
           setOaMatched(Boolean(json.matched));
         }
@@ -296,7 +398,7 @@ export function JobDetailPane({
       }
     })();
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [detailJob.id, detailJob.company]);
 
@@ -454,7 +556,7 @@ export function JobDetailPane({
             {/* Left Sub-column: Match & Notes */}
             <div className="xl:col-span-1 space-y-6">
               {/* Match Score Module */}
-              <div className="surface-raised rounded-[10px] p-5">
+              <div className="surface-raised rounded-[10px] p-5" data-testid="evidence-match-card">
                 <details className="group" open>
                   <summary className="flex justify-between items-center cursor-pointer mb-4 border-b border-border pb-2 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
                     <h3 className="font-section-label text-xs text-on-surface-variant uppercase tracking-widest">
@@ -465,33 +567,74 @@ export function JobDetailPane({
                       aria-hidden
                     />
                   </summary>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-full border-2 border-primary/40 flex items-center justify-center font-bold text-xs tabular-nums text-primary bg-primary/10">
-                      {checklist.percent}%
+                  {extractionState === "analyzing" ? (
+                    <div className="flex items-center gap-2.5 text-sm text-on-surface-variant" data-testid="evidence-match-analyzing">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" aria-hidden />
+                      <span>Analyzing requirements…</span>
                     </div>
-                    <div className="text-sm font-body-dense text-on-surface-variant">
-                      <span className="text-on-surface font-bold">
-                        {checklist.percent >= 70
-                          ? "High match"
-                          : checklist.percent >= 40
-                          ? "Partial match"
-                          : "Low match"}
-                      </span>{" "}
-                      — <span className="tabular-nums">{checklist.matched}</span> of <span className="tabular-nums">{checklist.total}</span> requirements backed by evidence.
+                  ) : extractionState === "unavailable" ? (
+                    <div className="space-y-3" data-testid="evidence-match-unavailable">
+                      <p className="text-sm text-on-surface-variant">
+                        Requirements unavailable — extract or paste the job description to compare against your Evidence Bank.
+                      </p>
+                      <button
+                        type="button"
+                        disabled={isFetchingFullText}
+                        onClick={() => onFetchFullText(detailJob.id)}
+                        className="inline-flex items-center gap-1.5 rounded-[6px] border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-xs font-mono-data text-primary hover:bg-primary/20 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                        Retry
+                      </button>
                     </div>
-                  </div>
-                  <ul className="space-y-2 font-mono-data text-xs">
-                    {checklist.items.map((item) => (
-                      <li key={item.label} className="flex items-center gap-2 text-on-surface-variant">
-                        {item.matched ? (
-                          <Check className="h-4 w-4 shrink-0 text-secondary" aria-hidden />
-                        ) : (
-                          <X className="h-4 w-4 shrink-0 text-error" aria-hidden />
-                        )}
-                        <span>{item.label}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  ) : extractionState === "empty" ? (
+                    <p className="text-sm text-on-surface-variant" data-testid="evidence-match-empty">
+                      No explicit skills identified in this posting to match against your Evidence Bank.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 rounded-full border-2 border-status-success/40 flex items-center justify-center font-bold text-xs tabular-nums text-status-success bg-status-success/10 shrink-0">
+                          {checklist.percent}%
+                        </div>
+                        <div className="text-sm font-body-dense text-on-surface-variant">
+                          <span className="text-on-surface font-bold">
+                            {checklist.percent >= 70
+                              ? "High match"
+                              : checklist.percent >= 40
+                              ? "Partial match"
+                              : "Low match"}
+                          </span>{" "}
+                          — <span className="tabular-nums">{checklist.matched}</span> of <span className="tabular-nums">{checklist.total}</span> requirements backed by verified evidence.
+                        </div>
+                      </div>
+                      {checklist.needsVerification > 0 && (
+                        <p className="mb-3 rounded-[6px] border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-xs text-primary" data-testid="needs-verification-summary">
+                          <span className="tabular-nums font-semibold">{checklist.needsVerification}</span>{" "}
+                          {checklist.needsVerification === 1 ? "requirement matches" : "requirements match"} only draft or unverified bullets (Needs verification).
+                        </p>
+                      )}
+                      <ul className="space-y-2 font-mono-data text-xs">
+                        {checklist.items.map((item) => (
+                          <li key={item.label} className="flex items-center gap-2 text-on-surface-variant">
+                            {item.status === "verified" ? (
+                              <Check className="h-4 w-4 shrink-0 text-status-success" aria-hidden />
+                            ) : item.status === "needs_verification" ? (
+                              <AlertCircle className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                            ) : (
+                              <X className="h-4 w-4 shrink-0 text-error" aria-hidden />
+                            )}
+                            <span className="min-w-0 truncate">{item.label}</span>
+                            {item.status === "needs_verification" && (
+                              <span className="ml-auto shrink-0 rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                                Needs verification
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
                 </details>
               </div>
 
@@ -597,9 +740,103 @@ export function JobDetailPane({
               )}
             </div>
 
-            {/* Right Sub-column: Job Details */}
-            <div className="xl:col-span-2">
-              <div className="surface-raised rounded-[10px] p-6 h-full flex flex-col">
+            {/* Right Sub-column: Skills & Requirements + Job Details */}
+            <div className="xl:col-span-2 space-y-6 flex flex-col">
+              {/* Stable Skills & Requirements Module */}
+              <div className="surface-raised rounded-[10px] p-5" data-testid="skills-and-requirements-card">
+                <div className="flex flex-wrap justify-between items-center gap-2 mb-3 border-b border-border pb-2">
+                  <h3 className="font-section-label text-xs text-on-surface-variant uppercase tracking-widest">
+                    Skills &amp; requirements
+                  </h3>
+                  {extractionState === "unavailable" && (
+                    <button
+                      type="button"
+                      data-testid="retry-requirements-btn"
+                      disabled={isFetchingFullText}
+                      onClick={() => onFetchFullText(detailJob.id)}
+                      className="inline-flex items-center gap-1.5 rounded-[6px] border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-mono-data text-primary hover:bg-primary/20 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    >
+                      {isFetchingFullText ? (
+                        <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                      ) : (
+                        <RotateCcw className="h-3 w-3" aria-hidden />
+                      )}
+                      Retry
+                    </button>
+                  )}
+                </div>
+
+                {extractionState === "analyzing" ? (
+                  <div className="flex items-center gap-2 text-xs text-on-surface-variant" data-testid="requirements-status-analyzing">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" aria-hidden />
+                    <span>Analyzing requirements…</span>
+                  </div>
+                ) : extractionState === "unavailable" ? (
+                  <p className="text-xs text-on-surface-variant" data-testid="requirements-status-unavailable">
+                    Requirements unavailable. Retry fetching the posting or paste the description in Tailor.
+                  </p>
+                ) : extractionState === "empty" ? (
+                  <p className="text-xs text-on-surface-variant" data-testid="requirements-status-empty">
+                    No explicit skills identified
+                  </p>
+                ) : (
+                  <div className="space-y-3" data-testid="requirements-groups">
+                    {requiredSkills.length > 0 && (
+                      <div>
+                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+                          Required
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {requiredSkills.map((skill) => (
+                            <span
+                              key={`req-${skill}`}
+                              className="rounded-[6px] border border-status-success/35 bg-status-success/10 px-2 py-0.5 text-xs font-mono-data text-status-success-soft"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {preferredSkills.length > 0 && (
+                      <div>
+                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+                          Preferred
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {preferredSkills.map((skill) => (
+                            <span
+                              key={`pref-${skill}`}
+                              className="rounded-[6px] border border-primary/35 bg-primary/10 px-2 py-0.5 text-xs font-mono-data text-primary"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {domainTerms.length > 0 && (
+                      <div>
+                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+                          Domain terms
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {domainTerms.map((term) => (
+                            <span
+                              key={`dom-${term}`}
+                              className="rounded-[6px] border border-outline-variant bg-surface-variant/60 px-2 py-0.5 text-xs font-mono-data text-on-surface-variant"
+                            >
+                              {term}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="surface-raised rounded-[10px] p-6 flex-1 flex flex-col">
                 <div className="flex justify-between items-center mb-4 border-b border-border pb-2">
                   <h3 className="font-section-label text-xs text-on-surface-variant uppercase tracking-widest">
                     JOB DETAILS

@@ -319,6 +319,121 @@ describe("Task 8.4: Tier 2 On-Demand Full-Text Fetcher", () => {
       await prisma.job.deleteMany({ where: { id: foreignJob.id } });
     }
   });
+
+  it("parses cached full descriptions with unparsed or stale requirements without refetching and never overwrites manual edits", async () => {
+    const { updateJob, parseRequirementsState } = await import("@/lib/db/jobs");
+    const fetchSpy = vi.spyOn(global, "fetch");
+
+    const unparsedOwned = await prisma.job.create({
+      data: {
+        userId: "owner-reqs-1",
+        company: "CacheParseCo",
+        roleTitle: "Backend Engineer",
+        rawDescription:
+          "Requirements:\n- Python, PostgreSQL, and Docker experience.\nPreferred:\n- Redis and GraphQL.",
+        extractedRequirements: "{}",
+        notes: `Apply Link: ${applyUrl}`,
+      },
+    });
+
+    const manualOwned = await prisma.job.create({
+      data: {
+        userId: "owner-reqs-1",
+        company: "ManualEditCo",
+        roleTitle: "Engineer",
+        rawDescription: "[Pending Import] Full job description text not yet fetched...",
+        extractedRequirements: "{}",
+        notes: `Apply Link: ${applyUrl}`,
+      },
+    });
+
+    try {
+      // 1. Unparsed cached full description parses locally without any outbound fetch.
+      const resUnparsed = await fetchAndCacheJobFullText(unparsedOwned.id, {
+        viewerUserId: "owner-reqs-1",
+      });
+      expect(resUnparsed.success).toBe(true);
+      expect(resUnparsed.cached).toBe(true);
+      expect(resUnparsed.requirementsUpdated).toBe(true);
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      const updatedRow = await prisma.job.findUniqueOrThrow({ where: { id: unparsedOwned.id } });
+      const parsedState = parseRequirementsState(
+        updatedRow.extractedRequirements,
+        updatedRow.rawDescription,
+        updatedRow.extractFailure
+      );
+      expect(parsedState.requirementsStatus).toBe("ready");
+      expect(parsedState.extractedRequirements.requiredSkills).toEqual(
+        expect.arrayContaining(["Python", "PostgreSQL", "Docker"])
+      );
+      expect(parsedState.extractedRequirements.preferredSkills).toEqual(
+        expect.arrayContaining(["Redis", "GraphQL"])
+      );
+
+      // 2. Stale parser version (version: 0) re-parses without refetching.
+      await prisma.job.update({
+        where: { id: unparsedOwned.id },
+        data: {
+          extractedRequirements: JSON.stringify({
+            requiredSkills: ["Python"],
+            preferredSkills: [],
+            domainTerms: [],
+            _meta: { source: "auto", version: 0 },
+          }),
+        },
+      });
+      const resStale = await fetchAndCacheJobFullText(unparsedOwned.id, {
+        viewerUserId: "owner-reqs-1",
+      });
+      expect(resStale.success).toBe(true);
+      expect(resStale.requirementsUpdated).toBe(true);
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      // 3. Manually edited requirements via updateJob are never overwritten by hydration/fetch.
+      await updateJob(
+        manualOwned.id,
+        {
+          extractedRequirements: {
+            requiredSkills: ["Rust"],
+            preferredSkills: ["Kubernetes"],
+            domainTerms: ["Fintech"],
+          },
+        },
+        "owner-reqs-1"
+      );
+
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            title: "Engineer",
+            content:
+              "<p>Full description requiring TypeScript, React, Python, and PostgreSQL for our platform engineering team building reliable systems.</p>",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const resManual = await fetchAndCacheJobFullText(manualOwned.id, {
+        viewerUserId: "owner-reqs-1",
+      });
+      expect(resManual.success).toBe(true);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      const manualRow = await prisma.job.findUniqueOrThrow({ where: { id: manualOwned.id } });
+      const manualState = parseRequirementsState(
+        manualRow.extractedRequirements,
+        manualRow.rawDescription,
+        manualRow.extractFailure
+      );
+      expect(manualState.requirementsSource).toBe("manual");
+      expect(manualState.extractedRequirements.requiredSkills).toEqual(["Rust"]);
+      expect(manualState.extractedRequirements.preferredSkills).toEqual(["Kubernetes"]);
+      expect(manualState.extractedRequirements.domainTerms).toEqual(["Fintech"]);
+    } finally {
+      await prisma.job.deleteMany({ where: { id: { in: [unparsedOwned.id, manualOwned.id] } } });
+    }
+  });
 });
 
 describe("safeFetch redirect SSRF guard", () => {

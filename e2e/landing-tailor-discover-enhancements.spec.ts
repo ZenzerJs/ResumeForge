@@ -103,51 +103,54 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
     await expect(matrixSection).not.toContainText(/\bSimplify\b/i);
   });
 
-  test("2. Tailor workspace 3-Pane view renders and coordinates Left, Center, and Right panes cleanly", async ({
+  test("2. Tailor workspace review-first layout coordinates Primary Review, Secondary Preview/ATS, Sheet, and Source toggle cleanly", async ({
     page,
   }) => {
     await page.goto("/tailor");
 
-    // Verify 3-Pane tab button exists
+    // Verify Workspace tab button exists
     const tab3Pane = page.getByTestId("tailor-tab-3-pane");
     await expect(tab3Pane).toBeVisible();
 
-    // Click 3-Pane tab
+    // Click Workspace tab
     await tab3Pane.click();
 
-    // 3-Pane container is mounted
+    // Workspace container is mounted
     const container3Pane = page.getByTestId("tailor-3pane-container");
     await expect(container3Pane).toBeVisible();
 
-    // Left Pane: Job Description with keyword highlights
-    const leftPane = page.getByTestId("tailor-pane-left");
-    await expect(leftPane).toBeVisible();
-    const highlightedJd = page.getByTestId("tailor-jd-highlighted-view");
+    // Primary Review & Secondary Preview/ATS panes
+    const primaryPane = page.getByTestId("tailor-pane-center");
+    await expect(primaryPane).toBeVisible();
+
+    const secondaryPane = page.getByTestId("tailor-pane-right");
+    await expect(secondaryPane).toBeVisible();
+    await expect(secondaryPane.getByTestId("ats-score-panel")).toBeVisible();
+
+    // Switch secondary pane to Job Details to inspect TechDiffPillList & keyword highlights
+    await page.getByTestId("workspace-secondary-job-tab").click();
+    const highlightedJd = secondaryPane.getByTestId("tailor-jd-highlighted-view");
     await expect(highlightedJd).toBeVisible();
 
-    // Verify keyword highlights render <mark> elements
     const markTags = highlightedJd.locator("mark");
     await expect(markTags.first()).toBeVisible();
     await expect(highlightedJd).toContainText("Go");
     await expect(highlightedJd).toContainText("Python");
+    await expect(secondaryPane.getByTestId("tech-diff-pill-list")).toBeVisible();
 
-    // Verify TechDiffPillList in Left Pane
-    const leftTechDiff = leftPane.getByTestId("tech-diff-pill-list");
-    await expect(leftTechDiff).toBeVisible();
+    // Open on-demand Requirements & JD Sheet
+    await page.getByTestId("workspace-job-details-btn").click();
+    const jdSheet = page.getByRole("dialog");
+    await expect(jdSheet).toBeVisible();
+    await expect(jdSheet.getByTestId("tech-diff-pill-list")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(jdSheet).not.toBeVisible();
 
-    // Center Pane: Typst AST and Tailoring Buffer
-    const centerPane = page.getByTestId("tailor-pane-center");
-    await expect(centerPane).toBeVisible();
-    const typstAst = page.getByTestId("typst-ast-preview");
-    await expect(typstAst).toBeVisible();
+    // Toggle optional Typst Source view
+    await page.getByTestId("toggle-typst-source-btn").click();
+    await expect(page.getByTestId("typst-ast-preview")).toBeVisible();
 
-    // Right Pane: ATS Score & Verification Panel
-    const rightPane = page.getByTestId("tailor-pane-right");
-    await expect(rightPane).toBeVisible();
-    const atsScorePanel = rightPane.getByTestId("ats-score-panel");
-    await expect(atsScorePanel).toBeVisible();
-
-    // Transition back to Job Info tab via button in left pane
+    // Transition to Job Info tab via context bar button
     const editJobBtn = page.getByTestId("edit-job-info-btn");
     await expect(editJobBtn).toBeVisible();
     await editJobBtn.click();
@@ -155,7 +158,7 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
     await expect(page.getByTestId("tailor-job-info-panel")).toBeVisible();
     await expect(container3Pane).not.toBeVisible();
 
-    // Verify Back button returns directly to 3-pane workspace
+    // Verify Back button returns directly to Workspace
     const backBtn = page.getByTestId("back-to-overview-btn");
     await expect(backBtn).toBeVisible();
     await expect(backBtn).toContainText("Back to 3-Pane Workspace");
@@ -263,7 +266,7 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
     await expect(card.getByTestId("tech-pill-missing-Kubernetes")).toBeVisible();
   });
 
-  test("4. 3-Pane Workspace and tab navigation adapt smoothly to mobile viewports", async ({
+  test("4. Review-first Workspace, on-demand Sheet, and tab navigation adapt smoothly to mobile viewports", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -272,14 +275,19 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
     const container3Pane = page.getByTestId("tailor-3pane-container");
     await expect(container3Pane).toBeVisible();
 
-    // Verify all 3 panes remain visible and functional in stacked single-column mode
-    const leftPane = page.getByTestId("tailor-pane-left");
+    // Primary review and secondary preview/ATS panes stack cleanly on mobile
     const centerPane = page.getByTestId("tailor-pane-center");
     const rightPane = page.getByTestId("tailor-pane-right");
 
-    await expect(leftPane).toBeVisible();
     await expect(centerPane).toBeVisible();
     await expect(rightPane).toBeVisible();
+
+    // On-demand Requirements & JD Sheet works cleanly on mobile
+    await page.getByTestId("workspace-job-details-btn").click();
+    const jdSheet = page.getByRole("dialog");
+    await expect(jdSheet).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(jdSheet).not.toBeVisible();
 
     // Verify tab buttons exist and are accessible
     const tabOverview = page.getByTestId("tailor-tab-overview");

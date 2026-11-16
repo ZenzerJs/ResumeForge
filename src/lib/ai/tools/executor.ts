@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { extractResumeFacts } from "@/lib/facts/extract";
+import {
+  buildTailoringValidationContext,
+  extractResumeFacts,
+  resolveValidationFacts,
+} from "@/lib/facts/extract";
+import type { ResumeFacts, TailoringValidationContext } from "@/lib/facts/types";
 import { checkGuardrail } from "@/lib/guardrail/check";
 import {
   assertCanExport,
@@ -70,7 +75,7 @@ export async function executeServerTool(
 
       case "run_guardrail": {
         const params = RunGuardrailParamsSchema.parse(rawParams);
-        let masterFacts = params.masterFacts;
+        let masterFacts: ResumeFacts | TailoringValidationContext | undefined = params.masterFacts;
 
         if (!masterFacts) {
           const ownerId = requireOwner(userId);
@@ -81,7 +86,13 @@ export async function executeServerTool(
             where: { status: "verified", userId: ownerId },
             include: { bullets: true },
           });
-          masterFacts = extractResumeFacts(master?.typstSource || "", evidence as any);
+          masterFacts = master?.factSnapshot
+            ? buildTailoringValidationContext(
+                master.factSnapshot as unknown as ResumeFacts,
+                evidence as any,
+                { ownerId, authoritativeEvidence: true }
+              )
+            : extractResumeFacts(master?.typstSource || "", evidence as any);
         }
 
         const guardrailResult = checkGuardrail(params.candidateTypst, masterFacts, {
@@ -204,7 +215,7 @@ export async function executeServerTool(
         assertCanExport(params.typstSource, params.masterFacts);
 
         const docxBytes = await generateAtsDocx(params.typstSource, {
-          facts: params.masterFacts,
+          facts: params.masterFacts ? resolveValidationFacts(params.masterFacts) : undefined,
         });
 
         return {

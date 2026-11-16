@@ -5,6 +5,8 @@ import {
   updateEvidenceItem,
   archiveEvidenceItem,
   deleteEvidenceItem,
+  preflightEvidenceDeletion,
+  EvidenceVersionConflictError,
 } from "@/lib/db/evidence";
 import { sanitizeError } from "@/lib/ai/redact";
 import { getRequestUserId, requireUserId } from "@/lib/security/auth-request";
@@ -26,6 +28,7 @@ const UpdateEvidenceSchema = z.object({
   tags: z.array(z.string()).optional(),
   status: z.enum(["verified", "draft", "archived"]).optional(),
   bullets: z.array(BulletSchema).optional(),
+  expectedUpdatedAt: z.string().optional(),
 });
 
 export async function GET(
@@ -99,6 +102,17 @@ export async function PUT(
     }
     return NextResponse.json({ success: true, data: updated });
   } catch (err) {
+    if (err instanceof EvidenceVersionConflictError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: err.message,
+          code: "EVIDENCE_VERSION_CONFLICT",
+          currentUpdatedAt: err.currentUpdatedAt,
+        },
+        { status: 409 }
+      );
+    }
     return NextResponse.json(
       { success: false, error: "Failed to update evidence item", message: sanitizeError(err) },
       { status: 500 }
@@ -134,12 +148,29 @@ export async function DELETE(
     const mode = searchParams.get("mode");
 
     if (mode === "purge") {
+      const preflight = await preflightEvidenceDeletion([id], userId);
+      if (preflight.blocked.length > 0) {
+        const blocked = preflight.blocked[0];
+        return NextResponse.json(
+          {
+            success: false,
+            error: blocked.reason,
+            code: "EVIDENCE_CITATION_RESTRICTED",
+            citationCount: blocked.citationCount,
+          },
+          { status: 409 }
+        );
+      }
       await deleteEvidenceItem(id, userId);
-    } else {
-      await archiveEvidenceItem(id, userId);
+      return NextResponse.json({ success: true, message: "Evidence item permanently deleted" });
     }
 
-    return NextResponse.json({ success: true, message: "Evidence item processed" });
+    const archived = await archiveEvidenceItem(id, userId);
+    return NextResponse.json({
+      success: true,
+      message: "Evidence item archived",
+      data: archived,
+    });
   } catch (err) {
     if (
       err &&

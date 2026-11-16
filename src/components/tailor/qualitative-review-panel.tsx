@@ -33,9 +33,9 @@ const VERDICT_STYLES: Record<
 > = {
   STRONG_EVIDENCE: {
     label: "Strong Evidence",
-    bg: "bg-emerald-950/80",
-    text: "text-emerald-300",
-    border: "border-emerald-800/80",
+    bg: "bg-status-success/15",
+    text: "text-status-success-soft",
+    border: "border-status-success/35",
     icon: "✓",
   },
   WEAK_EVIDENCE: {
@@ -102,7 +102,7 @@ export function QualitativeReviewPanel({
 
   const adjustmentBadgeColor =
     result.jdContextAdjustment > 0
-      ? "text-emerald-400 bg-emerald-950/60 border-emerald-800/80"
+      ? "status-success-surface"
       : result.jdContextAdjustment < 0
       ? "text-red-400 bg-red-950/60 border-red-800/80"
       : "text-text-secondary bg-inset border-hairline";
@@ -216,7 +216,7 @@ export function QualitativeReviewPanel({
                   <span
                     className={`font-mono text-xs font-bold px-2 py-0.5 rounded ${
                       item.points >= 0
-                        ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
+                        ? "status-success-surface border"
                         : "bg-red-950 text-red-300 border border-red-800"
                     }`}
                   >
@@ -262,7 +262,7 @@ export function QualitativeReviewPanel({
 
                 {cf.strengths.length > 0 && (
                   <div>
-                    <span className="text-[10px] text-emerald-400 font-semibold uppercase block">
+                    <span className="text-[10px] text-status-success-soft font-semibold uppercase block">
                       Strengths
                     </span>
                     <ul className="list-disc list-inside text-text-secondary space-y-0.5 mt-0.5">

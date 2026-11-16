@@ -251,6 +251,55 @@ describe("shared job catalog and private evidence", () => {
       // Shared catalog DB row must stay untouched when hydrated by a user request.
       const sharedRow = await prisma.job.findUnique({ where: { id: sharedPlaceholder.id } });
       expect(isTier1Placeholder(sharedRow?.rawDescription || "")).toBe(true);
+
+      // Canonical Zod-validated payload includes extractedRequirements + ready status.
+      const { HydratedJobDetailSchema } = await import("@/lib/jd-parser/types");
+      const parsedDetail = HydratedJobDetailSchema.safeParse(sharedResult.job);
+      expect(parsedDetail.success).toBe(true);
+      if (parsedDetail.success) {
+        expect(parsedDetail.data.requirementsStatus).toBe("ready");
+        expect(parsedDetail.data.hasFullDescription).toBe(true);
+        expect(parsedDetail.data.extractedRequirements.requiredSkills).toEqual(
+          expect.arrayContaining(["TypeScript", "React", "Node.js", "PostgreSQL"])
+        );
+      }
+
+      // Full description already cached with unparsed "{}" requirements hydrates requirements without refetching.
+      const cachedFullUnparsed = await prisma.job.create({
+        data: {
+          userId: owner.user.id,
+          company: "CachedDescCo",
+          roleTitle: "Platform Engineer",
+          rawDescription: "Required:\n- Go, Kubernetes, and Docker experience.\nPreferred:\n- Terraform.",
+          extractedRequirements: "{}",
+        },
+      });
+      createdJobIds.push(cachedFullUnparsed.id);
+
+      const callsBeforeCachedHydrate = fetchSpy.mock.calls.length;
+      const cachedHydrateRes = await hydratePOST(
+        authedNextRequest(
+          "http://localhost:3000/api/jobs/hydrate",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids: [cachedFullUnparsed.id] }),
+          },
+          owner.cookie
+        )
+      );
+      expect(cachedHydrateRes.status).toBe(200);
+      expect(fetchSpy.mock.calls.length).toBe(callsBeforeCachedHydrate);
+      const cachedHydrateJson = await cachedHydrateRes.json();
+      const cachedItem = cachedHydrateJson.results[0];
+      expect(cachedItem.status).toBe("ok");
+      expect(cachedItem.job.requirementsStatus).toBe("ready");
+      expect(cachedItem.job.extractedRequirements.requiredSkills).toEqual(
+        expect.arrayContaining(["Go", "Kubernetes", "Docker"])
+      );
+      expect(cachedItem.job.extractedRequirements.preferredSkills).toEqual(
+        expect.arrayContaining(["Terraform"])
+      );
     } finally {
       fetchSpy.mockRestore();
       await prisma.user.deleteMany({ where: { id: { in: [owner.user.id, other.user.id] } } });

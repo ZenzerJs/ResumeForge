@@ -1,4 +1,8 @@
 import type { JobStatus } from "@/lib/db/jobs";
+import type {
+  JobRequirementsSource,
+  RequirementsExtractionStatus,
+} from "@/lib/jd-parser/types";
 
 export interface JobVariant {
   id: string;
@@ -21,6 +25,7 @@ export interface JobItem {
   rawDescription?: string;
   salaryLabel?: string | null;
   isPlaceholder?: boolean;
+  hasFullDescription?: boolean;
   extractFailure?: string | null;
   source: string;
   extractedRequirements: {
@@ -28,6 +33,8 @@ export interface JobItem {
     preferredSkills: string[];
     domainTerms: string[];
   };
+  requirementsStatus?: RequirementsExtractionStatus;
+  requirementsSource?: JobRequirementsSource;
   status: JobStatus;
   appliedAt?: string | null;
   appliedVariantId?: string | null;

@@ -1,5 +1,21 @@
-import { FactDateRange, FactMetric, ResumeFacts } from "@/lib/facts/types";
-import { extractResumeFacts } from "@/lib/facts/extract";
+import {
+  FactDateRange,
+  FactMetric,
+  ResumeFacts,
+  TailoringValidationContext,
+  VerifiedEvidenceRegistry,
+} from "@/lib/facts/types";
+import {
+  extractResumeFacts,
+  isTailoringValidationContext,
+  resolveValidationFacts,
+} from "@/lib/facts/extract";
+import {
+  resolvePatchCitationReferences,
+  toResolvedEvidenceRegistry,
+  type PatchCitationObject,
+  type ResolvedEvidenceRegistry,
+} from "@/lib/ai/patch-schema";
 import {
   extractMetricsFromText,
   isCandidateTitleAllowedByMaster,
@@ -14,25 +30,34 @@ export interface CheckGuardrailOptions {
   /** Optional patch proposals to check before applying */
   patches?: Array<{
     id?: string;
+    operation?: string;
     after?: string;
     afterContent?: string;
     evidenceIds?: string[];
     evidenceCitations?: string[] | string;
+    citations?: PatchCitationObject[];
     targetSection?: string;
   }>;
   /** Normalized or raw skill tokens explicitly acknowledged by the user */
   acknowledgedSkills?: string[];
+  /** Optional verified evidence registry (used automatically when TailoringValidationContext is passed) */
+  registry?: VerifiedEvidenceRegistry | ResolvedEvidenceRegistry;
 }
 
 /**
  * Executes a fail-closed mechanical guardrail check comparing candidate Typst or patches against
- * the frozen master ResumeFacts snapshot.
+ * the protected master ResumeFacts snapshot or versioned TailoringValidationContext.
  */
 export function checkGuardrail(
   candidateTypst: string,
-  masterFacts: ResumeFacts,
+  masterFactsOrContext: ResumeFacts | TailoringValidationContext,
   options?: CheckGuardrailOptions
 ): GuardrailResult {
+  const masterFacts = resolveValidationFacts(masterFactsOrContext);
+  const rawRegistry = isTailoringValidationContext(masterFactsOrContext)
+    ? masterFactsOrContext.registry
+    : options?.registry;
+  const resolvedRegistry = rawRegistry ? toResolvedEvidenceRegistry(rawRegistry) : undefined;
   const violations: GuardrailViolation[] = [];
 
   // Master lookup sets (exact normalized employer + Evidence Bank aliases)
@@ -55,16 +80,79 @@ export function checkGuardrail(
   // 1. Check Patches Citations, Metrics, and Unacknowledged Patch Skills
   if (options?.patches) {
     for (const patch of options.patches) {
+      if (patch.operation === "REPORT_GAP") continue;
+
       const citations = parseCitations(patch.evidenceIds || patch.evidenceCitations);
-      for (const citId of citations) {
-        if (!masterEvidenceIds.has(citId)) {
+      const structuredCitations = patch.citations || [];
+
+      if (resolvedRegistry) {
+        if (citations.length === 0 && structuredCitations.length === 0) {
           violations.push({
             kind: "evidence",
             severity: "HARD",
             field: "evidenceIds",
-            message: `Patch cites invalid or unverified evidence ID "${citId}" not present in candidate Evidence Bank.`,
-            actual: citId,
+            message: "Patch has no verified evidence citations.",
+            actual: "",
           });
+        }
+        for (const citId of citations) {
+          try {
+            resolvePatchCitationReferences([citId], resolvedRegistry);
+          } catch (err) {
+            violations.push({
+              kind: "evidence",
+              severity: "HARD",
+              field: "evidenceIds",
+              message:
+                err instanceof Error
+                  ? `${err.message} ("${citId}")`
+                  : `Patch cites invalid or unverified evidence ID "${citId}" not present in candidate Evidence Bank.`,
+              actual: citId,
+            });
+          }
+        }
+        for (const citObj of structuredCitations) {
+          try {
+            resolvePatchCitationReferences([citObj], resolvedRegistry);
+          } catch (err) {
+            violations.push({
+              kind: "evidence",
+              severity: "HARD",
+              field: "citations",
+              message:
+                err instanceof Error
+                  ? err.message
+                  : "Patch citation pair is invalid or unverified.",
+              actual: JSON.stringify(citObj),
+            });
+          }
+        }
+      } else {
+        for (const citId of citations) {
+          if (!masterEvidenceIds.has(citId)) {
+            violations.push({
+              kind: "evidence",
+              severity: "HARD",
+              field: "evidenceIds",
+              message: `Patch cites invalid or unverified evidence ID "${citId}" not present in candidate Evidence Bank.`,
+              actual: citId,
+            });
+          }
+        }
+        for (const citObj of structuredCitations) {
+          if (
+            (!citObj.evidenceId && !citObj.bulletId) ||
+            (citObj.evidenceId && !masterEvidenceIds.has(citObj.evidenceId)) ||
+            (citObj.bulletId && !masterEvidenceIds.has(citObj.bulletId))
+          ) {
+            violations.push({
+              kind: "evidence",
+              severity: "HARD",
+              field: "citations",
+              message: "Patch citation pair is unavailable or unverified.",
+              actual: JSON.stringify(citObj),
+            });
+          }
         }
       }
 

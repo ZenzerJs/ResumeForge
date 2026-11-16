@@ -184,6 +184,16 @@ describe("Phase 12 Orchestrator & Promotion Pipeline", () => {
     expect(tracked.notes).toContain("Workplace: remote");
     expect(tracked.notes).toContain("Apply Link: https://jobs.ashbyhq.com/cohere/123");
 
+    // Reuses IngestedJob.parsedRequirements on promote/save.
+    const { parseRequirementsState } = await import("@/lib/db/jobs");
+    const reqState = parseRequirementsState(
+      tracked.extractedRequirements,
+      tracked.rawDescription,
+      tracked.extractFailure
+    );
+    expect(reqState.requirementsSource).toBe("ingested");
+    expect(reqState.requirementsStatus).toBe("ready");
+
     // Check linked relation
     const updatedIngested = await prisma.ingestedJob.findUnique({
       where: { id: ingested.id },

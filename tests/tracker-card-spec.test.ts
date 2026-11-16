@@ -6,6 +6,8 @@ import {
   extractPostingDateFromNotes,
   extractSalaryFromNotes,
   isPlaceholderDescription,
+  selectPendingHydrationJobIds,
+  type JobItem,
 } from "@/components/tracker/tracker-feed";
 
 describe("Task 8.3: Tracker Card Spec & Click Zone Refinements", () => {
@@ -174,5 +176,39 @@ describe("Task 8.3: Tracker Card Spec & Click Zone Refinements", () => {
 
     // Deduplication of identical locations
     expect(normalizeLocation("San Jose, CA; San Jose, CA")).toBe("San Jose, CA");
+  });
+
+  it("8. bounds background auto-hydration to unparsed cached descriptions and active placeholder job once per id", () => {
+    const makeJob = (overrides: Partial<JobItem>): JobItem => ({
+      id: "job-1",
+      source: "pasted",
+      status: "SAVED",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      extractedRequirements: { requiredSkills: [], preferredSkills: [], domainTerms: [] },
+      ...overrides,
+    });
+
+    const jobs: JobItem[] = [
+      makeJob({ id: "active-full-ready", isPlaceholder: false, requirementsStatus: "ready" }),
+      makeJob({ id: "bg-placeholder", isPlaceholder: true, requirementsStatus: "unparsed" }),
+      makeJob({ id: "bg-unparsed-cached", isPlaceholder: false, requirementsStatus: "unparsed" }),
+      makeJob({ id: "active-placeholder", isPlaceholder: true, requirementsStatus: "unparsed" }),
+      makeJob({ id: "failed-placeholder", isPlaceholder: true, extractFailure: "timeout", requirementsStatus: "unavailable" }),
+    ];
+
+    const attempted = new Set<string>(["already-attempted"]);
+    expect(selectPendingHydrationJobIds([...jobs, makeJob({ id: "already-attempted", isPlaceholder: false, requirementsStatus: "unparsed" })], "active-placeholder", attempted)).toEqual([
+      "active-placeholder",
+      "bg-unparsed-cached",
+    ]);
+
+    // When active job is not a placeholder, unselected placeholder rows are deferred until clicked.
+    expect(selectPendingHydrationJobIds(jobs, "active-full-ready", attempted)).toEqual([
+      "bg-unparsed-cached",
+    ]);
+
+    // Once attempted by ID, jobs are not re-queued even if placeholder flips before requirements are parsed.
+    attempted.add("bg-unparsed-cached");
+    expect(selectPendingHydrationJobIds(jobs, "active-full-ready", attempted)).toEqual([]);
   });
 });

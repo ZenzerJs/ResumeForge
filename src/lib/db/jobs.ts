@@ -1,8 +1,20 @@
 import { Prisma } from "@prisma/client";
 import { isBoardEligible, jobMaxAgeDays } from "@/lib/jobs/expiry";
 import { prisma } from "@/lib/prisma";
-import { JobRequirements, JobRequirementsSchema } from "@/lib/jd-parser/types";
+import { parseJobDescription } from "@/lib/jd-parser/parser";
 import {
+  CURRENT_REQUIREMENTS_PARSER_VERSION,
+  HydratedJobDetailSchema,
+  JobRequirements,
+  JobRequirementsMetaSchema,
+  JobRequirementsSchema,
+  type HydratedJobDetail,
+  type JobRequirementsSource,
+  type RequirementsExtractionStatus,
+} from "@/lib/jd-parser/types";
+import {
+  extractApplyUrlFromNotes,
+  extractLocationFromNotes,
   extractPostingDateFromNotes,
   extractSalaryFromNotes,
   isPlaceholderDescription,
@@ -55,8 +67,10 @@ import { normalizeCompany } from "@/lib/company";
 
 export async function createJob(input: CreateJobInput) {
   const reqsJson = input.extractedRequirements
-    ? JSON.stringify(input.extractedRequirements)
-    : JSON.stringify({ requiredSkills: [], preferredSkills: [], domainTerms: [] });
+    ? serializeRequirementsWithMeta(input.extractedRequirements, "manual")
+    : !isPlaceholderDescription(input.rawDescription)
+      ? serializeRequirementsWithMeta(parseJobDescription(input.rawDescription), "auto")
+      : JSON.stringify({ requiredSkills: [], preferredSkills: [], domainTerms: [] });
 
   let dossierId: string | null = null;
   if (input.company) {
@@ -95,9 +109,16 @@ export async function createJob(input: CreateJobInput) {
     },
   });
 
+  const reqState = parseRequirementsState(job.extractedRequirements, job.rawDescription, job.extractFailure);
+  const isPlaceholder = isPlaceholderDescription(job.rawDescription);
+
   return {
     ...job,
-    extractedRequirements: parseRequirementsJson(job.extractedRequirements),
+    extractedRequirements: reqState.extractedRequirements,
+    requirementsStatus: reqState.requirementsStatus,
+    requirementsSource: reqState.requirementsSource,
+    isPlaceholder,
+    hasFullDescription: !isPlaceholder,
   };
 }
 
@@ -120,7 +141,19 @@ export async function updateJob(
   if (input.notes !== undefined) dataToUpdate.notes = input.notes;
   if (input.rawDescription !== undefined) dataToUpdate.rawDescription = input.rawDescription;
   if (input.extractedRequirements !== undefined) {
-    dataToUpdate.extractedRequirements = JSON.stringify(input.extractedRequirements);
+    dataToUpdate.extractedRequirements = serializeRequirementsWithMeta(
+      input.extractedRequirements,
+      "manual"
+    );
+  } else if (
+    input.rawDescription !== undefined &&
+    !isManuallyEditedRequirements(existing.extractedRequirements) &&
+    !isPlaceholderDescription(input.rawDescription)
+  ) {
+    dataToUpdate.extractedRequirements = serializeRequirementsWithMeta(
+      parseJobDescription(input.rawDescription),
+      "auto"
+    );
   }
 
   if (Object.keys(dataToUpdate).length > 0) {
@@ -137,9 +170,20 @@ export async function updateJob(
   });
   if (!updated) return null;
 
+  const reqState = parseRequirementsState(
+    updated.extractedRequirements,
+    updated.rawDescription,
+    updated.extractFailure
+  );
+  const isPlaceholder = isPlaceholderDescription(updated.rawDescription);
+
   return {
     ...withViewerOutcome(updated, viewerUserId),
-    extractedRequirements: parseRequirementsJson(updated.extractedRequirements),
+    extractedRequirements: reqState.extractedRequirements,
+    requirementsStatus: reqState.requirementsStatus,
+    requirementsSource: reqState.requirementsSource,
+    isPlaceholder,
+    hasFullDescription: !isPlaceholder,
   };
 }
 
@@ -314,7 +358,10 @@ export async function getJobsList(query: JobListQuery = {}) {
     appliedAt: Date | null;
     appliedVariantId: string | null;
     extractedRequirements: JobRequirements;
+    requirementsStatus: RequirementsExtractionStatus;
+    requirementsSource: JobRequirementsSource;
     isPlaceholder: boolean;
+    hasFullDescription: boolean;
     salaryLabel: string | null;
   }> = [];
 
@@ -365,10 +412,19 @@ export async function getJobsList(query: JobListQuery = {}) {
         const { patchProposalBatches: _internal, rawDescription: _rawDescription, ...visible } = item as typeof item & { patchProposalBatches?: unknown };
         void _internal;
         void _rawDescription;
+        const reqState = parseRequirementsState(
+          job.extractedRequirements,
+          job.rawDescription,
+          job.extractFailure
+        );
+        const isPlaceholder = isPlaceholderDescription(job.rawDescription);
         data.push({
           ...visible,
-          extractedRequirements: parseRequirementsJson(job.extractedRequirements),
-          isPlaceholder: isPlaceholderDescription(job.rawDescription),
+          extractedRequirements: reqState.extractedRequirements,
+          requirementsStatus: reqState.requirementsStatus,
+          requirementsSource: reqState.requirementsSource,
+          isPlaceholder,
+          hasFullDescription: !isPlaceholder,
           salaryLabel: extractSalaryFromNotes(job.notes, job.rawDescription),
         });
       }
@@ -402,9 +458,21 @@ export async function getJobById(
 
   if (!job) return null;
 
+  const reqState = parseRequirementsState(
+    job.extractedRequirements,
+    job.rawDescription,
+    job.extractFailure
+  );
+  const isPlaceholder = isPlaceholderDescription(job.rawDescription);
+
   return {
     ...withViewerOutcome(job, viewerUserId),
-    extractedRequirements: parseRequirementsJson(job.extractedRequirements),
+    extractedRequirements: reqState.extractedRequirements,
+    requirementsStatus: reqState.requirementsStatus,
+    requirementsSource: reqState.requirementsSource,
+    isPlaceholder,
+    hasFullDescription: !isPlaceholder,
+    salaryLabel: extractSalaryFromNotes(job.notes, job.rawDescription),
   };
 }
 
@@ -491,17 +559,144 @@ export async function deleteJob(id: string, userId?: string) {
   });
 }
 
-function parseRequirementsJson(jsonStr: string): JobRequirements {
+const EMPTY_REQUIREMENTS: JobRequirements = {
+  requiredSkills: [],
+  preferredSkills: [],
+  domainTerms: [],
+};
+
+function parseRawRequirementsObject(jsonStr: string): {
+  extractedRequirements: JobRequirements;
+  meta: { source: JobRequirementsSource; version?: number } | null;
+} {
   try {
-    const parsed = JSON.parse(jsonStr);
-    return JobRequirementsSchema.parse(parsed);
-  } catch {
+    const raw = JSON.parse(jsonStr) as Record<string, unknown> | null;
+    const extractedRequirements = JobRequirementsSchema.parse(raw ?? {});
+    const metaParsed = JobRequirementsMetaSchema.safeParse(raw?._meta);
     return {
-      requiredSkills: [],
-      preferredSkills: [],
-      domainTerms: [],
+      extractedRequirements,
+      meta: metaParsed.success ? metaParsed.data : null,
     };
+  } catch {
+    return { extractedRequirements: { ...EMPTY_REQUIREMENTS }, meta: null };
   }
+}
+
+export function serializeRequirementsWithMeta(
+  reqs: JobRequirements,
+  source: JobRequirementsSource
+): string {
+  const validated = JobRequirementsSchema.parse(reqs);
+  return JSON.stringify({
+    ...validated,
+    _meta: { source, version: CURRENT_REQUIREMENTS_PARSER_VERSION },
+  });
+}
+
+export function isManuallyEditedRequirements(jsonStr: string): boolean {
+  return parseRawRequirementsObject(jsonStr).meta?.source === "manual";
+}
+
+export function parseRequirementsState(
+  jsonStr: string,
+  rawDescription?: string | null,
+  extractFailure?: string | null
+): {
+  extractedRequirements: JobRequirements;
+  requirementsStatus: RequirementsExtractionStatus;
+  requirementsSource: JobRequirementsSource;
+  needsReparse: boolean;
+  isManual: boolean;
+} {
+  const { extractedRequirements, meta } = parseRawRequirementsObject(jsonStr);
+  const hasAny =
+    extractedRequirements.requiredSkills.length +
+      extractedRequirements.preferredSkills.length +
+      extractedRequirements.domainTerms.length >
+    0;
+  const isPlaceholder = isPlaceholderDescription(rawDescription);
+  const requirementsSource: JobRequirementsSource = meta
+    ? meta.source
+    : hasAny
+      ? "auto"
+      : "unparsed";
+  const isManual = requirementsSource === "manual";
+
+  const isStale =
+    !isManual &&
+    meta !== null &&
+    (meta.source === "auto" || meta.source === "ingested") &&
+    (meta.version ?? 0) < CURRENT_REQUIREMENTS_PARSER_VERSION;
+
+  const needsReparse =
+    !isManual &&
+    !isPlaceholder &&
+    (requirementsSource === "unparsed" || isStale);
+
+  let requirementsStatus: RequirementsExtractionStatus;
+  if (isManual) {
+    requirementsStatus = "ready";
+  } else if (isPlaceholder) {
+    requirementsStatus = extractFailure ? "unavailable" : hasAny ? "ready" : "unparsed";
+  } else if (needsReparse) {
+    requirementsStatus = "unparsed";
+  } else {
+    requirementsStatus = "ready";
+  }
+
+  return {
+    extractedRequirements,
+    requirementsStatus,
+    requirementsSource,
+    needsReparse,
+    isManual,
+  };
+}
+
+export function buildHydratedJobDetail(
+  job: {
+    id: string;
+    rawDescription: string;
+    extractedRequirements: string;
+    extractFailure?: string | null;
+    notes?: string | null;
+    company?: string | null;
+    roleTitle?: string | null;
+  },
+  overrides?: {
+    requirementsStatus?: RequirementsExtractionStatus;
+    extractFailure?: string | null;
+  }
+): HydratedJobDetail {
+  const isPlaceholder = isPlaceholderDescription(job.rawDescription);
+  const extractFailure =
+    overrides?.extractFailure !== undefined
+      ? overrides.extractFailure
+      : (job.extractFailure ?? null);
+  const reqState = parseRequirementsState(
+    job.extractedRequirements,
+    job.rawDescription,
+    extractFailure
+  );
+  const requirementsStatus = overrides?.requirementsStatus ?? reqState.requirementsStatus;
+
+  return HydratedJobDetailSchema.parse({
+    id: job.id,
+    rawDescription: job.rawDescription,
+    isPlaceholder,
+    hasFullDescription: !isPlaceholder,
+    extractedRequirements: reqState.extractedRequirements,
+    requirementsStatus,
+    requirementsSource: reqState.requirementsSource,
+    extractFailure,
+    notes: job.notes ?? null,
+    salaryLabel: extractSalaryFromNotes(job.notes, job.rawDescription),
+    company: job.company ?? null,
+    roleTitle: job.roleTitle ?? null,
+    location: extractLocationFromNotes(job.notes) || null,
+    datePosted: extractPostingDateFromNotes(job.notes) || null,
+    applyUrl: extractApplyUrlFromNotes(job.notes) || null,
+  });
 }
 
 

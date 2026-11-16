@@ -148,7 +148,7 @@ export function CompanyIntelDossierPanel({
   const getFormatBadgeStyle = (format?: string) => {
     switch (format) {
       case "Practical / Systems":
-        return "border-emerald-500/60 bg-emerald-950/40 text-emerald-300";
+        return "border-status-success/45 bg-status-success/15 text-status-success-soft";
       case "Take-home Project":
         return "border-sky-500/60 bg-sky-950/40 text-sky-300";
       case "Behavioral / Values Driven":
@@ -226,7 +226,7 @@ export function CompanyIntelDossierPanel({
             type="button"
             onClick={handleGenerate}
             data-testid="generate-dossier-btn"
-            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-emerald-500 transition"
+            className="inline-flex items-center gap-2 rounded-lg bg-status-success px-4 py-2 text-xs font-semibold text-contrast-ink shadow-md hover:bg-status-success/90 transition"
           >
             <Sparkles className="size-3.5" />
             <span>⚡ Generate Company Intel with AI</span>
@@ -243,7 +243,7 @@ export function CompanyIntelDossierPanel({
   if (isGenerating) {
     return (
       <div className="space-y-4 p-8 rounded-xl border border-hairline bg-inset/70 text-center">
-        <RefreshCw className="size-7 mx-auto text-emerald-400 animate-spin" />
+        <RefreshCw className="size-7 mx-auto text-status-success animate-spin" />
         <div className="space-y-1">
           <h3 className="text-xs font-bold text-foreground">Synthesizing Company Intel for {company}...</h3>
           <p className="text-[11px] text-muted-foreground">
@@ -272,9 +272,9 @@ export function CompanyIntelDossierPanel({
                 <Badge
                   variant="outline"
                   data-testid="badge-whiteboard-free"
-                  className="border-emerald-500/60 bg-emerald-950/60 text-emerald-300 text-[10px] font-semibold gap-1"
+                  className="border-status-success/45 bg-status-success/15 text-status-success-soft text-[10px] font-semibold gap-1"
                 >
-                  <CheckCircle2 className="size-3 text-emerald-400" />
+                  <CheckCircle2 className="size-3 text-status-success" />
                   <span>✓ No Whiteboard Trivia — per Hiring Without Whiteboards</span>
                 </Badge>
               )}
@@ -294,8 +294,8 @@ export function CompanyIntelDossierPanel({
 
       {/* SECTION 1: What They Like Testing */}
       <div className="space-y-3">
-        <h3 className="font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-          <Cpu className="size-3.5 text-emerald-400" /> What They Like Testing
+        <h3 className="font-semibold uppercase tracking-wider text-status-success flex items-center gap-1.5">
+          <Cpu className="size-3.5 text-status-success" /> What They Like Testing
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -323,7 +323,7 @@ export function CompanyIntelDossierPanel({
               <div className="space-y-1.5">
                 {interview.roundBreakdown.map((round, idx) => (
                   <div key={idx} className="flex items-start gap-2 text-text-secondary">
-                    <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 text-[9px] font-bold">
+                    <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-status-success/15 text-status-success-soft border border-status-success/35 text-[9px] font-bold">
                       {idx + 1}
                     </span>
                     <span className="leading-snug">{round}</span>
@@ -338,8 +338,8 @@ export function CompanyIntelDossierPanel({
       {/* SECTION 2: Engineering Culture & Vibe */}
       {culture && (
         <div className="space-y-3">
-          <h3 className="font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-            <Layers className="size-3.5 text-emerald-400" /> Engineering Culture &amp; Vibe
+          <h3 className="font-semibold uppercase tracking-wider text-status-success flex items-center gap-1.5">
+            <Layers className="size-3.5 text-status-success" /> Engineering Culture &amp; Vibe
           </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -372,14 +372,14 @@ export function CompanyIntelDossierPanel({
           {((culture.pros && culture.pros.length > 0) || (culture.cons && culture.cons.length > 0)) && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {culture.pros && culture.pros.length > 0 && (
-                <div className="p-3 rounded-lg border border-emerald-900/30 bg-emerald-950/20 space-y-1.5">
-                  <span className="font-semibold text-emerald-400 text-[11px] flex items-center gap-1">
+                <div className="p-3 rounded-lg border border-status-success/30 bg-status-success/10 space-y-1.5">
+                  <span className="font-semibold text-status-success text-[11px] flex items-center gap-1">
                     <ThumbsUp className="size-3" /> Cultural Strengths
                   </span>
                   <div className="space-y-1">
                     {culture.pros.map((pro, idx) => (
                       <div key={idx} className="flex items-start gap-1.5 text-text-secondary text-[11px]">
-                        <span className="text-emerald-400 font-bold">+</span>
+                        <span className="text-status-success font-bold">+</span>
                         <span>{pro}</span>
                       </div>
                     ))}
@@ -409,8 +409,8 @@ export function CompanyIntelDossierPanel({
 
       {/* SECTION 3: Pro-Tips & Recent Signals */}
       <div className="space-y-3">
-        <h3 className="font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-          <Award className="size-3.5 text-emerald-400" /> Pro-Tips &amp; Recent Hiring Signals
+        <h3 className="font-semibold uppercase tracking-wider text-status-success flex items-center gap-1.5">
+          <Award className="size-3.5 text-status-success" /> Pro-Tips &amp; Recent Hiring Signals
         </h3>
 
         {interview?.proTips && interview.proTips.length > 0 && (
@@ -456,7 +456,7 @@ export function CompanyIntelDossierPanel({
               href={keyValuesUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-text-secondary hover:text-emerald-300 flex items-center gap-1 transition"
+              className="text-text-secondary hover:text-status-success-soft flex items-center gap-1 transition"
             >
               <span>KeyValues profile</span>
               <ExternalLink className="size-3" />
@@ -467,7 +467,7 @@ export function CompanyIntelDossierPanel({
             type="button"
             onClick={handleGenerate}
             disabled={isGenerating}
-            className="text-emerald-400 hover:underline flex items-center gap-1 disabled:opacity-50"
+            className="text-status-success hover:underline flex items-center gap-1 disabled:opacity-50"
           >
             <RefreshCw className={cn("size-3", isGenerating && "animate-spin")} />
             <span>Regenerate Intel</span>

@@ -28,8 +28,8 @@ export function GuardrailFeedback({
     switch (status) {
       case "clean":
         return (
-          <Badge variant="outline" className="border-emerald-500/40 text-emerald-400 bg-emerald-950/30 gap-1">
-            <CheckCircle2 className="size-3 text-emerald-400" />
+          <Badge variant="outline" className="border-status-success/40 text-status-success-soft bg-status-success/15 gap-1">
+            <CheckCircle2 className="size-3 text-status-success" />
             Clean — Guardrail Passed
           </Badge>
         );
@@ -60,12 +60,12 @@ export function GuardrailFeedback({
   return (
     <div className={className} data-testid="guardrail-feedback-container">
       {passed && !hasSoftViolations ? (
-        <Alert className="border-emerald-800/50 bg-emerald-950/20 text-emerald-300">
-          <ShieldCheck className="size-4 text-emerald-400" />
+        <Alert className="border-status-success/40 bg-status-success/10 text-status-success-soft">
+          <ShieldCheck className="size-4 text-status-success" />
           <div className="flex items-center justify-between w-full">
             <div>
-              <AlertTitle className="text-emerald-200 font-semibold">Mechanical Guardrail Verified</AlertTitle>
-              <AlertDescription className="text-xs text-emerald-400/90 mt-0.5">
+              <AlertTitle className="text-status-success-soft font-semibold">Mechanical Guardrail Verified</AlertTitle>
+              <AlertDescription className="text-xs text-status-success mt-0.5">
                 All claims, metrics, and employers conform strictly to frozen master facts.
               </AlertDescription>
             </div>

@@ -28,6 +28,8 @@ import { TrackerSubNav } from "@/components/tracker/tracker-sub-nav";
 import { fetchDemoConfig } from "@/components/auth/session-user";
 import { isSafeHref } from "@/lib/security/safe-url";
 import { type PostedWithin } from "@/lib/jobs/posted-within";
+import { parseJobDescription } from "@/lib/jd-parser/parser";
+import { isPlaceholderDescription } from "@/lib/ingestion/helpers";
 import type { ScoreBreakdown } from "@/lib/scoring/blended-sort";
 import { displayScore } from "@/lib/scoring/blended-display";
 import type { CompatibilityResult } from "@/lib/scoring/compatibility-engine";
@@ -472,7 +474,12 @@ export function DiscoverFeed() {
               notes: [job.location ? `Location: ${job.location}` : "", job.applyUrl ? `Apply: ${job.applyUrl}` : ""]
                 .filter(Boolean)
                 .join("\n"),
-              extractedRequirements: { requiredSkills: [], preferredSkills: [], domainTerms: [] },
+              extractedRequirements:
+                job.description && !isPlaceholderDescription(job.description)
+                  ? parseJobDescription(job.description)
+                  : { requiredSkills: [], preferredSkills: [], domainTerms: [] },
+              requirementsStatus:
+                job.description && !isPlaceholderDescription(job.description) ? "ready" : "unparsed",
               variants: [],
               coverLetters: [],
             });
