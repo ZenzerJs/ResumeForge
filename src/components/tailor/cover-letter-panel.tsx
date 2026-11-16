@@ -348,7 +348,7 @@ export function CoverLetterPanel({
                 data-testid="copy-cover-letter-btn"
                 className="px-3 py-1.5 bg-elevated hover:bg-control/30 text-foreground border border-hairline text-xs rounded-md font-medium transition flex items-center gap-1.5"
               >
-                {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? <Check className="h-3.5 w-3.5 text-status-success" /> : <Copy className="h-3.5 w-3.5" />}
                 {copied ? "Copied!" : "Copy to Clipboard"}
               </button>
 
@@ -372,7 +372,7 @@ export function CoverLetterPanel({
                   onClick={handleSaveToDatabase}
                   disabled={isSaving}
                   data-testid="save-cover-letter-btn"
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs rounded-md font-medium transition flex items-center gap-1.5"
+                  className="px-3 py-1.5 bg-status-success hover:bg-status-success/90 disabled:opacity-50 text-contrast-ink text-xs rounded-md font-semibold transition-colors flex items-center gap-1.5"
                 >
                   {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saveSuccess ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
                   {saveSuccess ? "Saved to Database!" : "Save Cover Letter"}

@@ -6,9 +6,15 @@
   - Why: Navy dark grounds feel generic and muddy against warm gold accents; warm espresso-black grounds keep the editorial desk atmosphere crisp and intentional.
   <!-- 2026-11-13: User rejected navy/blue-tinted dark backgrounds across all workspace and landing surfaces in favor of warm espresso-black grounds. -->
 
-- Define the palette around the **Ember Ink** 3-color motif: 2 neighboring warm hues (`--accent-action` Gold `#f7bd3f` / `247 189 63` + `--accent-secondary` Ember `#ff8b3d` / `255 139 61`) for primary actions, gradients, syntax, and warm glows, plus 1 contrasting hue from the opposite side of the wheel (`--accent-contrast` Electric Blue `#4f8fff` / `79 143 255`) for ATS scores, matched requirements, and telemetry signals.
-  - Why: Separating warm action hues (Gold + Ember) from cool signal/telemetry hues (Electric Blue) creates an immediate visual hierarchy between interactive CTAs and analytical ATS/match data.
+- Define the palette around the **Ember Ink** 3-color motif: 2 neighboring warm hues (`--accent-action` Gold `#f7bd3f` / `247 189 63` + `--accent-secondary` Ember `#ff8b3d` / `255 139 61`) for primary actions, gradients, syntax, and warm glows, plus 1 contrasting hue from the opposite side of the wheel (`--accent-contrast` Electric Blue `#4f8fff` / `79 143 255`) for ATS scores, matched requirements, telemetry signals, and all semantic success/verified/accepted states.
+  - Why: Separating warm action hues (Gold + Ember) from cool signal/telemetry hues (Electric Blue) creates an immediate visual hierarchy between interactive CTAs and analytical/verified states without introducing competing green/emerald/teal palettes.
   <!-- 2026-11-13: User selected Option C (Ember Ink) in the Palette Lab: Gold #f7bd3f + Ember #ff8b3d analogous warm pair with Electric Blue #4f8fff contrast signal. -->
+  <!-- 2026-11-15: Unified semantic success/verified/accepted states onto Electric Blue (--status-success: var(--accent-contrast)) and banned green/emerald/teal status utilities. -->
+
+- Keep every semantic success, verified, accepted, saved, and guardrail-clean token contrast-safe across both dark espresso panels and white resume paper (never use Tailwind `green-*`, `emerald-*`, `teal-*`, `--rf-emerald`, or green hexes like `#6bd69a`/`#10b981`):
+  - **Espresso dark surfaces** (`--surface-deep`..`--surface-elevated`): use `--status-success` (`79 143 255` / `#4f8fff`, `5.03:1–6.39:1` on espresso) for icons/borders/telemetry text, `--status-success-soft` (`147 197 253` / `#93c5fd`, `.text-status-success-soft`, `.status-success-surface`) for body text on tinted `bg-status-success/10..20` fills, and `--contrast-ink` (`3 19 47` / `#03132f`, `text-contrast-ink`, `5.91:1`) for labels on solid `bg-status-success` buttons/pills (never `text-white` on `#4f8fff`).
+  - **White paper highlights** (`--paper-sheet` `#ffffff`): use `.paper-highlight-accepted` (`rgb(var(--status-success) / 0.24)`) for accepted inline overlays, `--status-success-paper` (`29 78 216` / `#1d4ed8`, `6.70:1` on white) via `.paper-action-accepted` for white-text buttons, and `--status-success-paper-bg` (`219 234 254` / `#dbeafe`) + `--contrast-ink` via `.paper-marker-accepted` for paper-side badges/markers.
+  - Why: `#4f8fff` passes AA on espresso darks but fails AA against `#ffffff` or `#ffffff`-on-`#4f8fff`; pairing `--status-success-soft`, `--contrast-ink`, and `--status-success-paper` preserves Ember Ink harmony with >= 4.5:1 legibility everywhere.
 
 ## Surfaces
 

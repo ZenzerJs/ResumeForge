@@ -845,7 +845,7 @@ export function AiSidebar({
                   <span className="font-bold text-amber-300 text-xs">Proposal Summary</span>
                   <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${
                     repairProposal.confidence === "high"
-                      ? "bg-emerald-950 text-emerald-400 border-emerald-800"
+                      ? "bg-status-success/15 text-status-success-soft border-status-success/35"
                       : repairProposal.confidence === "medium"
                       ? "bg-amber-950 text-amber-400 border-amber-800"
                       : "bg-red-950 text-red-400 border-red-800"
@@ -859,8 +859,8 @@ export function AiSidebar({
 
                 {/* Pre-compilation status badge */}
                 {preValidationValid === true && (
-                  <div className="flex items-center gap-1.5 text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 p-2 rounded text-[11px]">
-                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <div className="flex items-center gap-1.5 text-status-success-soft bg-status-success/15 border border-status-success/35 p-2 rounded text-[11px]">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success" />
                     <span>Pre-compilation verification: PASSED</span>
                   </div>
                 )}
@@ -917,7 +917,7 @@ export function AiSidebar({
                           type="button"
                           disabled={preValidationValid === false || (isLargeDiff && !confirmLargeRepair) || repairApplied}
                           onClick={handleApplyRepairFix}
-                          className="flex-1 py-1.5 px-3 rounded font-bold text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white shadow transition cursor-pointer"
+                          className="flex-1 py-1.5 px-3 rounded font-bold text-xs bg-status-success hover:bg-status-success/90 disabled:opacity-50 text-contrast-ink shadow transition cursor-pointer"
                           data-testid="apply-typst-fix-btn"
                         >
                           {repairApplied ? "Fix Applied!" : "Apply Fix"}
@@ -1100,7 +1100,7 @@ export function AiSidebar({
                   disabled={isGenerating || hasApplied}
                   className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition ${
                     hasApplied
-                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                      ? "bg-status-success/15 text-status-success-soft border border-status-success/35"
                       : "bg-amber-500 hover:bg-amber-400 text-[#121010]"
                   }`}
                 >
@@ -1127,7 +1127,7 @@ export function AiSidebar({
                   key={s.id}
                   className={`rounded-lg border p-3 space-y-2 text-xs transition-all ${
                     isAccepted
-                      ? "border-emerald-700/50 bg-emerald-950/30"
+                      ? "border-status-success/40 bg-status-success/15"
                       : isRejected
                       ? "border-hairline bg-inset/40 opacity-50"
                       : "border-hairline bg-inset"
@@ -1148,7 +1148,7 @@ export function AiSidebar({
                     </div>
                   )}
                   {s.after && (
-                    <div className="text-[10px] bg-emerald-950/30 border border-emerald-900/40 rounded p-2 text-emerald-300 font-mono line-clamp-2">
+                    <div className="text-[10px] bg-status-success/10 border border-status-success/30 rounded p-2 text-status-success-soft font-mono line-clamp-2">
                       + {s.after}
                     </div>
                   )}
@@ -1160,7 +1160,7 @@ export function AiSidebar({
                       <button
                         type="button"
                         onClick={() => handleAccept(s.id)}
-                        className="flex-1 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold transition"
+                        className="flex-1 py-1 rounded bg-status-success/15 hover:bg-status-success/25 text-status-success-soft border border-status-success/25 text-[10px] font-semibold transition"
                       >
                         Accept
                       </button>

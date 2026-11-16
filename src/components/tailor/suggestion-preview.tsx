@@ -197,7 +197,9 @@ export async function resolveSuggestionPreview(params: {
   let currentLocations = { ...locations };
   for (const item of pendingAnchors) {
     if (isCancelled()) return;
-    const text = literalPreviewText(item.anchor);
+    // Strip leading Typst line comments (e.g. // RF_BULLET:...) so anchored bullets still locate their rendered text.
+    const candidateAnchor = item.anchor.replace(/^(?:[ \t]*\/\/[^\r\n]*\r?\n)+/, "");
+    const text = literalPreviewText(candidateAnchor);
     if (!text) {
       setBoundedCache(caches.probes, item.probeKey, null, MAX_PROBE_CACHE_ENTRIES, isProbePinned);
       continue;
@@ -208,7 +210,7 @@ export async function resolveSuggestionPreview(params: {
       continue;
     }
     // Preserve a simple list marker in the source while probing its literal content.
-    const rawText = item.anchor.replace(/^\s*[-+]\s+/, "").trim();
+    const rawText = candidateAnchor.replace(/^\s*[-+]\s+/, "").trim();
     const offset = item.anchor.indexOf(rawText);
     if (offset < 0) {
       setBoundedCache(caches.probes, item.probeKey, null, MAX_PROBE_CACHE_ENTRIES, isProbePinned);
@@ -278,6 +280,7 @@ interface Props {
   onSelect: (id: string) => void;
   onDecision: (id: string, decision: Decision) => void;
   renderReview?: RenderReviewFn;
+  evidenceTitles?: Record<string, string>;
 }
 
 export function SuggestionPreview({
@@ -291,6 +294,7 @@ export function SuggestionPreview({
   onSelect,
   onDecision,
   renderReview,
+  evidenceTitles,
 }: Props) {
   const [localCurrent, setLocalCurrent] = React.useState<
     string | null | undefined
@@ -448,15 +452,15 @@ export function SuggestionPreview({
         </p>
       ) : null}
       {!active || active.pages === null ? (
-        <p role="status" className="text-xs text-text-secondary">
+        <p role="status" className="text-xs text-text-secondary transition-opacity duration-150 motion-reduce:transition-none">
           Compiling and locating suggestions…
         </p>
       ) : active.error ? (
-        <p role="alert" className="text-xs text-red-300">
+        <p role="alert" className="text-xs text-red-300 transition-opacity duration-150 motion-reduce:transition-none">
           Preview compilation failed: {active.error}
         </p>
       ) : (
-        <div className="mx-auto max-h-[700px] max-w-[650px] space-y-4 overflow-auto">
+        <div className="mx-auto max-h-[700px] max-w-[650px] space-y-4 overflow-auto transition-opacity duration-150 motion-reduce:transition-none">
           {active.pages.map((page, pageIndex) => (
             <div key={pageIndex} className="relative bg-white">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -472,7 +476,7 @@ export function SuggestionPreview({
                     <React.Fragment key={`${patch.id}-${locationIndex}`}>
                       <span
                         aria-hidden="true"
-                        className={`pointer-events-none absolute rounded-sm ${selected === patch.id ? "bg-amber-400/45" : decisions[patch.id] === "accepted" ? "bg-emerald-300/40" : decisions[patch.id] === "rejected" ? "bg-red-300/30" : "bg-amber-300/30"}`}
+                        className={`pointer-events-none absolute rounded-sm ${selected === patch.id ? "bg-amber-400/45" : decisions[patch.id] === "accepted" ? "paper-highlight-accepted" : decisions[patch.id] === "rejected" ? "bg-red-300/30" : "bg-amber-300/30"}`}
                         style={{
                           left: `${location.left}%`,
                           top: `${location.top}%`,
@@ -485,7 +489,7 @@ export function SuggestionPreview({
                           type="button"
                           aria-label={`Review suggestion ${patchIndex + 1}, ${decisions[patch.id] || "pending"}`}
                           onClick={() => onSelect(patch.id)}
-                          className={`absolute z-10 flex h-7 min-w-7 -translate-y-1/2 items-center justify-center rounded-full border px-1 text-xs font-bold text-primary-foreground shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 ${decisions[patch.id] === "accepted" ? "border-emerald-800 bg-emerald-300" : decisions[patch.id] === "rejected" ? "border-red-800 bg-red-300" : "border-amber-700 bg-amber-300"}`}
+                          className={`absolute z-10 flex h-7 min-w-7 -translate-y-1/2 items-center justify-center rounded-full border px-1 text-xs font-bold shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 ${decisions[patch.id] === "accepted" ? "paper-marker-accepted" : decisions[patch.id] === "rejected" ? "border-red-800 bg-red-300 text-primary-foreground" : "border-amber-700 bg-amber-300 text-primary-foreground"}`}
                           style={{
                             left: `max(0px, calc(${location.left}% - 34px))`,
                             top: `${location.top}%`,
@@ -511,31 +515,39 @@ export function SuggestionPreview({
       {selectedPatch && (
         <div
           ref={detailRef}
-          className="space-y-2 rounded-lg border border-amber-700/50 bg-inset p-3 text-xs text-foreground"
+          className="space-y-2 rounded-lg border border-amber-700/50 bg-inset p-3 text-sm text-foreground transition-opacity duration-150 motion-reduce:transition-none"
           aria-live="polite"
         >
-          <p className="font-semibold text-amber-300">
+          <p className="text-xs font-semibold text-amber-300">
             Suggestion {patches.indexOf(selectedPatch) + 1} ·{" "}
             {decisions[selectedPatch.id] || "pending"}
           </p>
-          <p>
+          <p className="break-words leading-relaxed">
             <strong>Before:</strong> {selectedPatch.before || "(empty)"}
           </p>
-          <p>
+          <p className="break-words leading-relaxed">
             <strong>After:</strong> {selectedPatch.after || "(empty)"}
           </p>
-          <p>
+          <p className="break-words text-xs leading-relaxed text-text-secondary">
             <strong>Reason:</strong> {selectedPatch.rationale}
           </p>
-          <p className="break-all">
-            <strong>Evidence:</strong> {selectedPatch.evidenceIds.join(", ")}
+          <p className="break-words text-xs text-text-secondary">
+            <strong>Evidence:</strong>{" "}
+            {selectedPatch.evidenceIds
+              .map((eid) => evidenceTitles?.[eid] || eid)
+              .join(", ")}
+            {evidenceTitles && selectedPatch.evidenceIds.some((eid) => evidenceTitles[eid]) ? (
+              <span className="mt-1 block break-all font-mono text-[11px] text-muted-foreground">
+                IDs: {selectedPatch.evidenceIds.join(", ")}
+              </span>
+            ) : null}
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => onDecision(selectedPatch.id, "accepted")}
               aria-pressed={decisions[selectedPatch.id] === "accepted"}
-              className="rounded bg-emerald-800 px-3 py-2 text-white"
+              className="rounded px-3 py-2 text-xs font-semibold paper-action-accepted transition-colors motion-reduce:transition-none"
             >
               Accept
             </button>
@@ -543,7 +555,7 @@ export function SuggestionPreview({
               type="button"
               onClick={() => onDecision(selectedPatch.id, "rejected")}
               aria-pressed={decisions[selectedPatch.id] === "rejected"}
-              className="rounded bg-red-900 px-3 py-2 text-white"
+              className="rounded bg-red-900 px-3 py-2 text-xs font-semibold text-white transition-colors motion-reduce:transition-none"
             >
               Reject
             </button>

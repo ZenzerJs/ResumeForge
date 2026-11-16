@@ -276,7 +276,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
   const difficultyBadgeStyle = (difficulty: DsaProblem["difficulty"]) => {
     switch (difficulty) {
       case "Easy":
-        return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+        return "bg-status-success/10 text-status-success-soft border-status-success/25";
       case "Medium":
         return "bg-amber-500/10 text-amber-400 border-amber-500/20";
       case "Hard":
@@ -287,7 +287,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
   const statusBadgeStyle = (status: DsaExecutionSummary["status"]) => {
     switch (status) {
       case "Accepted":
-        return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
+        return "bg-status-success/15 text-status-success-soft border-status-success/35";
       case "Wrong Answer":
         return "bg-rose-500/15 text-rose-400 border-rose-500/30";
       case "Time Limit Exceeded":
@@ -477,7 +477,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                 </div>
                 <div>
                   <span className="font-semibold text-muted-foreground">Output: </span>
-                  <span className="text-emerald-400">{example.output}</span>
+                  <span className="text-status-success-soft">{example.output}</span>
                 </div>
                 {example.explanation && (
                   <div className="border-t border-hairline pt-1.5 font-sans text-[11px] leading-relaxed text-text-secondary">
@@ -668,7 +668,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
             {scorecard && (
               <div
                 data-testid="dsa-scorecard-panel"
-                className="space-y-2.5 rounded-lg border border-emerald-500/30 bg-emerald-950/15 p-3 text-xs"
+                className="space-y-2.5 rounded-lg border border-status-success/30 bg-status-success/10 p-3 text-xs"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-semibold text-foreground">
@@ -683,13 +683,13 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-[11px]">
                   <div className="rounded border border-hairline bg-inset p-2">
                     <span className="block text-[10px] text-muted-foreground">Time Complexity</span>
-                    <span className={scorecard.complexityAudit.isTimeOptimal ? "text-emerald-400" : "text-amber-300"}>
+                    <span className={scorecard.complexityAudit.isTimeOptimal ? "text-status-success-soft" : "text-amber-300"}>
                       {scorecard.complexityAudit.detectedTimeComplexity} (target {scorecard.complexityAudit.optimalTimeComplexity})
                     </span>
                   </div>
                   <div className="rounded border border-hairline bg-inset p-2">
                     <span className="block text-[10px] text-muted-foreground">Space Complexity</span>
-                    <span className={scorecard.complexityAudit.isSpaceOptimal ? "text-emerald-400" : "text-amber-300"}>
+                    <span className={scorecard.complexityAudit.isSpaceOptimal ? "text-status-success-soft" : "text-amber-300"}>
                       {scorecard.complexityAudit.detectedSpaceComplexity} (target {scorecard.complexityAudit.optimalSpaceComplexity})
                     </span>
                   </div>
@@ -879,7 +879,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                     <span>Case {idx + 1}</span>
                     {res &&
                       (res.passed ? (
-                        <CheckCircle2 className="h-3 w-3 text-emerald-400" aria-label="Passed" />
+                        <CheckCircle2 className="h-3 w-3 text-status-success" aria-label="Passed" />
                       ) : (
                         <XCircle className="h-3 w-3 text-rose-400" aria-label="Failed" />
                       ))}
@@ -904,7 +904,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                     <span className="font-sans text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Expected Output
                     </span>
-                    <span className="text-emerald-400">{JSON.stringify(activeTestCase.expected)}</span>
+                    <span className="text-status-success-soft">{JSON.stringify(activeTestCase.expected)}</span>
                   </div>
 
                   <span className="block pt-1 font-sans text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -916,7 +916,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                       "whitespace-pre-wrap rounded-md border bg-inset p-2",
                       activeResult
                         ? activeResult.passed
-                          ? "border-emerald-500/30 text-emerald-300"
+                          ? "border-status-success/35 text-status-success-soft"
                           : "border-rose-500/30 text-rose-300"
                         : "border-hairline text-muted-foreground"
                     )}

@@ -38,6 +38,11 @@ import {
 } from "@/lib/ingestion/helpers";
 import { matchesPostedWithin, type PostedWithin } from "@/lib/jobs/posted-within";
 import { fetchDemoConfig } from "@/components/auth/session-user";
+import { parseJobDescription } from "@/lib/jd-parser/parser";
+import {
+  HydratedJobDetailSchema,
+  type HydratedJobDetail,
+} from "@/lib/jd-parser/types";
 
 export type { JobItem, JobVariant, JobCoverLetter };
 
@@ -121,6 +126,7 @@ type ApiPayload<T = unknown> = {
     id?: string;
     status?: string;
     rawDescription?: string;
+    job?: unknown;
     source?: string;
     skipped?: boolean;
     success?: boolean;
@@ -133,6 +139,48 @@ async function readJsonSafe<T = unknown>(res: Response): Promise<ApiPayload<T> |
   } catch {
     return null;
   }
+}
+
+export function applyHydratedDetailToJobItem(
+  job: JobItem,
+  detail: HydratedJobDetail
+): JobItem {
+  return {
+    ...job,
+    rawDescription: detail.rawDescription,
+    isPlaceholder: detail.isPlaceholder,
+    hasFullDescription: detail.hasFullDescription,
+    extractedRequirements: detail.extractedRequirements,
+    requirementsStatus: detail.requirementsStatus,
+    requirementsSource: detail.requirementsSource,
+    extractFailure: detail.extractFailure,
+    notes: detail.notes ?? job.notes,
+    salaryLabel: detail.salaryLabel ?? job.salaryLabel,
+    company: detail.company ?? job.company,
+    roleTitle: detail.roleTitle ?? job.roleTitle,
+  };
+}
+
+/**
+ * Select job IDs eligible for automatic background hydration on /tracker.
+ * Cached descriptions with unparsed requirements parse locally without external HTTP,
+ * whereas placeholder descriptions requiring external scraping are fetched only for the active job.
+ */
+export function selectPendingHydrationJobIds(
+  jobs: JobItem[],
+  activeJobId: string | null,
+  attemptedIds: Set<string>
+): string[] {
+  return jobs
+    .filter((j) => {
+      if (attemptedIds.has(j.id)) return false;
+      const isPlaceholder = j.isPlaceholder ?? isPlaceholderDescription(j.rawDescription);
+      const needsDescription = isPlaceholder && !j.extractFailure && j.id === activeJobId;
+      const needsRequirements = !isPlaceholder && j.requirementsStatus === "unparsed";
+      return needsDescription || needsRequirements;
+    })
+    .sort((a, b) => Number(b.id === activeJobId) - Number(a.id === activeJobId))
+    .map((j) => j.id);
 }
 
 export function mergePatchedGuestJobs<T extends { id: string }>(prev: T[], next: T[]): T[] {
@@ -178,6 +226,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const [isSavingNotes, setIsSavingNotes] = useState<{ [id: string]: boolean }>({});
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<{ [id: string]: boolean }>({});
   const [isFetchingTier2, setIsFetchingTier2] = useState<Record<string, boolean>>({});
+  const [hydratingIds, setHydratingIds] = useState<Record<string, boolean>>({});
   const [tier2Notice, setTier2Notice] = useState<Record<string, string>>({});
   const [isImporting, setIsImporting] = useState(false);
   const [importNotice, setImportNotice] = useState<string | null>(null);
@@ -249,16 +298,46 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           const raw = localStorage.getItem("resumeforge_guest_jobs");
           const parsed = raw ? JSON.parse(raw) : [];
           if (Array.isArray(parsed)) {
-            localJobs = parsed.map((job) => ({
-              ...job,
-              source: job.source || "pasted",
-              status: ALL_STATUSES.includes(job.status) ? job.status : "SAVED",
-              createdAt: job.createdAt || new Date().toISOString(),
-              notes: job.notes || "",
-              extractedRequirements: job.extractedRequirements || { requiredSkills: [], preferredSkills: [], domainTerms: [] },
-              variants: Array.isArray(job.variants) ? job.variants : [],
-              coverLetters: Array.isArray(job.coverLetters) ? job.coverLetters : [],
-            }));
+            localJobs = parsed.map((job) => {
+              const isPlaceholder = isPlaceholderDescription(job.rawDescription);
+              const existingReqs = job.extractedRequirements || {
+                requiredSkills: [],
+                preferredSkills: [],
+                domainTerms: [],
+              };
+              const hasAnyReq =
+                (existingReqs.requiredSkills?.length ?? 0) +
+                  (existingReqs.preferredSkills?.length ?? 0) +
+                  (existingReqs.domainTerms?.length ?? 0) >
+                0;
+              const shouldParse =
+                !isPlaceholder &&
+                !hasAnyReq &&
+                job.requirementsSource !== "manual" &&
+                (!job.requirementsStatus || job.requirementsStatus === "unparsed");
+              const extractedRequirements = shouldParse
+                ? parseJobDescription(job.rawDescription || "")
+                : existingReqs;
+              return {
+                ...job,
+                source: job.source || "pasted",
+                status: ALL_STATUSES.includes(job.status) ? job.status : "SAVED",
+                createdAt: job.createdAt || new Date().toISOString(),
+                notes: job.notes || "",
+                isPlaceholder,
+                hasFullDescription: !isPlaceholder,
+                extractedRequirements,
+                requirementsStatus: job.requirementsStatus
+                  ? job.requirementsStatus
+                  : !isPlaceholder
+                    ? "ready"
+                    : job.extractFailure
+                      ? "unavailable"
+                      : "unparsed",
+                variants: Array.isArray(job.variants) ? job.variants : [],
+                coverLetters: Array.isArray(job.coverLetters) ? job.coverLetters : [],
+              };
+            });
           }
         } catch {
           localJobs = [];
@@ -375,67 +454,120 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
     else sessionStorage.removeItem("resumeforge_active_job_id");
   }, [isDemoMode, isLoading, activeJobId, jobs]);
 
-  // Automatically fetch + persist descriptions for placeholder rows on the current page.
-  // The server stores them on the Job row, so each posting is fetched at most once.
+  // Automatically hydrate cached descriptions with unparsed requirements and the active placeholder job.
+  // Avoid bulk-scraping unselected placeholder URLs on mount so initial page load stays responsive.
   useEffect(() => {
     if (isLoading || isDemoMode) return;
     const attempted = hydrateAttemptedRef.current;
-    const pending = jobs
-      .filter((j) => (j.isPlaceholder ?? isPlaceholderDescription(j.rawDescription)) && !j.extractFailure && !attempted.has(j.id))
-      .sort((a, b) => Number(b.id === activeJobId) - Number(a.id === activeJobId))
-      .map((j) => j.id);
-    if (pending.length === 0) return;
-    pending.forEach((id) => attempted.add(id));
+    const pendingIds = selectPendingHydrationJobIds(jobs, activeJobId, attempted);
+    if (pendingIds.length === 0) return;
+    pendingIds.forEach((id) => attempted.add(id));
 
     void (async () => {
-      const BATCH = 6;
+      const BATCH = 8;
       let done = 0;
-      setHydrateProgress({ done: 0, total: pending.length });
-      for (let i = 0; i < pending.length; i += BATCH) {
-        if (!mountedRef.current) return;
-        const ids = pending.slice(i, i + BATCH);
-        try {
-          const res = await fetch("/api/jobs/hydrate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ids }),
-          });
-          const json = await readJsonSafe(res);
+      setHydrateProgress({ done: 0, total: pendingIds.length });
+      setHydratingIds((prev) => {
+        const next = { ...prev };
+        pendingIds.forEach((id) => {
+          next[id] = true;
+        });
+        return next;
+      });
+      try {
+        for (let i = 0; i < pendingIds.length; i += BATCH) {
           if (!mountedRef.current) return;
-          if (res.status === 401 || res.status === 429) {
-            break;
-          }
-          if (res.ok && json?.success) {
-            const results = (json.results ?? []) as Array<{ id: string; status: string; rawDescription?: string }>;
-            const filled = new Map<string, string>(
-              results
-                .filter((r) => r.rawDescription)
-                .map((r) => [r.id, r.rawDescription as string]),
-            );
-            const failedIds = new Set<string>(
-              results.filter((r) => r.status === "failed").map((r) => r.id),
-            );
-            if (filled.size > 0 || failedIds.size > 0) {
-              setJobs((prev) =>
-                prev.map((j) => {
-                  if (filled.has(j.id)) {
-                    return { ...j, rawDescription: filled.get(j.id), isPlaceholder: false, extractFailure: null };
-                  }
-                  if (failedIds.has(j.id)) {
-                    return { ...j, extractFailure: "failed" };
-                  }
-                  return j;
-                }),
-              );
+          const ids = pendingIds.slice(i, i + BATCH);
+          try {
+            const res = await fetch("/api/jobs/hydrate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ids }),
+            });
+            const json = await readJsonSafe(res);
+            if (!mountedRef.current) return;
+            if (res.status === 401 || res.status === 429) {
+              break;
             }
+            if (res.ok && json?.success) {
+              const results = (json.results ?? []) as Array<{
+                id: string;
+                status: string;
+                rawDescription?: string;
+                job?: unknown;
+              }>;
+              const hydratedById = new Map<string, HydratedJobDetail>();
+              const fallbackDescById = new Map<string, string>();
+              const failedIds = new Set<string>();
+
+              for (const r of results) {
+                const parsedDetail = r.job ? HydratedJobDetailSchema.safeParse(r.job) : null;
+                if (parsedDetail?.success) {
+                  hydratedById.set(r.id, parsedDetail.data);
+                } else if (r.rawDescription) {
+                  fallbackDescById.set(r.id, r.rawDescription);
+                }
+                if (r.status === "failed") {
+                  failedIds.add(r.id);
+                }
+              }
+
+              if (hydratedById.size > 0 || fallbackDescById.size > 0 || failedIds.size > 0) {
+                setJobs((prev) =>
+                  prev.map((j) => {
+                    const detail = hydratedById.get(j.id);
+                    if (detail) {
+                      return applyHydratedDetailToJobItem(j, detail);
+                    }
+                    if (fallbackDescById.has(j.id)) {
+                      return {
+                        ...j,
+                        rawDescription: fallbackDescById.get(j.id),
+                        isPlaceholder: false,
+                        hasFullDescription: true,
+                        extractFailure: null,
+                      };
+                    }
+                    if (failedIds.has(j.id)) {
+                      const isPlaceholder = j.isPlaceholder ?? isPlaceholderDescription(j.rawDescription);
+                      return {
+                        ...j,
+                        extractFailure: j.extractFailure ?? "failed",
+                        requirementsStatus: isPlaceholder ? "unavailable" : j.requirementsStatus,
+                      };
+                    }
+                    return j;
+                  }),
+                );
+              }
+            }
+          } catch {
+            // Best effort; the manual "Pull Full Description" / Retry button remains in the detail pane.
           }
-        } catch {
-          // Best effort; the manual "Pull Full Description" button remains in the detail pane.
+          if (mountedRef.current) {
+            setHydratingIds((prev) => {
+              const next = { ...prev };
+              ids.forEach((id) => {
+                delete next[id];
+              });
+              return next;
+            });
+          }
+          done += ids.length;
+          if (mountedRef.current) setHydrateProgress({ done, total: pendingIds.length });
         }
-        done += ids.length;
-        if (mountedRef.current) setHydrateProgress({ done, total: pending.length });
+      } finally {
+        if (mountedRef.current) {
+          setHydratingIds((prev) => {
+            const next = { ...prev };
+            pendingIds.forEach((id) => {
+              delete next[id];
+            });
+            return next;
+          });
+          setHydrateProgress(null);
+        }
       }
-      if (mountedRef.current) setHydrateProgress(null);
     })();
   }, [jobs, isLoading, isDemoMode, activeJobId]);
 
@@ -663,16 +795,24 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
 
     try {
       const res = await fetch(`/api/jobs/${jobId}/fetch-fulltext`, { method: "POST" });
-      const json = await readJsonSafe<{ rawDescription: string }>(res);
+      const json = await readJsonSafe<HydratedJobDetail | { rawDescription: string }>(res);
+      const parsedDetail = json?.data ? HydratedJobDetailSchema.safeParse(json.data) : null;
       if (res.ok && json?.success && json.data) {
-        const rawDescription = json.data.rawDescription;
-        setJobs((prev) =>
-          prev.map((j) =>
-            j.id === jobId
-              ? { ...j, rawDescription, isPlaceholder: false }
-              : j,
-          ),
-        );
+        if (parsedDetail?.success) {
+          const detail = parsedDetail.data;
+          setJobs((prev) =>
+            prev.map((j) => (j.id === jobId ? applyHydratedDetailToJobItem(j, detail) : j)),
+          );
+        } else {
+          const rawDescription = json.data.rawDescription;
+          setJobs((prev) =>
+            prev.map((j) =>
+              j.id === jobId
+                ? { ...j, rawDescription, isPlaceholder: false, hasFullDescription: true, extractFailure: null }
+                : j,
+            ),
+          );
+        }
         setTier2Notice((p) => ({
           ...p,
           [jobId]: json.cached
@@ -680,6 +820,27 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             : "Successfully extracted full job description!",
         }));
       } else {
+        if (parsedDetail?.success) {
+          const detail = parsedDetail.data;
+          setJobs((prev) =>
+            prev.map((j) => (j.id === jobId ? applyHydratedDetailToJobItem(j, detail) : j)),
+          );
+        } else {
+          setJobs((prev) =>
+            prev.map((j) =>
+              j.id === jobId
+                ? {
+                    ...j,
+                    extractFailure: j.extractFailure ?? "failed",
+                    requirementsStatus:
+                      (j.isPlaceholder ?? isPlaceholderDescription(j.rawDescription))
+                        ? "unavailable"
+                        : j.requirementsStatus,
+                  }
+                : j,
+            ),
+          );
+        }
         setTier2Notice((p) => ({
           ...p,
           [jobId]:
@@ -760,6 +921,10 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const handleToggleNotes = (jobId: string) => {
     handleSelectJob(jobId);
   };
+
+  const handleJobLoaded = useCallback((loaded: JobItem) => {
+    setJobs((prev) => prev.map((j) => (j.id === loaded.id ? { ...j, ...loaded } : j)));
+  }, []);
 
   const effectiveStatuses = filterStatuses ?? ALL_STATUSES;
   const pageJobs = jobs;
@@ -1297,6 +1462,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
               isSavingNotes={Boolean(isSavingNotes[selectedJob.id])}
               isUpdatingStatus={Boolean(isUpdatingStatus[selectedJob.id])}
               isFetchingFullText={Boolean(isFetchingTier2[selectedJob.id])}
+              isHydrating={Boolean(hydratingIds[selectedJob.id])}
               tier2Notice={tier2Notice[selectedJob.id]}
               showNotes
               onStatusChange={handleStatusChange}
@@ -1306,9 +1472,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
               }
               onSaveNotes={handleSaveNotes}
               onFetchFullText={handleFetchFullText}
-              onJobLoaded={(loaded) =>
-                setJobs((prev) => prev.map((j) => (j.id === loaded.id ? { ...j, ...loaded } : j)))
-              }
+              onJobLoaded={handleJobLoaded}
             />
           ) : (
             <div className="flex h-full items-center justify-center bg-rf-surface px-6 text-center">
@@ -1328,6 +1492,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             isSavingNotes={Boolean(isSavingNotes[selectedJob.id])}
             isUpdatingStatus={Boolean(isUpdatingStatus[selectedJob.id])}
             isFetchingFullText={Boolean(isFetchingTier2[selectedJob.id])}
+            isHydrating={Boolean(hydratingIds[selectedJob.id])}
             tier2Notice={tier2Notice[selectedJob.id]}
             showNotes
             isSheet
@@ -1343,9 +1508,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             }
             onSaveNotes={handleSaveNotes}
             onFetchFullText={handleFetchFullText}
-            onJobLoaded={(loaded) =>
-              setJobs((prev) => prev.map((j) => (j.id === loaded.id ? { ...j, ...loaded } : j)))
-            }
+            onJobLoaded={handleJobLoaded}
           />
         </div>
       )}

@@ -16,6 +16,9 @@ import {
 } from "./types";
 import { JobSource as PrismaJobSource, Prisma, WorkplaceType as PrismaWorkplaceType } from "@prisma/client";
 import { ParsedIngestedRequirementsSchema } from "@/lib/jd-parser/types";
+import { parseJobDescription } from "@/lib/jd-parser/parser";
+import { isPlaceholderDescription } from "@/lib/ingestion/helpers";
+import { serializeRequirementsWithMeta } from "@/lib/db/jobs";
 import { computeIngestedJobEnrichment } from "./enrichment";
 
 export const CONNECTORS: Record<SourceConnector, ConnectorClient> = {
@@ -305,6 +308,13 @@ export async function promoteIngestedJobToTrackedJob(
       : null,
   ].filter(Boolean);
 
+  const parsedIngested = ParsedIngestedRequirementsSchema.safeParse(ingested.parsedRequirements);
+  const extractedRequirementsJson = parsedIngested.success
+    ? serializeRequirementsWithMeta(parsedIngested.data.requirements, "ingested")
+    : !isPlaceholderDescription(ingested.description)
+      ? serializeRequirementsWithMeta(parseJobDescription(ingested.description), "auto")
+      : JSON.stringify({ requiredSkills: [], preferredSkills: [], domainTerms: [] });
+
   // Create corresponding Job record and link trackedJobId atomically
   return await prisma.$transaction(async (tx) => {
     const createdJob = await tx.job.create({
@@ -313,6 +323,7 @@ export async function promoteIngestedJobToTrackedJob(
         company: ingested.companyName,
         roleTitle: ingested.title,
         rawDescription: ingested.description,
+        extractedRequirements: extractedRequirementsJson,
         source: ingested.source.toLowerCase(),
         status: "SAVED",
         notes: notesParts.join(" | "),

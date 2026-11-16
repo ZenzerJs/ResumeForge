@@ -1,8 +1,20 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import {
+  InvalidPatchCitationError,
+  createVerifiedEvidenceRegistry,
+  resolvePatchCitationReferences,
+  type PatchCitationInput,
+  type NormalizedPatchCitation,
+} from "@/lib/ai/patch-schema";
 
-export type PatchCitationInput = string | { evidenceId?: string; bulletId?: string };
-export interface NormalizedPatchCitation { evidenceId?: string; bulletId?: string }
+export {
+  InvalidPatchCitationError,
+  createVerifiedEvidenceRegistry,
+  resolvePatchCitationReferences,
+  type PatchCitationInput,
+  type NormalizedPatchCitation,
+};
 export interface PatchCitationReadResult {
   citations: NormalizedPatchCitation[];
   unresolvedLegacyReferences: string[];
@@ -16,62 +28,14 @@ interface EvidenceForCitation {
 }
 type CitationLookup = Pick<Prisma.TransactionClient, "evidenceItem">;
 
-export class InvalidPatchCitationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "InvalidPatchCitationError";
-  }
-}
-
 /** Exact-ID resolution for legacy string citations and validated current inputs. */
 export function normalizePatchCitations(
   references: readonly PatchCitationInput[],
   evidenceItems: readonly EvidenceForCitation[],
   ownerId: string
 ): NormalizedPatchCitation[] {
-  if (references.length === 0) {
-    throw new InvalidPatchCitationError("A patch must cite evidence or a verified bullet.");
-  }
-  const ownerEvidence = evidenceItems.filter(
-    (item) => item.userId === ownerId && item.status === "verified"
-  );
-  const evidenceById = new Map(ownerEvidence.map((item) => [item.id, item]));
-  const bulletById = new Map(ownerEvidence.flatMap((item) =>
-    item.bullets
-      .filter((bullet) => bullet.verified && bullet.evidenceId === item.id)
-      .map((bullet) => [bullet.id, { bullet, evidence: item }] as const)
-  ));
-
-  return references.map((reference) => {
-    if (typeof reference === "string") {
-      const evidence = evidenceById.get(reference);
-      if (evidence) return { evidenceId: evidence.id };
-      const bullet = bulletById.get(reference);
-      if (bullet) return { bulletId: bullet.bullet.id };
-      throw new InvalidPatchCitationError(
-        "Citation is unavailable, unverified, archived, or not owned by this user."
-      );
-    }
-    const evidenceId = reference.evidenceId;
-    const bulletId = reference.bulletId;
-    if ((!evidenceId && !bulletId) || evidenceId === "" || bulletId === "") {
-      throw new InvalidPatchCitationError("A citation needs a non-empty evidenceId or bulletId.");
-    }
-    const evidence = evidenceId ? evidenceById.get(evidenceId) : undefined;
-    const bullet = bulletId ? bulletById.get(bulletId) : undefined;
-    if ((evidenceId && !evidence) || (bulletId && !bullet)) {
-      throw new InvalidPatchCitationError(
-        "Citation is unavailable, unverified, archived, or not owned by this user."
-      );
-    }
-    if (evidence && bullet && bullet.evidence.id !== evidence.id) {
-      throw new InvalidPatchCitationError("The cited bullet does not belong to the cited evidence item.");
-    }
-    return {
-      ...(evidenceId ? { evidenceId } : {}),
-      ...(bulletId ? { bulletId } : {}),
-    };
-  });
+  const registry = createVerifiedEvidenceRegistry(evidenceItems, ownerId);
+  return resolvePatchCitationReferences(references, registry);
 }
 
 async function findVerifiedOwnerEvidence(

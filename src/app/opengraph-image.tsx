@@ -131,7 +131,7 @@ export default async function Image() {
               border: "1px solid #3a322f",
               padding: "10px 20px",
               borderRadius: "9999px",
-              color: "#6bd69a",
+              color: "#4f8fff",
               fontSize: "16px",
               fontWeight: 700,
             }}

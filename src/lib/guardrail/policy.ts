@@ -1,13 +1,20 @@
-import { ResumeFacts } from "@/lib/facts/types";
+import { ResumeFacts, TailoringValidationContext } from "@/lib/facts/types";
+import type { PatchCitationObject, PatchErrorCategory } from "@/lib/ai/patch-schema";
 import { checkGuardrail } from "./check";
 import { GuardrailResult, GuardrailStatus } from "./types";
 
 export class GuardrailBlockError extends Error {
   public result: GuardrailResult;
-  constructor(message: string, result: GuardrailResult) {
+  public errorCategory: PatchErrorCategory;
+  constructor(
+    message: string,
+    result: GuardrailResult,
+    errorCategory: PatchErrorCategory = "evidence_unavailable"
+  ) {
     super(message);
     this.name = "GuardrailBlockError";
     this.result = result;
+    this.errorCategory = errorCategory;
   }
 }
 
@@ -60,7 +67,7 @@ export function stripPatchedDocumentMarker(typstSource: string): string {
  */
 export function assertCanExport(
   source: string,
-  masterFacts?: ResumeFacts | null,
+  masterFacts?: ResumeFacts | TailoringValidationContext | null,
   options?: AssertCanExportOptions
 ): GuardrailResult {
   if (!masterFacts) {
@@ -91,7 +98,8 @@ export function assertCanExport(
     };
     throw new GuardrailBlockError(
       "Export blocked by mechanical guardrail: Freeze your master resume first before exporting a tailored or AI-patched variant.",
-      missingMasterResult
+      missingMasterResult,
+      "stale_resume_or_job"
     );
   }
 
@@ -113,12 +121,14 @@ export function assertCanExport(
  */
 export function assertCanApplyPatches(
   candidateTypst: string,
-  masterFacts: ResumeFacts,
+  masterFacts: ResumeFacts | TailoringValidationContext,
   patches?: Array<{
     id?: string;
+    operation?: string;
     after?: string;
     afterContent?: string;
     evidenceIds?: string[];
+    citations?: PatchCitationObject[];
   }>,
   options?: { acknowledgedSkills?: string[] }
 ): GuardrailResult {
@@ -158,7 +168,7 @@ export interface TailoringGenerationResult {
 export async function executeTailoringWithRetry(
   generateFn: (feedback?: string) => Promise<{ patches: any[]; gaps: any[] }>,
   masterTypst: string,
-  masterFacts: ResumeFacts
+  masterFacts: ResumeFacts | TailoringValidationContext
 ): Promise<TailoringGenerationResult> {
   // Attempt 1
   const attempt1 = await generateFn();

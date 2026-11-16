@@ -47,8 +47,8 @@ function CodeBlock({
         >
           {copied ? (
             <>
-              <Check className="size-3 text-emerald-400" />
-              <span className="text-emerald-400">Copied</span>
+              <Check className="size-3 text-status-success" />
+              <span className="text-status-success-soft">Copied</span>
             </>
           ) : (
             <>

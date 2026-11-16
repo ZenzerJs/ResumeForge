@@ -149,7 +149,7 @@ export function ConfirmMasterDialog({
             <span>Source Diff Review</span>
             {diff && (diff.stats.addedCount > 0 || diff.stats.deletedCount > 0) && (
               <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-inset border border-hairline">
-                <span className="text-emerald-400 font-bold">+{diff.stats.addedCount}</span>
+                <span className="text-status-success-soft font-bold">+{diff.stats.addedCount}</span>
                 <span className="text-red-400 font-bold">-{diff.stats.deletedCount}</span>
               </span>
             )}
@@ -205,7 +205,7 @@ export function ConfirmMasterDialog({
             {/* Metrics */}
             <div className="p-3 bg-inset rounded-lg border border-hairline space-y-1.5">
               <div className="flex items-center gap-1.5 font-semibold text-foreground text-xs">
-                <Hash className="size-3.5 text-emerald-400" />
+                <Hash className="size-3.5 text-status-success" />
                 <span>Extracted Metrics ({facts.metrics.filter((m) => !m.isTrivial).length} non-trivial)</span>
               </div>
               <div className="flex flex-wrap gap-1.5 pt-1">
@@ -213,7 +213,7 @@ export function ConfirmMasterDialog({
                   facts.metrics
                     .filter((m) => !m.isTrivial)
                     .map((m, i) => (
-                      <Badge key={i} variant="outline" className="border-emerald-700/60 bg-emerald-950/40 text-emerald-300">
+                      <Badge key={i} variant="outline" className="border-status-success/35 bg-status-success/15 text-status-success-soft">
                         {m.raw}
                       </Badge>
                     ))
@@ -271,8 +271,8 @@ export function ConfirmMasterDialog({
                 data-testid="master-diff-container"
                 className="p-4 rounded-lg bg-inset border border-hairline text-xs text-text-secondary space-y-2"
               >
-                <div className="flex items-center gap-2 text-emerald-400 font-semibold">
-                  <CheckCircle2 className="size-4 text-emerald-400" />
+                <div className="flex items-center gap-2 text-status-success-soft font-semibold">
+                  <CheckCircle2 className="size-4 text-status-success" />
                   <span>No Text Changes Detected</span>
                 </div>
                 <p className="text-muted-foreground leading-relaxed">
@@ -289,12 +289,12 @@ export function ConfirmMasterDialog({
                     return (
                       <div
                         key={idx}
-                        className="flex items-start gap-2 px-2 py-0.5 bg-emerald-950/50 text-emerald-300 border-l-2 border-emerald-500 rounded-sm"
+                        className="flex items-start gap-2 px-2 py-0.5 bg-status-success/15 text-status-success-soft border-l-2 border-status-success rounded-sm"
                       >
-                        <span className="w-8 text-right select-none text-emerald-600 text-[10px]">
+                        <span className="w-8 text-right select-none text-status-success/75 text-[10px]">
                           {line.lineNew}
                         </span>
-                        <span className="select-none text-emerald-400 font-bold px-1 rounded bg-emerald-900/40 text-[10px]">+</span>
+                        <span className="select-none text-status-success font-bold px-1 rounded bg-status-success/20 text-[10px]">+</span>
                         <span className="flex-1 whitespace-pre-wrap break-words">{line.text || " "}</span>
                       </div>
                     );

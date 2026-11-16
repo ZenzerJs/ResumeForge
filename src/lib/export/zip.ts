@@ -1,4 +1,5 @@
-import { ResumeFacts } from "@/lib/facts/types";
+import { ResumeFacts, TailoringValidationContext } from "@/lib/facts/types";
+import { resolveValidationFacts } from "@/lib/facts/extract";
 import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
 import { assertCanExport } from "@/lib/guardrail/policy";
 import { assertLayoutExportReady, type LayoutMeasurement } from "@/lib/typst/resume-document";
@@ -12,7 +13,7 @@ export interface ApplicationPackageZipOptions {
   layoutMeasurement?: LayoutMeasurement | null;
   twoPageApproval?: string | null;
   reviewApproval?: string | null;
-  masterFacts?: ResumeFacts | null;
+  masterFacts?: ResumeFacts | TailoringValidationContext | null;
   allowUnfrozenMasterSelfExport?: boolean;
   coverLetter?: string | null;
   job?: {
@@ -285,9 +286,12 @@ export async function generateApplicationPackageZip(
   options: ApplicationPackageZipOptions
 ): Promise<Uint8Array> {
   // 1. Freeze Snapshot
+  const resolvedFacts = options.masterFacts
+    ? resolveValidationFacts(options.masterFacts)
+    : undefined;
   const snapshot: ZipExportSnapshot = Object.freeze({
     typstSource: options.typstSource,
-    masterFacts: options.masterFacts ? Object.freeze({ ...options.masterFacts }) : undefined,
+    masterFacts: resolvedFacts ? Object.freeze({ ...resolvedFacts }) : undefined,
     coverLetter: options.coverLetter,
     job: options.job ? Object.freeze({ ...options.job }) : null,
     atsScore: options.atsScore ? Object.freeze({ ...options.atsScore }) : null,
@@ -298,7 +302,7 @@ export async function generateApplicationPackageZip(
   if (snapshot.typstSource.includes("// ResumeForge layout v2") && !options.compiledPdf) throw new Error("Layout v2 requires the measured browser-compiled PDF.");
 
   // 2. Mechanical Guardrail Gate
-  assertCanExport(snapshot.typstSource, snapshot.masterFacts, {
+  assertCanExport(snapshot.typstSource, options.masterFacts, {
     allowUnfrozenMasterSelfExport: options.allowUnfrozenMasterSelfExport,
   });
 

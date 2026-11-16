@@ -110,14 +110,14 @@ export function AiProgress({
         data-testid="ai-progress-compact"
         className={cn(
           "inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-medium border transition-colors",
-          isDone && "bg-emerald-950/70 border-emerald-800/80 text-emerald-300",
+          isDone && "bg-status-success/15 border-status-success/40 text-status-success-soft",
           isError && "bg-red-950/70 border-red-800/80 text-red-300",
           !isDone && !isError && "bg-amber-950/60 border-amber-800/70 text-amber-200",
           className
         )}
       >
         {isDone ? (
-          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+          <CheckCircle2 className="h-3.5 w-3.5 text-status-success shrink-0" />
         ) : isError ? (
           <AlertCircle className="h-3.5 w-3.5 text-red-400 shrink-0" />
         ) : (
@@ -140,7 +140,7 @@ export function AiProgress({
       data-testid="ai-progress-container"
       className={cn(
         "rounded-lg border p-3.5 shadow-sm transition-all",
-        isDone && "bg-emerald-950/40 border-emerald-800/60 text-emerald-100",
+        isDone && "bg-status-success/10 border-status-success/35 text-status-success-soft",
         isError && "bg-red-950/50 border-red-800/80 text-red-200",
         !isDone && !isError && "bg-inset border-hairline text-foreground",
         className
@@ -150,7 +150,7 @@ export function AiProgress({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           {isDone ? (
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-status-success/20 text-status-success">
               <CheckCircle2 className="h-4 w-4" />
             </div>
           ) : isError ? (
@@ -227,7 +227,7 @@ export function AiProgress({
                   <div
                     className={cn(
                       "h-1.5 w-full rounded-full transition-all duration-300",
-                      isPast && "bg-emerald-500",
+                      isPast && "bg-status-success",
                       isCurrent && "bg-amber-400 animate-pulse",
                       !isPast && !isCurrent && "bg-elevated"
                     )}
@@ -235,7 +235,7 @@ export function AiProgress({
                   <span
                     className={cn(
                       "text-[9px] font-mono capitalize transition-colors hidden sm:block truncate max-w-full text-center",
-                      isPast && "text-emerald-400 font-medium",
+                      isPast && "text-status-success font-medium",
                       isCurrent && "text-amber-300 font-bold",
                       !isPast && !isCurrent && "text-muted-foreground"
                     )}

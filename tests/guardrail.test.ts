@@ -13,7 +13,12 @@ import { mergeAndMarkAcceptedPatches } from "@/components/tailor/patch-diff-revi
 import { applyAcceptedSidebarPatches } from "@/components/editor/ai-sidebar";
 import { resolveDiagnosticFixAction } from "@/components/tailor/tailor-diagnostic-panel";
 import { ResumeFacts } from "@/lib/facts/types";
-import { extractResumeFacts } from "@/lib/facts/extract";
+import {
+  buildTailoringValidationContext,
+  extractResumeFacts,
+} from "@/lib/facts/extract";
+import { applyPatchProposals } from "@/lib/ai/patch-application";
+import { PatchResponseSchema, verifyEvidenceCitations } from "@/lib/ai/patch-schema";
 
 describe("Mechanical Guardrail Engine", () => {
   const masterFacts: ResumeFacts = {
@@ -411,6 +416,196 @@ describe("Mechanical Guardrail Engine", () => {
       expect(res.status).toBe("fell_back");
       expect(res.patches.length).toBe(0);
       expect(res.gaps.some((g) => g.requirement.includes("Guardrail Failure"))).toBe(true);
+    });
+  });
+
+  describe("TailoringValidationContext: freeze-master -> add/verify evidence -> generate -> accept -> apply -> export", () => {
+    it("allows patches backed by newly added verified evidence without silently re-freezing master", () => {
+      const ownerId = "synthetic-user-1";
+      const masterTypst = `= Alex Rivera\n== EXPERIENCE\n*Google* -- *Software Engineer*\n- Reduced latency by 45ms.\n== SKILLS\n- Languages: TypeScript, PostgreSQL`;
+
+      // 1. Freeze master with initial empty evidence bank
+      const frozenBaseline = extractResumeFacts(masterTypst, []);
+      const baselineSnapshotCopy = structuredClone(frozenBaseline);
+      expect(frozenBaseline.evidenceIds).toEqual([]);
+      expect(frozenBaseline.skills).not.toContain("graphql");
+
+      // 2. Add & verify new evidence AFTER freezing master
+      const newEvidence = {
+        id: "ev-synthetic-graphql",
+        userId: ownerId,
+        type: "experience",
+        title: "Software Engineer",
+        organization: "Google",
+        dates: "May 2022 - Aug 2023",
+        verifiedSummary: "Built federated GraphQL gateway sustaining 99.95% availability.",
+        tags: ["GraphQL"],
+        status: "verified",
+        bullets: [
+          {
+            id: "b-synthetic-graphql",
+            evidenceId: "ev-synthetic-graphql",
+            text: "Built federated GraphQL gateway sustaining 99.95% availability.",
+            technologies: ["GraphQL", "TypeScript"],
+            verified: true,
+          },
+        ],
+      };
+
+      // 3. Build one versioned TailoringValidationContext (used by Generate, Guardrail, Apply, Export)
+      const validationContext = buildTailoringValidationContext(
+        frozenBaseline,
+        [newEvidence],
+        { ownerId, authoritativeEvidence: true }
+      );
+
+      // Master baseline is NEVER silently re-frozen/mutated
+      expect(frozenBaseline).toEqual(baselineSnapshotCopy);
+      expect(validationContext.masterBaseline).toEqual(baselineSnapshotCopy);
+      expect(validationContext.version).toBe(2);
+      expect(validationContext.revision.length).toBeGreaterThan(8);
+      expect(validationContext.registry.evidenceIds).toEqual(["ev-synthetic-graphql"]);
+      expect(validationContext.registry.bulletIds).toEqual(["b-synthetic-graphql"]);
+      expect(validationContext.registry.bulletToEvidenceId).toEqual({
+        "b-synthetic-graphql": "ev-synthetic-graphql",
+      });
+
+      // 4. Generate: verify AI patch proposal against the same verified registry
+      const generated = verifyEvidenceCitations(
+        PatchResponseSchema.parse({
+          patches: [
+            {
+              id: "patch-new-ev",
+              operation: "MODIFY_BULLET",
+              targetSection: "experience",
+              before: "- Reduced latency by 45ms.",
+              after: "- Built federated GraphQL gateway sustaining 99.95% availability while keeping latency at 45ms.",
+              evidenceIds: ["ev-synthetic-graphql", "b-synthetic-graphql"],
+              citations: [{ evidenceId: "ev-synthetic-graphql", bulletId: "b-synthetic-graphql" }],
+              rationale: "Grounded in newly verified GraphQL evidence.",
+              confidence: 0.96,
+            },
+          ],
+          gaps: [],
+        }),
+        validationContext.registry
+      );
+      expect(generated.verified).toHaveLength(1);
+      expect(generated.rejected).toHaveLength(0);
+
+      // 5. Accept & Apply: reconstruct and run assertCanApplyPatches with validationContext
+      const reconstructed = applyPatchProposals(masterTypst, generated.verified);
+      const applyResult = assertCanApplyPatches(
+        reconstructed.typstSource,
+        validationContext,
+        generated.verified
+      );
+      expect(applyResult.passed).toBe(true);
+      expect(applyResult.hasHardViolations).toBe(false);
+
+      // 6. Direct Export: export succeeds consistently with validationContext and its combined facts
+      const exportFromContext = assertCanExport(reconstructed.typstSource, validationContext);
+      const exportFromVariantFacts = assertCanExport(reconstructed.typstSource, validationContext.facts);
+      expect(exportFromContext.passed).toBe(true);
+      expect(exportFromVariantFacts.passed).toBe(true);
+
+      // Verify stale frozen baseline alone would have failed (confirming the regression)
+      expect(() => assertCanApplyPatches(reconstructed.typstSource, frozenBaseline, generated.verified)).toThrow(
+        GuardrailBlockError
+      );
+      expect(() => assertCanExport(reconstructed.typstSource, frozenBaseline)).toThrow(
+        GuardrailBlockError
+      );
+    });
+
+    it("fails closed when newly added evidence is draft/archived, mismatched, or unbacked", () => {
+      const ownerId = "synthetic-user-2";
+      const masterTypst = `= Alex Rivera\n*Google* -- *Software Engineer*\n- Reduced latency by 45ms.`;
+      const frozenBaseline = extractResumeFacts(masterTypst, []);
+
+      const evidenceSet = [
+        {
+          id: "ev-verified",
+          userId: ownerId,
+          type: "project",
+          title: "Service A",
+          verifiedSummary: "Built TypeScript service.",
+          tags: ["TypeScript"],
+          status: "verified",
+          bullets: [
+            { id: "b-verified", evidenceId: "ev-verified", text: "Built TypeScript service.", verified: true },
+            { id: "b-draft", evidenceId: "ev-verified", text: "Unverified claim 999%.", verified: false },
+          ],
+        },
+        {
+          id: "ev-second",
+          userId: ownerId,
+          type: "project",
+          title: "Service B",
+          verifiedSummary: "Built Go service.",
+          tags: ["Go"],
+          status: "verified",
+          bullets: [
+            { id: "b-second", evidenceId: "ev-second", text: "Built Go service.", verified: true },
+          ],
+        },
+        {
+          id: "ev-draft",
+          userId: ownerId,
+          type: "project",
+          title: "Draft Project",
+          verifiedSummary: "Draft 80% speedup.",
+          tags: ["Rust"],
+          status: "draft",
+          bullets: [
+            { id: "b-from-draft-item", evidenceId: "ev-draft", text: "Draft 80% speedup.", verified: true },
+          ],
+        },
+      ];
+
+      const ctx = buildTailoringValidationContext(frozenBaseline, evidenceSet, {
+        ownerId,
+        authoritativeEvidence: true,
+      });
+
+      // Unverified bullet or draft item excluded from registry & facts
+      expect(ctx.registry.evidenceIds).toEqual(["ev-second", "ev-verified"]);
+      expect(ctx.registry.bulletIds).toEqual(["b-second", "b-verified"]);
+      expect(ctx.facts.skills).not.toContain("rust");
+
+      // Mismatched bullet -> evidenceId pair is blocked by checkGuardrail & assertCanApplyPatches
+      expect(() =>
+        assertCanApplyPatches(masterTypst, ctx, [
+          {
+            id: "p-mismatch",
+            after: "- Built TypeScript service.",
+            evidenceIds: ["ev-verified"],
+            citations: [{ evidenceId: "ev-verified", bulletId: "b-second" }],
+          },
+        ])
+      ).toThrow(GuardrailBlockError);
+
+      // Unverified bullet citation is blocked
+      expect(() =>
+        assertCanApplyPatches(masterTypst, ctx, [
+          {
+            id: "p-draft-bullet",
+            after: "- Built TypeScript service.",
+            evidenceIds: ["b-draft"],
+          },
+        ])
+      ).toThrow(GuardrailBlockError);
+
+      // Unbacked metric is still blocked even with verified citation
+      expect(() =>
+        assertCanApplyPatches(`${masterTypst}\n- Improved throughput by 999%.`, ctx, [
+          {
+            id: "p-fake-metric",
+            after: "- Improved throughput by 999%.",
+            evidenceIds: ["ev-verified"],
+          },
+        ])
+      ).toThrow(GuardrailBlockError);
     });
   });
 });

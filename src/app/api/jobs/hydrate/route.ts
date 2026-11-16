@@ -1,25 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { fetchAndCacheJobFullText } from "@/lib/ingestion/tier2-fetcher";
 import { isPlaceholderDescription } from "@/lib/ingestion/helpers";
-import { getJobById } from "@/lib/db/jobs";
+import { buildHydratedJobDetail, sharedOrSelfJobWhere } from "@/lib/db/jobs";
+import { HydrateResultSchema, type HydrateResult } from "@/lib/jd-parser/types";
+import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/security/auth-request";
 import { sanitizeError } from "@/lib/ai/redact";
 
 const MAX_IDS_PER_REQUEST = 8;
 const CONCURRENCY = 3;
 
-type HydrateStatus = "ok" | "cached" | "failed" | "skipped";
-
-interface HydrateResult {
-  id: string;
-  status: HydrateStatus;
-  rawDescription?: string;
-}
+const HydrateRequestSchema = z.object({
+  ids: z.array(z.string()).optional(),
+  retry: z.boolean().optional(),
+});
 
 /**
- * Background hydration of placeholder job descriptions.
- * Descriptions are persisted on the Job row, so each posting is fetched at most once.
- * Postings that already failed (extractFailure set) are skipped unless `retry` is true.
+ * Background hydration of job descriptions and structured requirements.
+ * Descriptions and parsed requirements are persisted on owned Job rows.
+ * Postings that already failed description fetch (extractFailure set) are skipped unless `retry` is true.
+ * Full descriptions with unparsed/stale requirements are parsed without refetching.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -27,16 +28,17 @@ export async function POST(req: NextRequest) {
     if (authResult instanceof NextResponse) return authResult;
     const userId = authResult;
 
-    const body = (await req.json().catch(() => ({}))) as { ids?: unknown; retry?: unknown };
-    const ids = Array.isArray(body.ids)
-      ? Array.from(new Set(body.ids.filter((id): id is string => typeof id === "string" && id.length > 0)))
+    const rawBody = await req.json().catch(() => ({}));
+    const parsedBody = HydrateRequestSchema.safeParse(rawBody);
+    const ids = parsedBody.success && Array.isArray(parsedBody.data.ids)
+      ? Array.from(new Set(parsedBody.data.ids.filter((id) => id.length > 0)))
       : [];
 
     if (ids.length === 0) {
       return NextResponse.json({ success: false, error: "ids is required" }, { status: 400 });
     }
 
-    const retry = body.retry === true;
+    const retry = parsedBody.success && parsedBody.data.retry === true;
     const queue = ids.slice(0, MAX_IDS_PER_REQUEST);
     const results: HydrateResult[] = [];
 
@@ -45,31 +47,55 @@ export async function POST(req: NextRequest) {
         const id = queue.shift();
         if (!id) return;
         try {
-          const job = await getJobById(id, userId);
+          const job = await prisma.job.findFirst({
+            where: { id, ...sharedOrSelfJobWhere(userId) },
+          });
           if (!job) {
-            results.push({ id, status: "skipped" });
+            results.push(HydrateResultSchema.parse({ id, status: "skipped" }));
             continue;
           }
           if (job.userId != null && job.userId !== userId) {
-            results.push({ id, status: "skipped" });
+            results.push(HydrateResultSchema.parse({ id, status: "skipped" }));
             continue;
           }
-          if (!isPlaceholderDescription(job.rawDescription)) {
-            results.push({ id, status: "cached", rawDescription: job.rawDescription });
-            continue;
-          }
-          if (job.extractFailure && !retry) {
-            results.push({ id, status: "skipped" });
+          if (isPlaceholderDescription(job.rawDescription) && job.extractFailure && !retry) {
+            const detail = buildHydratedJobDetail(job, {
+              requirementsStatus: "unavailable",
+            });
+            results.push(HydrateResultSchema.parse({ id, status: "skipped", job: detail }));
             continue;
           }
           const res = await fetchAndCacheJobFullText(id, { viewerUserId: userId });
           if (res.success && res.data) {
-            results.push({ id, status: "ok", rawDescription: res.data.rawDescription });
+            const detail = buildHydratedJobDetail(res.data);
+            const status = res.cached && !res.requirementsUpdated ? "cached" : "ok";
+            results.push(
+              HydrateResultSchema.parse({
+                id,
+                status,
+                rawDescription: detail.rawDescription,
+                job: detail,
+              })
+            );
           } else {
-            results.push({ id, status: "failed" });
+            const detail = res.data
+              ? buildHydratedJobDetail(res.data, {
+                  requirementsStatus: isPlaceholderDescription(res.data.rawDescription)
+                    ? "unavailable"
+                    : undefined,
+                  extractFailure: res.failureCode ?? res.data.extractFailure ?? "failed",
+                })
+              : undefined;
+            results.push(
+              HydrateResultSchema.parse({
+                id,
+                status: "failed",
+                ...(detail ? { job: detail } : {}),
+              })
+            );
           }
         } catch {
-          results.push({ id, status: "failed" });
+          results.push(HydrateResultSchema.parse({ id, status: "failed" }));
         }
       }
     }

@@ -42,6 +42,46 @@ describe("Design tokens & Ember Ink taste invariants", () => {
     expect(violations).toEqual([]);
   });
 
+  it("maps semantic success tokens to Electric Blue with espresso and paper contrast-safe variants in globals.css", () => {
+    const globalsSrc = fs.readFileSync(path.join(SRC_DIR, "app/globals.css"), "utf8");
+
+    expect(globalsSrc).toContain("--status-success: var(--accent-contrast);");
+    expect(globalsSrc).toContain("--status-success-soft:");
+    expect(globalsSrc).toContain("--status-success-paper:");
+    expect(globalsSrc).toContain("--status-success-paper-bg:");
+    expect(globalsSrc).toContain(".text-status-success-soft");
+    expect(globalsSrc).toContain(".status-success-surface");
+    expect(globalsSrc).toContain(".paper-highlight-accepted");
+    expect(globalsSrc).toContain(".paper-marker-accepted");
+    expect(globalsSrc).toContain(".paper-action-accepted");
+    expect(globalsSrc).not.toContain("--rf-emerald");
+    expect(globalsSrc).not.toContain("107 214 154");
+  });
+
+  it("forbids green/emerald/teal status styling across src/**/*.{ts,tsx,css}", () => {
+    const greenClassRe =
+      /\b(?:bg|text|border|from|to|via|ring|shadow|outline|decoration|accent|fill|stroke)-(?:green|emerald|teal)-\d{2,3}(?:\/\d{1,3})?\b/g;
+    const greenHexRe =
+      /#(?:6bd69a|10b981|34d399|059669|047857|065f46|064e3b|22c55e|4ade80|86efac|16a34a|14b8a6|2dd4bf)\b/gi;
+    const legacyAliasRe = /--rf-emerald|\brf-emerald\b/g;
+
+    const violations: string[] = [];
+    for (const file of sourceFiles) {
+      const rel = path.relative(ROOT, file).replace(/\\/g, "/");
+      const text = fs.readFileSync(file, "utf8");
+      const matches = [
+        ...(text.match(greenClassRe) ?? []),
+        ...(text.match(greenHexRe) ?? []),
+        ...(text.match(legacyAliasRe) ?? []),
+      ];
+      if (matches.length > 0) {
+        violations.push(`${rel}: ${matches.join(", ")}`);
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
   it("disables cursor interaction on every AsciiWaves usage", () => {
     const violations: string[] = [];
     for (const file of sourceFiles) {

@@ -9,6 +9,11 @@
 import { prisma } from "@/lib/prisma";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
 import {
+  isManuallyEditedRequirements,
+  parseRequirementsState,
+  serializeRequirementsWithMeta,
+} from "@/lib/db/jobs";
+import {
   extractApplyUrlFromNotes,
   extractSalaryFromNotes,
   extractLocationFromNotes,
@@ -919,11 +924,76 @@ export async function fetchAndCacheJobFullText(
     };
   }
 
+  const canPersistToDb = Boolean(
+    options.allowSharedCacheWrite || (options.viewerUserId && job.userId === options.viewerUserId)
+  );
+
   if (!isTier1Placeholder(job.rawDescription)) {
+    const reqState = parseRequirementsState(
+      job.extractedRequirements,
+      job.rawDescription,
+      job.extractFailure
+    );
+    if (!reqState.needsReparse) {
+      return {
+        success: true,
+        data: job,
+        cached: true,
+        requirementsUpdated: false,
+      };
+    }
+
+    const reparsed = parseJobDescription(job.rawDescription);
+    const serializedReqs = serializeRequirementsWithMeta(reparsed, "auto");
+
+    if (!canPersistToDb) {
+      return {
+        success: true,
+        data: {
+          ...job,
+          extractedRequirements: serializedReqs,
+        },
+        cached: true,
+        requirementsUpdated: true,
+      };
+    }
+
+    if (options.allowSharedCacheWrite) {
+      const updatedJob = await prisma.job.update({
+        where: { id: jobId },
+        data: { extractedRequirements: serializedReqs },
+      });
+      return {
+        success: true,
+        data: updatedJob,
+        cached: true,
+        requirementsUpdated: true,
+      };
+    }
+
+    const updateResult = await prisma.job.updateMany({
+      where: { id: jobId, userId: options.viewerUserId! },
+      data: { extractedRequirements: serializedReqs },
+    });
+    if (updateResult.count === 0) {
+      return {
+        success: true,
+        data: {
+          ...job,
+          extractedRequirements: serializedReqs,
+        },
+        cached: true,
+        requirementsUpdated: true,
+      };
+    }
+    const updatedJob = await prisma.job.findFirst({
+      where: { id: jobId, userId: options.viewerUserId! },
+    });
     return {
       success: true,
-      data: job,
+      data: updatedJob ?? { ...job, extractedRequirements: serializedReqs },
       cached: true,
+      requirementsUpdated: true,
     };
   }
 
@@ -938,10 +1008,6 @@ export async function fetchAndCacheJobFullText(
       cached: false,
     };
   }
-
-  const canPersistToDb = Boolean(
-    options.allowSharedCacheWrite || (options.viewerUserId && job.userId === options.viewerUserId)
-  );
 
   const extractRes = await extractFullTextFromUrl(applyUrl, {
     company: job.company ?? undefined,
@@ -974,7 +1040,8 @@ export async function fetchAndCacheJobFullText(
     };
   }
 
-  const reqs = parseJobDescription(extractRes.rawDescription);
+  const manualReqsPreserved = isManuallyEditedRequirements(job.extractedRequirements);
+  const reqs = manualReqsPreserved ? null : parseJobDescription(extractRes.rawDescription);
   const salary = extractSalaryFromNotes(null, extractRes.rawDescription);
 
   let updatedNotes = job.notes
@@ -991,12 +1058,19 @@ export async function fetchAndCacheJobFullText(
     }
   }
 
-  const hydratedFields = {
+  const hydratedFields: {
+    rawDescription: string;
+    notes: string;
+    extractFailure: null;
+    extractedRequirements?: string;
+  } = {
     rawDescription: extractRes.rawDescription,
-    extractedRequirements: JSON.stringify(reqs),
     notes: updatedNotes,
     extractFailure: null,
   };
+  if (reqs) {
+    hydratedFields.extractedRequirements = serializeRequirementsWithMeta(reqs, "auto");
+  }
 
   if (!canPersistToDb) {
     return {

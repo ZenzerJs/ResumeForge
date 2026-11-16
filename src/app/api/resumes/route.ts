@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createResume, getResumes } from "@/lib/db/resumes";
+import { getEvidenceItems } from "@/lib/db/evidence";
+import { buildTailoringValidationContext } from "@/lib/facts/extract";
+import type { ResumeFacts, TailoringValidationContext } from "@/lib/facts/types";
 import { sanitizeError } from "@/lib/ai/redact";
 import { getRequestUserId, requireUserId } from "@/lib/security/auth-request";
 
@@ -13,10 +16,20 @@ export async function GET(request: Request) {
   try {
     const userId = await getRequestUserId(request);
     if (!userId) {
-      return NextResponse.json({ success: true, data: [], guest: true });
+      return NextResponse.json({ success: true, data: [], guest: true, validationContext: null });
     }
     const resumes = await getResumes(userId);
-    return NextResponse.json({ success: true, data: resumes });
+    const master = resumes.find((r) => r.isMaster);
+    let validationContext: TailoringValidationContext | null = null;
+    if (master?.factSnapshot) {
+      const ownedEvidence = await getEvidenceItems(undefined, userId);
+      validationContext = buildTailoringValidationContext(
+        master.factSnapshot as unknown as ResumeFacts,
+        ownedEvidence,
+        { ownerId: userId, authoritativeEvidence: true }
+      );
+    }
+    return NextResponse.json({ success: true, data: resumes, validationContext });
   } catch (err) {
     return NextResponse.json(
       { success: false, error: "Failed to fetch resumes", message: sanitizeError(err) },

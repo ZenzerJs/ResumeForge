@@ -112,13 +112,14 @@ test("desktop workflow, tabs, and profile evaluation", async ({ page }) => {
   await expect(page.getByTestId("tailor-tab-diagnostic")).toBeFocused();
   await page.keyboard.press("Home");
   await expect(page.getByTestId("tailor-tab-overview")).toBeFocused();
+  const primaryTablist = page.getByRole("tablist", { name: "Tailor views" });
   for (const id of ["tailor-tab-overview", "tailor-tab-3-pane", "tailor-tab-job-info", "tailor-tab-cover-letter", "tailor-tab-diagnostic"]) {
     const tab = page.getByTestId(id);
     await tab.focus();
     await page.keyboard.press("Enter");
     await expect(tab).toHaveAttribute("aria-selected", "true");
-    await expect(page.locator('[role="tab"][aria-selected="true"]')).toHaveCount(1);
-    await expect(page.locator('[role="tab"][tabindex="0"]')).toHaveCount(1);
+    await expect(primaryTablist.locator('[role="tab"][aria-selected="true"]')).toHaveCount(1);
+    await expect(primaryTablist.locator('[role="tab"][tabindex="0"]')).toHaveCount(1);
     const panelId = await tab.getAttribute("aria-controls");
     expect(panelId).toBeTruthy();
     await expect(page.locator(`[role="tabpanel"]#${panelId}`)).toHaveAttribute("aria-labelledby", await tab.getAttribute("id") || "");

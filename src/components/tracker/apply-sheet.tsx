@@ -106,7 +106,7 @@ export function ApplySheetPatchCard({
       </div>
       <div className="grid grid-cols-2 gap-2 text-[11px] font-mono whitespace-pre-wrap">
         <div className="rounded bg-red-950/30 p-2 text-text-secondary"><span className="mb-1 block text-[9px] uppercase text-muted-foreground">Before</span>{patch.before || "(empty)"}</div>
-        <div className="rounded bg-emerald-950/30 p-2 text-emerald-200"><span className="mb-1 block text-[9px] uppercase text-muted-foreground">After</span>{patch.after || "(empty)"}</div>
+        <div className="rounded bg-status-success/15 p-2 text-status-success-soft"><span className="mb-1 block text-[9px] uppercase text-muted-foreground">After</span>{patch.after || "(empty)"}</div>
       </div>
       <p className="text-[11px] text-muted-foreground">{patch.rationale}</p>
     </article>
@@ -634,7 +634,7 @@ export function ApplySheet({
             <h4 className="font-semibold text-foreground flex items-center justify-between">
               <span>Target Role Profile</span>
               {job.salarySnippet && (
-                <span className="text-emerald-400 text-[11px] font-mono">{job.salarySnippet}</span>
+                <span className="text-status-success-soft text-[11px] font-mono">{job.salarySnippet}</span>
               )}
             </h4>
 
@@ -692,7 +692,7 @@ export function ApplySheet({
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-semibold text-text-secondary">Guardrail Audit</h4>
                 {appliedPatchCount > 0 && (
-                  <Badge variant="outline" className="border-emerald-500/40 text-emerald-300 bg-emerald-950/30 text-[10px]">
+                  <Badge variant="outline" className="border-status-success/40 text-status-success-soft bg-status-success/15 text-[10px]">
                     {appliedPatchCount} AI Patch{appliedPatchCount === 1 ? "" : "es"} Applied
                   </Badge>
                 )}
@@ -825,7 +825,7 @@ export function ApplySheet({
                   target="_blank"
                   rel="noopener noreferrer"
                   data-testid="direct-apply-link-btn"
-                  className="w-full inline-flex items-center justify-center rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs py-2 px-4 gap-2 shadow-lg shadow-emerald-600/20 transition-colors"
+                  className="w-full inline-flex items-center justify-center rounded-md bg-status-success hover:bg-status-success/90 text-contrast-ink font-semibold text-xs py-2 px-4 gap-2 shadow-lg shadow-status-success/20 transition-colors"
                 >
                   <ExternalLink className="size-3.5" />
                   Open Employer Application

@@ -22,7 +22,10 @@
     --accent-contrast: 79 143 255;
     --accent-ink: 42 28 0;
     --contrast-ink: 3 19 47;
-    --status-success: 107 214 154;
+    --status-success: var(--accent-contrast);
+    --status-success-soft: 147 197 253;
+    --status-success-paper: 29 78 216;
+    --status-success-paper-bg: 219 234 254;
     --status-warning: var(--accent-action);
     --status-danger: 255 138 128;
     --status-info: var(--accent-contrast);
@@ -40,7 +43,6 @@
     --rf-meta: rgb(var(--text-muted));
     --rf-border: rgb(var(--border-hairline));
     --rf-amber: rgb(var(--accent-action));
-    --rf-emerald: rgb(var(--status-success));
     --rf-popover-surface: rgb(var(--surface-elevated));
     --rf-popover-border: rgb(var(--border-control));
     --rf-surface-border: rgb(var(--border-hairline));
@@ -366,6 +368,32 @@
 
   .rf-meta {
     color: var(--rf-meta);
+  }
+
+  /* Semantic success/verified/accepted helpers (Electric Blue contrast-safe variants) */
+  .text-status-success-soft {
+    color: rgb(var(--status-success-soft));
+  }
+
+  .status-success-surface {
+    background-color: rgb(var(--status-success) / 0.12);
+    border-color: rgb(var(--status-success) / 0.35);
+    color: rgb(var(--status-success-soft));
+  }
+
+  .paper-highlight-accepted {
+    background-color: rgb(var(--status-success) / 0.24);
+  }
+
+  .paper-marker-accepted {
+    background-color: rgb(var(--status-success-paper-bg));
+    border-color: rgb(var(--status-success-paper));
+    color: rgb(var(--contrast-ink));
+  }
+
+  .paper-action-accepted {
+    background-color: rgb(var(--status-success-paper));
+    color: rgb(var(--paper-sheet));
   }
 
   /* Layered depth utilities (Ember Ink) */

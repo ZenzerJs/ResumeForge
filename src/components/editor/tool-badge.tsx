@@ -28,7 +28,7 @@ export const ToolBadge = React.memo(function ToolBadge({
         state === "running" &&
           "border-amber-500/30 bg-amber-950/20 text-amber-300 animate-pulse",
         state === "completed" &&
-          "border-emerald-500/30 bg-emerald-950/20 text-emerald-300",
+          "border-status-success/30 bg-status-success/10 text-status-success-soft",
         state === "error" &&
           "border-red-500/30 bg-red-950/20 text-red-300",
         className
@@ -39,7 +39,7 @@ export const ToolBadge = React.memo(function ToolBadge({
           <Loader2 className="size-3 animate-spin text-amber-400" />
         )}
         {state === "completed" && (
-          <CheckCircle2 className="size-3 text-emerald-400" />
+          <CheckCircle2 className="size-3 text-status-success" />
         )}
         {state === "error" && (
           <AlertCircle className="size-3 text-red-400" />
