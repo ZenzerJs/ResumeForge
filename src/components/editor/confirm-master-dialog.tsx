@@ -38,6 +38,7 @@ export interface ConfirmMasterDialogProps {
   isSaving?: boolean;
   draftEvidence: boolean;
   onDraftEvidenceChange: (next: boolean) => void;
+  showDraftEvidence?: boolean;
 }
 
 export function ConfirmMasterDialog({
@@ -50,6 +51,7 @@ export function ConfirmMasterDialog({
   isSaving = false,
   draftEvidence,
   onDraftEvidenceChange,
+  showDraftEvidence = true,
 }: ConfirmMasterDialogProps) {
   const [confirmed, setConfirmed] = useState(false);
   const [activeTab, setActiveTab] = useState<"facts" | "diff">("facts");
@@ -354,21 +356,23 @@ export function ConfirmMasterDialog({
         </div>
 
         {/* Optional Evidence Bank Drafting Consent */}
-        <div className="flex items-start gap-2.5 p-3 rounded-lg border border-hairline bg-inset">
-          <Checkbox
-            id="extract-evidence-checkbox"
-            checked={draftEvidence}
-            onCheckedChange={(checked) => onDraftEvidenceChange(Boolean(checked))}
-            data-testid="extract-evidence-checkbox"
-            className="mt-0.5"
-          />
-          <label
-            htmlFor="extract-evidence-checkbox"
-            className="text-xs text-text-secondary leading-snug cursor-pointer select-none"
-          >
-            Also draft Evidence Bank items from this Master (one AI call on my provider key)
-          </label>
-        </div>
+        {showDraftEvidence && (
+          <div className="flex items-start gap-2.5 p-3 rounded-lg border border-hairline bg-inset">
+            <Checkbox
+              id="extract-evidence-checkbox"
+              checked={draftEvidence}
+              onCheckedChange={(checked) => onDraftEvidenceChange(Boolean(checked))}
+              data-testid="extract-evidence-checkbox"
+              className="mt-0.5"
+            />
+            <label
+              htmlFor="extract-evidence-checkbox"
+              className="text-xs text-text-secondary leading-snug cursor-pointer select-none"
+            >
+              Also draft Evidence Bank items from this Master (one AI call on my provider key)
+            </label>
+          </div>
+        )}
 
         <DialogFooter className="gap-2 pt-2">
           <Button

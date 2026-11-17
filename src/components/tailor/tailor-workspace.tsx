@@ -1259,6 +1259,14 @@ export function TailorWorkspace() {
   const isReadyForPatchReview = Boolean(
     extractedRequirements && extractedRequirements.requiredSkills.length > 0 && masterResumeId
   );
+  const settingsParams = new URLSearchParams({ from: "tailor" });
+  const activeJobId = savedJobId || jobIdParam;
+  if (activeJobId) {
+    settingsParams.set("jobId", activeJobId);
+  }
+  if (activeTab) {
+    settingsParams.set("tab", activeTab);
+  }
 
   const handleClearSampleJob = () => {
     userEditedRef.current = true;
@@ -1373,7 +1381,7 @@ export function TailorWorkspace() {
                       </span>
                       {providerConfigStatus.checked && (
                         <Link
-                          href="/settings?from=tailor"
+                          href={`/settings?${settingsParams.toString()}`}
                           className="underline font-semibold text-foreground hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded"
                         >
                           Configure in Settings
@@ -1802,7 +1810,7 @@ export function TailorWorkspace() {
                         {isReadyForPatchReview
                           ? "Generate patches to compare proposed wording against your master resume side by side with live paper preview and citation checks."
                           : !masterResumeId
-                          ? "Load or create a master resume in 3-Pane Workspace before generating suggestions."
+                          ? "Load or create a master resume in the Editor before generating suggestions."
                           : "Paste a job description and extract requirements in Job Info before generating suggestions."}
                       </p>
                     </div>
@@ -1825,6 +1833,29 @@ export function TailorWorkspace() {
                           {isGeneratingPatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                           Generate AI patches
                         </button>
+                      ) : !masterResumeId ? (
+                        <>
+                          <Link
+                            href="/editor"
+                            className="min-h-11 inline-flex items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                          >
+                            <FileText className="h-4 w-4" aria-hidden />
+                            Open Editor
+                          </Link>
+                          {!(extractedRequirements && extractedRequirements.requiredSkills.length > 0) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPreviousTab("3-pane");
+                                selectTab("job-info");
+                              }}
+                              className="min-h-11 inline-flex items-center gap-1.5 rounded-md border border-control bg-panel px-3 text-xs font-medium text-foreground hover:bg-elevated"
+                            >
+                              <Briefcase className="h-3.5 w-3.5" aria-hidden />
+                              Review Job Info
+                            </button>
+                          )}
+                        </>
                       ) : (
                         <button
                           type="button"

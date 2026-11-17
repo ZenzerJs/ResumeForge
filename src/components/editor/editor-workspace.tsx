@@ -157,6 +157,7 @@ export function EditorWorkspace() {
   const [isUndoing, setIsUndoing] = useState<boolean>(false);
   const [undoSuccess, setUndoSuccess] = useState<boolean>(false);
   const [draftEvidenceFromMaster, setDraftEvidenceFromMaster] = useState<boolean>(false);
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [evidenceExtractToast, setEvidenceExtractToast] = useState<string | null>(null);
   const [isExtractingEvidence, setIsExtractingEvidence] = useState<boolean>(false);
   // Phase 11: Master Fact Snapshot state (strictly from frozen Master Resume + verified Evidence Bank)
@@ -392,6 +393,7 @@ export function EditorWorkspace() {
   const loadFrozenMasterSnapshot = useCallback(async () => {
     try {
       const demoConfig = await fetchDemoConfig();
+      setIsDemoMode(Boolean(demoConfig?.demoMode));
       if (demoConfig?.demoMode) {
         const rawSnapshot = localStorage.getItem("resumeforge_demo_master_facts");
         setMasterFacts(rawSnapshot ? JSON.parse(rawSnapshot) as ResumeFacts : null);
@@ -429,6 +431,9 @@ export function EditorWorkspace() {
     setHasAiPatchedBuffer(persistedAiPatched);
     try {
       const demoConfig = await fetchDemoConfig();
+      if (current()) {
+        setIsDemoMode(Boolean(demoConfig?.demoMode));
+      }
       if (demoConfig?.demoMode) {
         initializeDemoSamples();
         const personalSource = localStorage.getItem(STORAGE_KEY);
@@ -790,6 +795,7 @@ export function EditorWorkspace() {
       setSaveSuccess(false);
 
       const demoConfig = await fetchDemoConfig();
+      setIsDemoMode(Boolean(demoConfig?.demoMode));
       if (demoConfig?.demoMode) {
         const demoContext = getDemoContextFromBrowser();
         const facts = extractResumeFacts(cleanMasterSource, demoContext?.evidenceItems || []);
@@ -1190,6 +1196,7 @@ export function EditorWorkspace() {
         isSaving={isSavingMaster}
         draftEvidence={draftEvidenceFromMaster}
         onDraftEvidenceChange={setDraftEvidenceFromMaster}
+        showDraftEvidence={!isDemoMode}
       />
 
       {/* Main Workspace Body */}

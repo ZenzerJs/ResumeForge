@@ -63,7 +63,7 @@ export function SettingsWorkspace() {
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [isSessionLoaded, setIsSessionLoaded] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
-  const [isFromTailor, setIsFromTailor] = useState(false);
+  const [tailorBackHref, setTailorBackHref] = useState<string | null>(null);
   const [usernameDraft, setUsernameDraft] = useState("");
   const [usernameStatus, setUsernameStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isSavingUsername, setIsSavingUsername] = useState(false);
@@ -143,7 +143,17 @@ export function SettingsWorkspace() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setIsFromTailor(params.get("from") === "tailor");
+    if (params.get("from") !== "tailor") {
+      setTailorBackHref(null);
+      return;
+    }
+    const backParams = new URLSearchParams();
+    const jobId = params.get("jobId");
+    if (jobId) backParams.set("jobId", jobId);
+    const tab = params.get("tab");
+    if (tab) backParams.set("tab", tab);
+    const query = backParams.toString();
+    setTailorBackHref(query ? `/tailor?${query}` : "/tailor");
   }, []);
 
   const handleSaveUsername = async () => {
@@ -301,9 +311,9 @@ export function SettingsWorkspace() {
             title="Connect an AI provider key (stored in this browser)"
             description="Your API key stays in this browser and is sent only with your own AI request. It is never stored in our database or server logs."
             actions={
-              isFromTailor ? (
+              tailorBackHref ? (
                 <Link
-                  href="/tailor"
+                  href={tailorBackHref}
                   className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-hairline bg-elevated px-3.5 text-sm font-medium text-foreground hover:bg-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <ArrowLeft className="h-4 w-4" aria-hidden />
