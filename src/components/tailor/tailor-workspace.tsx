@@ -104,6 +104,25 @@ import { TechDiffPillList } from "@/components/tracker/tech-diff-pill-list";
 import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
 import { tokenizeHighlightedJd } from "@/lib/jd/highlight-keywords";
 import type { ResumeFacts, TailoringValidationContext } from "@/lib/facts/types";
+import {
+  buildEditorHref,
+  buildLibraryHref,
+  buildSettingsHref,
+  clearActiveApplicationContext,
+  clearPendingReviewChoices,
+  createSaveBeforeNavigationController,
+  normalizeEditorModeParam,
+  normalizeTailorTabParam,
+  readActiveApplicationContext,
+  readPendingReviewChoices,
+  resolveTailorEntryContext,
+  updateActiveApplicationContext,
+  writeActiveApplicationContext,
+  writePendingReviewChoices,
+  type ApplicationAccountScope,
+  type EditorModeParam,
+  type TailorWorkspaceTab,
+} from "@/lib/tailor/application-context";
 
 interface RankedMatch {
   id: string;
@@ -227,9 +246,35 @@ export function matchGuestEvidenceItems(
   return matchEvidenceToRequirements(evidenceItems, reqs);
 }
 
-export type TailorWorkspaceTab = "overview" | "3-pane" | "job-info" | "cover-letter" | "diagnostic";
+export { normalizeTailorTabParam, type TailorWorkspaceTab };
 export type TailorPrimaryTab = "job-info" | "3-pane";
 export type TailorMoreToolTab = "overview" | "cover-letter" | "diagnostic";
+
+export function formatRequirementSourceLabel(sourceOrConfidence: string): string {
+  if (sourceOrConfidence === "USER_ADDED") return "Added manually";
+  if (sourceOrConfidence === "VERIFIED_ATS") return "Verified ATS source";
+  if (sourceOrConfidence === "STRUCTURED_PAGE") return "Structured posting";
+  if (sourceOrConfidence === "USER_PASTED" || sourceOrConfidence === "PASTED") {
+    return "Pasted job posting";
+  }
+  return sourceOrConfidence.replace(/_/g, " ").toLowerCase();
+}
+
+export function formatJobDiagnosticLabel(statusOrKind: string): string {
+  switch (statusOrKind) {
+    case "USER_PASTED":
+    case "PASTED":
+      return "Pasted job posting";
+    case "VERIFIED_ATS":
+      return "Verified ATS source";
+    case "STRUCTURED_PAGE":
+      return "Structured posting page";
+    case "PARTIAL_EXTRACTION":
+      return "Partial posting extraction";
+    default:
+      return statusOrKind.replace(/_/g, " ").toLowerCase();
+  }
+}
 
 export const TAILOR_PRIMARY_TABS: ReadonlyArray<{
   id: TailorPrimaryTab;
@@ -249,19 +294,6 @@ export const TAILOR_MORE_TOOLS: ReadonlyArray<{
   { id: "cover-letter", label: "Cover letter", testId: "tailor-tool-cover-letter" },
   { id: "diagnostic", label: "Diagnostics", testId: "tailor-tool-diagnostic" },
 ];
-
-export function normalizeTailorTabParam(param: string | null | undefined): TailorWorkspaceTab {
-  if (
-    param === "overview" ||
-    param === "3-pane" ||
-    param === "job-info" ||
-    param === "cover-letter" ||
-    param === "diagnostic"
-  ) {
-    return param;
-  }
-  return "job-info";
-}
 
 export function isPrimaryTailorTab(tab: TailorWorkspaceTab): tab is TailorPrimaryTab {
   return tab === "job-info" || tab === "3-pane";
@@ -330,19 +362,53 @@ export function TailorWorkspace() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const jobIdParam = searchParams.get("jobId");
-  const hasInitialJobId = useRef(Boolean(jobIdParam));
+  const newParam = searchParams.get("new");
+  const actionParam = searchParams.get("action");
+  const sampleParam = searchParams.get("sample");
+  const variantIdParam = searchParams.get("variantId");
+  const modeParam = searchParams.get("mode");
+  const isExplicitNewEntry =
+    newParam === "1" || newParam === "true" || actionParam === "new";
+  const isFrontendSampleEntry = sampleParam === "frontend";
+  const isExplicitSampleEntry = Boolean(sampleParam);
+  const hasExplicitEntryOverride = Boolean(
+    jobIdParam || isExplicitNewEntry || isExplicitSampleEntry || variantIdParam || searchParams.get("resumeId")
+  );
+  const hasInitialJobId = useRef(Boolean(jobIdParam || isExplicitNewEntry || isExplicitSampleEntry));
 
-  const [company, setCompany] = useState(jobIdParam ? "" : "Nova Labs");
-  const [roleTitle, setRoleTitle] = useState(jobIdParam ? "" : "Senior Backend Engineer");
-  const [rawDescription, setRawDescription] = useState(jobIdParam ? "" : SAMPLE_BACKEND_JD);
+  const [company, setCompany] = useState(
+    jobIdParam || isExplicitNewEntry
+      ? ""
+      : isFrontendSampleEntry
+        ? "WebCraft Systems"
+        : "Nova Labs"
+  );
+  const [roleTitle, setRoleTitle] = useState(
+    jobIdParam || isExplicitNewEntry
+      ? ""
+      : isFrontendSampleEntry
+        ? "Frontend Engineer"
+        : "Senior Backend Engineer"
+  );
+  const [rawDescription, setRawDescription] = useState(
+    jobIdParam || isExplicitNewEntry
+      ? ""
+      : isFrontendSampleEntry
+        ? SAMPLE_FRONTEND_JD
+        : SAMPLE_BACKEND_JD
+  );
 
-  const [extractedRequirements, setExtractedRequirements] = useState<JobRequirements | null>(jobIdParam ? null : {
-    requiredSkills: ["Go", "Python", "Kubernetes", "Docker", "RESTful APIs", "PostgreSQL"],
-    preferredSkills: ["AWS/GCP", "GraphQL"],
-    domainTerms: ["Distributed Systems", "Microservices"],
-    roleTitle: "Senior Backend Engineer",
-    company: "Nova Labs",
-  });
+  const [extractedRequirements, setExtractedRequirements] = useState<JobRequirements | null>(
+    jobIdParam || isExplicitNewEntry || isFrontendSampleEntry
+      ? null
+      : {
+          requiredSkills: ["Go", "Python", "Kubernetes", "Docker", "RESTful APIs", "PostgreSQL"],
+          preferredSkills: ["AWS/GCP", "GraphQL"],
+          domainTerms: ["Distributed Systems", "Microservices"],
+          roleTitle: "Senior Backend Engineer",
+          company: "Nova Labs",
+        }
+  );
 
   const [selectedRoleProfile, setSelectedRoleProfile] = useState<RoleProfile>("Full-stack");
   const tabParam = searchParams.get("tab");
@@ -351,10 +417,26 @@ export function TailorWorkspace() {
   );
   const activeTab = navState.activeTab;
   const previousTab = navState.previousTab;
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+
+  const [accountScope, setAccountScope] = useState<ApplicationAccountScope>({
+    scopeResolved: false,
+  });
+  const accountScopeRef = useRef<ApplicationAccountScope>(accountScope);
+  accountScopeRef.current = accountScope;
+
+  const [activeVariantId, setActiveVariantId] = useState<string | null>(variantIdParam);
+  const [editorMode, setEditorMode] = useState<EditorModeParam | null>(() =>
+    normalizeEditorModeParam(modeParam)
+  );
 
   const selectTab = useCallback(
     (nextTab: TailorWorkspaceTab, options?: { preserveReturnRoute?: boolean }) => {
       setNavState((prev) => transitionTailorNavigation(prev, nextTab, options));
+      if (accountScopeRef.current.scopeResolved !== false) {
+        updateActiveApplicationContext({ tab: nextTab }, accountScopeRef.current);
+      }
       if (typeof window !== "undefined") {
         const url = new URL(window.location.href);
         if (url.searchParams.get("tab") !== nextTab) {
@@ -438,9 +520,16 @@ export function TailorWorkspace() {
   const [showErrorTechDetails, setShowErrorTechDetails] = useState(false);
   const [savedJobId, setSavedJobId] = useState<string | null>(null);
   const savedJobIdRef = useRef<string | null>(null);
-  const settingsNavigationRef = useRef(false);
+  const navControllerRef = useRef(createSaveBeforeNavigationController());
+  const navigationErrorRef = useRef<HTMLDivElement>(null);
+  const lastFailedNavTargetRef = useRef<((jobId: string | null) => string) | null>(null);
   const [isOpeningSettings, setIsOpeningSettings] = useState(false);
-  const [settingsNavigationError, setSettingsNavigationError] = useState<string | null>(null);
+  const [navigationError, setNavigationError] = useState<string | null>(null);
+  const [jobLoadError, setJobLoadError] = useState<{
+    kind: "not-found" | "forbidden" | "error";
+    jobId: string;
+    message: string;
+  } | null>(null);
   const userEditedRef = useRef(false);
   const saveQueueRef = useRef(Promise.resolve());
   const roleTitleRef = useRef(roleTitle);
@@ -459,6 +548,7 @@ export function TailorWorkspace() {
   const [tier2Status, setTier2Status] = useState<{ type: "loading" | "success" | "error"; message: string } | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isLoadingJob, setIsLoadingJob] = useState(Boolean(jobIdParam));
+  const [restoredJobId, setRestoredJobId] = useState<string | null>(null);
   const [providerConfigStatus, setProviderConfigStatus] = useState<{
     checked: boolean;
     ready: boolean;
@@ -589,7 +679,31 @@ export function TailorWorkspace() {
   useEffect(() => {
     async function loadMasterOrStarterResume() {
       try {
-        const config = await fetchDemoConfig();
+        const [config, sessionUser] = await Promise.all([
+          fetchDemoConfig(),
+          fetchSessionUser(),
+        ]);
+        const resolvedScope: ApplicationAccountScope = {
+          userId: sessionUser?.id ?? null,
+          demoMode: config?.demoMode === true,
+          scopeResolved: true,
+        };
+        setAccountScope(resolvedScope);
+        accountScopeRef.current = resolvedScope;
+
+        const entry = resolveTailorEntryContext(searchParams, resolvedScope, {
+          explicitNewJob: isExplicitNewEntry,
+          explicitSample: isFrontendSampleEntry ? "frontend" : isExplicitSampleEntry ? true : false,
+        });
+        if (entry.variantId) setActiveVariantId(entry.variantId);
+        if (entry.mode) setEditorMode(entry.mode);
+        if (entry.source === "stored-active" && entry.jobId) {
+          if (!tabParam && entry.tab) {
+            setNavState({ activeTab: entry.tab, previousTab: null });
+          }
+          setRestoredJobId(entry.jobId);
+        }
+
         if (config?.demoMode) {
           setIsDemo(true);
           initializeDemoSamples();
@@ -603,7 +717,7 @@ export function TailorWorkspace() {
           setMasterTypstSource(localSource);
           setActiveVariantContent(localSource);
           setResumeReady(Boolean(localSource));
-          if (!hasInitialJobId.current) {
+          if (!hasInitialJobId.current && entry.source !== "stored-active" && !hasExplicitEntryOverride) {
             setCompany(DEMO_JOB.company);
             setRoleTitle(DEMO_JOB.roleTitle);
             setRawDescription(DEMO_JOB.rawDescription);
@@ -659,6 +773,7 @@ export function TailorWorkspace() {
     void Promise.all([loadMasterOrStarterResume(), refreshProviderStatus()]).finally(() =>
       setIsBootstrapping(false)
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadEvidenceMetadata, refreshProviderStatus]);
 
   const triggerTier2Fetch = useCallback(async (jobIdToFetch: string) => {
@@ -729,7 +844,22 @@ export function TailorWorkspace() {
       const localId = targetId || `guest-job-${Date.now()}`;
       savedJobIdRef.current = localId;
       setSavedJobId(localId);
-      sessionStorage.setItem("resumeforge_active_job_id", localId);
+      const currentScope: ApplicationAccountScope =
+        accountScopeRef.current.scopeResolved !== false
+          ? accountScopeRef.current
+          : { userId: null, demoMode: demoConfig?.demoMode === true, scopeResolved: true };
+      writeActiveApplicationContext(
+        {
+          jobId: localId,
+          tab: activeTabRef.current,
+          roleTitle: payload.roleTitle || "Target Role",
+          company: payload.company || "Target Company",
+          variantId: activeVariantId ?? undefined,
+          resumeId: masterResumeId && masterResumeId !== "demo-local" ? masterResumeId : undefined,
+          mode: editorMode ?? undefined,
+        },
+        currentScope
+      );
       try {
         const raw = localStorage.getItem("resumeforge_guest_jobs");
         const parsed = raw ? JSON.parse(raw) : [];
@@ -776,6 +906,18 @@ export function TailorWorkspace() {
               "Unable to update saved job posting."
             );
           if (updateOk && updateJson?.success) {
+            writeActiveApplicationContext(
+              {
+                jobId: existingId,
+                tab: activeTabRef.current,
+                roleTitle: payload.roleTitle,
+                company: payload.company,
+                variantId: activeVariantId ?? undefined,
+                resumeId: masterResumeId && masterResumeId !== "demo-local" ? masterResumeId : undefined,
+                mode: editorMode ?? undefined,
+              },
+              accountScopeRef.current
+            );
             setSaveStatus("Job posting saved to database.");
             return existingId;
           }
@@ -817,7 +959,18 @@ export function TailorWorkspace() {
       if (saveOk && saveJson?.success && saveJson.data?.id) {
         savedJobIdRef.current = saveJson.data.id;
         setSavedJobId(saveJson.data.id);
-        sessionStorage.setItem("resumeforge_active_job_id", saveJson.data.id);
+        writeActiveApplicationContext(
+          {
+            jobId: saveJson.data.id,
+            tab: activeTabRef.current,
+            roleTitle: payload.roleTitle,
+            company: payload.company,
+            variantId: activeVariantId ?? undefined,
+            resumeId: masterResumeId && masterResumeId !== "demo-local" ? masterResumeId : undefined,
+            mode: editorMode ?? undefined,
+          },
+          { userId: sessionUser.id, demoMode: demoConfig?.demoMode === true, scopeResolved: true }
+        );
         setSaveStatus("Job posting saved to database.");
         return saveJson.data.id;
       }
@@ -1125,11 +1278,16 @@ export function TailorWorkspace() {
     }
   }, [matchGuestEvidenceLocally]);
 
+  const targetJobToLoad = jobIdParam || restoredJobId;
+  const loadedFromStoredRef = useRef(false);
+  loadedFromStoredRef.current = Boolean(!jobIdParam && restoredJobId);
+
   useEffect(() => {
-    if (!jobIdParam) return;
+    if (!targetJobToLoad) return;
     const controller = new AbortController();
     const { signal } = controller;
     setIsLoadingJob(true);
+    setJobLoadError(null);
     userEditedRef.current = false;
     setCoverLetterDraft(null);
     setExtractedRequirements(null);
@@ -1137,9 +1295,18 @@ export function TailorWorkspace() {
 
     async function loadJobById(jobId: string) {
       try {
-        const { demoMode } = await fetchDemoConfig();
+        const [demoConfig, sessionUser] = await Promise.all([
+          fetchDemoConfig(),
+          fetchSessionUser(),
+        ]);
+        const demoMode = demoConfig?.demoMode === true;
         if (signal.aborted) return;
         const localOnly = isLocalOrDemoJobId(jobId, demoMode);
+        const resolvedScope: ApplicationAccountScope = {
+          userId: sessionUser?.id ?? null,
+          demoMode,
+          scopeResolved: true,
+        };
         type LoadedJob = {
           id: string;
           company?: string | null;
@@ -1150,6 +1317,7 @@ export function TailorWorkspace() {
           requirementsStatus?: string;
         };
         let job: LoadedJob | null = null;
+        let responseStatus: number | null = null;
 
         if (localOnly) {
           if (demoMode) initializeDemoSamples();
@@ -1158,11 +1326,36 @@ export function TailorWorkspace() {
             (jobId === DEMO_JOB.id ? DEMO_JOB : null);
         } else {
           const res = await fetch(`/api/jobs/${jobId}`, { signal });
+          responseStatus = res.status;
           const { ok, data: json } = await readApiResponse<{ success?: boolean; data?: LoadedJob }>(res);
           if (ok && json?.success && json.data) job = json.data;
         }
 
-        if (signal.aborted || userEditedRef.current || !job) return;
+        if (signal.aborted || userEditedRef.current) return;
+        if (!job) {
+          const activeStored = readActiveApplicationContext(resolvedScope);
+          if (loadedFromStoredRef.current || activeStored?.jobId === jobId) {
+            clearActiveApplicationContext();
+          }
+          savedJobIdRef.current = null;
+          setSavedJobId(null);
+          if (responseStatus === 401 || responseStatus === 403) {
+            setJobLoadError({
+              kind: "forbidden",
+              jobId,
+              message: "That job posting belongs to a different account or requires sign-in. Return to Jobs to pick an available role.",
+            });
+          } else {
+            setJobLoadError({
+              kind: "not-found",
+              jobId,
+              message: "This job posting could not be found—it may have been deleted or belong to another session.",
+            });
+          }
+          return;
+        }
+
+        setJobLoadError(null);
         setCompany(job.company ?? "");
         setRoleTitle(job.roleTitle ?? "");
         setRawDescription(convertHtmlToCleanMarkdown(job.rawDescription ?? ""));
@@ -1177,22 +1370,44 @@ export function TailorWorkspace() {
           setExtractedRequirements(parsed.data);
           void fetchMatches(parsed.data, signal);
         }
-        if (!localOnly) {
-          sessionStorage.setItem("resumeforge_active_job_id", job.id);
-          if (job.rawDescription && isPlaceholderDescription(job.rawDescription)) {
-            void triggerTier2Fetch(job.id);
+        writeActiveApplicationContext(
+          {
+            jobId: job.id,
+            tab: activeTabRef.current,
+            roleTitle: job.roleTitle ?? undefined,
+            company: job.company ?? undefined,
+            variantId: activeVariantId ?? undefined,
+            resumeId: masterResumeId && masterResumeId !== "demo-local" ? masterResumeId : undefined,
+            mode: editorMode ?? undefined,
+          },
+          resolvedScope
+        );
+        const restoredChoices = readPendingReviewChoices(job.id, resolvedScope);
+        if (restoredChoices && Object.keys(restoredChoices.decisions).length > 0) {
+          setPatchDecisions(restoredChoices.decisions);
+          if (restoredChoices.acknowledgedSkills.length > 0) {
+            setAcknowledgedSkills(new Set(restoredChoices.acknowledgedSkills));
           }
         }
+        if (!localOnly && job.rawDescription && isPlaceholderDescription(job.rawDescription)) {
+          void triggerTier2Fetch(job.id);
+        }
       } catch {
-        // Leave the job input available if the posting cannot be loaded.
+        if (!signal.aborted) {
+          setJobLoadError({
+            kind: "error",
+            jobId,
+            message: "Unable to load that job posting right now. Return to Jobs or start a new posting below.",
+          });
+        }
       } finally {
         if (!signal.aborted) setIsLoadingJob(false);
       }
     }
 
-    void loadJobById(jobIdParam);
+    void loadJobById(targetJobToLoad);
     return () => controller.abort();
-  }, [jobIdParam, fetchMatches, triggerTier2Fetch]);
+  }, [targetJobToLoad, fetchMatches, triggerTier2Fetch, activeVariantId, masterResumeId, editorMode]);
 
   const handleRemoveRequirement = (category: "required" | "preferred" | "domain", termToRemove: string) => {
     if (!extractedRequirements) return;
@@ -1459,31 +1674,104 @@ export function TailorWorkspace() {
     }
   };
 
-  const handleOpenSettings = async () => {
-    if (settingsNavigationRef.current) return;
-    settingsNavigationRef.current = true;
+  const navigateWithSave = async (buildTargetHref: (resolvedJobId: string | null) => string) => {
+    if (navControllerRef.current.isPending) return;
     setIsOpeningSettings(true);
-    setSettingsNavigationError(null);
-    try {
-      let activeJobId = savedJobIdRef.current || jobIdParam;
-      if (userEditedRef.current) {
-        activeJobId = await ensureJobSaved({ forceUpdate: true, requireSuccess: true });
-        if (!activeJobId) {
-          throw new Error("Could not save your job draft. Please retry before opening Settings.");
+    setNavigationError(null);
+    lastFailedNavTargetRef.current = buildTargetHref;
+
+    const currentJobId = savedJobIdRef.current || jobIdParam;
+    const hasPendingSave = userEditedRef.current && Boolean(rawDescription.trim());
+    const hasPendingReviewChoices = Object.values(patchDecisions).some((d) => d !== "pending");
+
+    const outcome = await navControllerRef.current.execute<string | null>({
+      hasPendingSave,
+      hasPendingReviewChoices,
+      canPreserveReviewChoices: Boolean(currentJobId),
+      preserveReviewChoices: () => {
+        if (!currentJobId) return false;
+        return Boolean(
+          writePendingReviewChoices(
+            {
+              jobId: currentJobId,
+              batchId: patchBatch?.batchId ?? null,
+              decisions: patchDecisions,
+              acknowledgedSkills: Array.from(acknowledgedSkills),
+            },
+            accountScopeRef.current
+          )
+        );
+      },
+      save: async () => {
+        const savedId = await ensureJobSaved({ forceUpdate: true, requireSuccess: true });
+        if (!savedId) {
+          return {
+            ok: false,
+            error: "Could not save your job draft. Your edits are still here. Please retry.",
+          };
         }
-      }
-      const params = new URLSearchParams({ from: "tailor", tab: activeTab });
-      if (activeJobId) params.set("jobId", activeJobId);
-      router.push(`/settings?${params.toString()}`);
-    } catch {
-      setSettingsNavigationError("Could not save your job draft. Your edits are still here. Please retry.");
-      settingsNavigationRef.current = false;
+        return { ok: true, context: savedId };
+      },
+      onNavigate: (resolvedId) => {
+        const activeJobId = resolvedId ?? savedJobIdRef.current ?? jobIdParam;
+        router.push(buildTargetHref(activeJobId));
+      },
+      onErrorFocus: () => {
+        requestAnimationFrame(() => navigationErrorRef.current?.focus());
+      },
+    });
+
+    if (outcome.status === "failed") {
+      setNavigationError(outcome.error);
+      setIsOpeningSettings(false);
+    } else if (outcome.status === "cancelled") {
       setIsOpeningSettings(false);
     }
   };
 
+  const handleOpenSettings = async () => {
+    await navigateWithSave((activeJobId) =>
+      buildSettingsHref({
+        from: "tailor",
+        tab: activeTab,
+        jobId: activeJobId,
+        variantId: activeVariantId,
+        resumeId: masterResumeId && masterResumeId !== "demo-local" ? masterResumeId : null,
+        mode: editorMode,
+      })
+    );
+  };
+
+  const handleOpenEditor = async (overrideVariantId?: string | null) => {
+    await navigateWithSave((activeJobId) =>
+      buildEditorHref({
+        variantId: overrideVariantId ?? activeVariantId,
+        resumeId: masterResumeId && masterResumeId !== "demo-local" ? masterResumeId : null,
+        mode: editorMode,
+        from: "tailor",
+        tab: activeTab,
+        jobId: activeJobId,
+      })
+    );
+  };
+
+  const handleOpenLibrary = async (skill?: string) => {
+    await navigateWithSave((activeJobId) =>
+      buildLibraryHref({
+        from: "tailor",
+        tab: activeTab,
+        jobId: activeJobId,
+        variantId: activeVariantId,
+        resumeId: masterResumeId && masterResumeId !== "demo-local" ? masterResumeId : null,
+        mode: editorMode,
+        skill: skill ?? null,
+      })
+    );
+  };
+
   const updateJobDescription = (description: string) => {
     userEditedRef.current = true;
+    setJobLoadError(null);
     scanGenerationRef.current++;
     setIsExtracting(false);
     setIsAutoScanning(false);
@@ -1493,6 +1781,9 @@ export function TailorWorkspace() {
   };
 
   const handleClearSampleJob = () => {
+    savedJobIdRef.current = null;
+    setSavedJobId(null);
+    setJobLoadError(null);
     setCompany("");
     setRoleTitle("");
     updateJobDescription("");
@@ -1545,6 +1836,24 @@ export function TailorWorkspace() {
                         >
                           {isOpeningSettings ? "Saving…" : "Configure in Settings"}
                         </button>
+                      ) : (label === "Master resume" || label === "Resume draft") && nextStep !== "resume" && ready === false ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleOpenEditor()}
+                          disabled={isOpeningSettings}
+                          className="text-left font-medium underline underline-offset-2 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 disabled:opacity-60"
+                        >
+                          {isOpeningSettings ? "Saving…" : isDemo ? "Open resume draft" : "Save in Editor"}
+                        </button>
+                      ) : label === "Evidence Bank" && nextStep !== "evidence" && verifiedEvidenceCount === 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleOpenLibrary()}
+                          disabled={isOpeningSettings}
+                          className="text-left font-medium underline underline-offset-2 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 disabled:opacity-60"
+                        >
+                          {isOpeningSettings ? "Saving…" : "Open Evidence Bank"}
+                        </button>
                       ) : <span>{detail}</span>}
                     </div>
                   </li>
@@ -1558,14 +1867,14 @@ export function TailorWorkspace() {
                   </Button>
                 )}
                 {nextStep === "resume" && (
-                  <Link href="/editor" className={buttonVariants()}>
-                    {isDemo ? "Open resume draft" : "Save a master resume"}
-                  </Link>
+                  <Button onClick={() => void handleOpenEditor()} disabled={isOpeningSettings}>
+                    {isOpeningSettings ? "Saving…" : isDemo ? "Open resume draft" : "Save a master résumé"}
+                  </Button>
                 )}
                 {nextStep === "evidence" && (
-                  <Link href="/library" className={buttonVariants()}>
-                    {verifiedEvidenceCount === 0 ? "Verify evidence" : "Open Evidence Bank"}
-                  </Link>
+                  <Button onClick={() => void handleOpenLibrary()} disabled={isOpeningSettings}>
+                    {isOpeningSettings ? "Saving…" : verifiedEvidenceCount === 0 ? "Verify evidence" : "Open Evidence Bank"}
+                  </Button>
                 )}
                 {nextStep === "provider" && (
                   <Button onClick={() => void handleOpenSettings()} disabled={isOpeningSettings || !providerConfigStatus.checked}>
@@ -1583,14 +1892,60 @@ export function TailorWorkspace() {
                   Suggest resume edits
                 </Button>
               </div>
-              {settingsNavigationError && (
-                <p role="alert" className="text-sm text-status-danger xl:col-span-2">
-                  {settingsNavigationError}
-                </p>
+              {navigationError && (
+                <div
+                  ref={navigationErrorRef}
+                  tabIndex={-1}
+                  role="alert"
+                  className="flex flex-wrap items-center gap-3 text-sm text-status-danger xl:col-span-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                >
+                  <span>{navigationError}</span>
+                  {lastFailedNavTargetRef.current && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const retryTarget = lastFailedNavTargetRef.current;
+                        if (retryTarget) void navigateWithSave(retryTarget);
+                      }}
+                      className="rounded border border-status-danger/40 bg-status-danger/10 px-2.5 py-1 text-xs font-semibold text-status-danger hover:bg-status-danger/20"
+                    >
+                      Retry save &amp; continue
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           }
         />
+
+        {jobLoadError && (
+          <div
+            role="alert"
+            data-testid="job-load-error-banner"
+            className="mb-4 rounded-xl border border-status-danger/40 bg-status-danger/10 p-4 flex flex-wrap items-center justify-between gap-3 text-sm"
+          >
+            <div className="flex items-start gap-2.5 min-w-0">
+              <AlertTriangle className="h-4 w-4 text-status-danger shrink-0 mt-0.5" aria-hidden />
+              <p className="text-foreground break-words">{jobLoadError.message}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <Link
+                href="/tracker"
+                data-testid="job-load-error-back-to-jobs"
+                className={buttonVariants({ variant: "default", size: "sm" })}
+              >
+                Back to Jobs
+              </Link>
+              <button
+                type="button"
+                onClick={handleClearSampleJob}
+                className="min-h-9 rounded-md border border-control bg-panel px-3 text-xs font-medium text-foreground hover:bg-elevated"
+              >
+                Start a new job
+              </button>
+            </div>
+          </div>
+        )}
 
         <div
           data-testid="active-job-header-banner"
@@ -1632,15 +1987,18 @@ export function TailorWorkspace() {
                 ATS {atsResult.overallScore}%
               </span>
             )}
-            <div className="flex min-w-0 items-center gap-2 rounded-md border border-hairline bg-panel px-2.5 font-sans">
-              <label htmlFor="tailor-role-profile-select" className="font-medium text-muted-foreground">
+            <div className="inline-flex min-h-10 min-w-0 max-w-full items-center gap-2 rounded-md border border-hairline bg-panel px-2.5 py-1 font-sans">
+              <label
+                htmlFor="tailor-role-profile-select"
+                className="shrink-0 whitespace-nowrap text-xs font-medium leading-none text-muted-foreground"
+              >
                 ATS profile
               </label>
               <select
                 id="tailor-role-profile-select"
                 value={selectedRoleProfile}
                 onChange={(e) => setSelectedRoleProfile(e.target.value as RoleProfile)}
-                className="min-h-10 min-w-0 cursor-pointer rounded bg-transparent text-base font-medium text-foreground focus-visible:outline-2 focus-visible:outline-primary sm:text-sm"
+                className="h-8 min-w-0 max-w-full cursor-pointer rounded bg-transparent py-0 text-sm font-medium leading-normal text-foreground focus-visible:outline-2 focus-visible:outline-primary"
                 data-testid="tailor-role-profile-select"
               >
                 {ROLE_PROFILES.map((profile) => (
@@ -1683,12 +2041,14 @@ export function TailorWorkspace() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
                     {structuredPatchError.recoveryAction === "review_evidence" && (
-                      <Link
-                        href="/library"
-                        className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-status-danger/40 bg-status-danger/15 px-3 text-xs font-semibold text-status-danger hover:bg-status-danger/25"
+                      <button
+                        type="button"
+                        onClick={() => void handleOpenLibrary()}
+                        disabled={isOpeningSettings}
+                        className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-status-danger/40 bg-status-danger/15 px-3 text-xs font-semibold text-status-danger hover:bg-status-danger/25 disabled:opacity-60"
                       >
-                        Review evidence
-                      </Link>
+                        {isOpeningSettings ? "Saving…" : "Review evidence"}
+                      </button>
                     )}
                     <button
                       type="button"
@@ -2022,12 +2382,20 @@ export function TailorWorkspace() {
                     onSelectedPatchChange={setSelectedPatchId}
                     onRegeneratePatches={() => void handleGeneratePatches()}
                     renderInlinePreview={false}
-                    onApplySuccess={(_variantId, mergedContent) => {
+                    tailorTab={activeTab}
+                    masterResumeId={masterResumeId === "demo-local" ? null : masterResumeId}
+                    editorMode={editorMode}
+                    onApplySuccess={(variantId, mergedContent) => {
                       setActiveVariantContent(mergedContent);
-                      setSaveStatus("Tailored variant applied — ATS will re-score against updated content.");
+                      clearPendingReviewChoices();
                       if (masterResumeId === "demo-local") {
                         setMasterTypstSource(mergedContent);
                         localStorage.setItem("resumeforge_typst_source", mergedContent);
+                        setSaveStatus("Job-specific variant applied to your working draft — ATS will re-score against updated content.");
+                      } else {
+                        setActiveVariantId(variantId);
+                        updateActiveApplicationContext({ variantId }, accountScopeRef.current);
+                        setSaveStatus("Job-specific variant saved — ATS will re-score against your job-specific variant.");
                       }
                     }}
                   />
@@ -2042,7 +2410,15 @@ export function TailorWorkspace() {
                 {showTypstSource && (
                   <div className="flex flex-col space-y-2 pt-3 border-t border-hairline">
                     <div className="flex items-center justify-between text-xs text-muted-foreground font-mono tabular-nums">
-                      <span>Resume source ({activeVariantContent ? "Tailored Variant" : "Master Resume"})</span>
+                      <span>
+                        Resume source (
+                        {activeVariantId
+                          ? "job-specific variant"
+                          : masterResumeId && masterResumeId !== "demo-local"
+                            ? "master résumé"
+                            : "working draft"}
+                        )
+                      </span>
                       <span>{(activeVariantContent || masterTypstSource).split("\n").length} lines</span>
                     </div>
                     <pre
@@ -2146,6 +2522,13 @@ export function TailorWorkspace() {
                         extractedRequirements={extractedRequirements}
                         roleTitle={roleTitle}
                         rawDescription={rawDescription}
+                        evaluatedSourceLabel={
+                          activeVariantId
+                            ? "job-specific variant"
+                            : masterResumeId && masterResumeId !== "demo-local"
+                              ? "master résumé"
+                              : "working draft"
+                        }
                         initialProfile={selectedRoleProfile}
                         onProfileChange={setSelectedRoleProfile}
                         onEvaluationComplete={setAtsResult}
@@ -2445,10 +2828,10 @@ export function TailorWorkspace() {
                         ))}
                       </div>
 
-                      {/* Add Custom User Requirement */}
+                      {/* Add Custom Requirement */}
                       <div className="p-3 rounded bg-inset border border-hairline space-y-2">
                         <span className="font-semibold text-text-secondary block">
-                          Add Custom Requirement (User-Added)
+                          Add Custom Requirement
                         </span>
                         <div className="flex flex-wrap items-center gap-2">
                           <input
@@ -2491,8 +2874,8 @@ export function TailorWorkspace() {
                                   className="px-2 py-0.5 rounded bg-status-warning/10 border border-status-warning/35 text-xs text-status-warning flex items-center gap-1"
                                 >
                                   <span>{req.label}</span>
-                                  <span className="text-xs px-1 rounded bg-status-warning/25 text-status-warning font-bold">
-                                    USER_ADDED
+                                  <span className="text-xs px-1.5 py-0.5 rounded bg-status-warning/20 text-status-warning font-semibold">
+                                    {formatRequirementSourceLabel(req.confidence)}
                                   </span>
                                 </span>
                               ))}
@@ -2625,7 +3008,7 @@ export function TailorWorkspace() {
                       data-testid="job-extraction-diagnostics-summary"
                       className="cursor-pointer select-none py-1 font-mono text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded"
                     >
-                      Extraction diagnostics · {jobDoc.diagnostics.status}
+                      Extraction diagnostics · {formatJobDiagnosticLabel(jobDoc.diagnostics.status)}
                     </summary>
                     <div className="mt-3 space-y-3 border-t border-hairline pt-3 font-mono text-xs">
                       {jobDoc.diagnostics.status === "VERIFIED_ATS" && (
@@ -2652,14 +3035,14 @@ export function TailorWorkspace() {
                           className="p-3 rounded-lg bg-panel border border-hairline text-sm font-sans text-text-secondary flex items-start gap-2"
                         >
                           <FileText className="size-4 text-muted-foreground shrink-0" />
-                          <span>User Pasted: Review and edit the job description as needed.</span>
+                          <span>Pasted job posting: Review and edit the job description as needed.</span>
                         </div>
                       )}
                       <div className="p-3 rounded bg-panel border border-hairline space-y-2">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="text-muted-foreground">Ingestion Source Kind:</span>
-                          <span className="px-2 py-0.5 rounded bg-signal/10 text-signal border border-signal/35 font-bold text-xs">
-                            {jobDoc.sourceKind}
+                          <span className="text-muted-foreground">Source type:</span>
+                          <span className="px-2 py-0.5 rounded bg-signal/10 text-signal border border-signal/35 font-semibold text-xs">
+                            {formatJobDiagnosticLabel(jobDoc.sourceKind)}
                           </span>
                         </div>
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2674,8 +3057,8 @@ export function TailorWorkspace() {
                         </div>
                         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                           <span className="text-muted-foreground">Diagnostics Status:</span>
-                          <span className="px-2 py-0.5 rounded status-success-surface border font-bold text-xs">
-                            {jobDoc.diagnostics.status}
+                          <span className="px-2 py-0.5 rounded status-success-surface border font-semibold text-xs">
+                            {formatJobDiagnosticLabel(jobDoc.diagnostics.status)}
                           </span>
                         </div>
                       </div>
@@ -2817,7 +3200,7 @@ export function TailorWorkspace() {
                             : "bg-elevated text-muted-foreground border-hairline"
                         }`}
                       >
-                        {m.matchPercentage}% · {m.matchPercentage >= 60 ? "High" : "Low"} Match
+                        {m.matchPercentage}% evidence match · {m.matchPercentage >= 60 ? "High" : "Low"}
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">
