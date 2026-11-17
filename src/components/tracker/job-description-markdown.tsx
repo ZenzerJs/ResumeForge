@@ -96,7 +96,7 @@ export function JobDescriptionMarkdown({
             <dl key={index} className="grid gap-1 text-sm text-on-surface-variant">
               {block.items.map((item) => (
                 <div key={item.label} className="flex flex-wrap gap-x-2">
-                  <dt className="font-section-label text-[11px] uppercase tracking-wider text-on-surface-variant/80">
+                  <dt className="font-section-label text-xs uppercase tracking-wider text-on-surface-variant/80">
                     {item.label}
                   </dt>
                   <dd className="text-on-surface">{renderInline(item.value)}</dd>

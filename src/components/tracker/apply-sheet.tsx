@@ -104,11 +104,11 @@ export function ApplySheetPatchCard({
           <Button type="button" size="sm" variant={decision === "rejected" ? "destructive" : "outline"} onClick={onReject} data-testid={`apply-sheet-reject-${patch.id}`}>Reject</Button>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-2 text-[11px] font-mono whitespace-pre-wrap">
-        <div className="rounded bg-red-950/30 p-2 text-text-secondary"><span className="mb-1 block text-[9px] uppercase text-muted-foreground">Before</span>{patch.before || "(empty)"}</div>
-        <div className="rounded bg-status-success/15 p-2 text-status-success-soft"><span className="mb-1 block text-[9px] uppercase text-muted-foreground">After</span>{patch.after || "(empty)"}</div>
+      <div className="grid grid-cols-2 gap-2 text-xs font-mono whitespace-pre-wrap">
+        <div className="rounded bg-red-950/30 p-2 text-text-secondary"><span className="mb-1 block text-xs uppercase text-muted-foreground">Before</span>{patch.before || "(empty)"}</div>
+        <div className="rounded bg-status-success/15 p-2 text-status-success-soft"><span className="mb-1 block text-xs uppercase text-muted-foreground">After</span>{patch.after || "(empty)"}</div>
       </div>
-      <p className="text-[11px] text-muted-foreground">{patch.rationale}</p>
+      <p className="text-xs text-muted-foreground">{patch.rationale}</p>
     </article>
   );
 }
@@ -584,7 +584,7 @@ export function ApplySheet({
               <Badge variant="outline" className="border-amber-500/40 text-amber-400 bg-amber-950/20 text-xs">
                 One-Click Apply
               </Badge>
-              <span className="text-[11px] text-muted-foreground font-mono">Step {stepIndex} of 5</span>
+              <span className="text-xs text-muted-foreground font-mono">Step {stepIndex} of 5</span>
             </div>
             <SheetTitle className="text-lg font-bold text-foreground flex items-center gap-2 pt-1">
               <Briefcase className="size-4 text-primary" />
@@ -620,7 +620,7 @@ export function ApplySheet({
           {/* Progress Indicator */}
           <div className="space-y-1.5">
             <Progress value={(stepIndex / 5) * 100} className="h-1.5 bg-elevated" />
-            <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+            <div className="flex justify-between text-xs text-muted-foreground font-mono">
               <span className={stepIndex >= 1 ? "text-primary" : ""}>1. Job</span>
               <span className={stepIndex >= 2 ? "text-primary" : ""}>2. Tailor</span>
               <span className={stepIndex >= 3 ? "text-primary" : ""}>3. Guardrail</span>
@@ -634,16 +634,16 @@ export function ApplySheet({
             <h4 className="font-semibold text-foreground flex items-center justify-between">
               <span>Target Role Profile</span>
               {job.salarySnippet && (
-                <span className="text-status-success-soft text-[11px] font-mono">{job.salarySnippet}</span>
+                <span className="text-status-success-soft text-xs font-mono">{job.salarySnippet}</span>
               )}
             </h4>
 
             {job.requirements?.requiredSkills && job.requirements.requiredSkills.length > 0 && (
               <div className="space-y-1">
-                <span className="text-[11px] text-muted-foreground">Required Skills:</span>
+                <span className="text-xs text-muted-foreground">Required Skills:</span>
                 <div className="flex flex-wrap gap-1">
                   {job.requirements.requiredSkills.map((s, i) => (
-                    <Badge key={i} variant="secondary" className="text-[10px] bg-elevated text-text-secondary border border-hairline">
+                    <Badge key={i} variant="secondary" className="text-xs bg-elevated text-text-secondary border border-hairline">
                       {s}
                     </Badge>
                   ))}
@@ -692,7 +692,7 @@ export function ApplySheet({
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-semibold text-text-secondary">Guardrail Audit</h4>
                 {appliedPatchCount > 0 && (
-                  <Badge variant="outline" className="border-status-success/40 text-status-success-soft bg-status-success/15 text-[10px]">
+                  <Badge variant="outline" className="border-status-success/40 text-status-success-soft bg-status-success/15 text-xs">
                     {appliedPatchCount} AI Patch{appliedPatchCount === 1 ? "" : "es"} Applied
                   </Badge>
                 )}
@@ -720,7 +720,7 @@ export function ApplySheet({
                   {atsScore.overallScore} / 100
                 </Badge>
               </div>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Matches {atsScore.requiredMatch.score}/{atsScore.requiredMatch.maxScore} required skills points.
               </p>
             </div>
@@ -744,7 +744,7 @@ export function ApplySheet({
                   Dismiss
                 </button>
               </div>
-              <div className="flex items-center gap-2 pt-1 border-t border-red-900/60 text-[11px]">
+              <div className="flex items-center gap-2 pt-1 border-t border-red-900/60 text-xs">
                 <span className="text-red-300">Fallback direct downloads:</span>
                 <button
                   type="button"

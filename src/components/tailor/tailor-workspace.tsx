@@ -161,7 +161,7 @@ function renderHighlightedJd(text: string, skills: string[]) {
           return (
             <mark
               key={idx}
-              className="bg-amber-500/25 text-amber-300 font-semibold px-1 py-0.5 rounded border border-amber-500/40"
+              className="bg-primary/20 text-primary font-semibold px-1 py-0.5 rounded border border-primary/40"
             >
               {token.text}
             </mark>
@@ -1237,7 +1237,7 @@ export function TailorWorkspace() {
             isAutoScanning ? (
               <span
                 data-testid="auto-scanning-indicator"
-                className="flex items-center gap-1.5 rounded-full border border-status-warning/40 bg-status-warning/15 px-2.5 py-0.5 text-[11px] font-mono text-status-warning animate-pulse"
+                className="flex items-center gap-1.5 rounded-full border border-status-warning/40 bg-status-warning/15 px-2.5 py-0.5 text-xs font-mono text-status-warning animate-pulse"
               >
                 <Loader2 className="h-3 w-3 animate-spin" /> Auto-rescanning...
               </span>
@@ -1291,7 +1291,7 @@ export function TailorWorkspace() {
               {isSampleJob && (
                 <span
                   data-testid="sample-job-badge"
-                  className="inline-flex items-center rounded-full border border-status-warning/40 bg-status-warning/15 px-2 py-0.5 text-[11px] font-semibold text-status-warning"
+                  className="inline-flex items-center rounded-full border border-status-warning/40 bg-status-warning/15 px-2 py-0.5 text-xs font-semibold text-status-warning"
                 >
                   Sample job
                 </span>
@@ -1389,7 +1389,7 @@ export function TailorWorkspace() {
                       Technical details ({structuredPatchError.category})
                     </button>
                     {showErrorTechDetails && (
-                      <pre className="mt-2 overflow-x-auto rounded border border-status-danger/35 bg-inset p-2.5 font-mono text-[11px] text-text-secondary break-all whitespace-pre-wrap">
+                      <pre className="mt-2 overflow-x-auto rounded border border-status-danger/35 bg-inset p-2.5 font-mono text-xs text-text-secondary break-all whitespace-pre-wrap">
                         {JSON.stringify(structuredPatchError.details, null, 2)}
                       </pre>
                     )}
@@ -2169,7 +2169,7 @@ export function TailorWorkspace() {
                           >
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <span className="font-bold text-[#ffb77d]">{sec.heading}</span>
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-elevated text-text-secondary font-semibold uppercase">
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-elevated text-text-secondary font-semibold uppercase">
                                 {sec.kind}
                               </span>
                             </div>
@@ -2192,7 +2192,7 @@ export function TailorWorkspace() {
                             onChange={(e) => setNewUserReqText(e.target.value)}
                             placeholder="e.g. 5+ years Go microservices experience"
                             data-testid="add-user-requirement-input"
-                            className="min-w-0 min-h-11 flex-1 bg-panel border border-hairline px-3 text-sm text-foreground rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                            className="min-w-0 min-h-11 flex-1 bg-panel border border-hairline px-3 text-sm text-foreground rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary"
                           />
                           <button
                             type="button"
@@ -2218,15 +2218,15 @@ export function TailorWorkspace() {
                         </div>
                         {customUserReqs.length > 0 && (
                           <div className="pt-2 space-y-1">
-                            <span className="text-[10px] text-muted-foreground">Custom User Requirements:</span>
+                            <span className="text-xs text-muted-foreground">Custom User Requirements:</span>
                             <div className="flex flex-wrap gap-1.5">
                               {customUserReqs.map((req) => (
                                 <span
                                   key={req.id}
-                                  className="px-2 py-0.5 rounded bg-status-warning/10 border border-status-warning/35 text-[11px] text-status-warning flex items-center gap-1"
+                                  className="px-2 py-0.5 rounded bg-status-warning/10 border border-status-warning/35 text-xs text-status-warning flex items-center gap-1"
                                 >
                                   <span>{req.label}</span>
-                                  <span className="text-[9px] px-1 rounded bg-status-warning/25 text-status-warning font-bold">
+                                  <span className="text-xs px-1 rounded bg-status-warning/25 text-status-warning font-bold">
                                     USER_ADDED
                                   </span>
                                 </span>
@@ -2302,7 +2302,7 @@ export function TailorWorkspace() {
                           className="w-full bg-inset text-foreground text-base sm:text-sm p-4 rounded-lg border border-hairline resize-y leading-relaxed"
                         />
                         {tier2Status?.type === "error" ? (
-                          <pre className="mt-2 whitespace-pre-wrap rounded border border-hairline bg-inset p-3 font-mono text-[10px] leading-relaxed text-muted-foreground">
+                          <pre className="mt-2 whitespace-pre-wrap rounded border border-hairline bg-inset p-3 font-mono text-xs leading-relaxed text-muted-foreground">
                             {JD_PASTE_TEMPLATE}
                           </pre>
                         ) : null}
@@ -2365,23 +2365,23 @@ export function TailorWorkspace() {
                       <div className="p-3 rounded bg-inset border border-hairline space-y-2">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="text-muted-foreground">Ingestion Source Kind:</span>
-                          <span className="px-2 py-0.5 rounded bg-signal/10 text-signal border border-signal/35 font-bold text-[10px]">
+                          <span className="px-2 py-0.5 rounded bg-signal/10 text-signal border border-signal/35 font-bold text-xs">
                             {jobDoc.sourceKind}
                           </span>
                         </div>
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="text-muted-foreground">Acquired At:</span>
-                          <span className="text-foreground text-[11px] break-all">{jobDoc.acquiredAt}</span>
+                          <span className="text-foreground text-xs break-all">{jobDoc.acquiredAt}</span>
                         </div>
                         <div className="space-y-1">
                           <span className="text-muted-foreground block">Content Hash (SHA-256):</span>
-                          <code className="block p-1.5 rounded bg-panel border border-hairline text-[10px] text-status-success break-all">
+                          <code className="block p-1.5 rounded bg-panel border border-hairline text-xs text-status-success break-all">
                             {jobDoc.contentHash}
                           </code>
                         </div>
                         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                           <span className="text-muted-foreground">Diagnostics Status:</span>
-                          <span className="px-2 py-0.5 rounded status-success-surface border font-bold text-[10px]">
+                          <span className="px-2 py-0.5 rounded status-success-surface border font-bold text-xs">
                             {jobDoc.diagnostics.status}
                           </span>
                         </div>
@@ -2447,7 +2447,7 @@ export function TailorWorkspace() {
                                       setGapSkillToResolve(skill);
                                     }}
                                     data-testid={`resolve-gap-${skill}`}
-                                    className="ml-1 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300 hover:bg-amber-500/30 transition-colors flex items-center gap-0.5"
+                                    className="ml-1 rounded bg-primary/15 px-1.5 py-0.5 text-xs font-semibold text-primary hover:bg-primary/25 transition-colors flex items-center gap-0.5"
                                     title="Add evidence for this missing skill"
                                   >
                                     <Plus className="h-2.5 w-2.5" />
@@ -2508,7 +2508,7 @@ export function TailorWorkspace() {
                     <div className="flex flex-wrap justify-between items-start mb-1 gap-2">
                       <h4 className="font-bold text-sm text-foreground min-w-0">{m.title}</h4>
                       <span
-                        className={`shrink-0 text-[10px] font-mono tabular-nums px-2 py-0.5 rounded border ${
+                        className={`shrink-0 text-xs font-mono tabular-nums px-2 py-0.5 rounded border ${
                           m.matchPercentage >= 60
                             ? "bg-status-success/15 border-status-success/40 text-status-success"
                             : "bg-elevated text-muted-foreground border-hairline"
@@ -2529,7 +2529,7 @@ export function TailorWorkspace() {
                           <span
                             key={req}
                             data-testid="matched-req-badge"
-                            className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-elevated text-on-surface-variant border border-hairline"
+                            className="text-xs font-mono px-1.5 py-0.5 rounded bg-elevated text-on-surface-variant border border-hairline"
                           >
                             {req}
                           </span>

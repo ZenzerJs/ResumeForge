@@ -1746,7 +1746,7 @@ export function LibraryWorkspace() {
                   disabled={isBulkSubmitting}
                   data-testid="undo-archive-btn"
                   onClick={() => void handleUndoArchive(notification.undoArchive!)}
-                  className="min-h-11 sm:min-h-7 h-auto sm:h-7 px-2.5 text-[11px] font-mono border-status-success/40 bg-status-success/15 text-status-success-soft hover:bg-status-success/25"
+                  className="min-h-11 sm:min-h-7 h-auto sm:h-7 px-2.5 text-xs font-mono border-status-success/40 bg-status-success/15 text-status-success-soft hover:bg-status-success/25"
                 >
                   <RotateCcw className="h-3 w-3 mr-1" />
                   Undo
@@ -1799,7 +1799,7 @@ export function LibraryWorkspace() {
           >
             Review Queue
             {reviewItems.length > 0 && (
-              <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums">
+              <span className="bg-primary text-primary-foreground text-xs font-bold px-1.5 py-0.5 rounded-full tabular-nums">
                 {reviewItems.length}
               </span>
             )}
@@ -2033,7 +2033,7 @@ export function LibraryWorkspace() {
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                          <span className={`rounded-[5px] border px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider ${typeBadgeClass}`}>
+                          <span className={`rounded-[5px] border px-2 py-0.5 text-xs font-mono font-bold uppercase tracking-wider ${typeBadgeClass}`}>
                             {item.type}
                           </span>
                           <h2 className="text-base font-bold text-foreground tracking-tight break-words">
@@ -2049,7 +2049,7 @@ export function LibraryWorkspace() {
 
                     <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:shrink-0">
                       <span
-                        className={`rounded-[5px] px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider ${
+                        className={`rounded-[5px] px-2.5 py-0.5 text-xs font-mono font-bold uppercase tracking-wider ${
                           item.status === "verified"
                             ? "bg-status-success/10 border border-status-success/35 text-status-success"
                             : "bg-inset border border-hairline text-muted-foreground"
@@ -2068,7 +2068,7 @@ export function LibraryWorkspace() {
                           size="sm"
                           data-testid="verify-evidence-btn"
                           onClick={() => void handleVerifyItem(item)}
-                          className="min-h-11 sm:min-h-8 h-auto sm:h-8 gap-1.5 border-status-success/35 bg-status-success/10 px-2.5 text-[11px] font-mono font-semibold text-status-success hover:bg-status-success/20 hover:text-status-success"
+                          className="min-h-11 sm:min-h-8 h-auto sm:h-8 gap-1.5 border-status-success/35 bg-status-success/10 px-2.5 text-xs font-mono font-semibold text-status-success hover:bg-status-success/20 hover:text-status-success"
                           aria-label={`Verify ${item.title}`}
                         >
                           <CheckCircle2 className="h-3.5 w-3.5" />
@@ -2083,7 +2083,7 @@ export function LibraryWorkspace() {
                           disabled={isBulkSubmitting}
                           data-testid={`restore-evidence-btn-${item.id}`}
                           onClick={() => void handleRestoreItem(item, "draft")}
-                          className="min-h-11 sm:min-h-8 h-auto sm:h-8 gap-1.5 border-hairline bg-inset px-2.5 text-[11px] font-mono font-semibold text-foreground hover:bg-elevated"
+                          className="min-h-11 sm:min-h-8 h-auto sm:h-8 gap-1.5 border-hairline bg-inset px-2.5 text-xs font-mono font-semibold text-foreground hover:bg-elevated"
                           aria-label={`Restore ${item.title}`}
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
@@ -2180,7 +2180,7 @@ export function LibraryWorkspace() {
                       {item.tags.map((t, idx) => (
                         <span
                           key={idx}
-                          className="inline-flex items-center gap-1.5 rounded-[6px] bg-inset border border-hairline px-2.5 py-1 text-[11px] font-mono text-text-secondary"
+                          className="inline-flex items-center gap-1.5 rounded-[6px] bg-inset border border-hairline px-2.5 py-1 text-xs font-mono text-text-secondary"
                         >
                           {hasBrandIcon(t) && <BrandIcon name={t} className="h-3 w-3 shrink-0" />}
                           <span>{t}</span>
@@ -2230,7 +2230,7 @@ export function LibraryWorkspace() {
                     </div>
                     <div className="flex flex-col md:flex-row gap-4 mb-4">
                       <div className="flex-1 p-4 rounded-lg bg-inset border border-hairline">
-                        <div className="text-[11px] text-primary mb-1 font-mono uppercase">
+                        <div className="text-xs text-primary mb-1 font-mono uppercase">
                           Candidate Bullet
                         </div>
                         <p className="text-xs text-text-secondary leading-relaxed">
@@ -2242,13 +2242,13 @@ export function LibraryWorkspace() {
                           <div className="text-ember font-bold text-lg font-mono tabular-nums">
                             {Math.round((item.similarityScore || 0.75) * 100)}%
                           </div>
-                          <div className="text-[10px] text-muted-foreground uppercase font-mono">
+                          <div className="text-xs text-muted-foreground uppercase font-mono">
                             Similarity
                           </div>
                         </div>
                       </div>
                       <div className="flex-1 p-4 rounded-lg bg-inset border border-hairline">
-                        <div className="text-[11px] text-signal mb-1 font-mono uppercase">
+                        <div className="text-xs text-signal mb-1 font-mono uppercase">
                           Existing Bullet
                         </div>
                         <p className="text-xs text-text-secondary leading-relaxed">

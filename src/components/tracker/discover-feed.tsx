@@ -585,7 +585,7 @@ export function DiscoverFeed() {
               <Compass className="h-6 w-6" />
             </div>
             <div className="min-w-0 space-y-1">
-              <p className="font-mono text-[11px] font-semibold uppercase tracking-wider text-primary">
+              <p className="font-mono text-xs font-semibold uppercase tracking-wider text-primary">
                 Find your next role
               </p>
               <h2 className="text-2xl font-bold tracking-tight text-rf-cloud md:text-3xl">
@@ -638,7 +638,7 @@ export function DiscoverFeed() {
           className="flex flex-wrap items-center gap-2 rounded-xl border glass-bar px-4 py-2.5"
           data-testid="curated-company-chips"
         >
-          <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mr-1">
+          <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground mr-1">
             Featured Boards:
           </span>
           {CURATED_COMPANIES.map((company) => {
@@ -650,7 +650,7 @@ export function DiscoverFeed() {
                 onClick={() => setSearchQuery(isActive && company.query !== "" ? "" : company.query)}
                 aria-pressed={isActive}
                 data-testid={`curated-chip-${(company.query || "all").toLowerCase()}`}
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
                   isActive
                     ? "border border-primary/50 bg-primary/15 text-primary"
                     : "border border-hairline bg-inset text-text-secondary hover:border-control hover:text-foreground"
@@ -773,7 +773,7 @@ export function DiscoverFeed() {
                     {activeSecondaryFilterCount > 0 && (
                       <span
                         data-testid="discover-more-filters-count"
-                        className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold tabular-nums text-primary-foreground"
+                        className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold tabular-nums text-primary-foreground"
                       >
                         {activeSecondaryFilterCount}
                       </span>
@@ -811,7 +811,7 @@ export function DiscoverFeed() {
                       <div className="flex flex-col gap-1">
                         <label
                           htmlFor="discover-salary-select"
-                          className="text-[11px] font-mono uppercase tracking-wider text-rf-meta"
+                          className="text-xs font-mono uppercase tracking-wider text-rf-meta"
                         >
                           Minimum Salary
                         </label>
@@ -833,7 +833,7 @@ export function DiscoverFeed() {
                       <div className="flex flex-col gap-1">
                         <label
                           htmlFor="discover-source-select"
-                          className="text-[11px] font-mono uppercase tracking-wider text-rf-meta"
+                          className="text-xs font-mono uppercase tracking-wider text-rf-meta"
                         >
                           Source
                         </label>
@@ -855,7 +855,7 @@ export function DiscoverFeed() {
                       <div className="flex flex-col gap-1">
                         <label
                           htmlFor="discover-workplace-select"
-                          className="text-[11px] font-mono uppercase tracking-wider text-rf-meta"
+                          className="text-xs font-mono uppercase tracking-wider text-rf-meta"
                         >
                           Workplace
                         </label>
@@ -875,7 +875,7 @@ export function DiscoverFeed() {
                       </div>
 
                       <div className="flex flex-col gap-1.5">
-                        <span className="text-[11px] font-mono uppercase tracking-wider text-rf-meta">
+                        <span className="text-xs font-mono uppercase tracking-wider text-rf-meta">
                           Posted
                         </span>
                         <div className="flex flex-wrap items-center gap-1.5">
@@ -884,7 +884,7 @@ export function DiscoverFeed() {
                               key={opt.value}
                               type="button"
                               onClick={() => setPostedWithin(opt.value)}
-                              className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                                 postedWithin === opt.value
                                   ? "border border-primary/50 bg-primary/15 text-primary"
                                   : "border border-hairline bg-rf-elevated text-muted-foreground hover:text-foreground"
@@ -995,7 +995,7 @@ export function DiscoverFeed() {
                         <span className="break-words">{j.companyName}</span>
                       </span>
                       <div className="flex items-center gap-1.5">
-                        <span className="rounded border border-hairline bg-inset px-1.5 py-0.5 font-mono text-[10px] text-text-secondary uppercase">
+                        <span className="rounded border border-hairline bg-inset px-1.5 py-0.5 font-mono text-xs text-text-secondary uppercase">
                           {j.source}
                         </span>
                       </div>
@@ -1028,7 +1028,7 @@ export function DiscoverFeed() {
                               {clientSkillPct !== null && matchedClientSkills.length > 0 && (
                                 <span
                                   data-testid="discover-skill-match-badge"
-                                  className="rounded border border-signal/35 bg-signal/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-signal"
+                                  className="rounded border border-signal/35 bg-signal/10 px-1.5 py-0.5 font-mono text-xs font-semibold text-signal"
                                   title={`Matched skills: ${matchedClientSkills.slice(0, 5).join(", ")}`}
                                 >
                                   {clientSkillPct}% Skill Match
@@ -1036,7 +1036,7 @@ export function DiscoverFeed() {
                               )}
                               <Link
                                 href="/library"
-                                className="text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                                className="text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                               >
                                 Add evidence to score
                               </Link>
@@ -1061,7 +1061,7 @@ export function DiscoverFeed() {
                         <MapPin className="h-3 w-3 text-muted-foreground" />
                         {j.location || "Remote / Canada"}
                         {j.workplaceType && j.workplaceType !== "UNSPECIFIED" ? (
-                          <span className="rounded bg-inset border border-hairline px-1.5 py-0.2 text-[10px] text-text-secondary lowercase">
+                          <span className="rounded bg-inset border border-hairline px-1.5 py-0.2 text-xs text-text-secondary lowercase">
                             ({j.workplaceType})
                           </span>
                         ) : null}
@@ -1084,7 +1084,7 @@ export function DiscoverFeed() {
 
                     {j.compatibility && requiredCount > 0 && (
                       <div className="mt-2 space-y-1.5">
-                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono">
                           <span className="rounded bg-primary/10 border border-primary/35 px-2 py-0.5 text-primary">
                             {j.compatibility.matchedSkills.length}/{requiredCount} Skills Matched
                           </span>

@@ -255,7 +255,7 @@ export function AtsScorePanel({
           <h2 className="text-base font-semibold text-foreground flex flex-wrap items-center gap-2">
             <BarChart3 className="h-5 w-5 shrink-0 text-signal" />
             <span>ATS Grade</span>
-            <span className={`text-[10px] font-mono bg-signal/10 text-signal border border-signal/30 px-2 py-0.5 rounded-full whitespace-nowrap ${styles.engineBadge}`}>
+            <span className={`text-xs font-mono bg-signal/10 text-signal border border-signal/30 px-2 py-0.5 rounded-full whitespace-nowrap ${styles.engineBadge}`}>
               Deterministic Engine
             </span>
           </h2>
@@ -283,7 +283,7 @@ export function AtsScorePanel({
                 </div>
               </div>
               <div className="min-w-0">
-                <span className="block text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                <span className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground">
                   Overall Match · {gradeLabel}
                 </span>
                 <div className={`text-2xl font-bold tracking-tight font-mono tabular-nums leading-tight text-foreground ${styles.scoreValue}`}>
@@ -486,19 +486,19 @@ export function AtsScorePanel({
                   <div className="min-w-0 w-full">
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                       <span className="font-semibold text-foreground break-words">{se.skill}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase font-mono">
+                      <span className="text-xs text-muted-foreground uppercase font-mono">
                         ({se.category})
                       </span>
                     </div>
                     {se.matchedContext && (
-                      <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed break-words">
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed break-words">
                         {se.matchedContext}
                       </p>
                     )}
                   </div>
                   <span
                     data-testid={`status-badge-${se.skill}`}
-                    className={`w-fit max-w-full px-2 py-0.5 rounded text-[10px] font-semibold border inline-flex items-center gap-1 whitespace-normal ${badge.bg} ${badge.text} ${badge.border}`}
+                    className={`w-fit max-w-full px-2 py-0.5 rounded text-xs font-semibold border inline-flex items-center gap-1 whitespace-normal ${badge.bg} ${badge.text} ${badge.border}`}
                   >
                     <span>{badge.icon}</span> {badge.label}
                   </span>
@@ -529,7 +529,7 @@ export function AtsScorePanel({
                   className="flex items-start gap-2.5 rounded-[8px] border border-hairline bg-inset p-2.5 min-w-0"
                 >
                   <span
-                    className={`shrink-0 rounded-[5px] border px-1.5 py-0.5 text-[10.5px] font-semibold ${
+                    className={`shrink-0 rounded-[5px] border px-1.5 py-0.5 text-xs font-semibold ${
                       isUrgent
                         ? "border-status-danger/40 bg-status-danger/10 text-status-danger"
                         : "border-primary/40 bg-primary/10 text-primary"

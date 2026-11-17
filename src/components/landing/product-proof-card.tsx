@@ -18,7 +18,7 @@ export function ProductProofCard() {
       {/* Top header row matching palette-lab.html#ember .proof-top */}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             <BrandIcon name="stripe" className="h-3.5 w-3.5 shrink-0" />
             ATS match · Stripe, SWE Intern
           </span>
@@ -119,7 +119,7 @@ export function ProductProofCard() {
         </div>
         <Link
           href="/tailor"
-          className="font-mono text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           Sample Workspace Layout →
         </Link>

@@ -321,13 +321,13 @@ export function SettingsWorkspace() {
                       id="settings-username"
                       value={usernameDraft}
                       onChange={(event) => setUsernameDraft(event.target.value)}
-                      className="h-11 w-full rounded-md border border-hairline bg-inset px-3.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                      className="h-11 w-full rounded-md border border-hairline bg-inset px-3.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     />
                     <button
                       type="button"
                       disabled={isSavingUsername || usernameDraft.trim() === sessionUser.username}
                       onClick={() => void handleSaveUsername()}
-                      className="inline-flex h-11 shrink-0 items-center justify-center rounded-md bg-elevated px-4 text-sm font-semibold text-foreground hover:bg-panel focus-visible:ring-2 focus-visible:ring-amber-500/60 disabled:opacity-50"
+                      className="inline-flex h-11 shrink-0 items-center justify-center rounded-md bg-elevated px-4 text-sm font-semibold text-foreground hover:bg-panel focus-visible:ring-2 focus-visible:ring-primary/60 disabled:opacity-50"
                     >
                       {isSavingUsername ? "Saving…" : "Save username"}
                     </button>
@@ -346,7 +346,7 @@ export function SettingsWorkspace() {
                     setIsSigningOut(true);
                     void signOutAndRedirect("/");
                   }}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-md border border-hairline px-4 text-sm font-medium text-foreground hover:bg-elevated focus-visible:ring-2 focus-visible:ring-amber-500/60 disabled:opacity-50"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-md border border-hairline px-4 text-sm font-medium text-foreground hover:bg-elevated focus-visible:ring-2 focus-visible:ring-primary/60 disabled:opacity-50"
                 >
                   <LogOut className="h-4 w-4" aria-hidden />
                   Sign Out
@@ -356,14 +356,14 @@ export function SettingsWorkspace() {
               <div className="flex flex-wrap gap-2">
                 <Link
                   href="/login"
-                  className="inline-flex min-h-11 items-center gap-2 rounded-md border border-hairline px-4 text-sm font-medium text-foreground hover:bg-elevated focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-md border border-hairline px-4 text-sm font-medium text-foreground hover:bg-elevated focus-visible:ring-2 focus-visible:ring-primary/60"
                 >
                   <LogIn className="h-4 w-4" aria-hidden />
                   Sign In
                 </Link>
                 {!demoMode && <Link
                   href="/login?mode=signup"
-                  className="inline-flex min-h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary/60"
                 >Sign Up</Link>}
               </div>
             )}
@@ -379,7 +379,7 @@ export function SettingsWorkspace() {
                 id="provider-select"
                 value={provider}
                 onChange={handleProviderChange}
-                className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <option value="gemini">Google Gemini (Direct API)</option>
                 <option value="openai">OpenAI (BYOK)</option>
@@ -430,7 +430,7 @@ export function SettingsWorkspace() {
                         ? "gsk_..."
                         : "Optional API Key for custom endpoint"
                     }
-                    className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-mono"
+                    className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
                   />
                 </div>
                 {apiKey && (
@@ -477,7 +477,7 @@ export function SettingsWorkspace() {
                   value={baseUrl}
                   onChange={handleBaseUrlChange}
                   placeholder={provider === "ollama" ? "http://localhost:11434" : provider === "custom" ? "http://localhost:8000" : "https://api.openai.com"}
-                  className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-mono"
+                  className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
                 />
               </div>
             )}
@@ -495,9 +495,9 @@ export function SettingsWorkspace() {
                 placeholder={
                   DEFAULT_MODELS[provider] || "gemini-2.5-flash"
                 }
-                className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-mono"
+                className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
               />
-              <p className="mt-1.5 text-[11px] text-muted-foreground">
+              <p className="mt-1.5 text-xs text-muted-foreground">
                 Default for {provider}: <code className="text-text-secondary font-mono">{DEFAULT_MODELS[provider]}</code>
               </p>
             </div>
@@ -509,7 +509,7 @@ export function SettingsWorkspace() {
                 id="test-connection-btn"
                 onClick={handleTestConnection}
                 disabled={isTesting}
-                className="inline-flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 rounded-md bg-amber-500 hover:bg-amber-400 text-[#121010] px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50 transition-colors"
+                className="inline-flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50 transition-colors"
               >
                 {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Server className="h-4 w-4" />}
                 {isTesting ? "Testing Connection..." : "Test Connection"}
@@ -545,7 +545,7 @@ export function SettingsWorkspace() {
                     </div>
                     <p className="text-xs opacity-90">{testResult.message}</p>
                     {testResult.latencyMs !== undefined && (
-                      <div className="text-[11px] opacity-75">
+                      <div className="text-xs opacity-75">
                         Latency: {testResult.latencyMs}ms
                       </div>
                     )}

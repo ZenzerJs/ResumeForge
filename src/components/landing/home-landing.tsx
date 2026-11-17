@@ -302,7 +302,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
             {(() => {
               const step1Done = Boolean(stats.hasMasterResume || hasLocalResume);
               const step2Done = Boolean(stats.evidenceCount > 0 || hasLocalEvidence);
-              const step3Done = Boolean(hasAiKey);
+              const step3Done = Boolean(hasAiKey) && !aiKeyless;
               const step4Done = Boolean(stats.variantsCount > 0 || stats.jobsCount > 0);
               const completedCount = [step1Done, step2Done, step3Done, step4Done].filter(Boolean).length;
               const progressPct = Math.round((completedCount / 4) * 100);
@@ -312,7 +312,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-outline/70">
                     <div>
                       <div className="flex items-center gap-2.5">
-                        <span className="rounded-[4px] bg-primary/10 border border-primary/30 px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-primary">
+                        <span className="rounded-[4px] bg-primary/10 border border-primary/30 px-2.5 py-0.5 font-mono text-xs font-semibold uppercase tracking-wider text-primary">
                           Quick Start Guide
                         </span>
                         <span
@@ -362,7 +362,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                     >
                       <div>
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                             Step 1
                           </span>
                           {step1Done ? (
@@ -407,7 +407,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                     >
                       <div>
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                             Step 2
                           </span>
                           {step2Done ? (
@@ -443,7 +443,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                     >
                       <div>
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                             Step 3
                           </span>
                           {step3Done ? (
@@ -479,7 +479,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                     >
                       <div>
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                             Step 4
                           </span>
                           {step4Done ? (

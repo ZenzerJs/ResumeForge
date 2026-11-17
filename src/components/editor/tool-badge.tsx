@@ -34,7 +34,7 @@ export const ToolBadge = React.memo(function ToolBadge({
         className
       )}
     >
-      <div className="flex items-center gap-1.5 font-mono text-[11px]">
+      <div className="flex items-center gap-1.5 font-mono text-xs">
         {state === "running" && (
           <Loader2 className="size-3 animate-spin text-amber-400" />
         )}
@@ -49,7 +49,7 @@ export const ToolBadge = React.memo(function ToolBadge({
 
       {summary && (
         <>
-          <span className="text-muted-foreground font-mono text-[10px]">•</span>
+          <span className="text-muted-foreground font-mono text-xs">•</span>
           <span className="text-foreground font-medium text-xs truncate max-w-xs">
             {summary}
           </span>
@@ -57,7 +57,7 @@ export const ToolBadge = React.memo(function ToolBadge({
       )}
 
       {typeof durationMs === "number" && (
-        <span className="ml-auto font-mono text-[10px] text-muted-foreground">
+        <span className="ml-auto font-mono text-xs text-muted-foreground">
           {durationMs}ms
         </span>
       )}

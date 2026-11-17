@@ -83,7 +83,7 @@ export function OutcomesPanel() {
                     key={status}
                     className={`rounded-xl surface-raised ${STAGE_TOP_RULE[status]} p-3.5`}
                   >
-                    <div className="font-mono text-[10px] font-semibold uppercase tracking-wider text-text-secondary">
+                    <div className="font-mono text-xs font-semibold uppercase tracking-wider text-text-secondary">
                       {status}
                     </div>
                     <div className="mt-1 text-2xl font-bold tabular-nums text-foreground">

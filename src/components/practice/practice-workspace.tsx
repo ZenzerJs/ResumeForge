@@ -146,7 +146,7 @@ export function PracticeWorkspace() {
                   >
                     Target Role Context
                   </label>
-                  <p className="text-[11px] text-text-secondary">
+                  <p className="text-xs text-text-secondary">
                     Select a tracked job to focus interview questions and behavioral rubrics on your target role.
                   </p>
                 </div>
@@ -190,7 +190,7 @@ export function PracticeWorkspace() {
                   <button
                     type="button"
                     onClick={() => openTab("runner")}
-                    className="inline-flex min-h-11 sm:min-h-0 items-center rounded-md border border-primary/35 bg-primary/15 px-3 py-1.5 sm:px-2.5 sm:py-1 text-xs sm:text-[11px] font-semibold text-primary hover:bg-primary/25"
+                    className="inline-flex min-h-11 sm:min-h-0 items-center rounded-md border border-primary/35 bg-primary/15 px-3 py-1.5 sm:px-2.5 sm:py-1 text-xs sm:text-xs font-semibold text-primary hover:bg-primary/25"
                   >
                     Open Code Runner &rarr;
                   </button>

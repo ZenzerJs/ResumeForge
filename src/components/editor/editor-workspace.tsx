@@ -921,7 +921,7 @@ export function EditorWorkspace() {
             {docMetadata.type === "MASTER_RESUME" && (
               <span
                 data-testid="doc-badge-master"
-                className="text-[11px] font-semibold px-2 py-0.5 rounded bg-elevated text-foreground border border-primary/40 flex items-center gap-1.5 whitespace-nowrap"
+                className="text-xs font-semibold px-2 py-0.5 rounded bg-elevated text-foreground border border-primary/40 flex items-center gap-1.5 whitespace-nowrap"
               >
                 <ShieldCheck className="h-3.5 w-3.5 text-primary" />
                 Master Resume
@@ -930,7 +930,7 @@ export function EditorWorkspace() {
             {docMetadata.type === "RESUME_VARIANT" && (
               <span
                 data-testid="doc-badge-variant"
-                className="text-[11px] font-semibold px-2 py-0.5 rounded bg-elevated text-foreground border border-status-info/40 flex items-center gap-1.5 whitespace-nowrap"
+                className="text-xs font-semibold px-2 py-0.5 rounded bg-elevated text-foreground border border-status-info/40 flex items-center gap-1.5 whitespace-nowrap"
               >
                 <Sparkles className="h-3.5 w-3.5 text-status-info" />
                 Tailored Variant ({docMetadata.title})
@@ -939,7 +939,7 @@ export function EditorWorkspace() {
             {docMetadata.type === "LOCAL_FALLBACK" && (
               <span
                 data-testid="doc-badge-fallback"
-                className="text-[11px] font-semibold px-2 py-0.5 rounded bg-elevated text-text-secondary border border-outline/70 flex items-center gap-1.5 whitespace-nowrap"
+                className="text-xs font-semibold px-2 py-0.5 rounded bg-elevated text-text-secondary border border-outline/70 flex items-center gap-1.5 whitespace-nowrap"
               >
                 <FileText className="h-3.5 w-3.5 text-text-muted" />
                 {docMetadata.title}
@@ -1039,7 +1039,7 @@ export function EditorWorkspace() {
               <Bot className="h-3.5 w-3.5 text-primary" />
               <span>AI Assistant</span>
               {isXlDesktop && isAiPoppedOut && (
-                <span className="text-[9px] bg-primary/20 px-1 py-0.5 rounded font-mono text-primary">
+                <span className="text-xs bg-primary/20 px-1 py-0.5 rounded font-mono text-primary">
                   POP-OUT
                 </span>
               )}
@@ -1080,7 +1080,7 @@ export function EditorWorkspace() {
               <button
                 type="button"
                 onClick={() => setDocumentError(null)}
-                className="px-2.5 py-0.5 bg-status-danger/15 hover:bg-status-danger/25 text-foreground border border-status-danger/30 rounded text-[11px] font-medium transition"
+                className="px-2.5 py-0.5 bg-status-danger/15 hover:bg-status-danger/25 text-foreground border border-status-danger/30 rounded text-xs font-medium transition"
               >
                 Dismiss Error
               </button>

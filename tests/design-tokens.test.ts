@@ -253,4 +253,37 @@ describe("Design tokens & Ember Ink taste invariants", () => {
     expect(proofCardSrc).not.toContain('"Live"');
     expect(homeSrc).not.toContain("Math.max(8");
   });
+
+  it("enforces the 12px typography floor across src/app and src/components", () => {
+    const collectTsx = (dir: string): string[] => {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      const results: string[] = [];
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          results.push(...collectTsx(full));
+        } else if (entry.name.endsWith(".tsx")) {
+          results.push(full);
+        }
+      }
+      return results;
+    };
+
+    const sub12Re = /\btext-\[(?:9|10(?:\.5)?|11)px\]/g;
+    const files = [
+      ...collectTsx(path.join(SRC_DIR, "app")),
+      ...collectTsx(path.join(SRC_DIR, "components")),
+    ];
+    const violations: string[] = [];
+
+    for (const file of files) {
+      const src = fs.readFileSync(file, "utf8");
+      const matches = src.match(sub12Re);
+      if (matches && matches.length > 0) {
+        violations.push(`${path.relative(SRC_DIR, file)}: ${matches.join(", ")}`);
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
 });

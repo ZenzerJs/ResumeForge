@@ -37,12 +37,12 @@ function CodeBlock({
 
   return (
     <div className="relative my-3 rounded-xl border border-hairline bg-inset overflow-hidden text-xs shadow-sm">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-panel border-b border-hairline text-[11px] text-muted-foreground font-mono">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-panel border-b border-hairline text-xs text-muted-foreground font-mono">
         <span className="text-amber-400/90 font-medium">{language || "code"}</span>
         <button
           type="button"
           onClick={handleCopy}
-          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10.5px] text-muted-foreground hover:text-foreground hover:bg-elevated transition-colors"
+          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:bg-elevated transition-colors"
           title="Copy code snippet"
         >
           {copied ? (
@@ -129,7 +129,7 @@ export const AiMarkdownRenderer = React.memo(function AiMarkdownRenderer({
           },
           th({ children }) {
             return (
-              <th className="px-3 py-2 text-[10.5px] font-semibold tracking-wider uppercase text-amber-300/90 border-r border-hairline last:border-r-0">
+              <th className="px-3 py-2 text-xs font-semibold tracking-wider uppercase text-amber-300/90 border-r border-hairline last:border-r-0">
                 {children}
               </th>
             );

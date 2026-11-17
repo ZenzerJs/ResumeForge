@@ -56,7 +56,7 @@ function GuestBanner({ inline = false }: { inline?: boolean }) {
   if (inline) {
     return (
       <span
-        className="inline-flex items-center gap-1.5 rounded border border-outline/70 bg-elevated px-2 py-0.5 text-[11px] font-medium text-text-secondary whitespace-nowrap"
+        className="inline-flex items-center gap-1.5 rounded border border-outline/70 bg-elevated px-2 py-0.5 text-xs font-medium text-text-secondary whitespace-nowrap"
         data-testid="guest-banner"
       >
         {demoMode ? (

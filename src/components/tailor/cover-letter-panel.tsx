@@ -384,14 +384,14 @@ export function CoverLetterPanel({
           {/* Evidence Citations Badges */}
           {coverLetter.evidenceCitations && coverLetter.evidenceCitations.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 text-xs bg-signal/10 border border-signal/30 rounded-lg p-3">
-              <span className="text-signal font-semibold uppercase text-[10px] tracking-wider">
+              <span className="text-signal font-semibold uppercase text-xs tracking-wider">
                 Grounded Evidence Citations ({coverLetter.evidenceCitations.length}):
               </span>
               {coverLetter.evidenceCitations.map((cid) => (
                 <span
                   key={cid}
                   data-testid="evidence-citation-badge"
-                  className="text-[10px] font-mono px-2 py-0.5 rounded bg-signal/15 text-signal border border-signal/35"
+                  className="text-xs font-mono px-2 py-0.5 rounded bg-signal/15 text-signal border border-signal/35"
                 >
                   ✓ {cid}
                 </span>
@@ -410,7 +410,7 @@ export function CoverLetterPanel({
           ) : (
             <div className="space-y-3" data-testid="cover-letter-plain-view">
               <div className="bg-inset border border-hairline rounded-xl p-4 space-y-2">
-                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                <span className="text-xs uppercase font-bold text-muted-foreground tracking-wider">
                   Salutation & Opening Hook
                 </span>
                 <p className="text-xs text-foreground font-medium">{coverLetter.salutation}</p>
@@ -419,7 +419,7 @@ export function CoverLetterPanel({
 
               {coverLetter.bodyParagraphs.map((para, idx) => (
                 <div key={idx} className="bg-inset border border-hairline rounded-xl p-4 space-y-2">
-                  <span className="text-[10px] uppercase font-bold text-signal tracking-wider">
+                  <span className="text-xs uppercase font-bold text-signal tracking-wider">
                     Body Paragraph {idx + 1}
                   </span>
                   <p className="text-xs text-foreground leading-relaxed font-sans">{para}</p>
@@ -427,7 +427,7 @@ export function CoverLetterPanel({
               ))}
 
               <div className="bg-inset border border-hairline rounded-xl p-4 space-y-2">
-                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                <span className="text-xs uppercase font-bold text-muted-foreground tracking-wider">
                   Closing Statement
                 </span>
                 <p className="text-xs text-text-secondary leading-relaxed font-sans">{coverLetter.closingParagraph}</p>

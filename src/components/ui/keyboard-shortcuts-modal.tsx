@@ -86,7 +86,7 @@ export function KeyboardShortcutsModal() {
               <DialogTitle className="text-sm font-bold text-foreground">
                 Keyboard Shortcuts
               </DialogTitle>
-              <DialogDescription className="text-[11px] text-muted-foreground">
+              <DialogDescription className="text-xs text-muted-foreground">
                 Speed up your workflow across ResumeForge
               </DialogDescription>
             </DialogHeader>
@@ -111,7 +111,7 @@ export function KeyboardShortcutsModal() {
 
             return (
               <div key={cat} className="space-y-2">
-                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-primary">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">
                   {cat}
                 </h3>
                 <div className="rounded-[6px] border border-hairline bg-inset divide-y divide-hairline">
@@ -125,7 +125,7 @@ export function KeyboardShortcutsModal() {
                         {item.keys.map((k, kIdx) => (
                           <kbd
                             key={kIdx}
-                            className="rounded border border-control/60 bg-elevated px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground"
+                            className="rounded border border-control/60 bg-elevated px-1.5 py-0.5 font-mono text-xs font-semibold text-foreground"
                           >
                             {k}
                           </kbd>
@@ -139,8 +139,8 @@ export function KeyboardShortcutsModal() {
           })}
         </div>
 
-        <div className="flex items-center justify-between border-t border-hairline pt-3 text-[11px] text-muted-foreground">
-          <span>Press <kbd className="rounded border border-control/60 bg-elevated px-1 py-0.5 font-mono text-[10px] text-on-surface-variant">Esc</kbd> to close</span>
+        <div className="flex items-center justify-between border-t border-hairline pt-3 text-xs text-muted-foreground">
+          <span>Press <kbd className="rounded border border-control/60 bg-elevated px-1 py-0.5 font-mono text-xs text-on-surface-variant">Esc</kbd> to close</span>
           <span className="flex items-center gap-1">
             <Command className="h-3 w-3" aria-hidden /> ResumeForge
           </span>

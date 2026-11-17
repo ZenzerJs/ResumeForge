@@ -143,7 +143,7 @@ function AiStatusPill({
             : "No AI API key configured — Click to connect in Settings"
       }
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         aiStatus.keyless
           ? "border-outline bg-elevated/60 text-on-surface-variant hover:bg-elevated hover:text-foreground"
           : isConnected

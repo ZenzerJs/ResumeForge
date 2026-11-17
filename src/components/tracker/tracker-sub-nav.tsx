@@ -156,7 +156,7 @@ export function TrackerRefreshButton({
         {isImporting ? "Refreshing…" : "Refresh from Source"}
       </span>
       {lastSyncAt ? (
-        <span className="hidden xl:inline text-[11px] font-normal text-muted-foreground">
+        <span className="hidden xl:inline text-xs font-normal text-muted-foreground">
           {new Date(lastSyncAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
         </span>
       ) : null}

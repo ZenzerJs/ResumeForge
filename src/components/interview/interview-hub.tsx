@@ -117,7 +117,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
         {/* Company Filter Pills */}
         <div className="pt-2 border-t border-border">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            <span className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground flex-shrink-0">
+            <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground flex-shrink-0">
               Company:
             </span>
             <button
@@ -164,7 +164,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                 <h3 className="font-semibold text-base text-foreground transition-colors line-clamp-1">
                   {q.title}
                 </h3>
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${getDifficultyBadgeColor(q.difficulty)}`}>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${getDifficultyBadgeColor(q.difficulty)}`}>
                   {q.difficulty}
                 </span>
               </div>
@@ -186,7 +186,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                   return (
                     <span 
                       key={tag} 
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-[11px] text-on-surface-variant"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-xs text-on-surface-variant"
                     >
                       {logo ?? (hasBrandIcon(tag) ? <BrandIcon name={tag} className="h-3 w-3 shrink-0" /> : null)}
                       <span>{comp?.name || tag}</span>
@@ -195,7 +195,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                 })}
               </div>
               {q.timeComplexity && (
-                <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                <span className="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                   {q.timeComplexity}
                 </span>
               )}

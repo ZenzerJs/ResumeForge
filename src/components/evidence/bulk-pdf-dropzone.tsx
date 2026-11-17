@@ -240,7 +240,7 @@ export function BulkPdfDropzone({ onComplete }: Props) {
                         type="button"
                         onClick={() => setExpandedFile(isExpanded ? null : file.name)}
                         data-testid={`toggle-pdf-preview-${i}`}
-                        className="ml-1 inline-flex items-center gap-1 rounded bg-elevated px-2 py-0.5 text-[10px] font-mono text-text-secondary hover:text-foreground transition"
+                        className="ml-1 inline-flex items-center gap-1 rounded bg-elevated px-2 py-0.5 text-xs font-mono text-text-secondary hover:text-foreground transition"
                       >
                         {isExpanded ? (
                           <ChevronDown className="h-3 w-3" />
@@ -252,7 +252,7 @@ export function BulkPdfDropzone({ onComplete }: Props) {
                     )}
                   </div>
                   <span
-                    className={`px-2.5 py-1 text-[11px] font-mono font-semibold rounded-full ${statusClasses[file.status]}`}
+                    className={`px-2.5 py-1 text-xs font-mono font-semibold rounded-full ${statusClasses[file.status]}`}
                   >
                     {file.status === "Saved" ? (
                       <span className="flex items-center gap-1">
@@ -281,14 +281,14 @@ export function BulkPdfDropzone({ onComplete }: Props) {
                     className="mt-3 pt-3 border-t border-hairline space-y-2 max-h-64 overflow-y-auto"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
+                      <div className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
                         Extracted Sections ({sectionEntries.length})
                       </div>
                       <button
                         type="button"
                         data-testid={`pdf-commit-selected-btn-${i}`}
                         onClick={() => void handleCommitSelected(file)}
-                        className="rounded border border-primary/40 bg-primary/15 px-2.5 py-1 text-[10px] font-mono font-semibold text-primary hover:bg-primary/25 transition"
+                        className="rounded border border-primary/40 bg-primary/15 px-2.5 py-1 text-xs font-mono font-semibold text-primary hover:bg-primary/25 transition"
                       >
                         Save Selected to Evidence Bank
                       </button>

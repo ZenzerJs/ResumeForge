@@ -29,7 +29,7 @@ export function PageHeader({
     >
       <div className="min-w-0 flex-1 space-y-1.5 border-l-2 border-primary pl-3 sm:pl-4">
         {eyebrow ? (
-          <div className="inline-flex max-w-full w-fit items-center gap-2 rounded-full border border-hairline bg-inset/80 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+          <div className="inline-flex max-w-full w-fit items-center gap-2 rounded-full border border-hairline bg-inset/80 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-text-secondary">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
             <span className="truncate">{eyebrow}</span>
           </div>

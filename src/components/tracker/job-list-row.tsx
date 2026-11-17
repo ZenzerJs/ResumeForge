@@ -154,7 +154,7 @@ export function JobListRow({
                 data-testid={`job-status-select-${job.id}`}
                 onChange={(e) => onStatusChange(job.id, e.target.value as JobStatus)}
                 className={cn(
-                  "appearance-none rounded-full border px-2.5 py-1 pr-6 text-[11px] font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer",
+                  "appearance-none rounded-full border px-2.5 py-1 pr-6 text-xs font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer",
                   STATUS_BADGE_CLASSES[job.status] ?? STATUS_BADGE_CLASSES.SAVED,
                 )}
                 aria-label="Job status"
@@ -171,14 +171,14 @@ export function JobListRow({
 
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {salary ? (
-            <span className="rounded border border-secondary/40 bg-secondary/10 px-1.5 py-0.5 text-[11px] font-semibold text-secondary">
+            <span className="rounded border border-secondary/40 bg-secondary/10 px-1.5 py-0.5 text-xs font-semibold text-secondary">
               {salary}
             </span>
           ) : (
-            <span className="py-0.5 text-[11px] italic text-muted-foreground">No salary</span>
+            <span className="py-0.5 text-xs italic text-muted-foreground">No salary</span>
           )}
           {isPlaceholder && (
-            <span className="text-[11px] text-muted-foreground">Needs description</span>
+            <span className="text-xs text-muted-foreground">Needs description</span>
           )}
         </div>
 

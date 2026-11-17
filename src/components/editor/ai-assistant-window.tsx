@@ -419,7 +419,7 @@ export const AiAssistantWindow = React.memo(function AiAssistantWindow({
               onKeyDown={handleDragHandleKeyDown}
               aria-label="Move floating window. Use arrow keys to reposition."
               title="Use arrow keys to move window"
-              className="rounded-[6px] border border-hairline bg-inset px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+              className="rounded-[6px] border border-hairline bg-inset px-1.5 py-0.5 text-xs font-mono text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
             >
               Move
             </button>

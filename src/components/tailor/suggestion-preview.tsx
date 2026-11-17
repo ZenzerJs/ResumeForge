@@ -537,7 +537,7 @@ export function SuggestionPreview({
               .map((eid) => evidenceTitles?.[eid] || eid)
               .join(", ")}
             {evidenceTitles && selectedPatch.evidenceIds.some((eid) => evidenceTitles[eid]) ? (
-              <span className="mt-1 block break-all font-mono text-[11px] text-muted-foreground">
+              <span className="mt-1 block break-all font-mono text-xs text-muted-foreground">
                 IDs: {selectedPatch.evidenceIds.join(", ")}
               </span>
             ) : null}

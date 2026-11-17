@@ -88,7 +88,7 @@ export function EditorWorkspaceSkeleton({
                     <span
                       key={label}
                       className={cn(
-                        "rounded-[6px] px-2.5 py-1 text-[11px] font-semibold",
+                        "rounded-[6px] px-2.5 py-1 text-xs font-semibold",
                         label === "Editor"
                           ? "bg-elevated text-foreground"
                           : "text-muted-foreground"
@@ -111,11 +111,11 @@ export function EditorWorkspaceSkeleton({
               <Skeleton className="h-5 w-24 rounded bg-elevated" />
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="inline-flex h-7 items-center gap-1.5 rounded border border-outline/70 px-2.5 text-[11px] text-text-secondary">
+              <span className="inline-flex h-7 items-center gap-1.5 rounded border border-outline/70 px-2.5 text-xs text-text-secondary">
                 <RotateCcw className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Revert to Master</span>
               </span>
-              <span className="inline-flex h-7 items-center gap-1.5 rounded bg-primary px-3 text-[11px] font-semibold text-primary-foreground">
+              <span className="inline-flex h-7 items-center gap-1.5 rounded bg-primary px-3 text-xs font-semibold text-primary-foreground">
                 <Save className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Save as Master Resume</span>
               </span>
@@ -148,7 +148,7 @@ export function EditorWorkspaceSkeleton({
           </div>
           <div className="relative flex-1 overflow-hidden bg-inset p-3 font-mono">
             <div className="flex gap-3">
-              <div className="flex w-5 shrink-0 flex-col gap-[13px] pt-0.5 text-right text-[10px] leading-none text-text-muted select-none">
+              <div className="flex w-5 shrink-0 flex-col gap-[13px] pt-0.5 text-right text-xs leading-none text-text-muted select-none">
                 {Array.from({ length: CODE_LINE_WIDTHS.length }).map((_, i) => (
                   <span key={i}>{i + 1}</span>
                 ))}

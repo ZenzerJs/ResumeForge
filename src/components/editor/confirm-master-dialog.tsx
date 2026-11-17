@@ -148,7 +148,7 @@ export function ConfirmMasterDialog({
             <GitCompare className="size-3.5" />
             <span>Source Diff Review</span>
             {diff && (diff.stats.addedCount > 0 || diff.stats.deletedCount > 0) && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-inset border border-hairline">
+              <span className="inline-flex items-center gap-1 text-xs font-mono px-1.5 py-0.5 rounded bg-inset border border-hairline">
                 <span className="text-status-success-soft font-bold">+{diff.stats.addedCount}</span>
                 <span className="text-red-400 font-bold">-{diff.stats.deletedCount}</span>
               </span>
@@ -231,7 +231,7 @@ export function ConfirmMasterDialog({
               </div>
               <div className="flex flex-wrap gap-1 pt-1 max-h-24 overflow-y-auto">
                 {facts.skills.map((s, i) => (
-                  <span key={i} className="px-2 py-0.5 rounded bg-elevated text-[11px] text-text-secondary border border-hairline">
+                  <span key={i} className="px-2 py-0.5 rounded bg-elevated text-xs text-text-secondary border border-hairline">
                     {s}
                   </span>
                 ))}
@@ -262,7 +262,7 @@ export function ConfirmMasterDialog({
                 <p className="text-muted-foreground leading-relaxed">
                   No prior baseline exists. Freezing this document will create the initial master fact snapshot.
                 </p>
-                <div className="mt-3 p-2.5 rounded bg-panel border border-hairline font-mono text-[11px] text-text-secondary max-h-40 overflow-y-auto whitespace-pre-wrap">
+                <div className="mt-3 p-2.5 rounded bg-panel border border-hairline font-mono text-xs text-text-secondary max-h-40 overflow-y-auto whitespace-pre-wrap">
                   {typstSource}
                 </div>
               </div>
@@ -282,7 +282,7 @@ export function ConfirmMasterDialog({
             ) : (
               <div
                 data-testid="master-diff-container"
-                className="font-mono text-[11px] leading-relaxed max-h-[45vh] overflow-y-auto rounded-lg border border-hairline bg-inset p-2 space-y-0.5"
+                className="font-mono text-xs leading-relaxed max-h-[45vh] overflow-y-auto rounded-lg border border-hairline bg-inset p-2 space-y-0.5"
               >
                 {diff?.lines.map((line, idx) => {
                   if (line.type === "add") {
@@ -291,10 +291,10 @@ export function ConfirmMasterDialog({
                         key={idx}
                         className="flex items-start gap-2 px-2 py-0.5 bg-status-success/15 text-status-success-soft border-l-2 border-status-success rounded-sm"
                       >
-                        <span className="w-8 text-right select-none text-status-success/75 text-[10px]">
+                        <span className="w-8 text-right select-none text-status-success/75 text-xs">
                           {line.lineNew}
                         </span>
-                        <span className="select-none text-status-success font-bold px-1 rounded bg-status-success/20 text-[10px]">+</span>
+                        <span className="select-none text-status-success font-bold px-1 rounded bg-status-success/20 text-xs">+</span>
                         <span className="flex-1 whitespace-pre-wrap break-words">{line.text || " "}</span>
                       </div>
                     );
@@ -305,10 +305,10 @@ export function ConfirmMasterDialog({
                         key={idx}
                         className="flex items-start gap-2 px-2 py-0.5 bg-red-950/50 text-red-300 border-l-2 border-red-500 rounded-sm line-through opacity-85"
                       >
-                        <span className="w-8 text-right select-none text-red-600 text-[10px]">
+                        <span className="w-8 text-right select-none text-red-600 text-xs">
                           {line.lineOld}
                         </span>
-                        <span className="select-none text-red-400 font-bold px-1 rounded bg-red-900/40 text-[10px]">-</span>
+                        <span className="select-none text-red-400 font-bold px-1 rounded bg-red-900/40 text-xs">-</span>
                         <span className="flex-1 whitespace-pre-wrap break-words">{line.text || " "}</span>
                       </div>
                     );
@@ -318,7 +318,7 @@ export function ConfirmMasterDialog({
                       key={idx}
                       className="flex items-start gap-2 px-2 py-0.5 text-text-secondary hover:bg-panel/50 rounded-sm"
                     >
-                      <span className="w-8 text-right select-none text-muted-foreground text-[10px]">
+                      <span className="w-8 text-right select-none text-muted-foreground text-xs">
                         {line.lineNew}
                       </span>
                       <span className="select-none text-muted-foreground w-3 text-center"> </span>
@@ -343,7 +343,7 @@ export function ConfirmMasterDialog({
           <label
             htmlFor="confirm-master-checkbox"
             data-testid="extract-evidence-checkbox"
-            className="text-[11px] text-amber-200 leading-snug cursor-pointer select-none"
+            className="text-xs text-amber-200 leading-snug cursor-pointer select-none"
           >
             I confirm these extracted facts and document changes accurately represent my verified career experience.
             I understand future AI tailoring and exports will be fail-closed against this baseline.

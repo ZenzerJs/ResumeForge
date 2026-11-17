@@ -125,7 +125,7 @@ export function AiProgress({
         )}
         <span className="truncate">{message}</span>
         {!isDone && !isError && elapsed > 0 && (
-          <span className="font-mono text-[10px] text-amber-400/80 shrink-0">
+          <span className="font-mono text-xs text-amber-400/80 shrink-0">
             {elapsed}s
           </span>
         )}
@@ -168,7 +168,7 @@ export function AiProgress({
               {message}
             </p>
             {!isError && !isDone && (
-              <p className="text-[11px] text-muted-foreground capitalize">
+              <p className="text-xs text-muted-foreground capitalize">
                 Stage {currentStageIndex >= 0 ? currentStageIndex + 1 : 1} of {stages.length}: {stage}
               </p>
             )}
@@ -187,7 +187,7 @@ export function AiProgress({
             <button
               type="button"
               onClick={onDismissError}
-              className="px-2 py-0.5 rounded bg-red-900/60 hover:bg-red-800 text-[11px] font-medium text-red-100 transition"
+              className="px-2 py-0.5 rounded bg-red-900/60 hover:bg-red-800 text-xs font-medium text-red-100 transition"
             >
               Dismiss
             </button>
@@ -234,7 +234,7 @@ export function AiProgress({
                   />
                   <span
                     className={cn(
-                      "text-[9px] font-mono capitalize transition-colors hidden sm:block truncate max-w-full text-center",
+                      "text-xs font-mono capitalize transition-colors hidden sm:block truncate max-w-full text-center",
                       isPast && "text-status-success font-medium",
                       isCurrent && "text-amber-300 font-bold",
                       !isPast && !isCurrent && "text-muted-foreground"
@@ -252,7 +252,7 @@ export function AiProgress({
       {/* Error Details Accordion */}
       {isError && error && showDetails && (
         <div className="mt-2.5 pt-2 border-t border-red-800/50">
-          <pre className="text-[11px] font-mono text-red-300/90 whitespace-pre-wrap break-all bg-red-950/80 p-2 rounded border border-red-800/60 max-h-32 overflow-y-auto">
+          <pre className="text-xs font-mono text-red-300/90 whitespace-pre-wrap break-all bg-red-950/80 p-2 rounded border border-red-800/60 max-h-32 overflow-y-auto">
             {error}
           </pre>
         </div>

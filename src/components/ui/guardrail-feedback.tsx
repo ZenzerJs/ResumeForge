@@ -88,18 +88,18 @@ export function GuardrailFeedback({
               <Table>
                 <TableHeader>
                   <TableRow className="border-red-900/60 hover:bg-transparent">
-                    <TableHead className="text-[11px] text-red-400 h-8">Kind</TableHead>
-                    <TableHead className="text-[11px] text-red-400 h-8">Severity</TableHead>
-                    <TableHead className="text-[11px] text-red-400 h-8">Message</TableHead>
-                    {onAlignViolation && <TableHead className="text-[11px] text-red-400 h-8 w-16">Action</TableHead>}
+                    <TableHead className="text-xs text-red-400 h-8">Kind</TableHead>
+                    <TableHead className="text-xs text-red-400 h-8">Severity</TableHead>
+                    <TableHead className="text-xs text-red-400 h-8">Message</TableHead>
+                    {onAlignViolation && <TableHead className="text-xs text-red-400 h-8 w-16">Action</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {violations.map((v, i) => (
                     <TableRow key={i} className="border-red-900/40 text-xs hover:bg-red-950/20">
-                      <TableCell className="font-mono text-[11px] text-red-300 py-1.5 uppercase">{v.kind}</TableCell>
+                      <TableCell className="font-mono text-xs text-red-300 py-1.5 uppercase">{v.kind}</TableCell>
                       <TableCell className="py-1.5">
-                        <Badge variant={v.severity === "HARD" ? "destructive" : "secondary"} className="text-[10px] py-0 px-1.5">
+                        <Badge variant={v.severity === "HARD" ? "destructive" : "secondary"} className="text-xs py-0 px-1.5">
                           {v.severity}
                         </Badge>
                       </TableCell>
@@ -110,7 +110,7 @@ export function GuardrailFeedback({
                             type="button"
                             onClick={() => onAlignViolation(v)}
                             data-testid={`align-violation-btn-${i}`}
-                            className="text-[10px] text-amber-400 hover:underline inline-flex items-center gap-1 font-semibold cursor-pointer"
+                            className="text-xs text-amber-400 hover:underline inline-flex items-center gap-1 font-semibold cursor-pointer"
                           >
                             Align
                           </button>

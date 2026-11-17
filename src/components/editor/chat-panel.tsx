@@ -285,7 +285,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
             </div>
             <div className="space-y-1">
               <p className="text-xs font-medium text-foreground">Career Assistant</p>
-              <p className="text-[11px] text-muted-foreground max-w-[220px] leading-relaxed">
+              <p className="text-xs text-muted-foreground max-w-[220px] leading-relaxed">
                 Ask about your {resumeTitle || "resume"}, evidence bank, ATS fit, or a saved job.
               </p>
             </div>
@@ -296,7 +296,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
                   type="button"
                   data-testid="chat-quick-action"
                   onClick={() => void sendMessage(action)}
-                  className="rounded-full border border-hairline bg-inset px-2.5 py-1 text-[10px] text-text-secondary hover:border-amber-700/60 hover:text-amber-200 transition"
+                  className="rounded-full border border-hairline bg-inset px-2.5 py-1 text-xs text-text-secondary hover:border-amber-700/60 hover:text-amber-200 transition"
                 >
                   {action}
                 </button>
@@ -339,7 +339,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
               {streamingContent ? (
                 <AiMarkdownRenderer content={streamingContent} />
               ) : (
-                <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
                   Thinking…
                 </div>
@@ -406,7 +406,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
               type="button"
               data-testid="chat-stop-btn"
               onClick={stopStreaming}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-inset px-3 py-1.5 text-[11px] font-semibold text-foreground hover:bg-elevated"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-inset px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-elevated"
             >
               <Square className="h-3 w-3" />
               Stop
@@ -417,14 +417,14 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
               data-testid="chat-send-btn"
               disabled={!input.trim()}
               onClick={() => void sendMessage()}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 px-3 py-1.5 text-[11px] font-semibold text-[#121010] shadow shadow-amber-500/20"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 px-3 py-1.5 text-xs font-semibold text-[#121010] shadow shadow-amber-500/20"
             >
               <Send className="h-3 w-3" />
               Send
             </button>
           )}
         </div>
-        <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
           <Sparkles className="h-3 w-3" />
           Enter to send · Shift+Enter for a new line
         </p>

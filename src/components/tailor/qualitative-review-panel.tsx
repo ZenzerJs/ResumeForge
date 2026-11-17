@@ -121,7 +121,7 @@ export function QualitativeReviewPanel({
           <div>
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               AI Qualitative Reviewer
-              <span className="text-[10px] font-mono bg-signal/15 text-signal border border-signal/35 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-mono bg-signal/15 text-signal border border-signal/35 px-2 py-0.5 rounded-full">
                 BYOK Gateway Feedback
               </span>
             </h3>
@@ -199,7 +199,7 @@ export function QualitativeReviewPanel({
             className="border-t border-hairline pt-3 space-y-2"
             data-testid="adjustment-reasoning-list"
           >
-            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               JD Signal & Adjustment Traceability:
             </div>
             {result.adjustmentReasoning.map((item, idx) => (
@@ -262,7 +262,7 @@ export function QualitativeReviewPanel({
 
                 {cf.strengths.length > 0 && (
                   <div>
-                    <span className="text-[10px] text-status-success-soft font-semibold uppercase block">
+                    <span className="text-xs text-status-success-soft font-semibold uppercase block">
                       Strengths
                     </span>
                     <ul className="list-disc list-inside text-text-secondary space-y-0.5 mt-0.5">
@@ -275,7 +275,7 @@ export function QualitativeReviewPanel({
 
                 {cf.weaknesses.length > 0 && (
                   <div>
-                    <span className="text-[10px] text-amber-400 font-semibold uppercase block">
+                    <span className="text-xs text-amber-400 font-semibold uppercase block">
                       Areas to Strengthen
                     </span>
                     <ul className="list-disc list-inside text-text-secondary space-y-0.5 mt-0.5">
@@ -311,13 +311,13 @@ export function QualitativeReviewPanel({
                       &quot;{bf.bulletText}&quot;
                     </p>
                     <span
-                      className={`shrink-0 px-2.5 py-1 rounded text-[10px] font-semibold border flex items-center gap-1 ${badge.bg} ${badge.text} ${badge.border}`}
+                      className={`shrink-0 px-2.5 py-1 rounded text-xs font-semibold border flex items-center gap-1 ${badge.bg} ${badge.text} ${badge.border}`}
                     >
                       <span>{badge.icon}</span> {badge.label}
                     </span>
                   </div>
                   <p className="text-text-secondary">{bf.reasoning}</p>
-                  <p className="text-[11px] italic flex items-center gap-1 text-signal">
+                  <p className="text-xs italic flex items-center gap-1 text-signal">
                     <Info className="h-3 w-3 text-signal shrink-0" />
                     Advice: {bf.improvementAdvice}
                   </p>

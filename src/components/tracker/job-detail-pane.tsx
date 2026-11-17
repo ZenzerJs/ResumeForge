@@ -626,7 +626,7 @@ export function JobDetailPane({
                             )}
                             <span className="min-w-0 truncate">{item.label}</span>
                             {item.status === "needs_verification" && (
-                              <span className="ml-auto shrink-0 rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                              <span className="ml-auto shrink-0 rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">
                                 Needs verification
                               </span>
                             )}
@@ -646,7 +646,7 @@ export function JobDetailPane({
                     TECHNICAL INTERVIEW PREP
                   </h3>
                   {oaProblems.length > 0 && (
-                    <span className="text-[10px] px-2 py-0.5 rounded font-mono font-semibold tabular-nums bg-primary/10 text-primary border border-primary/30">
+                    <span className="text-xs px-2 py-0.5 rounded font-mono font-semibold tabular-nums bg-primary/10 text-primary border border-primary/30">
                       {oaProblems.length} Problems
                     </span>
                   )}
@@ -672,7 +672,7 @@ export function JobDetailPane({
                               href={prob.sourceUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-primary hover:underline shrink-0 p-1 flex items-center gap-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                              className="text-primary hover:underline shrink-0 p-1 flex items-center gap-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                               title="Practice problem"
                             >
                               <span>Practice</span>
@@ -783,7 +783,7 @@ export function JobDetailPane({
                   <div className="space-y-3" data-testid="requirements-groups">
                     {requiredSkills.length > 0 && (
                       <div>
-                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+                        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
                           Required
                         </p>
                         <div className="flex flex-wrap gap-1.5">
@@ -800,7 +800,7 @@ export function JobDetailPane({
                     )}
                     {preferredSkills.length > 0 && (
                       <div>
-                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+                        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
                           Preferred
                         </p>
                         <div className="flex flex-wrap gap-1.5">
@@ -817,7 +817,7 @@ export function JobDetailPane({
                     )}
                     {domainTerms.length > 0 && (
                       <div>
-                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+                        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
                           Domain terms
                         </p>
                         <div className="flex flex-wrap gap-1.5">
