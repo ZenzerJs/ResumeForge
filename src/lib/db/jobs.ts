@@ -25,6 +25,7 @@ import {
   filterByPostedWithin,
   type PostedWithin,
 } from "@/lib/jobs/posted-within";
+import { collapseDuplicateTrackerJobs } from "@/lib/jobs/posting-identity";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 
@@ -349,21 +350,17 @@ export async function getJobsList(query: JobListQuery = {}) {
   const postedWithin = query.postedWithin ?? "all";
   const workplace = query.workplace ?? "all";
   const start = (page - 1) * limit;
-  let total = 0;
-  let applied = 0;
-  let interviewing = 0;
   let cursor: string | undefined;
-  const data: Array<Omit<Prisma.JobGetPayload<{ include: typeof jobListInclude }>, "applications" | "extractedRequirements" | "status" | "rawDescription"> & {
-    status: JobStatus;
-    appliedAt: Date | null;
-    appliedVariantId: string | null;
-    extractedRequirements: JobRequirements;
-    requirementsStatus: RequirementsExtractionStatus;
-    requirementsSource: JobRequirementsSource;
-    isPlaceholder: boolean;
-    hasFullDescription: boolean;
-    salaryLabel: string | null;
-  }> = [];
+  type RawJobRow = Prisma.JobGetPayload<{ include: typeof jobListInclude }> & {
+    patchProposalBatches?: { id: string }[];
+  };
+  type EligibleJobEntry = ReturnType<typeof withViewerOutcome<RawJobRow>> & {
+    applications: RawJobRow["applications"];
+    rawDescription: string;
+    extractedRequirements: string;
+    patchProposalBatches?: { id: string }[];
+  };
+  const eligible: EligibleJobEntry[] = [];
 
   for (;;) {
     const jobs = await prisma.job.findMany({
@@ -405,33 +402,72 @@ export async function getJobsList(query: JobListQuery = {}) {
           filterByPostedWithin([item], postedWithin, () => cleanedPosted, () => job.createdAt, now).length === 0) continue;
       if (workplace !== "all" && !matchesWorkplaceFilter(job.notes, workplace)) continue;
 
-      if (item.status === "APPLIED" || item.status === "INTERVIEWING" || item.status === "OFFER") applied++;
-      if (item.status === "INTERVIEWING") interviewing++;
-      if (total >= start && total < start + limit) {
-        // The scoped proposal lookup is internal and must not leak into board responses.
-        const { patchProposalBatches: _internal, rawDescription: _rawDescription, ...visible } = item as typeof item & { patchProposalBatches?: unknown };
-        void _internal;
-        void _rawDescription;
-        const reqState = parseRequirementsState(
-          job.extractedRequirements,
-          job.rawDescription,
-          job.extractFailure
-        );
-        const isPlaceholder = isPlaceholderDescription(job.rawDescription);
-        data.push({
-          ...visible,
-          extractedRequirements: reqState.extractedRequirements,
-          requirementsStatus: reqState.requirementsStatus,
-          requirementsSource: reqState.requirementsSource,
-          isPlaceholder,
-          hasFullDescription: !isPlaceholder,
-          salaryLabel: extractSalaryFromNotes(job.notes, job.rawDescription),
-        });
-      }
-      total++;
+      eligible.push({
+        ...(item as ReturnType<typeof withViewerOutcome<RawJobRow>>),
+        applications: job.applications ?? [],
+        rawDescription: job.rawDescription,
+        extractedRequirements: job.extractedRequirements,
+        patchProposalBatches:
+          "patchProposalBatches" in job && Array.isArray(job.patchProposalBatches)
+            ? job.patchProposalBatches
+            : undefined,
+      });
     }
     if (jobs.length < 500) break;
     cursor = jobs[jobs.length - 1].id;
+  }
+
+  const deduped = collapseDuplicateTrackerJobs(eligible);
+  const total = deduped.length;
+  let applied = 0;
+  let interviewing = 0;
+  for (const entry of deduped) {
+    if (entry.status === "APPLIED" || entry.status === "INTERVIEWING" || entry.status === "OFFER") {
+      applied++;
+    }
+    if (entry.status === "INTERVIEWING") {
+      interviewing++;
+    }
+  }
+
+  const data: Array<Omit<Prisma.JobGetPayload<{ include: typeof jobListInclude }>, "applications" | "extractedRequirements" | "status" | "rawDescription"> & {
+    status: JobStatus;
+    appliedAt: Date | null;
+    appliedVariantId: string | null;
+    extractedRequirements: JobRequirements;
+    requirementsStatus: RequirementsExtractionStatus;
+    requirementsSource: JobRequirementsSource;
+    isPlaceholder: boolean;
+    hasFullDescription: boolean;
+    salaryLabel: string | null;
+  }> = [];
+
+  for (const entry of deduped.slice(start, start + limit)) {
+    // The scoped proposal lookup is internal and must not leak into board responses.
+    const {
+      patchProposalBatches: _internal,
+      applications: _applications,
+      rawDescription,
+      extractedRequirements,
+      ...visible
+    } = entry;
+    void _internal;
+    void _applications;
+    const reqState = parseRequirementsState(
+      extractedRequirements,
+      rawDescription,
+      entry.extractFailure
+    );
+    const isPlaceholder = isPlaceholderDescription(rawDescription);
+    data.push({
+      ...visible,
+      extractedRequirements: reqState.extractedRequirements,
+      requirementsStatus: reqState.requirementsStatus,
+      requirementsSource: reqState.requirementsSource,
+      isPlaceholder,
+      hasFullDescription: !isPlaceholder,
+      salaryLabel: extractSalaryFromNotes(entry.notes, rawDescription),
+    });
   }
 
   return {

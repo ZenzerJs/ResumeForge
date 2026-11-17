@@ -14,6 +14,7 @@ import {
 } from "@/lib/jd-parser/types";
 import { getRequestUserId } from "@/lib/security/auth-request";
 import { jobMaxAgeDays } from "@/lib/jobs/expiry";
+import { collapseDuplicateIngestedJobs } from "@/lib/jobs/posting-identity";
 import { loadScoringEvidence } from "@/lib/scoring/user-evidence";
 
 export const dynamic = "force-dynamic";
@@ -136,8 +137,14 @@ export async function GET(req: NextRequest) {
       orderBy: [{ postedAt: "desc" }, { createdAt: "desc" }],
       select: {
         id: true,
+        externalId: true,
+        source: true,
+        companyName: true,
+        title: true,
         location: true,
         workplaceType: true,
+        applyUrl: true,
+        trackedJobId: true,
         postedAt: true,
         createdAt: true,
         salaryMin: true,
@@ -190,6 +197,14 @@ export async function GET(req: NextRequest) {
     // Score and geo-filter in memory
     interface ScoredCandidate {
       id: string;
+      externalId: string;
+      source: string;
+      companyName: string;
+      title: string;
+      location: string;
+      applyUrl: string;
+      trackedJobId: string | null;
+      hasParsedRequirements: boolean;
       lat: number | null;
       lng: number | null;
       postedAt: Date | null;
@@ -251,8 +266,21 @@ export async function GET(req: NextRequest) {
         continue;
       }
 
+      const hasParsedRequirements = Boolean(
+        reqs &&
+          reqs.requiredSkills.length + reqs.preferredSkills.length + reqs.domainTerms.length > 0
+      );
+
       scoredJobs.push({
         id: job.id,
+        externalId: job.externalId,
+        source: job.source,
+        companyName: job.companyName,
+        title: job.title,
+        location: job.location,
+        applyUrl: job.applyUrl,
+        trackedJobId: job.trackedJobId ?? null,
+        hasParsedRequirements,
         lat: jobLat,
         lng: jobLng,
         postedAt: job.postedAt,
@@ -265,24 +293,26 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    const dedupedJobs = collapseDuplicateIngestedJobs(scoredJobs);
+
     // Sort scored records
     if (sort === "blended") {
-      scoredJobs.sort((a, b) => b.blendedScore - a.blendedScore);
+      dedupedJobs.sort((a, b) => b.blendedScore - a.blendedScore);
     } else if (sort === "ats") {
-      scoredJobs.sort((a, b) => b.scoreBreakdown.atsScore - a.scoreBreakdown.atsScore);
+      dedupedJobs.sort((a, b) => b.scoreBreakdown.atsScore - a.scoreBreakdown.atsScore);
     } else if (sort === "newest") {
-      scoredJobs.sort((a, b) => {
+      dedupedJobs.sort((a, b) => {
         const timeA = new Date(a.postedAt || a.createdAt).getTime();
         const timeB = new Date(b.postedAt || b.createdAt).getTime();
         return timeB - timeA;
       });
     } else if (sort === "salary") {
-      scoredJobs.sort((a, b) => (b.salaryMax || b.salaryMin || 0) - (a.salaryMax || a.salaryMin || 0));
+      dedupedJobs.sort((a, b) => (b.salaryMax || b.salaryMin || 0) - (a.salaryMax || a.salaryMin || 0));
     }
 
-    const total = scoredJobs.length;
+    const total = dedupedJobs.length;
     const skip = (page - 1) * limit;
-    const paginatedMeta = scoredJobs.slice(skip, skip + limit);
+    const paginatedMeta = dedupedJobs.slice(skip, skip + limit);
 
     // Pass 2: Fetch full response fields only for the selected page
     const pageIds = paginatedMeta.map((item) => item.id);
