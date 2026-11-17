@@ -23,6 +23,16 @@ import { CompetitiveMatrixSection } from "@/components/landing/competitive-matri
 import { getActiveConfig, resolveClientProviderConfig } from "@/lib/byok-vault";
 import type { DashboardStats } from "@/lib/db/stats";
 import { clearDemoSamplesForPersonalResume } from "@/lib/demo-client";
+import { fetchSessionUser, type SessionUser } from "@/components/auth/session-user";
+import {
+  buildTailorHref,
+  buildTailorNewJobHref,
+  buildTailorSampleHref,
+  isValidContextId,
+  resolveGlobalTailorContext,
+  type ApplicationAccountScope,
+  type StorageLike,
+} from "@/lib/tailor/application-context";
 import {
   Dialog,
   DialogContent,
@@ -193,6 +203,64 @@ export function parseGuestJobsSummary(raw: string | null): GuestJobsSummary {
   return { personalCount, hasSampleJob };
 }
 
+export interface SavedRoleEntry {
+  href: string;
+  roleLabel: string;
+}
+
+function findLatestGuestPersonalJob(raw: string | null): { id: string; label: string } | null {
+  if (!raw) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(parsed)) return null;
+
+  for (const item of parsed) {
+    if (!isPlainRecord(item)) continue;
+    if (!isValidContextId(typeof item.id === "string" ? item.id.trim() : null)) continue;
+    const id = (item.id as string).trim();
+    if (id.startsWith(DEMO_SAMPLE_ID_PREFIX)) continue;
+    const role = isNonEmptyString(item.roleTitle) ? item.roleTitle.trim() : null;
+    const company = isNonEmptyString(item.company) ? item.company.trim() : null;
+    const label = role && company ? `${role} (${company})` : role ?? company;
+    if (label) {
+      return { id, label };
+    }
+  }
+  return null;
+}
+
+export function resolveHomeSavedRole(
+  scope: ApplicationAccountScope,
+  guestJobsRaw: string | null,
+  storage?: StorageLike | null
+): SavedRoleEntry | null {
+  if (scope.scopeResolved === false) return null;
+
+  const { href, activeContext } = resolveGlobalTailorContext(scope, storage);
+  if (activeContext) {
+    const activeRole = activeContext.roleTitle?.trim();
+    const activeCompany = activeContext.company?.trim();
+    const label = activeRole ?? activeCompany ?? "saved role";
+    return { href, roleLabel: label };
+  }
+
+  if (!scope.userId) {
+    const guestJob = findLatestGuestPersonalJob(guestJobsRaw);
+    if (guestJob) {
+      return {
+        href: buildTailorHref({ jobId: guestJob.id, tab: "job-info" }),
+        roleLabel: guestJob.label,
+      };
+    }
+  }
+
+  return null;
+}
+
 export function computeOnboardingChecklistState({
   stats,
   hasLocalResume,
@@ -222,6 +290,7 @@ export function computeOnboardingChecklistState({
 
 interface SetupChecklistProps extends OnboardingChecklistInput {
   demoMode: boolean;
+  savedRole?: SavedRoleEntry | null;
   onUploadPdf: () => void;
   onDismiss: () => void;
 }
@@ -234,6 +303,7 @@ export function SetupChecklist({
   hasAiKey,
   aiKeyless,
   demoMode,
+  savedRole,
   onUploadPdf,
   onDismiss,
 }: SetupChecklistProps) {
@@ -257,6 +327,12 @@ export function SetupChecklist({
     stats.verifiedEvidenceCount > 0
       ? stats.verifiedEvidenceCount
       : guestEvidence.personalVerifiedCount;
+
+  const newJobHref = buildTailorNewJobHref({ tab: "job-info" });
+  const sampleHref = buildTailorSampleHref({
+    sample: demoMode ? "demo" : undefined,
+    tab: "job-info",
+  });
 
   return (
     <div className="rounded-[10px] surface-raised edge-glow p-6">
@@ -466,13 +542,29 @@ export function SetupChecklist({
               </p>
             ) : null}
           </div>
-          <Link
-            href="/tailor"
-            className="text-xs font-mono font-semibold text-primary hover:underline flex items-center gap-1 pt-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
-          >
-            {step4Done ? "Open Tailor" : "Add Target Job"}{" "}
-            <ArrowRight className="h-3 w-3" aria-hidden="true" />
-          </Link>
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <Link
+              href={step4Done ? (savedRole?.href ?? "/tailor") : newJobHref}
+              data-testid="onboarding-step-4-action"
+              className="text-xs font-mono font-semibold text-primary hover:underline flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
+            >
+              {step4Done
+                ? savedRole
+                  ? `Open Tailor · ${savedRole.roleLabel}`
+                  : "Open Tailor"
+                : "Add Target Job"}{" "}
+              <ArrowRight className="h-3 w-3" aria-hidden="true" />
+            </Link>
+            {!step4Done ? (
+              <Link
+                href={sampleHref}
+                data-testid="onboarding-step-4-sample-link"
+                className="text-xs font-mono text-muted-foreground hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
+              >
+                Try sample
+              </Link>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>
@@ -496,6 +588,8 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
   const [hasLocalResume, setHasLocalResume] = useState(false);
   const [guestEvidence, setGuestEvidence] = useState<GuestEvidenceSummary>(EMPTY_GUEST_EVIDENCE);
   const [guestJobs, setGuestJobs] = useState<GuestJobsSummary>(EMPTY_GUEST_JOBS);
+  const [sessionUser, setSessionUser] = useState<SessionUser | null | undefined>(undefined);
+  const [savedRole, setSavedRole] = useState<SavedRoleEntry | null>(null);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 
   const pdfInputRef = useRef<HTMLInputElement>(null);
@@ -504,6 +598,16 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
   useEffect(() => {
     setStats(initialStats);
   }, [initialStats]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchSessionUser().then((next) => {
+      if (!cancelled) setSessionUser(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -519,8 +623,17 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
       setGuestEvidence(
         parseGuestEvidenceSummary(localStorage.getItem("resumeforge_guest_evidence"))
       );
-      setGuestJobs(
-        parseGuestJobsSummary(localStorage.getItem("resumeforge_guest_jobs"))
+      const rawGuestJobs = localStorage.getItem("resumeforge_guest_jobs");
+      setGuestJobs(parseGuestJobsSummary(rawGuestJobs));
+      setSavedRole(
+        resolveHomeSavedRole(
+          {
+            userId: sessionUser?.id ?? null,
+            demoMode,
+            scopeResolved: sessionUser !== undefined,
+          },
+          rawGuestJobs
+        )
       );
       void getActiveConfig().then((cfg) => {
         if (cancelled) return;
@@ -534,14 +647,16 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
     window.addEventListener("focus", refreshLocalState);
     window.addEventListener("storage", refreshLocalState);
     window.addEventListener("resumeforge:evidence-changed", refreshLocalState);
+    window.addEventListener("resumeforge:application-context-changed", refreshLocalState);
 
     return () => {
       cancelled = true;
       window.removeEventListener("focus", refreshLocalState);
       window.removeEventListener("storage", refreshLocalState);
       window.removeEventListener("resumeforge:evidence-changed", refreshLocalState);
+      window.removeEventListener("resumeforge:application-context-changed", refreshLocalState);
     };
-  }, [demoMode]);
+  }, [demoMode, sessionUser]);
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -641,6 +756,12 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
     }
   };
 
+  const newJobHref = buildTailorNewJobHref({ tab: "job-info" });
+  const sampleHref = buildTailorSampleHref({
+    sample: demoMode ? "demo" : undefined,
+    tab: "job-info",
+  });
+
   return (
     <div className="bg-canvas text-foreground font-body-regular min-h-dvh min-w-0 flex flex-col overflow-x-hidden antialiased selection:bg-primary/25 selection:text-primary leading-[1.6] relative">
       <LandingAtmosphere />
@@ -701,13 +822,34 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
               </p>
 
               <div className="flex items-center gap-4 pt-2 flex-wrap">
-                <Link
-                  href="/tailor"
-                  className="bg-primary text-primary-foreground btn-glow font-bold px-6 py-3 rounded-[6px] inline-flex items-center gap-2 hover:opacity-95 transition-opacity min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-                >
-                  <ArrowRight className="h-4 w-4" aria-hidden />
-                  Start Tailoring
-                </Link>
+                {savedRole ? (
+                  <>
+                    <Link
+                      href={savedRole.href}
+                      data-testid="hero-resume-role-btn"
+                      className="bg-primary text-primary-foreground btn-glow font-bold px-6 py-3 rounded-[6px] inline-flex items-center gap-2 hover:opacity-95 transition-opacity min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                    >
+                      <ArrowRight className="h-4 w-4" aria-hidden />
+                      Resume {savedRole.roleLabel}
+                    </Link>
+                    <Link
+                      href={newJobHref}
+                      data-testid="hero-start-tailoring-btn"
+                      className="bg-panel border border-outline/70 text-foreground font-semibold px-5 py-3 rounded-[6px] inline-flex items-center gap-2 hover:bg-elevated transition-colors min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                    >
+                      New Target Job
+                    </Link>
+                  </>
+                ) : (
+                  <Link
+                    href={newJobHref}
+                    data-testid="hero-start-tailoring-btn"
+                    className="bg-primary text-primary-foreground btn-glow font-bold px-6 py-3 rounded-[6px] inline-flex items-center gap-2 hover:opacity-95 transition-opacity min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  >
+                    <ArrowRight className="h-4 w-4" aria-hidden />
+                    Start Tailoring
+                  </Link>
+                )}
 
                 <label htmlFor="landing-pdf-upload" className="sr-only">
                   Upload PDF resume
@@ -748,6 +890,16 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
                   </button>
                 )}
               </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <Link
+                  href={sampleHref}
+                  data-testid="hero-sample-job-link"
+                  className="inline-flex min-h-11 items-center gap-1.5 font-mono-data text-mono-data text-muted-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
+                >
+                  <span>Try sample job posting</span>
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                </Link>
+              </div>
             </div>
 
             <ProductProofCard />
@@ -768,6 +920,7 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
               hasAiKey={hasAiKey}
               aiKeyless={aiKeyless}
               demoMode={demoMode}
+              savedRole={savedRole}
               onUploadPdf={() => pdfInputRef.current?.click()}
               onDismiss={() => {
                 setOnboardingDismissed(true);

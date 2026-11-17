@@ -2,7 +2,7 @@ import React, { Suspense } from "react";
 import { PracticeWorkspace } from "@/components/practice/practice-workspace";
 
 export const metadata = {
-  title: "Technical Interview & OA Practice — ResumeForge",
+  title: "Technical Interview & OA Practice",
   description:
     "Master core algorithmic patterns, study blueprints and worked examples, and solve real company assessment problems in an interactive workspace.",
 };
