@@ -5,6 +5,14 @@ on:
   push:
     branches: [main, master]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  APP_ACCESS_SECRET: ci-access-secret-not-a-user-password
+  JOB_SYNC_SECRET: ci-sync-secret
+
 jobs:
   actionlint:
     name: Lint GitHub Workflows
@@ -15,29 +23,19 @@ jobs:
       - name: Run actionlint
         uses: docker://rhysd/actionlint:1.7.4
 
-  verify:
+  static-checks:
+    name: Lint, Typecheck & Env
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: resumeforge
-          POSTGRES_PASSWORD: resumeforge
-          POSTGRES_DB: resumeforge
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U resumeforge -d resumeforge"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      DATABASE_URL: postgresql://resumeforge:resumeforge@localhost:5432/resumeforge
-      APP_ACCESS_SECRET: ci-access-secret-not-a-user-password
-      JOB_SYNC_SECRET: ci-sync-secret
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /*
+            !/.agents/
+            !/docs/
+            !/public/wasm/
+          sparse-checkout-cone-mode: false
 
       - name: Reject conflict markers
         run: |
@@ -55,11 +53,11 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
       - name: Env parity
         run: npm run check:env
-
-      - name: Migrate
-        run: npx prisma migrate deploy
 
       - name: Typecheck
         run: npm run typecheck
@@ -67,19 +65,121 @@ jobs:
       - name: Lint
         run: npm run lint
 
+  tests:
+    name: Unit & PostgreSQL Integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: resumeforge
+          POSTGRES_PASSWORD: resumeforge
+          POSTGRES_DB: resumeforge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resumeforge -d resumeforge"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://resumeforge:resumeforge@localhost:5432/resumeforge
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /*
+            !/.agents/
+            !/docs/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Migrate
+        run: npx prisma migrate deploy
+
       - name: Test
         run: npm run test
 
       - name: PostgreSQL integration
         run: npm run test:integration
 
+  build-and-render:
+    name: Build & Resume Render Gate
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: resumeforge
+          POSTGRES_PASSWORD: resumeforge
+          POSTGRES_DB: resumeforge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resumeforge -d resumeforge"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://resumeforge:resumeforge@localhost:5432/resumeforge
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /*
+            !/.agents/
+            !/docs/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('src/**', 'next.config.*') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Chromium system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Install Chromium for resume render checks
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Migrate
+        run: npx prisma migrate deploy
+
       - name: Build
         run: npm run build
         env:
           NEXT_PUBLIC_RESUME_LAYOUT_V2: "true"
-
-      - name: Install Chromium for resume render checks
-        run: npx playwright install --with-deps chromium
 
       - name: Resume rendering and export gates
         run: npx playwright test --config playwright.demo.config.ts e2e/resume-layout-v2-verification.spec.ts
@@ -91,3 +191,18 @@ jobs:
           name: resume-layout-v2-renders
           path: test-results/resume-layout-v2
           if-no-files-found: ignore
+
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    needs: [static-checks, tests, build-and-render]
+    if: always()
+    steps:
+      - name: Check required jobs
+        run: |
+          if [ "${{ needs.static-checks.result }}" != "success" ] || \
+             [ "${{ needs.tests.result }}" != "success" ] || \
+             [ "${{ needs.build-and-render.result }}" != "success" ]; then
+            echo "One or more verification jobs failed: static-checks=${{ needs.static-checks.result }}, tests=${{ needs.tests.result }}, build-and-render=${{ needs.build-and-render.result }}"
+            exit 1
+          fi
