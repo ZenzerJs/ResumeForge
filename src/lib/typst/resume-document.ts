@@ -205,3 +205,81 @@ export function updateResumeBlock(doc: ResumeDocument, target: { start: number; 
   for (const block of blocks) if (block !== match && block.span.start >= target.end) { block.span.start += delta; block.span.end += delta; }
   return ResumeDocumentSchema.parse(copy);
 }
+
+const REQUIRED_BLOCK_KINDS = new Set<z.infer<typeof BlockKindSchema>>(["name", "section", "entry-title"]);
+
+export function isSchemaRequiredBlockKind(kind: z.infer<typeof BlockKindSchema>): boolean {
+  return REQUIRED_BLOCK_KINDS.has(kind);
+}
+
+export interface RemoveResumeBlockResult {
+  document: ResumeDocument;
+  removedRange: { start: number; end: number };
+}
+
+/** Removes an optional source block and shifts following spans, preserving neighboring text. */
+export function removeResumeBlockWithRange(
+  doc: ResumeDocument,
+  target: { start: number; end: number }
+): RemoveResumeBlockResult {
+  const validated = ResumeDocumentSchema.parse(doc);
+  const copy = structuredClone(validated);
+  const allBlocks = [...copy.header, ...copy.sections.flatMap((section) => [section.heading, ...section.blocks])].sort(
+    (a, b) => a.span.start - b.span.start
+  );
+  const matchIndex = allBlocks.findIndex(
+    (block) => block.span.start === target.start && block.span.end === target.end
+  );
+  if (matchIndex < 0) throw new Error("Source block no longer exists.");
+  const match = allBlocks[matchIndex];
+  if (isSchemaRequiredBlockKind(match.kind)) {
+    throw new Error(`Required block (${match.kind}) cannot be removed.`);
+  }
+  if (allBlocks.length <= 1) {
+    throw new Error("Cannot remove the last remaining block from the resume.");
+  }
+
+  const prev = matchIndex > 0 ? allBlocks[matchIndex - 1] : null;
+  const next = matchIndex + 1 < allBlocks.length ? allBlocks[matchIndex + 1] : null;
+
+  let removeStart = match.span.start;
+  let removeEnd = match.span.end;
+  if (prev && next) {
+    if (match.span.end < next.span.start) {
+      removeStart = prev.span.end;
+      removeEnd = match.span.end;
+    }
+  } else if (!prev && next) {
+    removeStart = match.span.start;
+    removeEnd = next.span.start;
+  } else if (prev && !next) {
+    removeStart = prev.span.end;
+    removeEnd = match.span.end;
+  }
+
+  const removedLength = removeEnd - removeStart;
+  copy.source = copy.source.slice(0, removeStart) + copy.source.slice(removeEnd);
+  copy.header = copy.header.filter((block) => block !== match);
+  for (const section of copy.sections) {
+    section.blocks = section.blocks.filter((block) => block !== match);
+  }
+  const remaining = [...copy.header, ...copy.sections.flatMap((section) => [section.heading, ...section.blocks])];
+  for (const block of remaining) {
+    if (block.span.start >= removeEnd) {
+      block.span.start -= removedLength;
+      block.span.end -= removedLength;
+    }
+  }
+  if (!remaining.some((block) => block.unassigned)) {
+    copy.issues = [];
+  }
+
+  return {
+    document: ResumeDocumentSchema.parse(copy),
+    removedRange: { start: removeStart, end: removeEnd },
+  };
+}
+
+export function removeResumeBlock(doc: ResumeDocument, target: { start: number; end: number }): ResumeDocument {
+  return removeResumeBlockWithRange(doc, target).document;
+}

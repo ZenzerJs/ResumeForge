@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -30,6 +30,7 @@ import {
   Sparkles,
   FileText,
   AlertTriangle,
+  ArrowLeft,
   Briefcase,
   RotateCcw,
   Undo2,
@@ -51,8 +52,14 @@ import {
 } from "@/components/ui/sheet";
 import { AppShell } from "@/components/design-system/app-shell";
 import { clearDemoSamplesForPersonalResume, getDemoContextFromBrowser, initializeDemoSamples } from "@/lib/demo-client";
-import { fetchDemoConfig } from "@/components/auth/session-user";
+import { fetchDemoConfig, fetchSessionPayload } from "@/components/auth/session-user";
 import { EditorWorkspaceSkeleton } from "@/components/editor/editor-workspace-skeleton";
+import {
+  buildLibraryHref,
+  normalizeEditorModeParam,
+  parseTailorReturnContext,
+  type ApplicationAccountScope,
+} from "@/lib/tailor/application-context";
 
 const STORAGE_KEY = "resumeforge_typst_source";
 const COMPILE_DEBOUNCE_MS = 400;
@@ -161,6 +168,11 @@ export function EditorWorkspace() {
   const [undoSuccess, setUndoSuccess] = useState<boolean>(false);
   const [draftEvidenceFromMaster, setDraftEvidenceFromMaster] = useState<boolean>(false);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
+  const [accountScope, setAccountScope] = useState<ApplicationAccountScope>({
+    userId: null,
+    demoMode: false,
+    scopeResolved: false,
+  });
   const [evidenceExtractToast, setEvidenceExtractToast] = useState<string | null>(null);
   const [isExtractingEvidence, setIsExtractingEvidence] = useState<boolean>(false);
   // Phase 11: Master Fact Snapshot state (strictly from frozen Master Resume + verified Evidence Bank)
@@ -240,8 +252,14 @@ export function EditorWorkspace() {
       return el;
     };
     let cancelled = false;
-    void fetchDemoConfig().then(({ demoMode }) => {
+    void Promise.all([fetchDemoConfig(), fetchSessionPayload()]).then(([demoConfig, session]) => {
       if (cancelled) return;
+      const demoMode = Boolean(demoConfig?.demoMode);
+      setAccountScope({
+        userId: session?.data?.id ?? null,
+        demoMode,
+        scopeResolved: true,
+      });
       let savedLayout = null;
       let isPoppedOut = false;
       try {
@@ -891,6 +909,23 @@ export function EditorWorkspace() {
     }
   };
 
+  const tailorReturnContext = useMemo(
+    () =>
+      parseTailorReturnContext(searchParams, {
+        scope: accountScope,
+        overrides: {
+          variantId:
+            variantIdParam ??
+            (docMetadata.type === "RESUME_VARIANT" ? docMetadata.id ?? null : null),
+          resumeId:
+            resumeIdParam ??
+            (!variantIdParam && docMetadata.type === "MASTER_RESUME" ? docMetadata.id ?? null : null),
+          mode: normalizeEditorModeParam(searchParams.get("mode")),
+        },
+      }),
+    [searchParams, accountScope, variantIdParam, resumeIdParam, docMetadata.type, docMetadata.id]
+  );
+
   return (
     <AppShell
       variant="editor"
@@ -928,6 +963,33 @@ export function EditorWorkspace() {
         }
         actions={
           <div className="flex flex-wrap items-center gap-1.5">
+            {tailorReturnContext && (
+              <Link
+                href={tailorReturnContext.href}
+                onClick={() => {
+                  if (persistTimer.current) {
+                    clearTimeout(persistTimer.current);
+                    persistTimer.current = null;
+                  }
+                  if (typeof window !== "undefined" && sourceRef.current) {
+                    try {
+                      localStorage.setItem(STORAGE_KEY, sourceRef.current);
+                    } catch {
+                      // Storage is optional.
+                    }
+                  }
+                }}
+                data-testid="editor-back-to-tailor-link"
+                title={tailorReturnContext.label}
+                className={cn(
+                  buttonVariants({ size: "sm", variant: "outline" }),
+                  "min-h-10 xl:min-h-0 xl:h-7 px-2.5 text-xs border-outline/70 bg-transparent text-text-secondary hover:bg-elevated hover:text-foreground gap-1.5 max-w-[240px] focus-visible:ring-2 focus-visible:ring-ring"
+                )}
+              >
+                <ArrowLeft className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="truncate">{tailorReturnContext.label}</span>
+              </Link>
+            )}
             {showShortcutSaveToast && (
               <div
                 data-testid="shortcut-save-toast"
@@ -1154,7 +1216,20 @@ export function EditorWorkspace() {
               <span>{evidenceExtractToast}</span>
               {evidenceExtractToast.includes("Library") && (
                 <Link
-                  href="/library"
+                  href={buildLibraryHref({
+                    from: tailorReturnContext?.from ?? null,
+                    jobId: tailorReturnContext?.jobId ?? null,
+                    tab: tailorReturnContext?.tab ?? null,
+                    variantId:
+                      variantIdParam ??
+                      (docMetadata.type === "RESUME_VARIANT" ? docMetadata.id ?? null : null),
+                    resumeId:
+                      resumeIdParam ??
+                      (!variantIdParam && docMetadata.type === "MASTER_RESUME"
+                        ? docMetadata.id ?? null
+                        : null),
+                    mode: normalizeEditorModeParam(searchParams.get("mode")),
+                  })}
                   className="ml-auto text-status-info underline underline-offset-2 hover:text-foreground"
                 >
                   Open Library
