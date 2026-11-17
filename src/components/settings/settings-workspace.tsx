@@ -37,6 +37,11 @@ import {
   usernameInitial,
   type SessionUser,
 } from "@/components/auth/session-user";
+import {
+  clearActiveApplicationContext,
+  parseTailorReturnContext,
+  type TailorReturnContext,
+} from "@/lib/tailor/application-context";
 
 const SETTINGS_STORAGE_KEY = "resumeforge_ai_settings";
 
@@ -110,6 +115,24 @@ export function hasNonDefaultAdvancedConfig(
   return hasCustomModel || hasOpenAiEndpointOverride;
 }
 
+export type ConnectionTestAvailability = "loading" | "sign-in-required" | "ready";
+
+export function getConnectionTestState(params: {
+  isHydrated: boolean;
+  isSessionLoaded: boolean;
+  isDemoLoaded: boolean;
+  sessionUser: SessionUser | null;
+  demoMode: boolean;
+}): ConnectionTestAvailability {
+  if (!params.isHydrated || !params.isSessionLoaded || !params.isDemoLoaded) {
+    return "loading";
+  }
+  if (!params.sessionUser && !params.demoMode) {
+    return "sign-in-required";
+  }
+  return "ready";
+}
+
 export function SettingsWorkspace() {
   const [provider, setProvider] = useState<ProviderType>("gemini");
   const [apiKey, setApiKey] = useState<string>("");
@@ -125,8 +148,9 @@ export function SettingsWorkspace() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [isSessionLoaded, setIsSessionLoaded] = useState(false);
+  const [isDemoLoaded, setIsDemoLoaded] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
-  const [tailorBackHref, setTailorBackHref] = useState<string | null>(null);
+  const [tailorReturnContext, setTailorReturnContext] = useState<TailorReturnContext | null>(null);
   const [usernameDraft, setUsernameDraft] = useState("");
   const [usernameStatus, setUsernameStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isSavingUsername, setIsSavingUsername] = useState(false);
@@ -184,6 +208,7 @@ export function SettingsWorkspace() {
         console.error("Failed to load BYOK settings:", err);
       } finally {
         if (!cancelled) {
+          setIsDemoLoaded(true);
           setIsHydrated(true);
         }
       }
@@ -209,19 +234,16 @@ export function SettingsWorkspace() {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("from") !== "tailor") {
-      setTailorBackHref(null);
-      return;
-    }
-    const backParams = new URLSearchParams();
-    const jobId = params.get("jobId");
-    if (jobId) backParams.set("jobId", jobId);
-    const tab = params.get("tab");
-    if (tab) backParams.set("tab", tab);
-    const query = backParams.toString();
-    setTailorBackHref(query ? `/tailor?${query}` : "/tailor");
-  }, []);
+    setTailorReturnContext(
+      parseTailorReturnContext(window.location.search, {
+        scope: {
+          userId: sessionUser?.id ?? null,
+          demoMode,
+          scopeResolved: isSessionLoaded && isDemoLoaded,
+        },
+      })
+    );
+  }, [sessionUser, demoMode, isSessionLoaded, isDemoLoaded]);
 
   const handleSaveUsername = async () => {
     setIsSavingUsername(true);
@@ -326,7 +348,16 @@ export function SettingsWorkspace() {
     await removeKey(provider);
   };
 
+  const connectionTestState = getConnectionTestState({
+    isHydrated,
+    isSessionLoaded,
+    isDemoLoaded,
+    sessionUser,
+    demoMode,
+  });
+
   const handleTestConnection = async () => {
+    if (connectionTestState !== "ready") return;
     setIsTesting(true);
     setTestResult(null);
 
@@ -386,13 +417,14 @@ export function SettingsWorkspace() {
                 : "Choose a provider and test the connection."
             }
             actions={
-              tailorBackHref ? (
+              tailorReturnContext ? (
                 <Link
-                  href={tailorBackHref}
+                  href={tailorReturnContext.href}
+                  data-testid="settings-back-to-tailor-link"
                   className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-hairline bg-elevated px-3.5 text-sm font-medium text-foreground hover:bg-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <ArrowLeft className="h-4 w-4" aria-hidden />
-                  Back to Tailor
+                  {tailorReturnContext.label}
                 </Link>
               ) : undefined
             }
@@ -613,22 +645,41 @@ export function SettingsWorkspace() {
             </details>
 
             {/* Action Buttons & Status */}
-            {isSessionLoaded && !sessionUser && !demoMode && (
+            {connectionTestState === "sign-in-required" && (
               <p className="text-sm text-muted-foreground">
-                The connection test requires sign-in.
+                Sign in to test AI provider connections on this self-hosted instance.
               </p>
             )}
             <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-hairline">
-              <button
-                type="button"
-                id="test-connection-btn"
-                onClick={handleTestConnection}
-                disabled={isTesting}
-                className="inline-flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50 transition-colors"
-              >
-                {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Server className="h-4 w-4" />}
-                {isTesting ? "Testing Connection..." : "Test Connection"}
-              </button>
+              {connectionTestState === "sign-in-required" ? (
+                <Link
+                  href="/login?next=%2Fsettings"
+                  data-testid="settings-signin-to-test-link"
+                  className="inline-flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 text-sm font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <LogIn className="h-4 w-4 shrink-0" aria-hidden />
+                  Sign in to test connection
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  id="test-connection-btn"
+                  onClick={handleTestConnection}
+                  disabled={isTesting || connectionTestState !== "ready"}
+                  className="inline-flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50 transition-colors"
+                >
+                  {isTesting ? (
+                    <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                  ) : (
+                    <Server className="h-4 w-4 shrink-0" />
+                  )}
+                  {isTesting
+                    ? "Testing Connection..."
+                    : connectionTestState === "loading"
+                      ? "Checking session..."
+                      : "Test Connection"}
+                </button>
+              )}
 
               <div className="flex items-start sm:items-center gap-2 text-xs text-muted-foreground min-w-0">
                 <ShieldCheck className="h-4 w-4 shrink-0 text-status-success mt-0.5 sm:mt-0" aria-hidden="true" />
@@ -724,6 +775,7 @@ export function SettingsWorkspace() {
                     disabled={isSigningOut}
                     onClick={() => {
                       setIsSigningOut(true);
+                      clearActiveApplicationContext();
                       void signOutAndRedirect("/");
                     }}
                     className="inline-flex min-h-11 items-center gap-2 rounded-md border border-hairline px-4 text-sm font-medium text-foreground hover:bg-elevated focus-visible:ring-2 focus-visible:ring-primary/60 disabled:opacity-50"

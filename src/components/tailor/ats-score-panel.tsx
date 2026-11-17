@@ -17,12 +17,135 @@ import {
   AtsEvaluationResult,
   RoleProfile,
   ROLE_PROFILES,
+  SkillEvaluation,
   SkillMatchStatus,
 } from "@/lib/ats-evaluator/types";
 import { QualitativeReviewPanel } from "./qualitative-review-panel";
 import { AtsQualitativeReviewResult } from "@/lib/ai/qualitative-schema";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
 import styles from "./ats-score-panel.module.css";
+
+export type EvaluatedResumeSourceKind =
+  | "master résumé"
+  | "working draft"
+  | "job-specific variant";
+
+export type SkillBackingClassification =
+  | "in-resume-experience"
+  | "in-resume-skills"
+  | "evidence-bank-only"
+  | "unsupported";
+
+export interface SkillBackingDetail {
+  backing: SkillBackingClassification;
+  inEvaluatedResume: boolean;
+  evidenceBankOnly: boolean;
+  badgeLabel: string;
+  sourceNote: string;
+}
+
+function splitResumeBodyAndSkills(typstContent: string): {
+  bodyLower: string;
+  skillsLower: string;
+} {
+  const lines = typstContent.split("\n");
+  const bodyLines: string[] = [];
+  const skillsLines: string[] = [];
+  let inSkillsSection = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const isCommentOrDefinition =
+      trimmed.startsWith("//") || /^#let\b/.test(trimmed);
+    const sectionCallMatch = !isCommentOrDefinition
+      ? trimmed.match(/^#section\s*\(\s*"((?:\\.|[^"\\])*)"(?:\s*,|\s*\))/)
+      : null;
+
+    const isHeader =
+      Boolean(sectionCallMatch) ||
+      line.includes("resume-section") ||
+      line.includes("#heading") ||
+      /^(=+)\s+/i.test(line);
+
+    if (isHeader) {
+      const headingText = sectionCallMatch ? sectionCallMatch[1] : line;
+      inSkillsSection = /skills|technologies|tools/i.test(headingText);
+    }
+
+    if (inSkillsSection) {
+      skillsLines.push(line);
+    } else {
+      bodyLines.push(line);
+    }
+  }
+
+  return {
+    bodyLower: bodyLines.join("\n").toLowerCase(),
+    skillsLower: skillsLines.join("\n").toLowerCase(),
+  };
+}
+
+/**
+ * Distinguishes skills worded in the evaluated résumé itself from skills that
+ * only appear because Evidence Bank items were included during ATS evaluation.
+ */
+export function classifySkillBacking(
+  skillEval: SkillEvaluation,
+  evaluatedTypstContent: string,
+  includeEvidenceBank: boolean,
+  sourceLabel: EvaluatedResumeSourceKind = "working draft"
+): SkillBackingDetail {
+  if (skillEval.status === "UNSUPPORTED_GAP") {
+    return {
+      backing: "unsupported",
+      inEvaluatedResume: false,
+      evidenceBankOnly: false,
+      badgeLabel: "Unsupported Gap",
+      sourceNote: `Not found in ${sourceLabel} or Evidence Bank.`,
+    };
+  }
+
+  const skillLower = skillEval.skill.toLowerCase();
+  const { bodyLower, skillsLower } = splitResumeBodyAndSkills(evaluatedTypstContent);
+
+  if (bodyLower.includes(skillLower)) {
+    return {
+      backing: "in-resume-experience",
+      inEvaluatedResume: true,
+      evidenceBankOnly: false,
+      badgeLabel: `In ${sourceLabel}`,
+      sourceNote: `Worded in this ${sourceLabel}'s experience or project bullets.`,
+    };
+  }
+
+  if (skillsLower.includes(skillLower)) {
+    return {
+      backing: "in-resume-skills",
+      inEvaluatedResume: true,
+      evidenceBankOnly: false,
+      badgeLabel: "In résumé skills only",
+      sourceNote: `Listed in this ${sourceLabel}'s skills section, not yet demonstrated in bullets.`,
+    };
+  }
+
+  if (includeEvidenceBank) {
+    return {
+      backing: "evidence-bank-only",
+      inEvaluatedResume: false,
+      evidenceBankOnly: true,
+      badgeLabel: "Evidence Bank only",
+      sourceNote: `Backed in your Evidence Bank, but omitted from this ${sourceLabel}'s wording.`,
+    };
+  }
+
+  return {
+    backing: "in-resume-experience",
+    inEvaluatedResume: true,
+    evidenceBankOnly: false,
+    badgeLabel: STATUS_BADGES[skillEval.status].label,
+    sourceNote: skillEval.matchedContext || `Matched in ${sourceLabel}.`,
+  };
+}
 
 interface AtsScorePanelProps {
   typstContent: string;
@@ -37,6 +160,8 @@ interface AtsScorePanelProps {
   useMasterResume?: boolean;
   /** Merge latest Evidence Bank into the scored document. */
   includeEvidenceBank?: boolean;
+  /** Actual object currently evaluated for display clarity. */
+  evaluatedSourceLabel?: EvaluatedResumeSourceKind;
   initialProfile?: RoleProfile;
   onProfileChange?: (profile: RoleProfile) => void;
   onEvaluationComplete?: (result: AtsEvaluationResult | null) => void;
@@ -78,12 +203,15 @@ export function AtsScorePanel({
   rawDescription,
   useMasterResume = false,
   includeEvidenceBank = true,
+  evaluatedSourceLabel,
   initialProfile = "Backend",
   onProfileChange,
   onEvaluationComplete,
   className = "",
   appearance = "default",
 }: AtsScorePanelProps) {
+  const sourceLabel: EvaluatedResumeSourceKind =
+    evaluatedSourceLabel ?? (useMasterResume ? "master résumé" : "working draft");
   const [selectedProfile, setSelectedProfile] = useState<RoleProfile>(initialProfile);
   const evaluationProfile = appearance === "tailor" ? initialProfile : selectedProfile;
   const [result, setResult] = useState<AtsEvaluationResult | null>(null);
@@ -244,6 +372,14 @@ export function AtsScorePanel({
   const gradeLabel =
     overallPct >= 80 ? "Strong" : overallPct >= 60 ? "Solid" : "Needs work";
 
+  const skillBackingDetails = (result?.skillEvaluations ?? []).map((se) => ({
+    eval: se,
+    backing: classifySkillBacking(se, typstContent, includeEvidenceBank, sourceLabel),
+  }));
+  const evidenceBankOnlyCount = skillBackingDetails.filter(
+    (item) => item.backing.evidenceBankOnly
+  ).length;
+
   return (
     <div
       className={`@container bg-panel border border-hairline rounded-[10px] p-6 shadow-lg space-y-6 min-w-0 ${appearance === "tailor" ? styles.tailor : ""} ${className}`}
@@ -260,8 +396,25 @@ export function AtsScorePanel({
             </span>
           </h2>
           <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-            {appearance === "tailor" ? "See how your resume aligns with this job and where evidence is missing." : "Rule-based evaluation of tailored ResumeVariant against job description & role overlay"}
+            {appearance === "tailor"
+              ? `Evaluates your ${sourceLabel}${includeEvidenceBank ? " alongside Evidence Bank backing" : ""} against this job's requirements.`
+              : `Rule-based evaluation of your ${sourceLabel}${includeEvidenceBank ? " + Evidence Bank" : ""} against job description & role overlay.`}
           </p>
+          <p
+            data-testid="ats-evaluated-source"
+            className="mt-1.5 text-xs font-mono text-text-secondary"
+          >
+            Evaluated source: <span className="font-semibold text-foreground">{sourceLabel}</span>
+            {includeEvidenceBank ? " + Evidence Bank backing" : ""}
+          </p>
+          {evidenceBankOnlyCount > 0 && (
+            <p
+              data-testid="ats-evidence-bank-only-notice"
+              className="mt-2 rounded-md border border-primary/35 bg-primary/10 px-3 py-2 text-xs text-foreground leading-relaxed"
+            >
+              {evidenceBankOnlyCount} matched {evidenceBankOnlyCount === 1 ? "skill is" : "skills are"} backed by your Evidence Bank but omitted from this {sourceLabel}&apos;s current wording.
+            </p>
+          )}
         </div>
 
         {result && (
@@ -278,7 +431,7 @@ export function AtsScorePanel({
                   filter: "drop-shadow(0 0 14px rgb(var(--accent-contrast) / 0.35))",
                 }}
               >
-                <div className="grid h-[58px] w-[58px] place-items-center rounded-full bg-panel font-sans text-[22px] font-bold tracking-[-0.03em] tabular-nums text-foreground">
+                <div className="grid h-[58px] w-[58px] place-items-center rounded-full bg-panel font-sans text-heading-lg font-bold tracking-[-0.03em] tabular-nums text-foreground">
                   {result.overallScore}
                 </div>
               </div>
@@ -366,7 +519,7 @@ export function AtsScorePanel({
                 <span className="break-words">Base Resume Health</span>
               </span>
               <span className="text-xs font-mono font-semibold tabular-nums text-foreground shrink-0">
-                {result.baseHealth.score} / {result.baseHealth.maxScore} pts
+                {result.baseHealth.score} / {result.baseHealth.maxScore} pts ({result.baseHealth.percentage}% match)
               </span>
             </div>
             <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
@@ -401,7 +554,7 @@ export function AtsScorePanel({
                 <span className="break-words">Required Role Match</span>
               </span>
               <span className="text-xs font-mono font-semibold tabular-nums text-foreground shrink-0">
-                {result.requiredMatch.score} / {result.requiredMatch.maxScore} pts
+                {result.requiredMatch.score} / {result.requiredMatch.maxScore} pts ({result.requiredMatch.percentage}% match)
               </span>
             </div>
             <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
@@ -425,7 +578,7 @@ export function AtsScorePanel({
                 <span className="break-words">Preferred Match</span>
               </span>
               <span className="text-xs font-mono font-semibold tabular-nums text-foreground shrink-0">
-                {result.preferredMatch.score} / {result.preferredMatch.maxScore} pts
+                {result.preferredMatch.score} / {result.preferredMatch.maxScore} pts ({result.preferredMatch.percentage}% match)
               </span>
             </div>
             <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
@@ -449,7 +602,7 @@ export function AtsScorePanel({
                 <span className="break-words">Role-Relevant Evidence ({result.selectedProfile})</span>
               </span>
               <span className="text-xs font-mono font-semibold tabular-nums text-foreground shrink-0">
-                {result.roleEvidence.score} / {result.roleEvidence.maxScore} pts
+                {result.roleEvidence.score} / {result.roleEvidence.maxScore} pts ({result.roleEvidence.percentage}% match)
               </span>
             </div>
             <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
@@ -475,8 +628,10 @@ export function AtsScorePanel({
             Skill Demonstration Status Tracing (<span className="tabular-nums">{result.skillEvaluations.length}</span> skills)
           </h3>
           <div className="grid grid-cols-1 gap-2" data-testid="skill-evaluations-list">
-            {result.skillEvaluations.map((se, idx) => {
+            {skillBackingDetails.map(({ eval: se, backing }, idx) => {
               const badge = STATUS_BADGES[se.status];
+              const itemPct =
+                se.maxScore > 0 ? Math.round((se.score / se.maxScore) * 100) : 0;
               return (
                 <div
                   key={`se-${idx}`}
@@ -484,24 +639,44 @@ export function AtsScorePanel({
                   className="bg-inset border border-border rounded-[6px] p-3 flex flex-col items-start gap-2 text-xs min-w-0"
                 >
                   <div className="min-w-0 w-full">
-                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                      <span className="font-semibold text-foreground break-words">{se.skill}</span>
-                      <span className="text-xs text-muted-foreground uppercase font-mono">
-                        ({se.category})
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                        <span className="font-semibold text-foreground break-words">{se.skill}</span>
+                        <span className="text-xs text-muted-foreground uppercase font-mono">
+                          ({se.category})
+                        </span>
+                      </div>
+                      <span
+                        data-testid={`skill-match-pct-${se.skill}`}
+                        className="text-xs font-mono tabular-nums text-muted-foreground shrink-0"
+                      >
+                        {itemPct}% skill match
                       </span>
                     </div>
-                    {se.matchedContext && (
-                      <p className="text-sm text-muted-foreground mt-1 leading-relaxed break-words">
-                        {se.matchedContext}
-                      </p>
-                    )}
+                    <p className="text-sm text-muted-foreground mt-1 leading-relaxed break-words">
+                      {backing.sourceNote}
+                    </p>
                   </div>
-                  <span
-                    data-testid={`status-badge-${se.skill}`}
-                    className={`w-fit max-w-full px-2 py-0.5 rounded text-xs font-semibold border inline-flex items-center gap-1 whitespace-normal ${badge.bg} ${badge.text} ${badge.border}`}
-                  >
-                    <span>{badge.icon}</span> {badge.label}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span
+                      data-testid={`status-badge-${se.skill}`}
+                      className={`w-fit max-w-full px-2 py-0.5 rounded text-xs font-semibold border inline-flex items-center gap-1 whitespace-normal ${badge.bg} ${badge.text} ${badge.border}`}
+                    >
+                      <span>{badge.icon}</span> {badge.label}
+                    </span>
+                    <span
+                      data-testid={`backing-badge-${se.skill}`}
+                      className={`w-fit max-w-full px-2 py-0.5 rounded text-xs font-medium border whitespace-normal ${
+                        backing.evidenceBankOnly
+                          ? "border-primary/40 bg-primary/10 text-primary"
+                          : backing.inEvaluatedResume
+                            ? "border-signal/35 bg-signal/10 text-signal"
+                            : "border-hairline bg-panel text-muted-foreground"
+                      }`}
+                    >
+                      {backing.badgeLabel}
+                    </span>
+                  </div>
                 </div>
               );
             })}

@@ -12,6 +12,8 @@ import {
   getTailorBackLabel,
   createInitialTailorNavigationState,
   transitionTailorNavigation,
+  formatRequirementSourceLabel,
+  formatJobDiagnosticLabel,
 } from "@/components/tailor/tailor-workspace";
 
 describe("Tailor task-sequence navigation & state helpers", () => {
@@ -122,8 +124,23 @@ describe("Tailor task-sequence navigation & state helpers", () => {
     expect(src).toContain('data-testid="job-extraction-diagnostics-summary"');
     expect(src).toContain("Suggest resume edits");
     expect(src).toContain("handleOpenSettings");
+    expect(src).toContain("handleOpenEditor");
+    expect(src).toContain("handleOpenLibrary");
     expect(src).toContain("requireSuccess: true");
+    expect(src).toContain('data-testid="job-load-error-banner"');
+    expect(src).toContain('href="/tracker"');
     expect(src).not.toContain("Open in 3-Pane Tailor");
     expect(src).not.toContain("Back to 3-Pane Workspace");
+    expect(src).not.toContain(">USER_ADDED<");
+  });
+
+  it("formats requirement and diagnostic statuses in plain English", () => {
+    expect(formatRequirementSourceLabel("USER_ADDED")).toBe("Added manually");
+    expect(formatRequirementSourceLabel("USER_PASTED")).toBe("Pasted job posting");
+    expect(formatJobDiagnosticLabel("USER_PASTED")).toBe("Pasted job posting");
+    expect(formatJobDiagnosticLabel("PASTED")).toBe("Pasted job posting");
+    expect(formatJobDiagnosticLabel("VERIFIED_ATS")).toBe("Verified ATS source");
+    expect(formatJobDiagnosticLabel("STRUCTURED_PAGE")).toBe("Structured posting page");
+    expect(formatJobDiagnosticLabel("PARTIAL_EXTRACTION")).toBe("Partial posting extraction");
   });
 });
