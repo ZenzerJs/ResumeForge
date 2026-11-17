@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useId } from "react";
 import { buildResumeDocument, typstContent, typstString, type ResumeAssignment } from "@/lib/typst/resume-document";
 import {
   User,
@@ -463,6 +463,7 @@ export function isResumeSourceSafeForForm(source: string): boolean {
 }
 
 export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
+  const formId = useId();
   const [model, setModel] = useState<StructuredResumeModel>(() =>
     parseTypstToStructuredModel(value)
   );
@@ -651,8 +652,9 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-mono text-text-muted mb-1">Full Name</label>
+                  <label htmlFor={`${formId}-fullname`} className="block text-xs font-mono text-text-muted mb-1">Full Name</label>
                   <input
+                    id={`${formId}-fullname`}
                     type="text"
                     value={model.fullName}
                     onChange={(e) => commitModel({ ...model, fullName: e.target.value })}
@@ -661,8 +663,9 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-mono text-text-muted mb-1">Location</label>
+                  <label htmlFor={`${formId}-location`} className="block text-xs font-mono text-text-muted mb-1">Location</label>
                   <input
+                    id={`${formId}-location`}
                     type="text"
                     value={model.location}
                     onChange={(e) => commitModel({ ...model, location: e.target.value })}
@@ -671,8 +674,9 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-mono text-text-muted mb-1">Email</label>
+                  <label htmlFor={`${formId}-email`} className="block text-xs font-mono text-text-muted mb-1">Email</label>
                   <input
+                    id={`${formId}-email`}
                     type="email"
                     value={model.email}
                     onChange={(e) => commitModel({ ...model, email: e.target.value })}
@@ -681,8 +685,9 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-mono text-text-muted mb-1">Phone</label>
+                  <label htmlFor={`${formId}-phone`} className="block text-xs font-mono text-text-muted mb-1">Phone</label>
                   <input
+                    id={`${formId}-phone`}
                     type="text"
                     value={model.phone}
                     onChange={(e) => commitModel({ ...model, phone: e.target.value })}
@@ -691,8 +696,9 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-mono text-text-muted mb-1">GitHub URL</label>
+                  <label htmlFor={`${formId}-github`} className="block text-xs font-mono text-text-muted mb-1">GitHub URL</label>
                   <input
+                    id={`${formId}-github`}
                     type="text"
                     value={model.github}
                     onChange={(e) => commitModel({ ...model, github: e.target.value })}
@@ -700,8 +706,9 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-mono text-text-muted mb-1">LinkedIn URL</label>
+                  <label htmlFor={`${formId}-linkedin`} className="block text-xs font-mono text-text-muted mb-1">LinkedIn URL</label>
                   <input
+                    id={`${formId}-linkedin`}
                     type="text"
                     value={model.linkedin}
                     onChange={(e) => commitModel({ ...model, linkedin: e.target.value })}
@@ -713,12 +720,13 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
 
             <div className="rounded-[10px] border border-outline/70 bg-canvas/50 p-4 space-y-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-primary">
+                <label htmlFor={`${formId}-summary`} className="text-xs font-mono font-semibold uppercase tracking-wider text-primary">
                   Professional Summary (Optional)
-                </h3>
+                </label>
                 <span className="text-xs font-mono text-text-muted">Renders above Experience</span>
               </div>
               <textarea
+                id={`${formId}-summary`}
                 rows={3}
                 value={model.summary}
                 onChange={(e) => commitModel({ ...model, summary: e.target.value })}
@@ -781,7 +789,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-xs font-mono text-text-muted mb-1">
+                    <label htmlFor={`${formId}-${activeSection}-${idx}-title`} className="block text-xs font-mono text-text-muted mb-1">
                       {activeSection === "education"
                         ? "University / Institution"
                         : activeSection === "projects"
@@ -789,6 +797,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                         : "Company / Organization"}
                     </label>
                     <input
+                      id={`${formId}-${activeSection}-${idx}-title`}
                       type="text"
                       value={entry.title}
                       onChange={(e) =>
@@ -798,10 +807,11 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-mono text-text-muted mb-1">
+                    <label htmlFor={`${formId}-${activeSection}-${idx}-role`} className="block text-xs font-mono text-text-muted mb-1">
                       {activeSection === "education" ? "Degree / Program" : "Role / Title"}
                     </label>
                     <input
+                      id={`${formId}-${activeSection}-${idx}-role`}
                       type="text"
                       value={entry.role}
                       onChange={(e) =>
@@ -811,10 +821,11 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-mono text-text-muted mb-1">
+                    <label htmlFor={`${formId}-${activeSection}-${idx}-location`} className="block text-xs font-mono text-text-muted mb-1">
                       Location
                     </label>
                     <input
+                      id={`${formId}-${activeSection}-${idx}-location`}
                       type="text"
                       value={entry.location}
                       onChange={(e) =>
@@ -824,10 +835,11 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-mono text-text-muted mb-1">
+                    <label htmlFor={`${formId}-${activeSection}-${idx}-date`} className="block text-xs font-mono text-text-muted mb-1">
                       Date Range
                     </label>
                     <input
+                      id={`${formId}-${activeSection}-${idx}-date`}
                       type="text"
                       value={entry.date}
                       onChange={(e) =>
@@ -854,7 +866,11 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                   {entry.bullets.map((bullet, bIdx) => (
                     <div key={bIdx} className="flex items-start gap-2">
                       <span className="mt-2 text-xs text-primary">•</span>
+                      <label htmlFor={`${formId}-${activeSection}-${idx}-bullet-${bIdx}`} className="sr-only">
+                        {`${entry.title || `Entry ${idx + 1}`} bullet ${bIdx + 1}`}
+                      </label>
                       <textarea
+                        id={`${formId}-${activeSection}-${idx}-bullet-${bIdx}`}
                         rows={2}
                         value={bullet}
                         onChange={(e) =>
@@ -910,12 +926,16 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
             </div>
 
             <div className="space-y-3">
-              {model.skills.map((skill) => (
+              {model.skills.map((skill, sIdx) => (
                 <div
                   key={skill.id}
                   className="rounded-[10px] border border-outline/70 bg-canvas/50 p-3 flex flex-col sm:flex-row items-start sm:items-center gap-2.5"
                 >
+                  <label htmlFor={`${formId}-skill-${sIdx}-category`} className="sr-only">
+                    {`Skill category ${sIdx + 1}`}
+                  </label>
                   <input
+                    id={`${formId}-skill-${sIdx}-category`}
                     type="text"
                     value={skill.category}
                     onChange={(e) => {
@@ -927,7 +947,11 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                     placeholder="Category (e.g. Languages)"
                     className="w-full sm:w-44 shrink-0 rounded border border-outline/70 bg-inset px-2.5 py-1.5 text-xs font-semibold text-primary focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
+                  <label htmlFor={`${formId}-skill-${sIdx}-items`} className="sr-only">
+                    {`Skills for ${skill.category || `category ${sIdx + 1}`}`}
+                  </label>
                   <input
+                    id={`${formId}-skill-${sIdx}-items`}
                     type="text"
                     value={skill.items}
                     onChange={(e) => {

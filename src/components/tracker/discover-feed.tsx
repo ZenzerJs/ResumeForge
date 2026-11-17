@@ -39,6 +39,7 @@ import { CompanyAvatar } from "@/components/tracker/company-avatar";
 import { FitPercentageDial } from "@/components/tracker/fit-percentage-dial";
 import { TechDiffPillList } from "@/components/tracker/tech-diff-pill-list";
 import { normalizeCompanyIntel, formatFundingBadge, formatH1BBadge } from "@/lib/companyIntel";
+import { buildDiscoverDisambiguators } from "@/lib/jobs/posting-identity";
 
 export interface IngestedJobItem {
   id: string;
@@ -154,7 +155,7 @@ const CURATED_COMPANIES: { label: string; query: string }[] = [
 ];
 
 const FILTER_CONTROL =
-  "min-h-11 rounded-md border border-hairline bg-rf-elevated px-2.5 text-sm text-rf-cloud placeholder:text-muted-foreground transition-colors duration-150 focus:border-primary/60";
+  "h-11 py-0 leading-normal rounded-md border border-hairline bg-rf-elevated px-2.5 text-sm text-rf-cloud placeholder:text-muted-foreground transition-colors duration-150 focus:border-primary/60";
 
 type FeedNotification = {
   message: string;
@@ -341,6 +342,8 @@ export function DiscoverFeed() {
     () => clientSkills.filter((s) => s.length >= 2),
     [clientSkills]
   );
+
+  const disambiguatorById = useMemo(() => buildDiscoverDisambiguators(jobs), [jobs]);
 
   const jobCardMeta = useMemo(() => {
     const map = new Map<
@@ -982,6 +985,7 @@ export function DiscoverFeed() {
               const isAlreadyTracked = Boolean(trackedJobId);
               const matchScore = displayScore(j.blendedScore);
               const requiredCount = j.compatibility?.totalRequiredCount ?? 0;
+              const disambiguator = disambiguatorById.get(j.id);
 
               return (
                 <div
@@ -996,6 +1000,14 @@ export function DiscoverFeed() {
                         <span className="break-words">{j.companyName}</span>
                       </span>
                       <div className="flex items-center gap-1.5">
+                        {disambiguator ? (
+                          <span
+                            data-testid={`discover-disambiguator-${j.id}`}
+                            className="rounded border border-primary/35 bg-primary/10 px-1.5 py-0.5 font-mono text-xs text-primary"
+                          >
+                            {disambiguator}
+                          </span>
+                        ) : null}
                         <span className="rounded border border-hairline bg-inset px-1.5 py-0.5 font-mono text-xs text-text-secondary uppercase">
                           {j.source}
                         </span>

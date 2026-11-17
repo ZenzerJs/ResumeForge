@@ -84,10 +84,11 @@ describe("Sign In & Landing Page Polish Unit Tests", () => {
   describe("CompetitiveMatrixSection Typography & Product Facts", () => {
     it("renders factual product architecture columns without competitor brands or strawman claims", () => {
       expect(typeof CompetitiveMatrixSection).toBe("function");
-      const html = renderToStaticMarkup(React.createElement(CompetitiveMatrixSection));
+      const html = renderToStaticMarkup(React.createElement(CompetitiveMatrixSection, { demoMode: true }));
       expect(html).toContain("Capability");
       expect(html).toContain("ResumeForge");
-      expect(html).toContain("How ResumeForge Is Built");
+      expect(html).toContain("ResumeForge architecture table");
+      expect(html).toContain("Demo drafts stay in browser storage. Account signup is disabled.");
       expect(html).not.toContain("Competitors");
       expect(html).not.toMatch(/\b(Teal|Simplify|Jobright)\b/i);
     });

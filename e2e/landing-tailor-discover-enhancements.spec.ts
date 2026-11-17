@@ -10,8 +10,13 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
     await expect(page.getByTestId("landing-atmosphere")).toBeVisible();
     await expect(page.getByTestId("ascii-waves-canvas")).toBeVisible();
 
-    // Verify Instant ATS Sandbox Section
     const sandboxSection = page.getByTestId("instant-ats-sandbox-section");
+    const matrixSection = page.getByTestId("competitive-matrix-section");
+    await expect(sandboxSection).toBeHidden();
+    await expect(matrixSection).toBeHidden();
+    const scoreDisclosure = page.getByText("Try the resume match score", { exact: true });
+    await scoreDisclosure.focus();
+    await page.keyboard.press("Enter");
     await expect(sandboxSection).toBeVisible();
 
     // Verify Sample Roles preset buttons
@@ -85,10 +90,8 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
       unsafeExternalRefs: 0,
     });
 
-    // Verify Competitive Matrix Section
-    const matrixSection = page.getByTestId("competitive-matrix-section");
+    await page.getByText("How ResumeForge is built", { exact: true }).click();
     await expect(matrixSection).toBeVisible();
-    await expect(matrixSection).toContainText("How ResumeForge Is Built");
 
     // Check table moats and architecture columns
     await expect(matrixSection).toContainText("Hallucination Prevention");
@@ -98,7 +101,7 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
     await expect(matrixSection).toContainText("ATS Evaluation Engine");
 
     await expect(matrixSection).toContainText("Capability");
-    await expect(matrixSection).toContainText("ResumeForge (Guest / Postgres)");
+    await expect(matrixSection.getByRole("columnheader", { name: "ResumeForge" })).toBeVisible();
     await expect(matrixSection).not.toContainText(/\bTeal\b/i);
     await expect(matrixSection).not.toContainText(/\bSimplify\b/i);
   });
@@ -158,10 +161,10 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
     await expect(page.getByTestId("tailor-job-info-panel")).toBeVisible();
     await expect(container3Pane).not.toBeVisible();
 
-    // Verify Back button returns directly to Workspace
+    // Verify Back button returns directly to Review edits
     const backBtn = page.getByTestId("back-to-overview-btn");
     await expect(backBtn).toBeVisible();
-    await expect(backBtn).toContainText("Back to 3-Pane Workspace");
+    await expect(backBtn).toContainText("Back to Review edits");
     await backBtn.click();
 
     await expect(page.getByTestId("tailor-3pane-container")).toBeVisible();
@@ -289,12 +292,12 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
     await page.keyboard.press("Escape");
     await expect(jdSheet).not.toBeVisible();
 
-    // Verify tab buttons exist and are accessible
-    const tabOverview = page.getByTestId("tailor-tab-overview");
+    // Verify primary tab buttons and More tools menu trigger exist and are accessible
+    const moreToolsTrigger = page.getByTestId("tailor-more-tools-trigger");
     const tab3Pane = page.getByTestId("tailor-tab-3-pane");
     const tabJobInfo = page.getByTestId("tailor-tab-job-info");
 
-    await expect(tabOverview).toBeVisible();
+    await expect(moreToolsTrigger).toBeVisible();
     await expect(tab3Pane).toBeVisible();
     await expect(tabJobInfo).toBeVisible();
   });

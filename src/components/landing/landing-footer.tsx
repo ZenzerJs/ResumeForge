@@ -24,7 +24,7 @@ export function LandingFooter() {
             Editor
           </Link>
           <Link href="/tailor" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
-            Tailor Engine
+            Tailor
           </Link>
           <Link href="/tracker" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
             Tracker
@@ -33,7 +33,7 @@ export function LandingFooter() {
             Evidence Bank
           </Link>
           <Link href="/settings" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
-            BYOK Settings
+            AI settings
           </Link>
           <Link href="/privacy" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
             Privacy Policy

@@ -50,16 +50,15 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
     await expect(proofCard).not.toContainText("87/100");
   });
 
-  test("5. Interactive 5-step workflow timeline supports step switching and keyboard navigation", async ({ page }) => {
+  test("5. Quick start presents one preparation sequence", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
-    const activePanel = page.locator('[data-testid="workflow-active-panel"]');
-    await expect(activePanel).toContainText("1. IMPORT");
-    await expect(activePanel).toContainText("2. GROUND");
-    await expect(activePanel).toContainText("3. TAILOR");
-    await expect(activePanel).toContainText("4. VERIFY");
-    await expect(activePanel).toContainText("5. APPLY");
+    const checklist = page.getByTestId("consumer-onboarding-checklist");
+    await expect(checklist.getByRole("heading", { name: "Quick start" })).toBeVisible();
+    for (const step of [1, 2, 3, 4]) {
+      await expect(checklist.getByTestId(`onboarding-step-${step}`)).toBeVisible();
+    }
   });
 
   test("6. Upload PDF button remains enabled and immediately clickable", async ({ page }) => {
@@ -71,11 +70,11 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
     await expect(uploadBtn).toBeEnabled();
   });
 
-  test("7. All 5 capability cards navigate to correct destinations", async ({ page }) => {
+  test("7. Workspace tools link to each destination", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
-    const grid = page.locator('[data-testid="capability-cards-grid"]');
+    const grid = page.getByTestId("capability-grid-section");
 
     const editorLink = grid.locator('a[href="/editor"]');
     await expect(editorLink).toBeVisible();
@@ -91,6 +90,7 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
 
     const settingsLink = grid.locator('a[href="/settings"]');
     await expect(settingsLink).toBeVisible();
+    await expect(grid.locator('a[href="/practice"]')).toBeVisible();
   });
 
   test("8. prefers-reduced-motion: reduce renders landing page cleanly", async ({ page }) => {
@@ -117,7 +117,7 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
 
     // 768px Tablet Viewport
     await page.setViewportSize({ width: 768, height: 1024 });
-    await expect(page.locator('[data-testid="workflow-section"]')).toBeVisible();
+    await expect(page.getByTestId("consumer-onboarding-checklist")).toBeVisible();
 
     // 1200px Desktop Viewport
     await page.setViewportSize({ width: 1200, height: 800 });

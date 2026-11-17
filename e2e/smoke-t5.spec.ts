@@ -368,7 +368,9 @@ test.describe("T5 Browser Smoke Check", () => {
 
     const coverLetterSection = page.getByTestId("tailor-cover-letter-section");
     await expect(coverLetterSection).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId("tailor-tab-cover-letter")).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#tailor-tool-heading-cover-letter")).toHaveText("Cover letter");
+    await expect(page.getByTestId("tailor-tab-job-info")).toHaveAttribute("aria-selected", "false");
+    await expect(page.getByTestId("tailor-tab-3-pane")).toHaveAttribute("aria-selected", "false");
   });
 
   test("7. /practice?jobId=X renders job context banner", async ({ page }) => {

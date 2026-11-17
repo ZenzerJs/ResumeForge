@@ -1,5 +1,48 @@
 # ResumeForge — Product Specification
 
+<!-- impeccable:product-schema 1 -->
+
+## Platform
+
+web
+
+## Users
+
+- **Primary users:** Internship and early-career tech applicants tailoring resumes and cover letters across many technical job applications while keeping every claim truthful and verifiable.
+
+## Product Purpose
+
+ResumeForge is a **local-first AI workspace** that generates truthful, job-specific resume variants from a single, protected master resume. It eliminates the tradeoff between generic resumes that fail automated screening and manual tailoring that causes burnout or resume drift, producing a clean, one-page Typst-compiled PDF tailored to each role.
+
+## Positioning
+
+Unlike generic AI resume writers that rewrite whole documents, stuff keywords, or invent plausible-sounding metrics, ResumeForge enforces a **patch-only, evidence-backed workflow**: every proposed edit is a structured diff citing verified items in the user's Evidence Bank, unsupported requirements surface as explicit gaps, and the Master Resume can never be silently overwritten.
+
+## Operating Context
+
+- **Core ritual:** Maintain a verified Master Resume and Evidence Bank -> ingest a Job Description (paste, URL fetch, or SimplifyJobs feed) -> run deterministic requirement matching -> review AI-proposed patches item-by-item -> inspect the 100-point internship ATS rubric -> export a one-page PDF via Typst WASM.
+- **Environments:** Public demo (browser storage, labeled synthetic sample content, visitor BYOK, no DB persistence) and self-hosted (PostgreSQL persistence, optional accounts, visitor/user BYOK or operator-configured provider).
+
+## Evidence on Hand
+
+- Live in-browser Typst WASM compiler and one-page PDF export (`scripts/generate-sample-resume-pdf.ts` fixture support).
+- Labeled synthetic sample resume and job data for the public demo.
+- **Strict absence rule:** Never fabricate experience, employers, metrics, technologies, testimonials, or user benchmarks. Any job requirement without a matching Evidence Bank item must be reported as an explicit gap.
+
+## Product Principles
+
+1. **Truthfulness & Traceability First:** Every resume and cover-letter claim must cite a verified Evidence Bank item; unsupported requirements become explicit gaps.
+2. **Master Protection & Consent:** AI proposes structured patches only; users accept, edit, or reject every change, with snapshots and instant undo.
+3. **One-Page Typst Precision:** Typst is the locked compiler and one-page output is the default target; no ATS gaming or hidden text.
+4. **Local-First & BYOK Privacy:** Guest/demo work stays in browser storage; API keys never persist server-side in plaintext or logs.
+5. **Strict Scope Discipline:** Build only what is specified; no unrequested features or silent refactors.
+
+## Accessibility & Inclusion
+
+- Keyboard-first navigation, visible `:focus-visible` rings, accessible Radix dialogs/sheets, ARIA combobox and selection targets, and full `prefers-reduced-motion: reduce` support across all workspace surfaces.
+
+---
+
 ## 1. Product Vision
 
 ResumeForge is a **local-first AI workspace** that generates truthful, job-specific resume variants from a single, protected master resume.

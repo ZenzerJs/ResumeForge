@@ -37,6 +37,10 @@ import {
   isPlaceholderDescription,
 } from "@/lib/ingestion/helpers";
 import { matchesPostedWithin, type PostedWithin } from "@/lib/jobs/posted-within";
+import {
+  buildTrackerDisambiguators,
+  collapseDuplicateTrackerJobs,
+} from "@/lib/jobs/posting-identity";
 import { fetchDemoConfig, fetchSessionUser } from "@/components/auth/session-user";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
 import {
@@ -107,7 +111,7 @@ const MIN_SALARY_OPTIONS: { value: string; label: string }[] = [
 ];
 
 const FILTER_CONTROL =
-  "min-h-11 rounded-md border border-hairline bg-inset px-2.5 text-[12.5px] text-rf-cloud placeholder-muted-foreground transition-colors duration-150 focus:border-primary/60";
+  "h-11 py-0 leading-normal rounded-md border border-hairline bg-inset px-2.5 text-xs text-rf-cloud placeholder-muted-foreground transition-colors duration-150 focus:border-primary/60";
 
 type ApiPayload<T = unknown> = {
   success?: boolean;
@@ -183,6 +187,16 @@ export function selectPendingHydrationJobIds(
     .map((j) => j.id);
 }
 
+export type TrackerAuthStatus = "pending" | "authenticated" | "guest";
+
+export function canAutoHydrateTrackerJobs(params: {
+  isLoading: boolean;
+  isDemoMode: boolean;
+  authStatus: TrackerAuthStatus;
+}): boolean {
+  return !params.isLoading && !params.isDemoMode && params.authStatus === "authenticated";
+}
+
 export function mergePatchedGuestJobs<T extends { id: string }>(prev: T[], next: T[]): T[] {
   return prev.map((job) => next.find((item) => item.id === job.id) ?? job);
 }
@@ -203,6 +217,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [authStatus, setAuthStatus] = useState<TrackerAuthStatus>("pending");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
@@ -362,15 +377,16 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             return amount ? Number(amount) >= minimum : false;
           });
         }
-        const total = filtered.length;
+        const dedupedFiltered = collapseDuplicateTrackerJobs(filtered);
+        const total = dedupedFiltered.length;
         const totalPageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-        const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+        const visible = dedupedFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
         setJobs(visible);
         setTotalJobs(total);
         setTotalPages(totalPageCount);
         setPipelineCounts({
-          applied: filtered.filter((job) => job.status === "APPLIED").length,
-          interviewing: filtered.filter((job) => job.status === "INTERVIEWING").length,
+          applied: dedupedFiltered.filter((job) => job.status === "APPLIED").length,
+          interviewing: dedupedFiltered.filter((job) => job.status === "INTERVIEWING").length,
         });
         setEditingNotes(Object.fromEntries(visible.map((job) => [job.id, job.notes || ""])));
         setLastSyncAt(null);
@@ -454,10 +470,31 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
     else sessionStorage.removeItem("resumeforge_active_job_id");
   }, [isDemoMode, isLoading, activeJobId, jobs]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const demoConfig = await fetchDemoConfig();
+      if (cancelled) return;
+      const demo = demoConfig?.demoMode === true;
+      setIsDemoMode(demo);
+      if (demo) {
+        setAuthStatus("guest");
+        return;
+      }
+      const user = await fetchSessionUser();
+      if (cancelled) return;
+      setAuthStatus(user ? "authenticated" : "guest");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Automatically hydrate cached descriptions with unparsed requirements and the active placeholder job.
   // Avoid bulk-scraping unselected placeholder URLs on mount so initial page load stays responsive.
+  // Gate on resolved authentication so signed-out self-hosted guests and demo guests trigger zero hydrate requests.
   useEffect(() => {
-    if (isLoading || isDemoMode) return;
+    if (!canAutoHydrateTrackerJobs({ isLoading, isDemoMode, authStatus })) return;
     const attempted = hydrateAttemptedRef.current;
     const pendingIds = selectPendingHydrationJobIds(jobs, activeJobId, attempted);
     if (pendingIds.length === 0) return;
@@ -569,7 +606,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         }
       }
     })();
-  }, [jobs, isLoading, isDemoMode, activeJobId]);
+  }, [jobs, isLoading, isDemoMode, authStatus, activeJobId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -934,6 +971,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
 
   const effectiveStatuses = filterStatuses ?? ALL_STATUSES;
   const pageJobs = jobs;
+  const disambiguatorById = useMemo(() => buildTrackerDisambiguators(pageJobs), [pageJobs]);
   const selectedJob = activeJobId ? jobs.find((j) => j.id === activeJobId) ?? null : null;
 
   const pipelineApplied = pipelineCounts.applied;
@@ -1045,7 +1083,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                 ? `${locationListboxId}-option-${activeLocationIndex}`
                 : undefined
             }
-            placeholder="Location (e.g. Toronto)"
+            placeholder="City (Toronto)"
             value={locationQuery}
             onChange={(e) => {
               setLocationQuery(e.target.value);
@@ -1195,7 +1233,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           ))}
         </select>
 
-        <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:ml-auto sm:w-auto sm:justify-end sm:gap-3 text-[12.5px] text-muted-foreground">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:ml-auto sm:w-auto sm:justify-end sm:gap-3 text-xs text-muted-foreground">
           <div
             className="flex items-center rounded-md border border-hairline bg-inset p-0.5"
             role="tablist"
@@ -1260,7 +1298,20 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       {viewMode === "kanban" ? (
         <div
           data-testid="tracker-kanban-board"
-          className="flex min-h-0 flex-1 gap-4 overflow-x-auto snap-x snap-mandatory md:snap-none bg-transparent p-4"
+          tabIndex={0}
+          role="region"
+          aria-label="Kanban pipeline stages"
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === "ArrowRight") {
+              e.preventDefault();
+              e.currentTarget.scrollBy({ left: 260, behavior: "smooth" });
+            } else if (e.key === "ArrowLeft") {
+              e.preventDefault();
+              e.currentTarget.scrollBy({ left: -260, behavior: "smooth" });
+            }
+          }}
+          className="flex min-h-0 flex-1 gap-4 overflow-x-auto snap-x snap-mandatory md:snap-none bg-transparent p-4 xl:grid xl:grid-cols-5 xl:overflow-x-visible xl:snap-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         >
           {(["SAVED", "APPLIED", "INTERVIEWING", "OFFER", "REJECTED"] as JobStatus[]).map(
             (stage) => {
@@ -1276,13 +1327,13 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                       setDraggedJobId(null);
                     }
                   }}
-                  className="flex h-full w-[82vw] max-w-72 sm:w-72 shrink-0 snap-start flex-col rounded-xl surface-raised overflow-hidden"
+                  className="flex h-full w-[82vw] max-w-72 sm:w-72 shrink-0 snap-start flex-col rounded-xl surface-raised overflow-hidden xl:w-full xl:max-w-none xl:min-w-0 xl:shrink xl:snap-align-none"
                 >
-                  <div className="flex items-center justify-between border-b border-hairline bg-inset/90 px-3.5 py-2.5">
-                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
+                  <div className="flex items-center justify-between gap-2 border-b border-hairline bg-inset/90 px-3.5 py-2.5">
+                    <span className="min-w-0 truncate font-mono text-xs font-bold uppercase tracking-wider text-foreground">
                       {STATUS_LABELS[stage]}
                     </span>
-                    <span className="rounded-full bg-elevated border border-hairline px-2 py-0.5 font-mono text-xs font-semibold text-primary">
+                    <span className="shrink-0 rounded-full bg-elevated border border-hairline px-2 py-0.5 font-mono text-xs font-semibold text-primary">
                       {stageJobs.length}
                     </span>
                   </div>
@@ -1293,59 +1344,69 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                         Drop job card here
                       </div>
                     ) : (
-                      stageJobs.map((job) => (
-                        <div
-                          key={job.id}
-                          draggable
-                          onDragStart={() => setDraggedJobId(job.id)}
-                          data-testid={`kanban-card-${job.id}`}
-                          className="rounded-lg surface-raised card-lift p-3 cursor-grab active:cursor-grabbing space-y-2"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActiveJobId(job.id);
-                                setViewMode("split");
-                              }}
-                              className="text-left group"
-                            >
-                              <h3 className="text-xs font-bold text-foreground group-hover:text-primary transition line-clamp-2">
-                                {job.roleTitle}
-                              </h3>
-                              <p className="text-xs font-mono text-muted-foreground mt-0.5">
-                                {job.company}
-                              </p>
-                            </button>
-                          </div>
+                      stageJobs.map((job) => {
+                        const disambiguator = disambiguatorById.get(job.id);
+                        const cardLocation = extractLocationFromNotes(job.notes);
+                        return (
+                          <div
+                            key={job.id}
+                            draggable
+                            onDragStart={() => setDraggedJobId(job.id)}
+                            data-testid={`kanban-card-${job.id}`}
+                            className="min-w-0 rounded-lg surface-raised card-lift p-3 cursor-grab active:cursor-grabbing space-y-2"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveJobId(job.id);
+                                  setViewMode("split");
+                                }}
+                                className="min-w-0 text-left group"
+                              >
+                                <h3 className="text-xs font-bold text-foreground group-hover:text-primary transition line-clamp-2 break-words">
+                                  {job.roleTitle}
+                                </h3>
+                                <p className="text-xs font-mono text-muted-foreground mt-0.5 truncate">
+                                  {job.company}
+                                  {cardLocation ? ` · ${cardLocation}` : ""}
+                                </p>
+                                {disambiguator ? (
+                                  <span className="mt-1 inline-block rounded border border-hairline bg-inset px-1.5 py-0.5 font-mono text-xs text-text-secondary">
+                                    {disambiguator}
+                                  </span>
+                                ) : null}
+                              </button>
+                            </div>
 
-                          <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-hairline">
-                            <select
-                              value={job.status}
-                              onChange={(e) =>
-                                void handleStatusChange(job.id, e.target.value as JobStatus)
-                              }
-                              aria-label={`Change status for ${job.roleTitle}`}
-                              className="rounded-[6px] border border-control/70 bg-inset px-2 py-0.5 text-xs font-mono text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                            >
-                              {(["SAVED", "APPLIED", "INTERVIEWING", "OFFER", "REJECTED"] as JobStatus[]).map(
-                                (st) => (
-                                  <option key={st} value={st}>
-                                    {STATUS_LABELS[st]}
-                                  </option>
-                                )
-                              )}
-                            </select>
+                            <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-hairline">
+                              <select
+                                value={job.status}
+                                onChange={(e) =>
+                                  void handleStatusChange(job.id, e.target.value as JobStatus)
+                                }
+                                aria-label={`Change status for ${job.roleTitle}`}
+                                className="min-w-0 max-w-full rounded-[6px] border border-control/70 bg-inset px-2 py-0.5 text-xs font-mono text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                              >
+                                {(["SAVED", "APPLIED", "INTERVIEWING", "OFFER", "REJECTED"] as JobStatus[]).map(
+                                  (st) => (
+                                    <option key={st} value={st}>
+                                      {STATUS_LABELS[st]}
+                                    </option>
+                                  )
+                                )}
+                              </select>
 
-                            <Link
-                              href={`/tailor?jobId=${job.id}&tab=overview`}
-                              className="text-xs font-mono font-semibold text-primary hover:underline"
-                            >
-                              Tailor →
-                            </Link>
+                              <Link
+                                href={`/tailor?jobId=${job.id}&tab=overview`}
+                                className="shrink-0 text-xs font-mono font-semibold text-primary hover:underline"
+                              >
+                                Tailor →
+                              </Link>
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -1416,6 +1477,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                   isSelected={job.id === activeJobId}
                   isUpdatingStatus={Boolean(isUpdatingStatus[job.id])}
                   isFetchingFullText={Boolean(isFetchingTier2[job.id])}
+                  disambiguator={disambiguatorById.get(job.id)}
                   onSelect={handleSelectJob}
                   onStatusChange={handleStatusChange}
                   onFetchFullText={handleFetchFullText}

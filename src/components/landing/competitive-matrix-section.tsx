@@ -36,14 +36,6 @@ const MATRIX_DATA: MatrixRow[] = [
       "No subscription paywalls or artificial daily credit pools for Typst compilation, ATS checks, or PDF export. Connect your own BYOK model key when using AI actions.",
   },
   {
-    area: "Data Privacy & Ownership",
-    category: "Architecture Invariants",
-    icon: Lock,
-    title: "Browser Guest Mode + Hosted Postgres Sync",
-    summary:
-      "Guest drafts stay in browser localStorage until you sign in to persist in Postgres. BYOK API keys stay encrypted in IndexedDB and relay only to your chosen provider on AI actions.",
-  },
-  {
     area: "Document Quality & Layout",
     category: "Typesetting & Output",
     icon: FileCode,
@@ -61,41 +53,41 @@ const MATRIX_DATA: MatrixRow[] = [
   },
 ];
 
-export function CompetitiveMatrixSection() {
+export function CompetitiveMatrixSection({ demoMode }: { demoMode: boolean }) {
+  const privacy: MatrixRow = {
+    area: "Data Privacy & Ownership",
+    category: "Storage",
+    icon: Lock,
+    title: demoMode ? "Browser storage in the public demo" : "Browser drafts and PostgreSQL accounts",
+    summary: demoMode
+      ? "Demo drafts stay in browser storage. Account signup is disabled."
+      : "Guest drafts stay in browser storage. Signed-in users can save work in PostgreSQL.",
+  };
+
   return (
     <section
       data-testid="competitive-matrix-section"
-      className="py-20 px-4 md:px-8 max-w-7xl mx-auto w-full border-t border-outline/70"
+      className="w-full px-2 pb-8 pt-4 md:px-4"
     >
-      <div className="mb-14 text-center max-w-3xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[6px] border border-outline/70 bg-panel text-primary text-xs font-mono mb-4">
-          <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
-          <span>PRODUCT ARCHITECTURE</span>
-        </div>
-        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground tracking-tight mb-4">
-          How ResumeForge Is Built
-        </h2>
-        <p className="text-on-surface-variant text-sm md:text-base lg:text-lg leading-relaxed">
-          Every tailored bullet is grounded in your Evidence Bank, scored with a
-          transparent formula, and typeset client-side in Typst WASM.
-        </p>
-      </div>
-
-      {/* Architecture Breakdown Table */}
-      <div className="overflow-x-auto rounded-[10px] surface-raised edge-glow">
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label="ResumeForge architecture table"
+        className="overflow-x-auto rounded-[10px] border border-hairline bg-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
         <table className="w-full text-left border-collapse min-w-[560px]">
           <thead>
             <tr className="border-b border-outline/70 bg-inset">
-              <th className="p-4 md:p-5 text-xs md:text-sm font-mono uppercase tracking-wider text-on-surface-variant w-[32%]">
+              <th scope="col" className="p-4 md:p-5 text-xs md:text-sm font-mono uppercase tracking-wider text-on-surface-variant w-[32%]">
                 Capability
               </th>
-              <th className="p-4 md:p-5 text-xs md:text-sm font-mono uppercase tracking-wider text-primary bg-primary/10 border-l border-primary/30 w-[68%]">
-                ResumeForge (Guest / Postgres)
+              <th scope="col" className="p-4 md:p-5 text-xs md:text-sm font-mono uppercase tracking-wider text-primary bg-primary/10 border-l border-primary/30 w-[68%]">
+                ResumeForge
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-outline/60 font-sans">
-            {MATRIX_DATA.map((row, idx) => {
+            {[...MATRIX_DATA, privacy].map((row, idx) => {
               const IconComp = row.icon;
               return (
                 <tr
@@ -103,7 +95,7 @@ export function CompetitiveMatrixSection() {
                   className={idx % 2 === 0 ? "bg-transparent" : "bg-inset/50"}
                 >
                   {/* Capability Column */}
-                  <td className="p-4 md:p-5 align-top">
+                  <th scope="row" className="p-4 font-normal md:p-5 align-top">
                     <div className="flex items-start gap-3">
                       <div className="p-2 rounded-[6px] bg-inset border border-outline/70 text-primary shrink-0 mt-0.5">
                         <IconComp className="h-4 w-4" aria-hidden />
@@ -117,7 +109,7 @@ export function CompetitiveMatrixSection() {
                         </span>
                       </div>
                     </div>
-                  </td>
+                  </th>
 
                   {/* ResumeForge Column */}
                   <td className="p-4 md:p-5 align-top bg-primary/[0.04] border-l border-primary/25">
@@ -140,13 +132,10 @@ export function CompetitiveMatrixSection() {
         </table>
       </div>
 
-      {/* Trust Invariant Footer Banner */}
-      <div className="mt-6 p-4 md:p-5 rounded-[10px] border border-outline/70 bg-panel flex items-center gap-2.5 text-on-surface-variant text-xs md:text-sm font-sans">
-        <Lock className="h-4 w-4 text-status-success shrink-0" aria-hidden />
-        <span>
-          Data Architecture: Guest drafts stay in this browser; signed-in data persists in hosted Postgres; BYOK keys stay encrypted in IndexedDB and relay only to your chosen provider on AI actions.
-        </span>
-      </div>
+      <p className="mt-4 max-w-prose text-sm text-on-surface-variant">
+        Provider keys are encrypted in IndexedDB when browser storage is available and kept in memory otherwise.
+        They are used when you test the connection or request AI help.
+      </p>
     </section>
   );
 }

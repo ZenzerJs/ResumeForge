@@ -8,7 +8,6 @@ import {
   FileCode,
   Eye,
   Terminal,
-  ShieldCheck,
   ChevronDown,
   ChevronUp,
   RotateCcw,
@@ -321,27 +320,12 @@ export function AtsSandboxSection() {
   return (
     <section
       data-testid="instant-ats-sandbox-section"
-      className="py-20 px-4 md:px-8 max-w-7xl mx-auto w-full border-t border-outline/70"
+      className="w-full px-2 pb-8 pt-4 md:px-4"
     >
-      {/* Header */}
-      <div className="mb-12 text-center max-w-3xl mx-auto">
-        <div className="flex flex-wrap items-center justify-center gap-2 mb-4">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-signal/40 bg-signal/10 text-signal text-xs font-mono">
-            <ShieldCheck className="h-4 w-4" />
-            <span>ZERO-AUTH DETERMINISTIC SANDBOX</span>
-          </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-mono font-semibold text-primary">
-            Synthetic sample
-          </span>
-        </div>
-        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground tracking-tight mb-4">
-          Instant ATS &amp; Typst Sandbox
-        </h2>
-        <p className="text-on-surface-variant text-sm md:text-base lg:text-lg leading-relaxed">
-          Test our explainable mathematical ATS evaluator and in-browser Typst WASM compiler right now.
-          Runs in your browser with no signup required; guest drafts stay local until you sign in.
-        </p>
-      </div>
+      <p className="mb-6 max-w-prose text-sm leading-relaxed text-on-surface-variant">
+        Compare a synthetic sample resume with example roles to see how skills, experience, and evidence affect the score.
+        The score and Typst preview run in your browser.
+      </p>
 
       {/* Preset Role Selectors */}
       <div className="flex flex-wrap items-center justify-center gap-3 mb-10">

@@ -3,6 +3,7 @@ import {
   parsePersistedLayout,
   serializeLayoutState,
   DEFAULT_EDITOR_LAYOUT,
+  getDesktopPanelLayout,
   MIN_PANEL_SIZES,
   EDITOR_LAYOUT_STORAGE_KEY,
 } from "@/lib/editor/layout-persistence";
@@ -12,14 +13,29 @@ describe("Task 9.2 — Resizable & Collapsible Editor Panels Unit Tests", () => 
     vi.restoreAllMocks();
   });
 
-  it("1. Default layout renders all three panes [panel-code: 45, panel-preview: 35, panel-ai: 20] when no persisted layout exists", () => {
+  it("1. Default self-hosted layout gives preview the largest share", () => {
     const layout = parsePersistedLayout(null);
     expect(layout.sizes).toEqual({
-      "panel-code": 45,
-      "panel-preview": 35,
+      "panel-code": 30,
+      "panel-preview": 50,
       "panel-ai": 20,
     });
     expect(layout.isAiCollapsed).toBe(false);
+  });
+
+  it("starts with AI collapsed in the public demo and preserves a saved open layout", () => {
+    const defaults = parsePersistedLayout(null, true);
+    expect(defaults.isAiCollapsed).toBe(true);
+    expect(getDesktopPanelLayout(defaults.sizes, defaults.isAiCollapsed)).toEqual({
+      "panel-code": 30,
+      "panel-preview": 70,
+      "panel-ai": 0,
+    });
+
+    const sizes = { "panel-code": 39, "panel-preview": 36, "panel-ai": 25 };
+    const preferred = parsePersistedLayout(serializeLayoutState(sizes, false), true);
+    expect(preferred.isAiCollapsed).toBe(false);
+    expect(getDesktopPanelLayout(preferred.sizes, preferred.isAiCollapsed)).toEqual(sizes);
   });
 
   it("2. Valid layout updates and persists to localStorage structure via serializeLayoutState", () => {
@@ -60,6 +76,11 @@ describe("Task 9.2 — Resizable & Collapsible Editor Panels Unit Tests", () => 
     );
     const layout = parsePersistedLayout(collapsedState);
     expect(layout.isAiCollapsed).toBe(true);
+    expect(getDesktopPanelLayout(layout.sizes, true)).toEqual({
+      "panel-code": 55,
+      "panel-preview": 45,
+      "panel-ai": 0,
+    });
   });
 
   it("6. Storage key constant matches resumeforge_editor_layout", () => {

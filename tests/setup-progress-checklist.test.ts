@@ -9,7 +9,7 @@ import {
   parseGuestJobsSummary,
 } from "@/components/landing/home-landing";
 import { emptyGuestStats, type DashboardStats } from "@/lib/db/stats";
-import { DEMO_EVIDENCE, DEMO_JOB } from "@/lib/demo-samples";
+import { DEMO_EVIDENCE, DEMO_JOB, DEMO_RESUME_SOURCE } from "@/lib/demo-samples";
 
 function makeStats(overrides: Partial<DashboardStats> = {}): DashboardStats {
   return {
@@ -136,10 +136,10 @@ describe("Setup progress checklist predicates and UI states", () => {
   });
 
   describe("computeOnboardingChecklistState", () => {
-    it("computes 0/4 on zero records and ignores draft-only or demo-only evidence and jobs", () => {
+    it("computes 0/4 on zero records and ignores a synthetic demo resume", () => {
       const zero = computeOnboardingChecklistState({
         stats: makeStats(),
-        hasLocalResume: false,
+        hasLocalResume: hasLocalPersonalResume(DEMO_RESUME_SOURCE),
         guestEvidence: parseGuestEvidenceSummary(null),
         guestJobs: parseGuestJobsSummary(null),
         hasAiKey: false,
@@ -229,12 +229,13 @@ describe("Setup progress checklist predicates and UI states", () => {
           guestJobs: parseGuestJobsSummary(JSON.stringify([DEMO_JOB])),
           hasAiKey: true,
           aiKeyless: true,
+          demoMode: false,
           onUploadPdf: () => {},
           onDismiss: () => {},
         })
       );
 
-      expect(html).toContain("Prepare your workspace for truthful tailoring.");
+      expect(html).toContain("Quick start");
       expect(html).not.toContain("under 3 minutes");
       expect(html).toContain("0 of 4 steps completed (0%)");
       expect(html).toContain('role="progressbar"');
@@ -247,15 +248,15 @@ describe("Setup progress checklist predicates and UI states", () => {
       expect(html).toContain("Synthetic sample available · save your own job");
 
       // Keyless local provider gets neutral explanation, retains incomplete predicate
-      expect(html).toContain("Local provider selected; test in Settings");
-      expect(html).toContain("Open Settings");
+      expect(html).toContain("Test your local or custom endpoint in Settings.");
+      expect(html).toContain("Open provider settings");
 
       // Step 4 truthful copy
       expect(html).toContain("Add a target job");
       expect(html).toContain("Save a job description, then open Tailor to review matches and proposed edits.");
     });
 
-    it("renders keyed provider as 'Key saved · Manage' and completed step 4 without submission-ready claims", () => {
+    it("renders demo provider choices and completed personal setup without submission-ready claims", () => {
       const html = renderToStaticMarkup(
         React.createElement(SetupChecklist, {
           stats: makeStats({
@@ -269,6 +270,7 @@ describe("Setup progress checklist predicates and UI states", () => {
           guestJobs: parseGuestJobsSummary(JSON.stringify([DEMO_JOB])),
           hasAiKey: true,
           aiKeyless: false,
+          demoMode: true,
           onUploadPdf: () => {},
           onDismiss: () => {},
         })
@@ -277,7 +279,9 @@ describe("Setup progress checklist predicates and UI states", () => {
       expect(html).toContain("4 of 4 steps completed (100%)");
       expect(html).toContain('aria-valuenow="4"');
       expect(html).toContain("View 2 Verified");
-      expect(html).toContain("Key saved · Manage");
+      expect(html).toContain("Manage provider");
+      expect(html).toContain("Gemini, OpenAI, Anthropic, or Groq");
+      expect(html).not.toMatch(/Ollama|custom endpoint/i);
       expect(html).not.toContain("Connected");
       expect(html).not.toContain("Test passed");
       expect(html).toContain("Open Tailor");

@@ -1,7 +1,7 @@
 import { OutcomesPanel } from "@/components/tracker/outcomes-panel";
 
 export const metadata = {
-  title: "Outcomes — ResumeForge Tracker",
+  title: "Outcomes — Tracker",
   description: "Pipeline funnel and interview rate for each resume variant.",
 };
 

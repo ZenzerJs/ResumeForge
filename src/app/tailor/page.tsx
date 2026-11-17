@@ -4,7 +4,7 @@ import { TailorWorkspace } from "@/components/tailor/tailor-workspace";
 import { PageSkeleton } from "@/components/design-system/page-skeleton";
 
 export const metadata: Metadata = {
-  title: "Job Tailoring & Requirement Matcher | ResumeForge",
+  title: "Job Tailoring & Requirement Matcher",
   description: "Deterministic JD requirement extraction and Evidence Bank matching workspace",
 };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -14,7 +14,6 @@ import { AiMarkdownRenderer } from "@/components/editor/ai-markdown-renderer";
 import { ToolBadge } from "@/components/editor/tool-badge";
 import type { ChatMessage, ChatStreamChunk, ToolCallRecord } from "@/lib/ai/chat-types";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
-import { fetchDemoConfig } from "@/components/auth/session-user";
 
 const STORAGE_KEY = "resumeforge_chat_messages";
 
@@ -33,9 +32,10 @@ const QUICK_ACTIONS = [
 interface ChatPanelProps {
   typstSource: string;
   resumeTitle?: string;
+  jobId: string | null;
 }
 
-export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
+export function ChatPanel({ typstSource, resumeTitle, jobId }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -43,7 +43,6 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
   const [streamingTools, setStreamingTools] = useState<ToolCallRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [noKeyError, setNoKeyError] = useState(false);
-  const [demoMode, setDemoMode] = useState(false);
 
   const listRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -59,16 +58,6 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
     } catch {
       // ignore
     }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetchDemoConfig().then((config) => {
-      if (!cancelled) setDemoMode(config.demoMode === true);
-    });
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   useEffect(() => {
@@ -89,11 +78,6 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, streamingContent, streamingTools, isStreaming]);
 
-  const activeJobId = useMemo(() => {
-    if (typeof window === "undefined") return undefined;
-    return sessionStorage.getItem("resumeforge_active_job_id") || undefined;
-  }, []);
-
   const stopStreaming = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -104,9 +88,13 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
     async (rawText?: string) => {
       const text = (rawText ?? input).trim();
       if (!text || isStreaming) return;
-      if (demoMode) {
-        setError("Career Assistant chat is unavailable in the public demo because it reads saved account data. Use Tailoring and ATS review with your local draft instead.");
-        return;
+      let activeJobId = jobId || undefined;
+      if (!activeJobId) {
+        try {
+          activeJobId = sessionStorage.getItem("resumeforge_active_job_id") || undefined;
+        } catch {
+          // Chat can run without saved job context.
+        }
       }
 
       const aiSettings = await resolveClientProviderConfig();
@@ -252,7 +240,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
         abortRef.current = null;
       }
     },
-    [activeJobId, demoMode, input, isStreaming, messages, typstSource]
+    [input, isStreaming, jobId, messages, typstSource]
   );
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -273,11 +261,6 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="chat-panel">
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-3">
-        {demoMode && (
-          <p className="rounded-lg border border-hairline bg-inset p-3 text-sm text-text-secondary">
-            Career Assistant chat is unavailable in the public demo because it reads saved account data. Use Tailoring and ATS review with your local draft instead.
-          </p>
-        )}
         {messages.length === 0 && !isStreaming && (
           <div className="flex flex-col items-center text-center py-6 gap-3">
             <div className="rounded-full bg-status-warning/15 border border-status-warning/40 p-3">
@@ -384,7 +367,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
         </div>
       )}
 
-      {!demoMode && <div className="border-t border-hairline p-3 space-y-2">
+      <div className="border-t border-hairline p-3 space-y-2">
         <textarea
           ref={textareaRef}
           data-testid="chat-input"
@@ -428,7 +411,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
           <Sparkles className="h-3 w-3" />
           Enter to send · Shift+Enter for a new line
         </p>
-      </div>}
+      </div>
     </div>
   );
 }

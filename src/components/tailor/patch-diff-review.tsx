@@ -33,6 +33,12 @@ import { assertCanApplyPatches, GuardrailBlockError, markDocumentAsPatched } fro
 import { applyPatchProposals } from "@/lib/ai/patch-application";
 import type { ResumeFacts, TailoringValidationContext } from "@/lib/facts/types";
 import { readApiResponse } from "@/lib/api-error";
+import {
+  buildEditorHref,
+  buildLibraryHref,
+  type EditorModeParam,
+  type TailorWorkspaceTab,
+} from "@/lib/tailor/application-context";
 import { SuggestionPreview } from "./suggestion-preview";
 
 /**
@@ -232,6 +238,9 @@ interface PatchDiffReviewProps {
   onApplySuccess?: (variantId: string, mergedContent: string) => void;
   onRegeneratePatches?: () => void;
   renderInlinePreview?: boolean;
+  tailorTab?: TailorWorkspaceTab;
+  masterResumeId?: string | null;
+  editorMode?: EditorModeParam | null;
 }
 
 const SEVERITY_STYLES: Record<string, { bg: string; border: string; text: string }> = {
@@ -249,7 +258,11 @@ const OPERATION_STYLES: Record<string, { bg: string; text: string }> = {
 
 function renderRecoveryActions(
   category: PatchErrorCategory,
-  options: { onRegenerate?: () => void; onRetry?: () => void }
+  options: {
+    onRegenerate?: () => void;
+    onRetry?: () => void;
+    libraryHref?: string;
+  }
 ) {
   const showReviewEvidence =
     category === "evidence_changed" || category === "evidence_unavailable";
@@ -267,7 +280,7 @@ function renderRecoveryActions(
     <div className="mt-2 flex flex-wrap items-center gap-2">
       {showReviewEvidence && (
         <Link
-          href="/library"
+          href={options.libraryHref || "/library"}
           className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-hairline bg-elevated px-2.5 py-1 text-xs font-medium text-foreground hover:bg-panel transition-colors motion-reduce:transition-none"
         >
           <BookOpen className="h-3.5 w-3.5 text-status-success" aria-hidden />
@@ -329,6 +342,9 @@ export function PatchDiffReview({
   onApplySuccess,
   onRegeneratePatches,
   renderInlinePreview = true,
+  tailorTab = "3-pane",
+  masterResumeId = null,
+  editorMode = null,
 }: PatchDiffReviewProps) {
   const [internalDecisions, setInternalDecisions] = useState<Record<string, PatchDecision>>(() => {
     const initial: Record<string, PatchDecision> = {};
@@ -537,8 +553,8 @@ export function PatchDiffReview({
       if (localOnly && !masterFactsSnapshot) {
         setApplyError({
           category: "stale_resume_or_job",
-          message: "Freeze a local master resume before applying patches.",
-          recoveryAction: "Open the Editor to freeze your Master Resume, then generate updated suggestions.",
+          message: "Save a master résumé in the Editor before applying patches.",
+          recoveryAction: "Open the Editor to save your master résumé, then generate updated suggestions.",
         });
         return;
       }
@@ -641,7 +657,7 @@ export function PatchDiffReview({
         localStorage.setItem("resumeforge_has_guest_draft", "true");
         setCreatedVariantId(localVariantId);
         setAppliedPatchIds(new Set(acceptedIds));
-        setApplySuccess("Sample variant applied to this browser only. It was compiled and checked locally.");
+        setApplySuccess("Job-specific variant applied to your working draft in this browser.");
         onApplySuccess?.(localVariantId, mergedContent);
         return;
       }
@@ -700,7 +716,7 @@ export function PatchDiffReview({
 
       setCreatedVariantId(json.data.variantId);
       setAppliedPatchIds(new Set(acceptedIds));
-      setApplySuccess(`Tailored variant "${json.data.variantTitle}" created successfully.`);
+      setApplySuccess(`Job-specific variant "${json.data.variantTitle}" created successfully.`);
       onApplySuccess?.(json.data.variantId, json.data.typstContent);
     } catch (err) {
       setApplyError({
@@ -920,7 +936,7 @@ export function PatchDiffReview({
                           {patchIndex + 1}. {patch.targetSection}
                         </button>
                         <span className="text-xs text-muted-foreground font-mono tabular-nums">
-                          {Math.round(patch.confidence * 100)}%
+                          {Math.round(patch.confidence * 100)}% evidence match
                         </span>
                         {/* Status Distinction Badges */}
                         {isApplied ? (
@@ -1011,6 +1027,14 @@ export function PatchDiffReview({
                             {renderRecoveryActions(applyError.category, {
                               onRegenerate: onRegeneratePatches,
                               onRetry: handleApplyAccepted,
+                              libraryHref: buildLibraryHref({
+                                from: "tailor",
+                                tab: tailorTab,
+                                jobId,
+                                variantId: createdVariantId,
+                                resumeId: masterResumeId,
+                                mode: editorMode,
+                              }),
                             })}
                             <details className="pt-1">
                               <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
@@ -1036,7 +1060,7 @@ export function PatchDiffReview({
                         <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
                           Before
                         </span>
-                        <div className="mt-1.5 rounded-lg border border-status-danger/30 bg-status-danger/10 p-3 text-sm sm:text-[15px] leading-relaxed font-sans text-text-secondary whitespace-pre-wrap break-words">
+                        <div className="mt-1.5 rounded-lg border border-status-danger/30 bg-status-danger/10 p-3 text-body-dense leading-relaxed font-sans text-text-secondary whitespace-pre-wrap break-words">
                           {patch.before || "(empty)"}
                         </div>
                       </div>
@@ -1044,7 +1068,7 @@ export function PatchDiffReview({
                         <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
                           After
                         </span>
-                        <div className="mt-1.5 rounded-lg border border-status-success/35 bg-status-success/10 p-3 text-sm sm:text-[15px] leading-relaxed font-sans text-status-success-soft whitespace-pre-wrap break-words">
+                        <div className="mt-1.5 rounded-lg border border-status-success/35 bg-status-success/10 p-3 text-body-dense leading-relaxed font-sans text-status-success-soft whitespace-pre-wrap break-words">
                           {patch.after || "(empty)"}
                         </div>
                       </div>
@@ -1058,9 +1082,20 @@ export function PatchDiffReview({
 
                     {/* Human-readable Evidence Citations with expandable source/status/IDs */}
                     <div className="space-y-2 border-t border-hairline/70 pt-3">
-                      <span className="text-xs text-muted-foreground font-medium block">
-                        Supporting Evidence ({citationRefs.length})
-                      </span>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs text-muted-foreground font-medium">
+                          Supporting Evidence Bank Sources ({citationRefs.length})
+                        </span>
+                        {patch.after &&
+                          !masterTypstSource.toLowerCase().includes(patch.after.trim().toLowerCase()) && (
+                            <span
+                              data-testid={`draft-omits-badge-${patch.id}`}
+                              className="text-xs font-medium text-primary"
+                            >
+                              Backed by Evidence Bank · Adds new wording to draft
+                            </span>
+                          )}
+                      </div>
                       <div className="space-y-2">
                         {citationRefs.map((ref) => {
                           const resolved =
@@ -1071,13 +1106,22 @@ export function PatchDiffReview({
                               ? `${resolved.entry.title} @ ${resolved.entry.organization}`
                               : resolved.entry.title
                             : ref.primaryId;
+                          const librarySourceHref = buildLibraryHref({
+                            from: "tailor",
+                            tab: tailorTab,
+                            jobId,
+                            variantId: createdVariantId,
+                            resumeId: masterResumeId,
+                            mode: editorMode,
+                          });
 
                           return (
                             <details
                               key={ref.key}
+                              data-testid={`citation-details-${patch.id}`}
                               className="rounded-lg border border-hairline bg-inset/70 px-3 py-2 text-xs"
                             >
-                              <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 list-none">
+                              <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 list-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
                                 <span className="flex flex-wrap items-center gap-2 min-w-0">
                                   <span className="font-medium text-foreground break-words">
                                     {displayTitle}
@@ -1095,7 +1139,7 @@ export function PatchDiffReview({
                                   )}
                                 </span>
                                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                  <span>Source &amp; IDs</span>
+                                  <span>Inspect source &amp; IDs</span>
                                   <ChevronDown className="h-3 w-3" aria-hidden />
                                 </span>
                               </summary>
@@ -1112,9 +1156,23 @@ export function PatchDiffReview({
                                     {resolved.entry.verifiedSummary}
                                   </p>
                                 )}
+                                {!resolved && (
+                                  <p className="text-muted-foreground leading-relaxed">
+                                    Cited from your Evidence Bank record ({ref.primaryId}). Open the Evidence Bank to inspect or update this item.
+                                  </p>
+                                )}
                                 <div className="font-mono text-xs text-muted-foreground break-all space-y-0.5">
                                   {ref.evidenceId && <div>evidenceId: {ref.evidenceId}</div>}
                                   {ref.bulletId && <div>bulletId: {ref.bulletId}</div>}
+                                </div>
+                                <div className="pt-1">
+                                  <Link
+                                    href={librarySourceHref}
+                                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                  >
+                                    <BookOpen className="h-3 w-3" aria-hidden />
+                                    Inspect in Evidence Bank
+                                  </Link>
                                 </div>
                               </div>
                             </details>
@@ -1169,6 +1227,24 @@ export function PatchDiffReview({
                       <Info className="h-4 w-4 shrink-0 mt-0.5 text-muted-foreground" aria-hidden />
                       <span>{gap.recommendation}</span>
                     </p>
+                    <div>
+                      <Link
+                        href={buildLibraryHref({
+                          from: "tailor",
+                          tab: tailorTab,
+                          jobId,
+                          skill: gap.requirement,
+                          variantId: createdVariantId,
+                          resumeId: masterResumeId,
+                          mode: editorMode,
+                        })}
+                        data-testid={`gap-open-library-${idx}`}
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                      >
+                        <BookOpen className="h-3.5 w-3.5" aria-hidden />
+                        Add or verify in Evidence Bank
+                      </Link>
+                    </div>
                   </div>
                 );
               })}
@@ -1218,6 +1294,14 @@ export function PatchDiffReview({
                         {pf.category &&
                           renderRecoveryActions(pf.category, {
                             onRegenerate: onRegeneratePatches,
+                            libraryHref: buildLibraryHref({
+                              from: "tailor",
+                              tab: tailorTab,
+                              jobId,
+                              variantId: createdVariantId,
+                              resumeId: masterResumeId,
+                              mode: editorMode,
+                            }),
                           })}
                         <details className="text-xs">
                           <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
@@ -1280,6 +1364,14 @@ export function PatchDiffReview({
                       </div>
                       {renderRecoveryActions("evidence_unavailable", {
                         onRegenerate: onRegeneratePatches,
+                        libraryHref: buildLibraryHref({
+                          from: "tailor",
+                          tab: tailorTab,
+                          jobId,
+                          variantId: createdVariantId,
+                          resumeId: masterResumeId,
+                          mode: editorMode,
+                        }),
                       })}
                     </div>
                   ))}
@@ -1347,6 +1439,14 @@ export function PatchDiffReview({
                 {renderRecoveryActions(applyError.category, {
                   onRegenerate: onRegeneratePatches,
                   onRetry: handleApplyAccepted,
+                  libraryHref: buildLibraryHref({
+                    from: "tailor",
+                    tab: tailorTab,
+                    jobId,
+                    variantId: createdVariantId,
+                    resumeId: masterResumeId,
+                    mode: editorMode,
+                  }),
                 })}
                 <details className="pt-1">
                   <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
@@ -1381,20 +1481,27 @@ export function PatchDiffReview({
                   <span className="font-semibold block text-foreground text-sm">{applySuccess}</span>
                   <span className="text-xs text-text-secondary">
                     {localOnly
-                      ? "Your tailored draft is saved in this browser. Open the editor to continue editing."
-                      : "Your tailored variant is saved to the database. Edit and compile it live in the editor."}
+                      ? "Saved to your working draft in this browser. Open in Editor to refine or export."
+                      : "Saved as a job-specific variant (master résumé unchanged). Open in Editor to refine or export."}
                   </span>
                 </div>
               </div>
 
               {createdVariantId && (
                 <Link
-                  href={localOnly ? "/editor" : `/editor?variantId=${createdVariantId}`}
+                  href={buildEditorHref({
+                    variantId: localOnly ? null : createdVariantId,
+                    resumeId: localOnly ? null : masterResumeId,
+                    mode: editorMode,
+                    from: "tailor",
+                    tab: tailorTab,
+                    jobId,
+                  })}
                   data-testid="open-variant-in-editor-btn"
                   className="min-h-10 px-4 py-2 bg-status-success hover:bg-status-success/90 text-contrast-ink font-semibold rounded-lg flex items-center gap-1.5 shadow-md transition-colors motion-reduce:transition-none shrink-0 self-start sm:self-center"
                 >
                   <Edit3 className="h-4 w-4" aria-hidden />
-                  Open in editor
+                  Open in Editor
                 </Link>
               )}
             </div>
@@ -1430,8 +1537,8 @@ export function PatchDiffReview({
                 <>
                   <CheckCircle2 className="h-4 w-4" aria-hidden />
                   {localOnly
-                    ? `Apply ${acceptedPatches.length} Accepted Patch${acceptedPatches.length !== 1 ? "es" : ""} to This Browser`
-                    : `Apply ${acceptedPatches.length} Accepted Patch${acceptedPatches.length !== 1 ? "es" : ""} & Create Variant`}
+                    ? `Apply ${acceptedPatches.length} Accepted Patch${acceptedPatches.length !== 1 ? "es" : ""} to Working Draft`
+                    : `Apply ${acceptedPatches.length} Accepted Patch${acceptedPatches.length !== 1 ? "es" : ""} & Save Variant`}
                 </>
               )}
             </button>

@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { assertLayoutExportReady, isResumeLayoutV2Enabled, parseManagedResume } from "@/lib/typst/resume-document";
 import { sanitizeTypstSvg } from "@/lib/typst/svg-sanitize";
 import { Download, RefreshCw, AlertCircle, CheckCircle2, Loader2, BarChart3, Sparkles, FileText, ChevronDown, Package, MoreHorizontal } from "lucide-react";
 import dynamic from "next/dynamic";
 import { cleanTypstToText, sanitizeZipFilename } from "@/lib/export/zip";
-import { downloadBlob } from "@/lib/utils";
+import { cn, downloadBlob } from "@/lib/utils";
 import { assertCanExport } from "@/lib/guardrail/policy";
 import { ResumeFacts } from "@/lib/facts/types";
 import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
@@ -375,8 +375,57 @@ export function PreviewPanel({
 
   // Task 9.5: ATS Grade in Editor preview state
   const [showGrade, setShowGrade] = useState(false);
-  const [showDockedGrade, setShowDockedGrade] = useState(true);
+  const [showDockedGrade, setShowDockedGrade] = useState(false);
   const [previewView, setPreviewView] = useState<"fit" | "actual">("fit");
+  const [statusNeedsOwnRow, setStatusNeedsOwnRow] = useState(false);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const leftToolbarGroupRef = useRef<HTMLDivElement>(null);
+  const statusBarRef = useRef<HTMLDivElement>(null);
+  const rightControlsRef = useRef<HTMLDivElement>(null);
+
+  const measureToolbarFit = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const width = window.innerWidth;
+    if (!v2 || width < 640 || width >= 1024) {
+      setStatusNeedsOwnRow(false);
+      return;
+    }
+    const toolbar = toolbarRef.current;
+    const leftGroup = leftToolbarGroupRef.current;
+    const statusEl = statusBarRef.current;
+    const rightGroup = rightControlsRef.current;
+    if (!toolbar || !leftGroup || !statusEl || !rightGroup) {
+      setStatusNeedsOwnRow(false);
+      return;
+    }
+    const children = Array.from(statusEl.children) as HTMLElement[];
+    const statusIntrinsicWidth =
+      children.reduce((total, child) => total + child.offsetWidth, 0) +
+      Math.max(0, children.length - 1) * 8;
+    const available = toolbar.clientWidth - 20;
+    const required = leftGroup.offsetWidth + statusIntrinsicWidth + rightGroup.offsetWidth + 24;
+    setStatusNeedsOwnRow(required > available);
+  }, [v2]);
+
+  useEffect(() => {
+    measureToolbarFit();
+    const toolbar = toolbarRef.current;
+    if (!toolbar || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => measureToolbarFit());
+    observer.observe(toolbar);
+    return () => observer.disconnect();
+  }, [
+    measureToolbarFit,
+    measurement,
+    measurementError,
+    source,
+    isFitting,
+    twoPageApproval,
+    reviewApproval,
+    isCompiling,
+    showGrade,
+    previewView,
+  ]);
 
   const handleToggleGrade = () => {
     setShowGrade((prev) => !prev);
@@ -397,13 +446,14 @@ export function PreviewPanel({
   );
 
   // Synchronous client-side Ember Ink ATS Grade computation for the docked Editor grade rail
-  const liveAtsGrade = useMemo<AtsEvaluationResult>(() => {
+  const liveAtsGrade = useMemo<AtsEvaluationResult | null>(() => {
+    if (!showDockedGrade || showGrade || v2 || !hasHydratedSource) return null;
     return evaluateAtsScore(
-      source || "",
+      source,
       extractedRequirements || EMPTY_EXTRACTED_REQUIREMENTS,
       "Backend"
     );
-  }, [source, extractedRequirements]);
+  }, [extractedRequirements, hasHydratedSource, showDockedGrade, showGrade, source, v2]);
 
   const handleExportPdf = async () => {
     try {
@@ -535,9 +585,16 @@ export function PreviewPanel({
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-inset">
-      {/* 32px Pane Toolbar */}
-      <div className="flex h-8 shrink-0 items-center justify-between gap-x-2 border-b border-outline/70 bg-panel px-2.5 text-xs text-text-secondary overflow-hidden">
-        <div className="flex min-w-0 items-center gap-x-2 overflow-hidden">
+      {/* 32px Pane Toolbar on lg+, compact multi-row status bar on narrow screens */}
+      <div
+        ref={toolbarRef}
+        data-testid="preview-pane-toolbar"
+        className="flex min-h-8 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-outline/70 bg-panel px-2.5 py-1 text-xs text-text-secondary lg:h-8 lg:flex-nowrap lg:py-0 lg:overflow-hidden"
+      >
+        <div
+          ref={leftToolbarGroupRef}
+          className="order-1 flex min-w-0 shrink-0 items-center gap-x-2 overflow-hidden"
+        >
           <span className="h-2 w-2 shrink-0 rounded-full bg-status-success" />
           <button
             type="button"
@@ -562,76 +619,89 @@ export function PreviewPanel({
               }}
               aria-pressed={showDockedGrade && !showGrade}
               data-testid="preview-split-grade-toggle"
-              className="hidden xl:inline-flex items-center gap-1.5 font-mono text-xs tabular-nums text-text-secondary hover:text-foreground transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+              className="hidden xl:inline-flex shrink-0 items-center gap-1.5 text-xs text-text-secondary hover:text-foreground transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
               title="Toggle docked ATS Grade column alongside paper preview"
             >
               <span className={showDockedGrade && !showGrade ? "text-signal font-semibold" : "text-text-secondary"}>
-                Preview · Grade ▸
+                Grade summary
               </span>
             </button>
           )}
           {isCompiling && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />}
-          {v2 && (
-            <div
-              className="inline-flex min-w-0 items-center gap-x-2 text-xs font-mono tabular-nums text-text-secondary overflow-hidden"
-              role="status"
-              data-testid="layout-page-status"
-            >
-              <span className="whitespace-nowrap">
-                {measurementError
-                  ? `Measurement failed: ${measurementError}`
-                  : !measurement || measurement.source !== source
-                  ? "Measuring…"
-                  : `${measurement.pages} ${measurement.pages === 1 ? "page" : "pages"} measured`}
-              </span>
-              {onApplyLayout && (
-                <button
-                  type="button"
-                  className="shrink-0 underline font-semibold text-primary hover:text-primary/80 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-                  disabled={isFitting}
-                  onClick={() => void fitToOnePage()}
-                >
-                  {isFitting ? "Fitting…" : "Fit to one page"}
-                </button>
-              )}
-              {source.includes("// @layout-v2-link-placement-required") && (
-                <span className="shrink-0 text-status-warning">· Place links in Visual Form</span>
-              )}
-              {source.includes("// @layout-v2-review-required") && (
-                <span className="shrink-0">
-                  · <button type="button" className="underline font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm" onClick={() => void approve("review")}>I reviewed this content</button>
-                  {reviewApproval === source && " ✓"}
-                </span>
-              )}
-              {measurement?.source === source && measurement.pages === 2 && (
-                <span className="shrink-0">
-                  <button type="button" className="underline font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm" onClick={() => void approve("two-pages")}>Use two pages</button>
-                  {twoPageApproval === source && " ✓"}
-                </span>
-              )}
-              {measurement?.source === source && measurement.pages > 2 && (
-                <span className="shrink-0 text-text-muted">· Trim to ≤2 pages</span>
-              )}
-            </div>
-          )}
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        {v2 && (
+          <div
+            ref={statusBarRef}
+            className={cn(
+              "order-3 flex basis-full flex-wrap items-center gap-x-2 gap-y-1 border-t border-outline/50 pt-1 pb-0.5 text-xs font-mono tabular-nums text-text-secondary lg:order-2 lg:basis-auto lg:w-auto lg:min-w-0 lg:flex-1 lg:flex-nowrap lg:overflow-hidden lg:border-t-0 lg:py-0",
+              !statusNeedsOwnRow && "sm:order-2 sm:basis-auto sm:w-auto sm:min-w-0 sm:flex-1 sm:flex-nowrap sm:overflow-hidden sm:border-t-0 sm:py-0"
+            )}
+            role="status"
+            data-testid="layout-page-status"
+          >
+            <span className="whitespace-nowrap">
+              {measurementError
+                ? `Measurement failed: ${measurementError}`
+                : !measurement || measurement.source !== source
+                ? "Measuring…"
+                : `${measurement.pages} ${measurement.pages === 1 ? "page" : "pages"} measured`}
+            </span>
+            {onApplyLayout && (
+              <button
+                type="button"
+                className="shrink-0 whitespace-nowrap underline font-semibold text-primary hover:text-primary/80 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm py-0.5 lg:py-0"
+                disabled={isFitting}
+                title="Adjust layout spacing so the resume fits on one page"
+                onClick={() => void fitToOnePage()}
+              >
+                {isFitting ? "Fitting…" : "Fit to one page"}
+              </button>
+            )}
+            {source.includes("// @layout-v2-link-placement-required") && (
+              <span className="shrink-0 whitespace-nowrap text-status-warning">· Place links in Visual Form</span>
+            )}
+            {source.includes("// @layout-v2-review-required") && (
+              <span className="shrink-0 whitespace-nowrap">
+                · <button type="button" className="underline font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm py-0.5 lg:py-0" onClick={() => void approve("review")}>I reviewed this content</button>
+                {reviewApproval === source && " ✓"}
+              </span>
+            )}
+            {measurement?.source === source && measurement.pages === 2 && (
+              <span className="shrink-0 whitespace-nowrap">
+                <button type="button" className="underline font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm py-0.5 lg:py-0" onClick={() => void approve("two-pages")}>Use two pages</button>
+                {twoPageApproval === source && " ✓"}
+              </span>
+            )}
+            {measurement?.source === source && measurement.pages > 2 && (
+              <span className="shrink-0 whitespace-nowrap text-text-muted">· Trim to ≤2 pages</span>
+            )}
+          </div>
+        )}
+
+        <div
+          ref={rightControlsRef}
+          className={cn(
+            "order-2 flex items-center gap-1.5 shrink-0 lg:order-3",
+            v2 && !statusNeedsOwnRow && "sm:order-3"
+          )}
+        >
           <button
             type="button"
             onClick={() => setPreviewView((v) => (v === "fit" ? "actual" : "fit"))}
             data-testid="preview-view-toggle-btn"
-            className="inline-flex h-6 items-center rounded border border-outline/70 bg-elevated px-2 text-xs font-mono tabular-nums text-text-secondary hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            title="Toggle page preview sizing (Fit pane width or 100% scale)"
+            aria-label={previewView === "fit" ? "Fit width preview zoom" : "100% preview zoom"}
+            className="inline-flex h-7 lg:h-6 items-center rounded border border-outline/70 bg-elevated px-1.5 sm:px-2 text-xs font-mono tabular-nums text-text-secondary hover:bg-muted hover:text-foreground transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            title="Toggle preview zoom (Fit pane width or 100% actual size)"
           >
-            {previewView === "fit" ? "Fit" : "100%"}
+            {previewView === "fit" ? "Fit width" : "100%"}
           </button>
 
           <button
             type="button"
             onClick={handleToggleGrade}
             data-testid="grade-resume-btn"
-            className={`inline-flex h-6 items-center gap-1 rounded border px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`inline-flex h-7 lg:h-6 items-center gap-1 rounded border px-2 text-xs font-semibold transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               showGrade
                 ? "border-primary/60 bg-primary/15 text-primary"
                 : "border-outline/70 bg-elevated text-foreground hover:bg-muted"
@@ -648,7 +718,7 @@ export function PreviewPanel({
                 type="button"
                 disabled={isExporting}
                 data-testid="export-dropdown-btn"
-                className="inline-flex h-6 items-center gap-1 rounded bg-primary px-2.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="inline-flex h-7 lg:h-6 items-center gap-1 rounded bg-primary px-2.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {isExporting ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -718,7 +788,7 @@ export function PreviewPanel({
                 aria-label="More preview actions"
                 title="More preview actions"
                 data-testid="preview-more-actions-btn"
-                className="inline-flex h-6 w-6 items-center justify-center rounded border border-outline/70 bg-elevated text-text-secondary hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="inline-flex h-7 w-7 lg:h-6 lg:w-6 items-center justify-center rounded border border-outline/70 bg-elevated text-text-secondary hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <MoreHorizontal className="h-3.5 w-3.5" />
               </button>
@@ -740,7 +810,7 @@ export function PreviewPanel({
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <div
           ref={scrollContainerRef}
-          className="relative flex-1 min-w-0 min-h-0 overflow-auto bg-deep px-4 pb-6 pt-2 flex flex-col items-center"
+          className="relative flex-1 min-w-0 min-h-0 overflow-auto bg-deep px-4 pb-8 pt-3 sm:px-6 sm:pt-4 lg:pt-2 flex flex-col items-center"
           style={{
             backgroundImage:
               "radial-gradient(520px 280px at 50% 0%, rgb(var(--accent-action) / 0.06), transparent 70%)",
@@ -941,7 +1011,7 @@ export function PreviewPanel({
         </div>
 
         {/* Docked Right-Hand ATS Grade Column matching palette-lab.html#ember Section 03 */}
-        {!showGrade && showDockedGrade && (
+        {!v2 && !showGrade && showDockedGrade && (
           <aside
             data-testid="editor-ats-grade-aside"
             aria-label="ATS Grade summary"
@@ -959,7 +1029,7 @@ export function PreviewPanel({
               </button>
             </div>
 
-            {hasHydratedSource ? (
+            {liveAtsGrade ? (
               <>
                 <div className="flex items-center gap-3.5">
                   <div
@@ -969,7 +1039,7 @@ export function PreviewPanel({
                       filter: "drop-shadow(0 0 14px rgb(var(--accent-contrast) / 0.35))",
                     }}
                   >
-                    <div className="grid h-[58px] w-[58px] place-items-center rounded-full bg-panel font-sans text-[22px] font-bold tracking-[-0.03em] tabular-nums text-foreground">
+                    <div className="grid h-[58px] w-[58px] place-items-center rounded-full bg-panel font-sans text-heading-lg tracking-[-0.03em] tabular-nums text-foreground">
                       {liveAtsGrade.overallScore}
                     </div>
                   </div>
