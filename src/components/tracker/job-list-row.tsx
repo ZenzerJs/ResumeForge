@@ -49,6 +49,7 @@ interface JobListRowProps {
   isSelected: boolean;
   isUpdatingStatus: boolean;
   isFetchingFullText: boolean;
+  disambiguator?: string | null;
   onSelect: (jobId: string) => void;
   onStatusChange: (jobId: string, status: JobStatus) => void;
   onFetchFullText: (jobId: string) => void;
@@ -62,6 +63,7 @@ export function JobListRow({
   isSelected,
   isUpdatingStatus,
   isFetchingFullText,
+  disambiguator,
   onSelect,
   onStatusChange,
   onFetchFullText,
@@ -126,12 +128,20 @@ export function JobListRow({
             className="min-w-0 flex-1 rounded-[6px] text-left after:absolute after:inset-0 after:z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <span className="relative z-[1] block min-w-0">
-              <h3 className="text-[13.5px] font-semibold leading-snug text-foreground">
+              <h3 className="text-body-dense font-semibold leading-snug text-foreground">
                 {job.roleTitle || "Untitled Role"}
               </h3>
               <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                 <span>{job.company || "Unknown Company"}</span>
                 {location ? <span>· {location}</span> : null}
+                {disambiguator ? (
+                  <span
+                    data-testid={`job-disambiguator-${job.id}`}
+                    className="rounded border border-hairline bg-inset px-1.5 py-0.5 font-mono text-xs text-text-secondary"
+                  >
+                    {disambiguator}
+                  </span>
+                ) : null}
                 {datePosted ? (
                   <span className="inline-flex items-center gap-1">
                     · <Clock className="h-3 w-3 shrink-0" aria-hidden /> {datePosted}
