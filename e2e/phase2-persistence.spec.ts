@@ -7,6 +7,7 @@ test.describe("Phase 2 Persistence & Evidence Bank E2E Tests", () => {
 
     // Click "Save as Master Resume" and confirm modal
     await page.click("button:has-text('Save as Master Resume')");
+    await page.click("[data-testid='confirm-master-checkbox']");
     await page.click("[data-testid='confirm-save-master-btn']");
 
     // Wait for "Saved as Master!" button state
@@ -167,6 +168,7 @@ test.describe("Phase 2 Persistence & Evidence Bank E2E Tests", () => {
     await expect(checkbox).toBeVisible();
 
     // Confirm save
+    await page.click("[data-testid='confirm-master-checkbox']");
     await page.click("[data-testid='confirm-save-master-btn']");
     await page.waitForSelector("text=Saved as Master!", { timeout: 5000 });
   });

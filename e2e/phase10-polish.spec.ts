@@ -5,7 +5,7 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
     await page.goto("/non-existent-route-xyz");
     await page.waitForLoadState("networkidle");
 
-    const header = page.locator("h1", { hasText: "Document Not Found" });
+    const header = page.locator("h1", { hasText: "Page not found" });
     await expect(header).toBeVisible();
 
     const returnBtn = page.locator('a:has-text("Return to Dashboard")');

@@ -101,7 +101,7 @@ test.describe("WS0 — UX Bug Fixes & Staged AI Feedback", () => {
     expect(gradeBg).toBe("rgb(27, 23, 22)");
 
     await page.goto("/nonexistent-route-check");
-    const notFoundHeading = page.getByRole("heading", { name: "Document Not Found" });
+    const notFoundHeading = page.getByRole("heading", { name: "Page not found" });
     await expect(notFoundHeading).toBeVisible();
     const notFoundBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
     expect(notFoundBg).toBe("rgb(18, 16, 16)");

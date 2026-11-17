@@ -6,7 +6,7 @@ test.describe("Phase 4 BYOK AI Gateway Settings UI", () => {
   });
 
   test("renders settings page with generic custom provider label", async ({ page }) => {
-    await expect(page.locator("h1")).toContainText("Bring-Your-Own-Key (BYOK) AI Configuration");
+    await expect(page.locator("h1")).toContainText("Connect an AI provider key (stored in this browser)");
 
     const providerSelect = page.locator("#provider-select");
     await expect(providerSelect).toBeVisible();

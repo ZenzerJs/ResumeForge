@@ -32,6 +32,7 @@ test.describe("Cross-Page Multi-Workspace E2E Journey Tests (Task B2)", () => {
       (resp) => (resp.url().includes("/api/resumes/save-master") || resp.url().includes("/api/resumes")) && resp.request().method() === "POST" && resp.ok()
     );
     await page.click("button:has-text('Save as Master Resume')");
+    await page.click("[data-testid='confirm-master-checkbox']");
     await page.click("[data-testid='confirm-save-master-btn']");
     await savePromise;
     await page.waitForSelector("text=Saved as Master!", { timeout: 15000 });
