@@ -104,13 +104,13 @@ export function AppShell({
 
   const [showMigrationModal, setShowMigrationModal] = useState(false);
   const [guestDraft, setGuestDraft] = useState<string | null>(null);
-  const [isDesktopXl, setIsDesktopXl] = useState(true);
+  const [isDesktopLg, setIsDesktopLg] = useState(true);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-    const mediaQuery = window.matchMedia("(min-width: 1280px)");
-    setIsDesktopXl(mediaQuery.matches);
-    const listener = (event: MediaQueryListEvent) => setIsDesktopXl(event.matches);
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+    setIsDesktopLg(mediaQuery.matches);
+    const listener = (event: MediaQueryListEvent) => setIsDesktopLg(event.matches);
     mediaQuery.addEventListener("change", listener);
     return () => mediaQuery.removeEventListener("change", listener);
   }, []);
@@ -207,7 +207,7 @@ export function AppShell({
     };
   }, []);
 
-  const showCompactActionsRow = !hideNav && !useToolbar && Boolean(actions) && !isDesktopXl;
+  const showCompactActionsRow = !hideNav && !useToolbar && Boolean(actions) && !isDesktopLg;
 
   return (
     <div
@@ -225,7 +225,7 @@ export function AppShell({
         <TopNav
           compact={variant === "editor"}
           badge={useToolbar ? undefined : badge}
-          actions={!useToolbar && isDesktopXl ? actions : undefined}
+          actions={!useToolbar && isDesktopLg ? actions : undefined}
         />
       ) : null}
       <main
@@ -242,7 +242,7 @@ export function AppShell({
       >
         {showCompactActionsRow ? (
           <div
-            className="xl:hidden relative z-30 flex min-w-0 max-w-full shrink-0 flex-wrap items-center justify-start gap-2 border-b border-outline/70 glass-bar px-4 py-2 sm:justify-end"
+            className="lg:hidden relative z-30 flex min-w-0 max-w-full shrink-0 flex-wrap items-center justify-start gap-2 border-b border-outline/70 glass-bar px-4 py-2 sm:justify-end"
             data-testid="compact-page-actions"
           >
             {actions}

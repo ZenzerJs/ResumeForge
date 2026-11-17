@@ -72,7 +72,7 @@ function SignOutButton({ className }: { className?: string }) {
 
 function GuestAuthLinks({ className, signupEnabled }: { className?: string; signupEnabled: boolean }) {
   return (
-    <div className={cn("hidden xl:flex items-center gap-2", className)}>
+    <div className={cn("hidden lg:flex items-center gap-2", className)}>
       <Link
         href="/login"
         className="inline-flex min-h-9 items-center rounded-[7px] border border-outline/80 bg-transparent px-3.5 text-xs font-medium text-foreground/90 transition-colors hover:border-outline hover:bg-elevated/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -174,7 +174,7 @@ function NavUtilities({
   aiStatus: { provider: string; hasKey: boolean; keyless: boolean } | null;
 }) {
   return (
-    <div className="hidden xl:flex items-center gap-1.5">
+    <div className="hidden lg:flex items-center gap-1.5">
       {aiStatus && <AiStatusPill aiStatus={aiStatus} testId="nav-ai-status-pill" />}
     </div>
   );
@@ -215,7 +215,7 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-    const mediaQuery = window.matchMedia("(min-width: 1280px)");
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
     const closeIfDesktop = (matches: boolean) => {
       if (matches) {
         setMobileOpen(false);
@@ -234,8 +234,8 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
       className={cn(
         "bg-rf-bg/90 backdrop-blur-xl border-b border-border fixed top-0 w-full z-50 flex items-center justify-between gap-2 sm:gap-3 pt-[env(safe-area-inset-top)] max-w-full overflow-visible",
         compact
-          ? "h-[calc(3rem+env(safe-area-inset-top))] px-4 xl:px-6"
-          : "h-[calc(4rem+env(safe-area-inset-top))] px-4 xl:px-8"
+          ? "h-[calc(3rem+env(safe-area-inset-top))] px-4 lg:px-6"
+          : "h-[calc(4rem+env(safe-area-inset-top))] px-4 lg:px-8"
       )}
     >
       <div className={cn("flex items-center min-w-0", compact ? "gap-3 sm:gap-6" : "gap-4 sm:gap-8")}>
@@ -267,7 +267,7 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
       </div>
 
       <nav
-        className="hidden xl:flex flex-1 items-center justify-center gap-1 xl:gap-2 text-sm"
+        className="hidden lg:flex flex-1 items-center justify-center gap-1 xl:gap-2 text-sm"
         aria-label="Primary navigation"
       >
         {NAV_LINKS.map(({ href, label }) => {
@@ -295,7 +295,7 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
         <button
           ref={mobileMenuTriggerRef}
           type="button"
-          className="xl:hidden inline-flex min-h-11 min-w-11 items-center justify-center rounded-[6px] text-on-surface-variant hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="lg:hidden inline-flex min-h-11 min-w-11 items-center justify-center rounded-[6px] text-on-surface-variant hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           aria-expanded={mobileOpen}
           aria-controls={mobileOpen ? menuId : undefined}
           aria-label={mobileOpen ? "Close menu" : "Open menu"}
@@ -303,21 +303,21 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
         >
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
-        {actions ? <div className="hidden xl:flex items-center gap-2">{actions}</div> : null}
+        {actions ? <div className="hidden lg:flex items-center gap-2">{actions}</div> : null}
         <NavUtilities aiStatus={aiStatus} />
         {user ? (
           <>
             <Link
               href="/settings"
               title={user.username}
-              className="hidden xl:inline-flex max-w-[10rem] items-center gap-2 rounded-[6px] px-2 py-1 text-xs text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="hidden lg:inline-flex max-w-[10rem] items-center gap-2 rounded-[6px] px-2 py-1 text-xs text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-outline bg-elevated font-bold text-primary">
                 {usernameInitial(user.username)}
               </span>
               <span className="truncate">@{user.username}</span>
             </Link>
-            <SignOutButton className="hidden xl:inline-flex" />
+            <SignOutButton className="hidden lg:inline-flex" />
           </>
         ) : isGuest ? (
           <GuestAuthLinks signupEnabled={signupEnabled} />
@@ -328,14 +328,14 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
         <SheetContent
           id={menuId}
           side="left"
-          className="w-72 border-r border-hairline bg-panel px-6 pb-6 pt-[calc(1.5rem+env(safe-area-inset-top))] text-foreground xl:hidden overscroll-contain overflow-y-auto"
+          className="w-72 border-r border-hairline bg-panel px-6 pb-6 pt-[calc(1.5rem+env(safe-area-inset-top))] text-foreground lg:hidden overscroll-contain overflow-y-auto"
           onEscapeKeyDown={() => setMobileOpen(false)}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             if (
               typeof window !== "undefined" &&
               typeof window.matchMedia === "function" &&
-              window.matchMedia("(min-width: 1280px)").matches
+              window.matchMedia("(min-width: 1024px)").matches
             ) {
               return;
             }

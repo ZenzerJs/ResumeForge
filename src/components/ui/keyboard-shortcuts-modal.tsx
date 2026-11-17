@@ -60,7 +60,7 @@ export function KeyboardShortcutsModal() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
 
-  const categories = ["Global", "Editor", "Navigation"] as const;
+  const categories = ["Global", "Editor"] as const;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

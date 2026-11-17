@@ -40,6 +40,12 @@ import {
 } from "@/lib/guardrail/policy";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { AppShell } from "@/components/design-system/app-shell";
 import { clearDemoSamplesForPersonalResume, getDemoContextFromBrowser, initializeDemoSamples } from "@/lib/demo-client";
 import { fetchDemoConfig } from "@/components/auth/session-user";
@@ -190,26 +196,39 @@ export function EditorWorkspace() {
   const [layout, setLayout] = useState<Record<string, number>>(DEFAULT_EDITOR_LAYOUT.sizes);
   const [isAiCollapsed, setIsAiCollapsed] = useState<boolean>(DEFAULT_EDITOR_LAYOUT.isAiCollapsed);
   const [isAiPoppedOut, setIsAiPoppedOut] = useState<boolean>(false);
+  const [isAiSheetOpen, setIsAiSheetOpen] = useState<boolean>(false);
   const [aiMode, setAiMode] = useState<"chat" | "tailor">("chat");
   const [isLayoutReady, setIsLayoutReady] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
+  const [isXlDesktop, setIsXlDesktop] = useState(true);
   const [hosts, setHosts] = useState<EditorPaneHosts | null>(null);
   const isDesktopRef = useRef<boolean>(true);
+  const isXlDesktopRef = useRef<boolean>(true);
   const isAiCollapsedRef = useRef<boolean>(isAiCollapsed);
   const isAiPoppedOutRef = useRef<boolean>(isAiPoppedOut);
   const skipResizePersistRef = useRef(false);
   const suppressResizePersistUntilRef = useRef(0);
 
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1280px)");
+    const mqLg = window.matchMedia("(min-width: 1024px)");
+    const mqXl = window.matchMedia("(min-width: 1280px)");
     const sync = () => {
       suppressResizePersistUntilRef.current = Date.now() + 750;
-      isDesktopRef.current = mq.matches;
-      setIsDesktop(mq.matches);
+      isDesktopRef.current = mqLg.matches;
+      isXlDesktopRef.current = mqXl.matches;
+      setIsDesktop(mqLg.matches);
+      setIsXlDesktop(mqXl.matches);
+      if (mqXl.matches || !mqLg.matches) {
+        setIsAiSheetOpen(false);
+      }
     };
     sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
+    mqLg.addEventListener("change", sync);
+    mqXl.addEventListener("change", sync);
+    return () => {
+      mqLg.removeEventListener("change", sync);
+      mqXl.removeEventListener("change", sync);
+    };
   }, []);
 
   useEffect(() => {
@@ -257,7 +276,7 @@ export function EditorWorkspace() {
 
   // Collapse panel on mount (or when returning to >=1280px) if layout was persisted as collapsed or popped out
   useEffect(() => {
-    if (!isLayoutReady || !isDesktop) return;
+    if (!isLayoutReady || !isXlDesktop) return;
     if (isAiCollapsed || isAiPoppedOut) {
       suppressResizePersistUntilRef.current = Date.now() + 750;
       const timer = setTimeout(() => {
@@ -265,7 +284,7 @@ export function EditorWorkspace() {
       }, 50);
       return () => clearTimeout(timer);
     }
-  }, [aiPanelRef, isAiCollapsed, isAiPoppedOut, isDesktop, isLayoutReady]);
+  }, [aiPanelRef, isAiCollapsed, isAiPoppedOut, isXlDesktop, isLayoutReady]);
 
   const persistLayoutState = (sizes: Record<string, number>, collapsed: boolean) => {
     if (typeof window === "undefined") return;
@@ -280,7 +299,7 @@ export function EditorWorkspace() {
   };
 
   const handleLayoutChange = useCallback((layoutData: Record<string, number> | number[]) => {
-    if (!isDesktopRef.current) return;
+    if (!isXlDesktopRef.current) return;
     let layoutMap: Record<string, number>;
     if (Array.isArray(layoutData)) {
       layoutMap = {
@@ -309,7 +328,7 @@ export function EditorWorkspace() {
           // ignore
         }
       }
-      if (isDesktopRef.current) {
+      if (isXlDesktopRef.current) {
         if (next) {
           aiPanelRef.current?.collapse();
           updateAiCollapsedState(true);
@@ -647,9 +666,11 @@ export function EditorWorkspace() {
   const handleTriggerRepair = useCallback(
     (context: { compileError: string; line?: number; column?: number; sourceExcerpt?: string }) => {
       setRepairContext(context);
-      if (isDesktopRef.current && isAiCollapsedRef.current && !isAiPoppedOutRef.current && aiPanelRef.current) {
+      if (isXlDesktopRef.current && isAiCollapsedRef.current && !isAiPoppedOutRef.current && aiPanelRef.current) {
         aiPanelRef.current.expand();
         updateAiCollapsedState(false);
+      } else if (isDesktopRef.current && !isXlDesktopRef.current) {
+        setIsAiSheetOpen(true);
       }
       setActiveTab("ai");
     },
@@ -978,7 +999,9 @@ export function EditorWorkspace() {
               size="sm"
               variant="outline"
               onClick={() => {
-                if (isAiPoppedOut) {
+                if (!isXlDesktop) {
+                  setIsAiSheetOpen((prev) => !prev);
+                } else if (isAiPoppedOut) {
                   handleToggleAiPopOut();
                 } else if (isAiCollapsed) {
                   toggleAiSidebarCollapse();
@@ -986,24 +1009,36 @@ export function EditorWorkspace() {
                   handleToggleAiPopOut();
                 }
               }}
-              data-testid={isAiCollapsed ? "expand-ai-sidebar-btn" : "toggle-ai-assistant-btn"}
+              data-testid={
+                !isXlDesktop
+                  ? isAiSheetOpen
+                    ? "toggle-ai-assistant-btn"
+                    : "expand-ai-sidebar-btn"
+                  : isAiCollapsed
+                    ? "expand-ai-sidebar-btn"
+                    : "toggle-ai-assistant-btn"
+              }
               className={cn(
-                "h-7 shrink-0 gap-1.5 px-2.5 text-xs hidden xl:inline-flex transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                isAiPoppedOut || !isAiCollapsed
+                "h-7 shrink-0 gap-1.5 px-2.5 text-xs hidden lg:inline-flex transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                (isXlDesktop ? isAiPoppedOut || !isAiCollapsed : isAiSheetOpen)
                   ? "border-primary/60 bg-primary/15 text-primary hover:bg-primary/20"
                   : "border-outline/70 bg-elevated text-text-secondary hover:bg-muted hover:text-foreground"
               )}
               title={
-                isAiPoppedOut
-                  ? "AI Assistant is popped out in floating window (Click to dock)"
-                  : isAiCollapsed
-                  ? "Expand AI Assistant"
-                  : "Pop out AI Assistant into floating window"
+                !isXlDesktop
+                  ? isAiSheetOpen
+                    ? "Close AI Assistant"
+                    : "Open AI Assistant"
+                  : isAiPoppedOut
+                    ? "AI Assistant is popped out in floating window (Click to dock)"
+                    : isAiCollapsed
+                      ? "Expand AI Assistant"
+                      : "Pop out AI Assistant into floating window"
               }
             >
               <Bot className="h-3.5 w-3.5 text-primary" />
               <span>AI Assistant</span>
-              {isAiPoppedOut && (
+              {isXlDesktop && isAiPoppedOut && (
                 <span className="text-[9px] bg-primary/20 px-1 py-0.5 rounded font-mono text-primary">
                   POP-OUT
                 </span>
@@ -1161,20 +1196,21 @@ export function EditorWorkspace() {
 
       {/* Main Workspace Body */}
       <div className="flex flex-1 min-h-0 overflow-hidden bg-canvas px-1.5 pb-1.5 pt-0">
-        {/* Desktop 3-Panel Resizable Layout (>= xl screens) vs Mobile/Tablet Tabbed View (< xl screens) */}
+        {/* Desktop Resizable Layout (2-pane at >= lg, 3-pane at >= xl) vs Mobile/Tablet Tabbed View (< lg) */}
         {isDesktop ? (
           isLayoutReady && hosts ? (
             <ResizablePanelGroup
+              key={isXlDesktop ? "3-pane" : "2-pane"}
               id="editor-resizable-panel-group"
               orientation="horizontal"
               onLayoutChange={handleLayoutChange}
-              className="hidden xl:flex h-full w-full"
+              className="hidden lg:flex h-full w-full"
               data-testid="editor-resizable-panel-group"
             >
               {/* Panel 1: CodeMirror Editor */}
               <ResizablePanel
                 id="panel-code"
-                defaultSize={layout["panel-code"] ?? 45}
+                defaultSize={isXlDesktop ? (layout["panel-code"] ?? 45) : 50}
                 minSize={20}
                 className="h-full overflow-hidden"
                 data-testid="panel-code"
@@ -1187,7 +1223,7 @@ export function EditorWorkspace() {
               {/* Panel 2: Live Preview */}
               <ResizablePanel
                 id="panel-preview"
-                defaultSize={layout["panel-preview"] ?? 35}
+                defaultSize={isXlDesktop ? (layout["panel-preview"] ?? 35) : 50}
                 minSize={25}
                 className="h-full overflow-hidden"
                 data-testid="panel-preview"
@@ -1195,54 +1231,58 @@ export function EditorWorkspace() {
                 <PortalSlot host={hosts.preview} className="h-full min-h-0" />
               </ResizablePanel>
 
-              <ResizableHandle withHandle />
+              {isXlDesktop && (
+                <>
+                  <ResizableHandle withHandle />
 
-              {/* Panel 3: AI Sidebar (Collapsible) */}
-              <ResizablePanel
-                id="panel-ai"
-                panelRef={aiPanelRef}
-                defaultSize={isAiCollapsed || isAiPoppedOut ? 0 : (layout["panel-ai"] ?? 20)}
-                minSize={15}
-                collapsible={true}
-                collapsedSize={0}
-                onResize={(size) => {
-                  if (!isDesktopRef.current) return;
-                  if (skipResizePersistRef.current) return;
-                  if (Date.now() < suppressResizePersistUntilRef.current) return;
-                  const sizeNum =
-                    typeof size === "number"
-                      ? size
-                      : typeof size === "object" &&
-                          size !== null &&
-                          "asPercentage" in size &&
-                          typeof size.asPercentage === "number"
-                        ? size.asPercentage
-                        : 20;
-                  const isCurrentlyCollapsed = sizeNum <= 2;
-                  if (isCurrentlyCollapsed !== isAiCollapsedRef.current) {
-                    updateAiCollapsedState(isCurrentlyCollapsed);
-                    persistLayoutState(layout, isCurrentlyCollapsed);
-                  }
-                }}
-                className="h-full overflow-hidden"
-                data-testid="panel-ai"
-              >
-                {!isAiPoppedOut ? (
-                  <PortalSlot host={hosts.ai} className="h-full min-h-0" />
-                ) : (
-                  <div className="h-full min-h-0" />
-                )}
-              </ResizablePanel>
+                  {/* Panel 3: AI Sidebar (Collapsible, >= xl) */}
+                  <ResizablePanel
+                    id="panel-ai"
+                    panelRef={aiPanelRef}
+                    defaultSize={isAiCollapsed || isAiPoppedOut ? 0 : (layout["panel-ai"] ?? 20)}
+                    minSize={15}
+                    collapsible={true}
+                    collapsedSize={0}
+                    onResize={(size) => {
+                      if (!isXlDesktopRef.current) return;
+                      if (skipResizePersistRef.current) return;
+                      if (Date.now() < suppressResizePersistUntilRef.current) return;
+                      const sizeNum =
+                        typeof size === "number"
+                          ? size
+                          : typeof size === "object" &&
+                              size !== null &&
+                              "asPercentage" in size &&
+                              typeof size.asPercentage === "number"
+                            ? size.asPercentage
+                            : 20;
+                      const isCurrentlyCollapsed = sizeNum <= 2;
+                      if (isCurrentlyCollapsed !== isAiCollapsedRef.current) {
+                        updateAiCollapsedState(isCurrentlyCollapsed);
+                        persistLayoutState(layout, isCurrentlyCollapsed);
+                      }
+                    }}
+                    className="h-full overflow-hidden"
+                    data-testid="panel-ai"
+                  >
+                    {!isAiPoppedOut ? (
+                      <PortalSlot host={hosts.ai} className="h-full min-h-0" />
+                    ) : (
+                      <div className="h-full min-h-0" />
+                    )}
+                  </ResizablePanel>
+                </>
+              )}
             </ResizablePanelGroup>
           ) : (
             <div
-              className="hidden xl:flex h-full w-full"
+              className="hidden lg:flex h-full w-full"
               data-testid="editor-resizable-panel-group-placeholder"
               aria-hidden
             />
           )
         ) : (
-          <div className="flex h-full w-full flex-col xl:hidden" data-testid="editor-mobile-tabs">
+          <div className="flex h-full w-full flex-col lg:hidden" data-testid="editor-mobile-tabs">
             <div className="flex shrink-0 items-center border-b border-outline/70 bg-panel px-2 py-1.5">
               <div
                 role="tablist"
@@ -1325,8 +1365,26 @@ export function EditorWorkspace() {
         )}
       </div>
 
+      {/* AI Assistant Drawer (lg 1024px–1279px two-pane layout) */}
+      {isDesktop && !isXlDesktop && hosts && (
+        <Sheet open={isAiSheetOpen} onOpenChange={setIsAiSheetOpen}>
+          <SheetContent
+            side="right"
+            hideCloseButton
+            data-testid="editor-ai-sheet"
+            className="flex w-[400px] flex-col border-l border-outline bg-panel p-0 sm:max-w-[420px]"
+          >
+            <SheetTitle className="sr-only">AI Assistant</SheetTitle>
+            <SheetDescription className="sr-only">
+              AI Chat and Tailor Assistant
+            </SheetDescription>
+            <PortalSlot host={hosts.ai} className="h-full min-h-0 flex-1" />
+          </SheetContent>
+        </Sheet>
+      )}
+
       {/* Floating Portaled AI Assistant Window (desktop >=1280px only) */}
-      {isDesktop && isAiPoppedOut && hosts && (
+      {isXlDesktop && isAiPoppedOut && hosts && (
         <AiAssistantWindow
           open={isAiPoppedOut}
           onOpenChange={(open) => {
@@ -1339,7 +1397,7 @@ export function EditorWorkspace() {
                 // ignore
               }
             }
-            if (!open && isDesktopRef.current) {
+            if (!open && isXlDesktopRef.current) {
               aiPanelRef.current?.expand();
               updateAiCollapsedState(false);
             }
@@ -1381,12 +1439,16 @@ export function EditorWorkspace() {
           <AiSidebar
             source={source}
             onApplyToBuffer={handleApplyRepair}
-            isCollapsed={isDesktop ? (isAiPoppedOut ? false : isAiCollapsed) : false}
-            isPoppedOut={isDesktop ? isAiPoppedOut : false}
-            onPopOut={isDesktop ? handleToggleAiPopOut : undefined}
+            isCollapsed={isXlDesktop ? (isAiPoppedOut ? false : isAiCollapsed) : false}
+            isPoppedOut={isXlDesktop ? isAiPoppedOut : false}
+            onPopOut={isXlDesktop ? handleToggleAiPopOut : undefined}
             masterFacts={masterFacts}
             onToggleCollapse={
-              isDesktop && !isAiPoppedOut ? toggleAiSidebarCollapse : undefined
+              isXlDesktop && !isAiPoppedOut
+                ? toggleAiSidebarCollapse
+                : isDesktop && !isXlDesktop
+                  ? () => setIsAiSheetOpen(false)
+                  : undefined
             }
             repairContext={repairContext}
             onDismissRepair={() => setRepairContext(null)}
