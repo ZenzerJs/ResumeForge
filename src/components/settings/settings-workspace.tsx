@@ -11,6 +11,7 @@ import {
   ByokProvider,
 } from "@/lib/byok-vault";
 import {
+  ArrowLeft,
   CheckCircle2,
   XCircle,
   Loader2,
@@ -22,14 +23,13 @@ import {
   LogIn,
   UserRound,
   Lock,
-  Sparkles,
+  ExternalLink,
+  ChevronDown,
 } from "lucide-react";
 import { AppShell } from "@/components/design-system/app-shell";
 import { PageHeader } from "@/components/design-system/page-header";
 import { Surface } from "@/components/design-system/surface";
 import { PageSkeleton } from "@/components/design-system/page-skeleton";
-import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
-import { OpenAILogo } from "@/components/interview/company-logos";
 import {
   fetchDemoConfig,
   fetchSessionUser,
@@ -49,17 +49,65 @@ const DEFAULT_MODELS: Record<string, string> = {
   custom: "llama3",
 };
 
-function renderProviderIcon(providerId: ProviderType) {
-  if (hasBrandIcon(providerId)) {
-    return <BrandIcon name={providerId} className="h-3.5 w-3.5 shrink-0" />;
-  }
-  if (providerId === "openai") {
-    return <OpenAILogo className="h-3.5 w-3.5 shrink-0" />;
-  }
-  if (providerId === "groq") {
-    return <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />;
-  }
-  return <Server className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />;
+export type CloudProviderId = "gemini" | "openai" | "anthropic" | "groq";
+
+export interface ProviderHelpInfo {
+  label: string;
+  whatIsNeeded: string;
+  getKeyUrl: string;
+  prerequisites: string;
+}
+
+export const PROVIDER_HELP: Record<CloudProviderId, ProviderHelpInfo> = {
+  gemini: {
+    label: "Google Gemini",
+    whatIsNeeded: "A Google account and a Gemini API key from Google AI Studio.",
+    getKeyUrl: "https://aistudio.google.com/app/apikey",
+    prerequisites:
+      "Google AI Studio includes a rate-limited Free tier with no credit card required (prompts may be used to improve Google products). Higher limits and private data handling require linking a Google Cloud billing account.",
+  },
+  openai: {
+    label: "OpenAI",
+    whatIsNeeded: "An OpenAI Platform account and a secret API key.",
+    getKeyUrl: "https://platform.openai.com/api-keys",
+    prerequisites:
+      "Separate from a ChatGPT subscription. Requires an OpenAI Platform organization with a payment method and prepaid API billing credits before requests succeed.",
+  },
+  anthropic: {
+    label: "Anthropic",
+    whatIsNeeded: "A Claude Console account and an API key.",
+    getKeyUrl: "https://platform.claude.com/settings/keys",
+    prerequisites:
+      "Separate from consumer Claude plans. Requires a Claude Console organization with prepaid usage credits configured in Billing before API calls succeed.",
+  },
+  groq: {
+    label: "Groq",
+    whatIsNeeded: "A GroqCloud account (Google, GitHub, or email) and an API key.",
+    getKeyUrl: "https://console.groq.com/keys",
+    prerequisites:
+      "GroqCloud offers a rate-limited Free tier with no credit card required to sign up. Upgrading to the pay-as-you-go Developer tier requires adding a payment method in Billing.",
+  },
+};
+
+export function isCloudProvider(provider: ProviderType): provider is CloudProviderId {
+  return (
+    provider === "gemini" ||
+    provider === "openai" ||
+    provider === "anthropic" ||
+    provider === "groq"
+  );
+}
+
+export function hasNonDefaultAdvancedConfig(
+  provider: ProviderType,
+  model: string,
+  baseUrl: string
+): boolean {
+  const trimmedModel = model.trim();
+  const defaultModel = DEFAULT_MODELS[provider] || "";
+  const hasCustomModel = Boolean(trimmedModel && trimmedModel !== defaultModel);
+  const hasOpenAiEndpointOverride = provider === "openai" && baseUrl.trim().length > 0;
+  return hasCustomModel || hasOpenAiEndpointOverride;
 }
 
 export function SettingsWorkspace() {
@@ -76,11 +124,14 @@ export function SettingsWorkspace() {
   } | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [isSessionLoaded, setIsSessionLoaded] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
+  const [tailorBackHref, setTailorBackHref] = useState<string | null>(null);
   const [usernameDraft, setUsernameDraft] = useState("");
   const [usernameStatus, setUsernameStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isSavingUsername, setIsSavingUsername] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
   // Load saved settings and vault key on mount
   useEffect(() => {
@@ -125,6 +176,9 @@ export function SettingsWorkspace() {
           setBaseUrl(activeBaseUrl);
           setApiKey(key || "");
           setHasVaultKey(Boolean(key && key.trim().length > 0));
+          setIsAdvancedOpen(
+            hasNonDefaultAdvancedConfig(activeProvider, activeModel, activeBaseUrl)
+          );
         }
       } catch (err) {
         console.error("Failed to load BYOK settings:", err);
@@ -147,10 +201,26 @@ export function SettingsWorkspace() {
       if (cancelled) return;
       setSessionUser(user);
       setUsernameDraft(user?.username ?? "");
+      setIsSessionLoaded(true);
     });
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("from") !== "tailor") {
+      setTailorBackHref(null);
+      return;
+    }
+    const backParams = new URLSearchParams();
+    const jobId = params.get("jobId");
+    if (jobId) backParams.set("jobId", jobId);
+    const tab = params.get("tab");
+    if (tab) backParams.set("tab", tab);
+    const query = backParams.toString();
+    setTailorBackHref(query ? `/tailor?${query}` : "/tailor");
   }, []);
 
   const handleSaveUsername = async () => {
@@ -209,6 +279,9 @@ export function SettingsWorkspace() {
     const storedKey = await getKey(nextProvider);
     setApiKey(storedKey || "");
     setHasVaultKey(Boolean(storedKey && storedKey.trim().length > 0));
+    if (hasNonDefaultAdvancedConfig(nextProvider, nextModel, nextUrl)) {
+      setIsAdvancedOpen(true);
+    }
 
     saveSettingsToStorage(nextProvider, nextUrl, nextModel);
   };
@@ -295,22 +368,11 @@ export function SettingsWorkspace() {
     return `${key.slice(0, 4)}••••••••${key.slice(-4)}`;
   };
 
-  const providerPills: Array<{ id: ProviderType; label: string }> = [
-    { id: "gemini", label: "Google Gemini" },
-    { id: "openai", label: "OpenAI" },
-    { id: "anthropic", label: "Anthropic" },
-    { id: "groq", label: "Groq" },
-    ...(!demoMode
-      ? [
-          { id: "ollama" as ProviderType, label: "Ollama" },
-          { id: "custom" as ProviderType, label: "Custom" },
-        ]
-      : []),
-  ];
-
   if (!isHydrated) {
     return <PageSkeleton variant="settings" />;
   }
+
+  const cloudHelp = isCloudProvider(provider) ? PROVIDER_HELP[provider] : null;
 
   return (
     <AppShell variant="settings" className="overflow-y-auto">
@@ -318,20 +380,31 @@ export function SettingsWorkspace() {
         <div className="space-y-6">
           <PageHeader
             eyebrow="Control room"
-            title="AI Provider Gateway Settings — Bring-Your-Own-Key (BYOK) AI Configuration"
-            description="Configure your preferred LLM provider or local OpenAI-compatible endpoint. API keys are encrypted in your browser's Web Crypto vault and never written to the database or server logs."
+            title="Connect an AI provider key (stored in this browser)"
+            description="Your API key stays in this browser and is sent only with your own AI request. It is never stored in our database or server logs."
+            actions={
+              tailorBackHref ? (
+                <Link
+                  href={tailorBackHref}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-hairline bg-elevated px-3.5 text-sm font-medium text-foreground hover:bg-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <ArrowLeft className="h-4 w-4" aria-hidden />
+                  Back to Tailor
+                </Link>
+              ) : undefined
+            }
           />
 
           <Surface variant="raised" className="edge-glow p-6 space-y-5" data-testid="account-settings">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">Account</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Sign in to save resumes, evidence, and jobs. The nav shows your username, not your email.
                 </p>
               </div>
               {sessionUser ? (
-                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-hairline bg-elevated font-bold text-[#ff8b3d]">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-hairline bg-elevated font-bold text-ember">
                   {usernameInitial(sessionUser.username)}
                 </span>
               ) : (
@@ -350,20 +423,20 @@ export function SettingsWorkspace() {
                       id="settings-username"
                       value={usernameDraft}
                       onChange={(event) => setUsernameDraft(event.target.value)}
-                      className="h-11 w-full rounded-md border border-hairline bg-inset px-3.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                      className="h-11 w-full rounded-md border border-hairline bg-inset px-3.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     />
                     <button
                       type="button"
                       disabled={isSavingUsername || usernameDraft.trim() === sessionUser.username}
                       onClick={() => void handleSaveUsername()}
-                      className="inline-flex h-11 shrink-0 items-center justify-center rounded-md bg-elevated px-4 text-sm font-semibold text-foreground hover:bg-panel focus-visible:ring-2 focus-visible:ring-amber-500/60 disabled:opacity-50"
+                      className="inline-flex h-11 shrink-0 items-center justify-center rounded-md bg-elevated px-4 text-sm font-semibold text-foreground hover:bg-panel focus-visible:ring-2 focus-visible:ring-primary/60 disabled:opacity-50"
                     >
                       {isSavingUsername ? "Saving…" : "Save username"}
                     </button>
                   </div>
                 </div>
                 {usernameStatus ? (
-                  <p className={`text-xs ${usernameStatus.type === "success" ? "text-status-success-soft" : "text-rose-400"}`} role="status">
+                  <p className={`text-xs ${usernameStatus.type === "success" ? "text-status-success-soft" : "text-status-danger"}`} role="status">
                     {usernameStatus.message}
                   </p>
                 ) : null}
@@ -375,7 +448,7 @@ export function SettingsWorkspace() {
                     setIsSigningOut(true);
                     void signOutAndRedirect("/");
                   }}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-md border border-hairline px-4 text-sm font-medium text-foreground hover:bg-elevated focus-visible:ring-2 focus-visible:ring-amber-500/60 disabled:opacity-50"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-md border border-hairline px-4 text-sm font-medium text-foreground hover:bg-elevated focus-visible:ring-2 focus-visible:ring-primary/60 disabled:opacity-50"
                 >
                   <LogOut className="h-4 w-4" aria-hidden />
                   Sign Out
@@ -385,14 +458,14 @@ export function SettingsWorkspace() {
               <div className="flex flex-wrap gap-2">
                 <Link
                   href="/login"
-                  className="inline-flex min-h-11 items-center gap-2 rounded-md border border-hairline px-4 text-sm font-medium text-foreground hover:bg-elevated focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-md border border-hairline px-4 text-sm font-medium text-foreground hover:bg-elevated focus-visible:ring-2 focus-visible:ring-primary/60"
                 >
                   <LogIn className="h-4 w-4" aria-hidden />
                   Sign In
                 </Link>
                 {!demoMode && <Link
                   href="/login?mode=signup"
-                  className="inline-flex min-h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary/60"
                 >Sign Up</Link>}
               </div>
             )}
@@ -400,41 +473,15 @@ export function SettingsWorkspace() {
 
           <Surface variant="raised" className="edge-glow p-6 space-y-6">
             {/* Provider Selection */}
-            <div className="rounded-lg border border-hairline bg-inset/60 p-4 card-lift">
-              <label htmlFor="provider-select" className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+            <div className="rounded-lg border border-hairline bg-inset/60 p-4">
+              <label htmlFor="provider-select" className="block font-mono text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
                 Select AI Provider
               </label>
-              <div
-                role="group"
-                aria-label="Quick select AI provider"
-                className="mb-3 flex flex-wrap gap-2"
-              >
-                {providerPills.map((p) => {
-                  const active = provider === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      data-testid={`provider-pill-${p.id}`}
-                      aria-pressed={active}
-                      onClick={() => void selectProvider(p.id)}
-                      className={`inline-flex min-h-11 sm:min-h-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
-                        active
-                          ? "border-primary/45 bg-primary/15 font-semibold text-primary"
-                          : "border-hairline bg-panel font-medium text-text-secondary hover:bg-elevated hover:text-foreground"
-                      }`}
-                    >
-                      {renderProviderIcon(p.id)}
-                      <span>{p.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
               <select
                 id="provider-select"
                 value={provider}
                 onChange={handleProviderChange}
-                className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <option value="gemini">Google Gemini (Direct API)</option>
                 <option value="openai">OpenAI (BYOK)</option>
@@ -443,128 +490,215 @@ export function SettingsWorkspace() {
                 {!demoMode && <option value="ollama">Ollama (Local Inference)</option>}
                 {!demoMode && <option value="custom">Custom OpenAI-compatible endpoint (Local / self-hosted endpoint)</option>}
               </select>
-              {demoMode && <p className="mt-2 text-xs text-muted-foreground">Demo BYOK supports Gemini, OpenAI, Anthropic, and Groq. Custom and local Ollama endpoints are disabled.</p>}
+              {demoMode && <p className="mt-2 text-sm text-muted-foreground">Demo BYOK supports Gemini, OpenAI, Anthropic, and Groq. Custom and local Ollama endpoints are disabled.</p>}
             </div>
 
-            {/* API Key Input (Hidden for Ollama) */}
-            {provider !== "ollama" ? (
-              <div className="rounded-lg border border-hairline bg-inset/60 p-4 card-lift">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                  <label htmlFor="api-key-input" className="block text-xs font-semibold text-text-secondary uppercase tracking-wider">
-                    API Key {provider === "custom" ? "(Optional)" : ""}
+            {/* Required Endpoint for Custom / Ollama (never hidden under Advanced) */}
+            {(provider === "custom" || provider === "ollama") && (
+              <div className="rounded-lg border border-hairline bg-inset/60 p-4 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label htmlFor="base-url-input" className="block font-mono text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                    {provider === "ollama" ? "Ollama Endpoint" : "Endpoint Base URL"}
                   </label>
-                  {apiKey && (
-                    <button
-                      type="button"
-                      id="clear-key-btn"
-                      data-testid="clear-key-btn"
-                      onClick={handleClearKey}
-                      className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 text-xs text-rose-400 hover:text-rose-300 transition-colors"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      Clear Key
-                    </button>
-                  )}
+                  <span className="font-mono text-xs text-muted-foreground">Required</span>
                 </div>
-                <div className="relative">
-                  <input
-                    id="api-key-input"
-                    type="password"
-                    value={apiKey}
-                    onChange={handleKeyChange}
-                    aria-invalid={testResult && !testResult.success ? true : undefined}
-                    aria-describedby={testResult && !testResult.success ? "test-result-banner" : undefined}
-                    placeholder={
-                      provider === "openai"
-                        ? "sk-proj-..."
-                        : provider === "anthropic"
-                        ? "sk-ant-..."
-                        : provider === "gemini"
-                        ? "AIzaSy..."
-                        : provider === "groq"
-                        ? "gsk_..."
-                        : "Optional API Key for custom endpoint"
-                    }
-                    className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-mono"
-                  />
-                </div>
-                {apiKey && (
-                  <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-                    <Key className="h-3.5 w-3.5 text-amber-400" />
-                    <span>Configured key: <code className="text-text-secondary font-mono">{maskKey(apiKey)}</code></span>
-                  </div>
-                )}
-                {/* Visual Status Indicator */}
-                <div data-testid="vault-status" className="mt-2 flex items-center gap-2 text-xs">
-                  {hasVaultKey ? (
-                    <div className="flex items-center gap-1.5 text-status-success-soft">
-                      <Lock className="h-4 w-4 text-status-success" />
-                      <span>Key encrypted in browser IndexedDB (AES-GCM vault)</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                      <Key className="h-4 w-4 text-muted-foreground" />
-                      <span>No encrypted key in vault for {provider}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-lg border border-hairline bg-inset/60 p-4 card-lift">
-                {/* Ollama Visual Status Indicator */}
-                <div data-testid="vault-status" className="flex items-center gap-2 text-xs text-status-success-soft">
-                  <Server className="h-4 w-4 text-status-success" />
-                  <span>Local daemon endpoint (no API key required)</span>
-                </div>
-              </div>
-            )}
-
-            {/* Custom/Ollama Endpoint Base URL Input */}
-            {(provider === "custom" || provider === "openai" || provider === "ollama") && (
-              <div className="rounded-lg border border-hairline bg-inset/60 p-4 card-lift">
-                <label htmlFor="base-url-input" className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
-                  {provider === "ollama" ? "Ollama Endpoint" : `Endpoint Base URL ${provider === "custom" ? "" : "(Optional Override)"}`}
-                </label>
                 <input
                   id="base-url-input"
                   data-testid="ollama-endpoint"
                   type="url"
                   value={baseUrl}
                   onChange={handleBaseUrlChange}
-                  placeholder={provider === "ollama" ? "http://localhost:11434" : provider === "custom" ? "http://localhost:8000" : "https://api.openai.com"}
-                  className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-mono"
+                  placeholder={provider === "ollama" ? "http://localhost:11434" : "http://localhost:8000"}
+                  className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
                 />
+                {provider === "ollama" ? (
+                  <div data-testid="vault-status" className="flex items-center gap-2 text-xs text-status-success-soft pt-0.5">
+                    <Server className="h-4 w-4 shrink-0 text-status-success" aria-hidden="true" />
+                    <span>Local daemon endpoint (no API key required)</span>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Enter the base URL for your OpenAI-compatible server. An API key below is optional.
+                  </p>
+                )}
               </div>
             )}
 
-            {/* Model Name Input */}
-            <div className="rounded-lg border border-hairline bg-inset/60 p-4 card-lift">
-              <label htmlFor="model-input" className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
-                Model Name <span className="text-muted-foreground font-normal normal-case">(optional — leave blank for provider default)</span>
-              </label>
-              <input
-                id="model-input"
-                type="text"
-                value={model}
-                onChange={handleModelChange}
-                placeholder={
-                  DEFAULT_MODELS[provider] || "gemini-2.5-flash"
-                }
-                className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-mono"
-              />
-              <p className="mt-1.5 text-[11px] text-muted-foreground">
-                Default for {provider}: <code className="text-text-secondary font-mono">{DEFAULT_MODELS[provider]}</code>
-              </p>
-            </div>
+            {/* Contextual Help + API Key Input (Hidden for Ollama) */}
+            {provider !== "ollama" && (
+              <div className="rounded-lg border border-hairline bg-inset/60 p-4 space-y-4">
+                {cloudHelp && (
+                  <div
+                    key={provider}
+                    data-testid="provider-help"
+                    data-provider={provider}
+                    className="rounded-lg border border-hairline bg-panel/70 p-3.5 space-y-2"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                        {cloudHelp.label} setup
+                      </span>
+                      <a
+                        href={cloudHelp.getKeyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-testid="provider-get-key-link"
+                        className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-hairline bg-elevated px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
+                      >
+                        Get an API key
+                        <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                      </a>
+                    </div>
+                    <p className="text-sm text-foreground leading-relaxed">
+                      {cloudHelp.whatIsNeeded}
+                    </p>
+                    <p className="text-xs text-text-secondary leading-relaxed">
+                      <span className="font-semibold text-foreground">Account &amp; billing: </span>
+                      {cloudHelp.prerequisites}
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <label htmlFor="api-key-input" className="block font-mono text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                      API Key {provider === "custom" ? "(Optional)" : ""}
+                    </label>
+                    {apiKey && (
+                      <button
+                        type="button"
+                        id="clear-key-btn"
+                        data-testid="clear-key-btn"
+                        onClick={handleClearKey}
+                        className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 text-xs text-status-danger hover:text-status-danger/80 transition-colors"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Clear Key
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      id="api-key-input"
+                      type="password"
+                      value={apiKey}
+                      onChange={handleKeyChange}
+                      aria-invalid={testResult && !testResult.success ? true : undefined}
+                      aria-describedby={testResult && !testResult.success ? "test-result-banner" : undefined}
+                      placeholder={
+                        provider === "openai"
+                          ? "sk-proj-..."
+                          : provider === "anthropic"
+                          ? "sk-ant-..."
+                          : provider === "gemini"
+                          ? "AIzaSy..."
+                          : provider === "groq"
+                          ? "gsk_..."
+                          : "Optional API Key for custom endpoint"
+                      }
+                      className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
+                    />
+                  </div>
+                  {apiKey && (
+                    <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+                      <Key className="h-3.5 w-3.5 text-status-warning" />
+                      <span>Configured key: <code className="text-text-secondary font-mono">{maskKey(apiKey)}</code></span>
+                    </div>
+                  )}
+                  {/* Visual Vault Status Indicator (distinct from connection test status) */}
+                  <div data-testid="vault-status" className="mt-2 flex items-center gap-2 text-xs">
+                    {hasVaultKey ? (
+                      <div className="flex items-center gap-1.5 text-status-success-soft">
+                        <Lock className="h-4 w-4 text-status-success" />
+                        <span>Key encrypted in browser IndexedDB (AES-GCM vault)</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Key className="h-4 w-4 text-muted-foreground" />
+                        <span>No encrypted key in vault for {provider}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Advanced Disclosure: Optional Model Name + OpenAI Endpoint Override */}
+            <details
+              open={isAdvancedOpen}
+              onToggle={(event) => {
+                setIsAdvancedOpen(event.currentTarget.open);
+              }}
+              data-testid="advanced-settings-disclosure"
+              className="group rounded-lg border border-hairline bg-inset/60"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg p-4 text-sm font-medium text-foreground hover:bg-elevated/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                <div className="flex flex-wrap items-center gap-2 min-w-0">
+                  <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                    Advanced
+                  </span>
+                  <span className="text-xs text-muted-foreground font-normal">
+                    {provider === "openai"
+                      ? "Optional model name and endpoint override"
+                      : "Optional model name"}
+                  </span>
+                </div>
+                <ChevronDown
+                  className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none"
+                  aria-hidden="true"
+                />
+              </summary>
+
+              <div className="space-y-4 border-t border-hairline p-4">
+                {provider === "openai" && (
+                  <div>
+                    <label htmlFor="base-url-input" className="block font-mono text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+                      Endpoint Base URL <span className="font-sans text-muted-foreground font-normal normal-case">(optional override)</span>
+                    </label>
+                    <input
+                      id="base-url-input"
+                      data-testid="ollama-endpoint"
+                      type="url"
+                      value={baseUrl}
+                      onChange={handleBaseUrlChange}
+                      placeholder="https://api.openai.com"
+                      className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label htmlFor="model-input" className="block font-mono text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+                    Model Name <span className="font-sans text-muted-foreground font-normal normal-case">(optional — leave blank for provider default)</span>
+                  </label>
+                  <input
+                    id="model-input"
+                    type="text"
+                    value={model}
+                    onChange={handleModelChange}
+                    placeholder={DEFAULT_MODELS[provider] || "gemini-2.5-flash"}
+                    className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
+                  />
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Default for {provider}: <code className="text-text-secondary font-mono">{DEFAULT_MODELS[provider]}</code>
+                  </p>
+                </div>
+              </div>
+            </details>
 
             {/* Action Buttons & Status */}
+            {isSessionLoaded && !sessionUser && !demoMode && (
+              <p className="text-sm text-muted-foreground">
+                The connection test requires sign-in.
+              </p>
+            )}
             <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-hairline">
               <button
                 type="button"
                 id="test-connection-btn"
                 onClick={handleTestConnection}
                 disabled={isTesting}
-                className="inline-flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 rounded-md bg-amber-500 hover:bg-amber-400 text-[#121010] px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50 transition-colors"
+                className="inline-flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50 transition-colors"
               >
                 {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Server className="h-4 w-4" />}
                 {isTesting ? "Testing Connection..." : "Test Connection"}
@@ -585,22 +719,22 @@ export function SettingsWorkspace() {
                 className={`rounded-lg p-4 border text-sm ${
                   testResult.success
                     ? "status-success-surface"
-                    : "border-rose-800/50 bg-rose-950/40 text-rose-200"
+                    : "border-status-danger/30 bg-status-danger/10 text-status-danger"
                 }`}
               >
                 <div className="flex items-start gap-3">
                   {testResult.success ? (
                     <CheckCircle2 className="h-5 w-5 shrink-0 text-status-success mt-0.5" />
                   ) : (
-                    <XCircle className="h-5 w-5 shrink-0 text-rose-400 mt-0.5" />
+                    <XCircle className="h-5 w-5 shrink-0 text-status-danger mt-0.5" />
                   )}
                   <div className="space-y-1">
                     <div className="font-semibold">
                       {testResult.success ? "Connection Verified" : "Connection Failed"}
                     </div>
-                    <p className="text-xs opacity-90">{testResult.message}</p>
+                    <p className="text-sm opacity-90">{testResult.message}</p>
                     {testResult.latencyMs !== undefined && (
-                      <div className="text-[11px] opacity-75">
+                      <div className="text-xs opacity-75">
                         Latency: {testResult.latencyMs}ms
                       </div>
                     )}

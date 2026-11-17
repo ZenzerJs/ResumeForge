@@ -23,14 +23,17 @@ test.describe("WS2 — Discover Page Filters, Geocoding & Blended Sorting", () =
     await expect(radiusSelect).toBeVisible();
     await radiusSelect.selectOption("50");
 
-    // Check Salary Select
-    const salarySelect = page.getByTestId("discover-salary-select");
-    await expect(salarySelect).toBeVisible();
-
-    // Check Sort Select
+    // Check Sort Select (primary filter row)
     const sortSelect = page.getByTestId("discover-sort-select");
     await expect(sortSelect).toBeVisible();
     await sortSelect.selectOption("blended");
+
+    // Open "More filters" popover for secondary filters (Salary, Canada Only)
+    await page.getByRole("button", { name: /more filters/i }).click();
+
+    // Check Salary Select
+    const salarySelect = page.getByTestId("discover-salary-select");
+    await expect(salarySelect).toBeVisible();
 
     // Check Canada Only toggle
     const canadaToggle = page.getByTestId("discover-canadian-toggle");

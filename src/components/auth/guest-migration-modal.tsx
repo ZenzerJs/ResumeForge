@@ -185,7 +185,7 @@ export function GuestMigrationModal({
               Unsaved Guest Draft Detected
             </DialogTitle>
           </div>
-          <DialogDescription className="text-xs text-text-secondary">
+          <DialogDescription className="text-sm text-text-secondary">
             We found a resume draft in this browser from your unauthenticated session. Choose how to synchronize it with your account.
           </DialogDescription>
         </DialogHeader>
@@ -201,13 +201,13 @@ export function GuestMigrationModal({
               {guestEvidenceItems.length > 0 && (
                 <span
                   data-testid="guest-evidence-migration-badge"
-                  className="rounded-full bg-status-success/15 border border-status-success/30 px-2 py-0.5 font-mono text-[10px] text-status-success"
+                  className="rounded-full bg-status-success/15 border border-status-success/30 px-2 py-0.5 font-mono text-xs text-status-success"
                 >
                   +{guestEvidenceItems.length} Evidence Item{guestEvidenceItems.length === 1 ? "" : "s"}
                 </span>
               )}
             </div>
-            <div className="max-h-28 overflow-y-auto rounded-md border border-hairline bg-inset p-2.5 font-mono text-[11px] text-text-secondary whitespace-pre-wrap leading-relaxed">
+            <div className="max-h-28 overflow-y-auto rounded-md border border-hairline bg-inset p-2.5 font-mono text-xs text-text-secondary whitespace-pre-wrap leading-relaxed">
               {draftSource.slice(0, 400)}
               {draftSource.length > 400 ? "\n..." : ""}
             </div>
@@ -215,7 +215,7 @@ export function GuestMigrationModal({
 
           {/* Conflict Strategy Selector */}
           <div className="space-y-1.5" data-testid="conflict-strategy-selector">
-            <span className="text-[11px] font-semibold text-primary">Select Sync Action:</span>
+            <span className="text-xs font-semibold text-primary">Select Sync Action:</span>
             <div className="space-y-1.5">
               <label
                 className={`flex items-start gap-2.5 p-2.5 rounded-md border cursor-pointer transition-colors ${
@@ -237,7 +237,7 @@ export function GuestMigrationModal({
                   <span className="font-semibold text-foreground block text-xs">
                     Import as Draft Resume (Recommended)
                   </span>
-                  <span className="text-[10px] text-text-muted leading-tight block mt-0.5">
+                  <span className="text-xs text-text-muted leading-tight block mt-0.5">
                     Saves draft safely without overwriting your existing Master Resume.
                   </span>
                 </div>
@@ -263,7 +263,7 @@ export function GuestMigrationModal({
                   <span className="font-semibold text-foreground block text-xs">
                     Replace Account Master Resume
                   </span>
-                  <span className="text-[10px] text-text-muted leading-tight block mt-0.5">
+                  <span className="text-xs text-text-muted leading-tight block mt-0.5">
                     Replaces your primary Master baseline with this guest draft.
                   </span>
                 </div>
@@ -289,7 +289,7 @@ export function GuestMigrationModal({
                   <span className="font-semibold text-foreground block text-xs">
                     Discard Local Draft
                   </span>
-                  <span className="text-[10px] text-text-muted leading-tight block mt-0.5">
+                  <span className="text-xs text-text-muted leading-tight block mt-0.5">
                     Clear this local draft without importing to your account.
                   </span>
                 </div>
@@ -303,11 +303,11 @@ export function GuestMigrationModal({
               data-testid="replace-master-confirmation-box"
               className="p-2.5 rounded-md bg-primary/10 border border-primary/50 space-y-2 text-xs"
             >
-              <div className="flex items-center gap-1.5 text-primary font-semibold text-[11px]">
+              <div className="flex items-center gap-1.5 text-primary font-semibold text-xs">
                 <ShieldAlert className="size-4 text-primary shrink-0" />
                 <span>Critical: Master Overwrite Verification</span>
               </div>
-              <p className="text-text-secondary text-[10px] leading-relaxed">
+              <p className="text-text-secondary text-sm leading-relaxed">
                 This action creates an automated snapshot of your previous master and updates your primary baseline to this draft.
               </p>
               <label className="flex items-start gap-2 pt-0.5 cursor-pointer select-none">
@@ -318,7 +318,7 @@ export function GuestMigrationModal({
                   data-testid="confirm-replace-master-checkbox"
                   className="mt-0.5 rounded border-primary text-primary focus:ring-0"
                 />
-                <span className="text-[10px] text-foreground font-medium leading-snug">
+                <span className="text-xs text-foreground font-medium leading-snug">
                   I understand this will archive my existing Master Resume and freeze this guest draft as the new canonical baseline.
                 </span>
               </label>
@@ -339,7 +339,7 @@ export function GuestMigrationModal({
                 type="button"
                 onClick={handleMigrate}
                 data-testid="retry-migrate-draft-btn"
-                className="px-2 py-0.5 rounded bg-status-danger/20 hover:bg-status-danger/30 text-foreground text-[10px] font-semibold shrink-0 flex items-center gap-1"
+                className="px-2 py-0.5 rounded bg-status-danger/20 hover:bg-status-danger/30 text-foreground text-xs font-semibold shrink-0 flex items-center gap-1"
               >
                 <RefreshCw className="size-3" />
                 <span>Retry</span>

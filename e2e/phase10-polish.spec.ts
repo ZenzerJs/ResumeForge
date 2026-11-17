@@ -5,10 +5,10 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
     await page.goto("/non-existent-route-xyz");
     await page.waitForLoadState("networkidle");
 
-    const header = page.locator("h1", { hasText: "Document Not Found" });
+    const header = page.locator("h1", { hasText: "Page not found" });
     await expect(header).toBeVisible();
 
-    const returnBtn = page.locator('a:has-text("Return to Dashboard")');
+    const returnBtn = page.locator('a:has-text("Back to home")');
     await expect(returnBtn).toBeVisible();
     await returnBtn.click();
 
@@ -99,7 +99,7 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
     await page.waitForLoadState("networkidle");
 
     const heroTitle = page.locator("h1");
-    await expect(heroTitle).toContainText("Make every application feel");
+    await expect(heroTitle).toContainText("Tailor your resume. Keep every claim true.");
   });
 
   test("9. Responsive viewports (375px mobile, 768px tablet, 1200px desktop) render without horizontal overflow", async ({ page }) => {

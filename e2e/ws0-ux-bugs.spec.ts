@@ -101,7 +101,7 @@ test.describe("WS0 — UX Bug Fixes & Staged AI Feedback", () => {
     expect(gradeBg).toBe("rgb(27, 23, 22)");
 
     await page.goto("/nonexistent-route-check");
-    const notFoundHeading = page.getByRole("heading", { name: "Document Not Found" });
+    const notFoundHeading = page.getByRole("heading", { name: "Page not found" });
     await expect(notFoundHeading).toBeVisible();
     const notFoundBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
     expect(notFoundBg).toBe("rgb(18, 16, 16)");
@@ -124,8 +124,9 @@ test.describe("WS0 — UX Bug Fixes & Staged AI Feedback", () => {
     await expect(marqueeTrack).toBeVisible();
 
     // Verify presence of capability items inside static capability strip
-    await expect(marqueeTrack.getByText("Typst WASM Engine").first()).toBeVisible();
-    await expect(marqueeTrack.getByText("Verified Evidence Bank").first()).toBeVisible();
-    await expect(marqueeTrack.getByText("100-Point ATS Rubric").first()).toBeVisible();
+    await expect(marqueeTrack.getByText("Clean PDF export").first()).toBeVisible();
+    await expect(marqueeTrack.getByText("Verified work history").first()).toBeVisible();
+    await expect(marqueeTrack.getByText("Bring your own AI key").first()).toBeVisible();
+    await expect(marqueeTrack.getByText("Instant ATS scoring").first()).toBeVisible();
   });
 });

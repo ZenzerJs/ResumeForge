@@ -104,11 +104,11 @@ export function ApplySheetPatchCard({
           <Button type="button" size="sm" variant={decision === "rejected" ? "destructive" : "outline"} onClick={onReject} data-testid={`apply-sheet-reject-${patch.id}`}>Reject</Button>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-2 text-[11px] font-mono whitespace-pre-wrap">
-        <div className="rounded bg-red-950/30 p-2 text-text-secondary"><span className="mb-1 block text-[9px] uppercase text-muted-foreground">Before</span>{patch.before || "(empty)"}</div>
-        <div className="rounded bg-status-success/15 p-2 text-status-success-soft"><span className="mb-1 block text-[9px] uppercase text-muted-foreground">After</span>{patch.after || "(empty)"}</div>
+      <div className="grid grid-cols-2 gap-2 text-xs font-mono whitespace-pre-wrap">
+        <div className="rounded bg-status-danger/10 p-2 text-text-secondary"><span className="mb-1 block text-xs uppercase text-muted-foreground">Before</span>{patch.before || "(empty)"}</div>
+        <div className="rounded bg-status-success/15 p-2 text-status-success-soft"><span className="mb-1 block text-xs uppercase text-muted-foreground">After</span>{patch.after || "(empty)"}</div>
       </div>
-      <p className="text-[11px] text-muted-foreground">{patch.rationale}</p>
+      <p className="text-sm text-muted-foreground">{patch.rationale}</p>
     </article>
   );
 }
@@ -581,10 +581,10 @@ export function ApplySheet({
         <div className="space-y-5">
           <SheetHeader>
             <div className="flex items-center justify-between">
-              <Badge variant="outline" className="border-amber-500/40 text-amber-400 bg-amber-950/20 text-xs">
+              <Badge variant="outline" className="border-status-warning/40 text-status-warning bg-status-warning/15 text-xs">
                 One-Click Apply
               </Badge>
-              <span className="text-[11px] text-muted-foreground font-mono">Step {stepIndex} of 5</span>
+              <span className="text-xs text-muted-foreground font-mono">Step {stepIndex} of 5</span>
             </div>
             <SheetTitle className="text-lg font-bold text-foreground flex items-center gap-2 pt-1">
               <Briefcase className="size-4 text-primary" />
@@ -612,7 +612,7 @@ export function ApplySheet({
                 ))}
               </select>
               {variantError && (
-                <span className="mt-1 block text-xs text-red-400" role="alert">{variantError}</span>
+                <span className="mt-1 block text-xs text-status-danger" role="alert">{variantError}</span>
               )}
             </label>
           )}
@@ -620,7 +620,7 @@ export function ApplySheet({
           {/* Progress Indicator */}
           <div className="space-y-1.5">
             <Progress value={(stepIndex / 5) * 100} className="h-1.5 bg-elevated" />
-            <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+            <div className="flex justify-between text-xs text-muted-foreground font-mono">
               <span className={stepIndex >= 1 ? "text-primary" : ""}>1. Job</span>
               <span className={stepIndex >= 2 ? "text-primary" : ""}>2. Tailor</span>
               <span className={stepIndex >= 3 ? "text-primary" : ""}>3. Guardrail</span>
@@ -634,16 +634,16 @@ export function ApplySheet({
             <h4 className="font-semibold text-foreground flex items-center justify-between">
               <span>Target Role Profile</span>
               {job.salarySnippet && (
-                <span className="text-status-success-soft text-[11px] font-mono">{job.salarySnippet}</span>
+                <span className="text-status-success-soft text-xs font-mono">{job.salarySnippet}</span>
               )}
             </h4>
 
             {job.requirements?.requiredSkills && job.requirements.requiredSkills.length > 0 && (
               <div className="space-y-1">
-                <span className="text-[11px] text-muted-foreground">Required Skills:</span>
+                <span className="text-xs text-muted-foreground">Required Skills:</span>
                 <div className="flex flex-wrap gap-1">
                   {job.requirements.requiredSkills.map((s, i) => (
-                    <Badge key={i} variant="secondary" className="text-[10px] bg-elevated text-text-secondary border border-hairline">
+                    <Badge key={i} variant="secondary" className="text-xs bg-elevated text-text-secondary border border-hairline">
                       {s}
                     </Badge>
                   ))}
@@ -668,8 +668,8 @@ export function ApplySheet({
             </div>
           )}
           {(patchBatch || demoLocalPatches) && skillsNeedingAck.length > 0 && (
-            <div className="space-y-2 rounded-lg border border-amber-800/60 bg-amber-950/30 p-3 text-xs text-amber-200">
-              <p>Confirm any unverified skills you have real experience with before applying:</p>
+            <div className="space-y-2 rounded-lg border border-status-warning/40 bg-status-warning/15 p-3 text-xs text-status-warning">
+              <p className="text-sm">Confirm any unverified skills you have real experience with before applying:</p>
               {skillsNeedingAck.map((skill) => (
                 <label key={skill} className="flex items-center gap-2">
                   <input type="checkbox" checked={acknowledgedSkills.includes(skill)} onChange={() => setAcknowledgedSkills((current) => current.includes(skill) ? current.filter((item) => item !== skill) : [...current, skill])} />
@@ -679,20 +679,20 @@ export function ApplySheet({
             </div>
           )}
           {patchGaps.length > 0 && (
-            <div className="space-y-1 rounded-lg border border-amber-800/60 bg-amber-950/30 p-3 text-xs text-amber-200" data-testid="apply-sheet-gaps">
+            <div className="space-y-1 rounded-lg border border-status-warning/40 bg-status-warning/15 p-3 text-xs text-status-warning" data-testid="apply-sheet-gaps">
               <p className="font-semibold">Requirements not covered by verified evidence</p>
               {patchGaps.map((gap, index) => (
-                <p key={`${gap.requirement}-${index}`}>{gap.requirement}: {gap.recommendation}</p>
+                <p key={`${gap.requirement}-${index}`} className="text-sm">{gap.requirement}: {gap.recommendation}</p>
               ))}
             </div>
           )}
-          {tailoringNotice && <p className="rounded-lg border border-hairline bg-inset p-3 text-xs text-text-secondary" role="status">{tailoringNotice}</p>}
+          {tailoringNotice && <p className="rounded-lg border border-hairline bg-inset p-3 text-sm text-text-secondary" role="status">{tailoringNotice}</p>}
           {guardrailResult && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-semibold text-text-secondary">Guardrail Audit</h4>
                 {appliedPatchCount > 0 && (
-                  <Badge variant="outline" className="border-status-success/40 text-status-success-soft bg-status-success/15 text-[10px]">
+                  <Badge variant="outline" className="border-status-success/40 text-status-success-soft bg-status-success/15 text-xs">
                     {appliedPatchCount} AI Patch{appliedPatchCount === 1 ? "" : "es"} Applied
                   </Badge>
                 )}
@@ -720,7 +720,7 @@ export function ApplySheet({
                   {atsScore.overallScore} / 100
                 </Badge>
               </div>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 Matches {atsScore.requiredMatch.score}/{atsScore.requiredMatch.maxScore} required skills points.
               </p>
             </div>
@@ -729,28 +729,28 @@ export function ApplySheet({
           {exportError && (
             <div
               data-testid="apply-export-error-recovery"
-              className="p-3 rounded-lg bg-red-950/40 border border-red-900 text-xs text-red-300 space-y-2"
+              className="p-3 rounded-lg bg-status-danger/10 border border-status-danger/30 text-xs text-status-danger space-y-2"
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="size-4 text-red-400 shrink-0" />
+                  <AlertCircle className="size-4 text-status-danger shrink-0" />
                   <span>{exportError}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setExportError(null)}
-                  className="text-red-400 hover:text-red-200 text-xs underline shrink-0 font-medium"
+                  className="text-status-danger hover:text-status-danger/80 text-xs underline shrink-0 font-medium"
                 >
                   Dismiss
                 </button>
               </div>
-              <div className="flex items-center gap-2 pt-1 border-t border-red-900/60 text-[11px]">
-                <span className="text-red-300">Fallback direct downloads:</span>
+              <div className="flex items-center gap-2 pt-1 border-t border-status-danger/30 text-xs">
+                <span className="text-status-danger">Fallback direct downloads:</span>
                 <button
                   type="button"
                   onClick={handleDownloadPdf}
                   data-testid="fallback-apply-pdf-btn"
-                  className="px-2 py-0.5 rounded bg-red-900/40 hover:bg-red-800 text-red-100 border border-red-700 font-medium"
+                  className="px-2 py-0.5 rounded bg-status-danger/10 hover:bg-status-danger/20 text-status-danger border border-status-danger/30 font-medium"
                 >
                   PDF
                 </button>
@@ -758,7 +758,7 @@ export function ApplySheet({
                   type="button"
                   onClick={handleDownloadDocx}
                   data-testid="fallback-apply-docx-btn"
-                  className="px-2 py-0.5 rounded bg-red-900/40 hover:bg-red-800 text-red-100 border border-red-700 font-medium"
+                  className="px-2 py-0.5 rounded bg-status-danger/10 hover:bg-status-danger/20 text-status-danger border border-status-danger/30 font-medium"
                 >
                   DOCX
                 </button>

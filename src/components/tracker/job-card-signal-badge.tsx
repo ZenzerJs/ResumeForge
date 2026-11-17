@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import {
@@ -159,7 +159,7 @@ export function JobCardSignalBadge({
             type="button"
             onClick={handleClick}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-xs font-bold transition-colors cursor-pointer shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40",
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-xs font-bold transition-colors cursor-pointer shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-warning/40",
               badgeColorClass
             )}
             title="Hover or click to view explainable point derivation"
@@ -200,13 +200,13 @@ export function JobCardSignalBadge({
             <div className="space-y-3">
               {/* Component breakdown meters */}
               <div className="space-y-2 rounded-lg bg-inset border border-hairline p-3">
-                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider block">
+                <span className="text-xs uppercase font-semibold text-muted-foreground tracking-wider block">
                   Weighted Score Components
                 </span>
 
                 {/* Core Stack */}
                 <div className="space-y-1">
-                  <div className="flex justify-between text-[11px]">
+                  <div className="flex justify-between text-xs">
                     <span className="text-text-secondary">Core Stack (50%)</span>
                     <span className="text-signal font-bold">
                       {effectiveScoreResult.breakdown.coreStackScore}%
@@ -222,7 +222,7 @@ export function JobCardSignalBadge({
 
                 {/* Seniority */}
                 <div className="space-y-1">
-                  <div className="flex justify-between text-[11px]">
+                  <div className="flex justify-between text-xs">
                     <span className="text-text-secondary">Seniority &amp; YOE (20%)</span>
                     <span className="text-primary font-bold">
                       {effectiveScoreResult.breakdown.seniorityScore}%
@@ -238,7 +238,7 @@ export function JobCardSignalBadge({
 
                 {/* Tools */}
                 <div className="space-y-1">
-                  <div className="flex justify-between text-[11px]">
+                  <div className="flex justify-between text-xs">
                     <span className="text-text-secondary">Tooling &amp; Infra (15%)</span>
                     <span className="text-ember font-bold">
                       {effectiveScoreResult.breakdown.toolsScore}%
@@ -254,7 +254,7 @@ export function JobCardSignalBadge({
 
                 {/* Evidence Coverage */}
                 <div className="space-y-1">
-                  <div className="flex justify-between text-[11px]">
+                  <div className="flex justify-between text-xs">
                     <span className="text-text-secondary">Evidence Coverage (15%)</span>
                     <span className="text-foreground font-bold">
                       {effectiveScoreResult.breakdown.evidenceCoverageScore}%
@@ -271,7 +271,7 @@ export function JobCardSignalBadge({
 
               {/* Verified Evidence Gains */}
               {verifiedSkills.length > 0 && (
-                <div className="space-y-1 rounded border border-signal/30 bg-signal/[0.07] p-2.5 text-[11px]">
+                <div className="space-y-1 rounded border border-signal/30 bg-signal/[0.07] p-2.5 text-xs">
                   <span className="font-bold text-signal block mb-1">
                     Points Gained from Verified Evidence Bank:
                   </span>
@@ -279,7 +279,7 @@ export function JobCardSignalBadge({
                     {verifiedSkills.map((s, idx) => (
                       <span
                         key={idx}
-                        className="inline-flex items-center gap-1 rounded bg-signal/10 border border-signal/35 px-1.5 py-0.5 text-[10px] text-signal font-mono"
+                        className="inline-flex items-center gap-1 rounded bg-signal/10 border border-signal/35 px-1.5 py-0.5 text-xs text-signal font-mono"
                       >
                         <CheckCircle2 className="h-2.5 w-2.5 text-signal" />
                         {hasBrandIcon(s.skill) && <BrandIcon name={s.skill} className="h-3 w-3 shrink-0" />}
@@ -292,9 +292,9 @@ export function JobCardSignalBadge({
 
               {/* Missing critical stack notice / deductions */}
               {effectiveScoreResult.missingRequiredSkills.length > 0 && (
-                <div className="rounded border border-dashed border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-300">
+                <div className="rounded border border-dashed border-status-warning/40 bg-status-warning/15 p-2 text-xs text-status-warning">
                   <div className="flex items-center gap-1.5 font-bold mb-1">
-                    <AlertTriangle className="h-3 w-3 text-amber-400" />
+                    <AlertTriangle className="h-3 w-3 text-status-warning" />
                     <span>Points Deducted for Missing Stack:</span>
                   </div>
                   <span>{effectiveScoreResult.missingRequiredSkills.join(", ")}</span>
@@ -303,10 +303,10 @@ export function JobCardSignalBadge({
 
               {/* Point Derivation Log */}
               <div className="space-y-1.5">
-                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider block">
+                <span className="text-xs uppercase font-semibold text-muted-foreground tracking-wider block">
                   Ground Truth Derivation Steps
                 </span>
-                <div className="max-h-36 overflow-y-auto space-y-1 text-[11px] text-text-secondary pr-1">
+                <div className="max-h-36 overflow-y-auto space-y-1 text-xs text-text-secondary pr-1">
                   {effectiveScoreResult.explanationDerivation.map((line, idx) => (
                     <div
                       key={idx}
@@ -315,7 +315,7 @@ export function JobCardSignalBadge({
                         line.startsWith("+")
                           ? "bg-inset border-hairline border-l-2 border-l-signal text-text-primary"
                           : line.startsWith("Deductions") || line.startsWith("Penalty")
-                          ? "bg-amber-950/30 border-amber-900/40 text-amber-300"
+                          ? "bg-status-warning/15 border-status-warning/40 text-status-warning"
                           : "bg-inset border-hairline text-muted-foreground"
                       )}
                     >
@@ -330,14 +330,14 @@ export function JobCardSignalBadge({
               <p>
                 Deterministic fit calculated against active candidate Master Resume and Evidence Bank.
               </p>
-              <div className="rounded border border-hairline bg-inset p-2.5 text-[11px] text-text-secondary font-mono">
+              <div className="rounded border border-hairline bg-inset p-2.5 text-xs text-text-secondary font-mono">
                 Formula: 0.50(CoreStack) + 0.20(Seniority) + 0.15(Tools) + 0.15(EvidenceCoverage) = {score}%
               </div>
             </div>
           )}
 
           {/* Popover Footer Info */}
-          <div className="mt-3 pt-2 border-t border-hairline flex items-center justify-between text-[10px] text-muted-foreground">
+          <div className="mt-3 pt-2 border-t border-hairline flex items-center justify-between text-xs text-muted-foreground">
             <span>Zero Hallucination AI Contract</span>
             <span>100% Deterministic</span>
           </div>
@@ -347,7 +347,7 @@ export function JobCardSignalBadge({
       {/* Sub-badge: Funding Stage */}
       {fundingBadge && (
         <span
-          className="inline-flex items-center gap-1 rounded-full border border-signal/35 bg-signal/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-signal shadow-sm"
+          className="inline-flex items-center gap-1 rounded-full border border-signal/35 bg-signal/10 px-2 py-0.5 font-mono text-xs font-semibold text-signal shadow-sm"
           title={`Venture Funding: ${fundingBadge}`}
           data-testid="funding-badge"
         >
@@ -359,7 +359,7 @@ export function JobCardSignalBadge({
       {/* Sub-badge: H1B Status */}
       {h1bBadge && (
         <span
-          className="inline-flex items-center gap-1 rounded-full border border-hairline bg-elevated px-2 py-0.5 font-mono text-[10px] font-semibold text-text-secondary shadow-sm"
+          className="inline-flex items-center gap-1 rounded-full border border-hairline bg-elevated px-2 py-0.5 font-mono text-xs font-semibold text-text-secondary shadow-sm"
           title={`US DOL LCA H1B Sponsorship: ${h1bBadge}`}
           data-testid="h1b-badge"
         >

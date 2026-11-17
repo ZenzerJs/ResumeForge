@@ -411,7 +411,7 @@ export function SuggestionPreview({
     return (
       <div
         role="status"
-        className="rounded-lg border border-amber-800 p-3 text-xs text-amber-200"
+        className="rounded-lg border border-status-warning/40 bg-status-warning/15 p-3 text-xs text-status-warning"
       >
         Preview unavailable: this proposal no longer matches the current resume
         or batch. Generate suggestions again.
@@ -427,7 +427,7 @@ export function SuggestionPreview({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold text-foreground">Review on resume</h3>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Suggested is a temporary preview; applying creates the saved result.
           </p>
         </div>
@@ -446,7 +446,7 @@ export function SuggestionPreview({
         </div>
       </div>
       {candidate.excluded.length ? (
-        <p role="status" className="text-xs text-amber-300">
+        <p role="status" className="text-sm text-status-warning">
           {candidate.excluded.length} conflicting or invalid suggestion(s) are
           excluded from the candidate. Review the list below.
         </p>
@@ -456,7 +456,7 @@ export function SuggestionPreview({
           Compiling and locating suggestions…
         </p>
       ) : active.error ? (
-        <p role="alert" className="text-xs text-red-300 transition-opacity duration-150 motion-reduce:transition-none">
+        <p role="alert" className="text-sm text-status-danger transition-opacity duration-150 motion-reduce:transition-none">
           Preview compilation failed: {active.error}
         </p>
       ) : (
@@ -476,7 +476,7 @@ export function SuggestionPreview({
                     <React.Fragment key={`${patch.id}-${locationIndex}`}>
                       <span
                         aria-hidden="true"
-                        className={`pointer-events-none absolute rounded-sm ${selected === patch.id ? "bg-amber-400/45" : decisions[patch.id] === "accepted" ? "paper-highlight-accepted" : decisions[patch.id] === "rejected" ? "bg-red-300/30" : "bg-amber-300/30"}`}
+                        className={`pointer-events-none absolute rounded-sm ${selected === patch.id ? "bg-status-warning/45" : decisions[patch.id] === "accepted" ? "paper-highlight-accepted" : decisions[patch.id] === "rejected" ? "bg-status-danger/30" : "bg-status-warning/30"}`}
                         style={{
                           left: `${location.left}%`,
                           top: `${location.top}%`,
@@ -489,7 +489,7 @@ export function SuggestionPreview({
                           type="button"
                           aria-label={`Review suggestion ${patchIndex + 1}, ${decisions[patch.id] || "pending"}`}
                           onClick={() => onSelect(patch.id)}
-                          className={`absolute z-10 flex h-7 min-w-7 -translate-y-1/2 items-center justify-center rounded-full border px-1 text-xs font-bold shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 ${decisions[patch.id] === "accepted" ? "paper-marker-accepted" : decisions[patch.id] === "rejected" ? "border-red-800 bg-red-300 text-primary-foreground" : "border-amber-700 bg-amber-300 text-primary-foreground"}`}
+                          className={`absolute z-10 flex h-7 min-w-7 -translate-y-1/2 items-center justify-center rounded-full border px-1 text-xs font-bold shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-warning ${decisions[patch.id] === "accepted" ? "paper-marker-accepted" : decisions[patch.id] === "rejected" ? "border-status-danger bg-status-danger text-primary-foreground" : "border-status-warning bg-status-warning text-primary-foreground"}`}
                           style={{
                             left: `max(0px, calc(${location.left}% - 34px))`,
                             top: `${location.top}%`,
@@ -506,7 +506,7 @@ export function SuggestionPreview({
         </div>
       )}
       {active && active.pages !== null && !active.error && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {active.isProbing
             ? "Locating suggestions on preview…"
             : `${patches.filter((patch) => !active.locations[patch.id]).length} suggestion(s) have no verified location in this view; use the review list below.`}
@@ -515,10 +515,10 @@ export function SuggestionPreview({
       {selectedPatch && (
         <div
           ref={detailRef}
-          className="space-y-2 rounded-lg border border-amber-700/50 bg-inset p-3 text-sm text-foreground transition-opacity duration-150 motion-reduce:transition-none"
+          className="space-y-2 rounded-lg border border-status-warning/40 bg-inset p-3 text-sm text-foreground transition-opacity duration-150 motion-reduce:transition-none"
           aria-live="polite"
         >
-          <p className="text-xs font-semibold text-amber-300">
+          <p className="text-xs font-semibold text-status-warning">
             Suggestion {patches.indexOf(selectedPatch) + 1} ·{" "}
             {decisions[selectedPatch.id] || "pending"}
           </p>
@@ -528,16 +528,16 @@ export function SuggestionPreview({
           <p className="break-words leading-relaxed">
             <strong>After:</strong> {selectedPatch.after || "(empty)"}
           </p>
-          <p className="break-words text-xs leading-relaxed text-text-secondary">
+          <p className="break-words text-sm leading-relaxed text-text-secondary">
             <strong>Reason:</strong> {selectedPatch.rationale}
           </p>
-          <p className="break-words text-xs text-text-secondary">
+          <p className="break-words text-sm text-text-secondary">
             <strong>Evidence:</strong>{" "}
             {selectedPatch.evidenceIds
               .map((eid) => evidenceTitles?.[eid] || eid)
               .join(", ")}
             {evidenceTitles && selectedPatch.evidenceIds.some((eid) => evidenceTitles[eid]) ? (
-              <span className="mt-1 block break-all font-mono text-[11px] text-muted-foreground">
+              <span className="mt-1 block break-all font-mono text-xs text-muted-foreground">
                 IDs: {selectedPatch.evidenceIds.join(", ")}
               </span>
             ) : null}
@@ -555,7 +555,7 @@ export function SuggestionPreview({
               type="button"
               onClick={() => onDecision(selectedPatch.id, "rejected")}
               aria-pressed={decisions[selectedPatch.id] === "rejected"}
-              className="rounded bg-red-900 px-3 py-2 text-xs font-semibold text-white transition-colors motion-reduce:transition-none"
+              className="rounded border border-status-danger/30 bg-status-danger/10 px-3 py-2 text-xs font-semibold text-status-danger transition-colors motion-reduce:transition-none"
             >
               Reject
             </button>

@@ -81,13 +81,14 @@ describe("Sign In & Landing Page Polish Unit Tests", () => {
     });
   });
 
-  describe("CompetitiveMatrixSection Typography & Competitor Renaming", () => {
-    it("consolidates comparison columns into a single Competitors column without named competitor brands", () => {
+  describe("CompetitiveMatrixSection Typography & Product Facts", () => {
+    it("renders factual product architecture columns without competitor brands or strawman claims", () => {
       expect(typeof CompetitiveMatrixSection).toBe("function");
       const html = renderToStaticMarkup(React.createElement(CompetitiveMatrixSection));
-      expect(html).toContain("Architectural Moat");
-      expect(html).toContain("ResumeForge (Guest / Postgres)");
-      expect(html).toContain("Competitors");
+      expect(html).toContain("Capability");
+      expect(html).toContain("ResumeForge");
+      expect(html).toContain("How ResumeForge Is Built");
+      expect(html).not.toContain("Competitors");
       expect(html).not.toMatch(/\b(Teal|Simplify|Jobright)\b/i);
     });
   });

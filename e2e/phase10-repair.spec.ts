@@ -187,7 +187,7 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     await page.waitForLoadState("networkidle");
 
     const headline = page.locator("h1");
-    await expect(headline).toContainText("Make every application feel");
+    await expect(headline).toContainText("Tailor your resume. Keep every claim true.");
 
     // Verify proof card container exists
     const proofCard = page.locator('[data-testid="product-proof-card"]');

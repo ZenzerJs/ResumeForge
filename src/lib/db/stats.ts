@@ -5,6 +5,7 @@ export interface DashboardStats {
   masterResumeTitle: string | null;
   evidenceCount: number;
   verifiedEvidenceCount: number;
+  hasTargetJob: boolean;
   jobsCount: number;
   appliedJobsCount: number;
   variantsCount: number;
@@ -17,6 +18,7 @@ export async function getDashboardStats(userId?: string): Promise<DashboardStats
       masterResume,
       evidenceCount,
       verifiedEvidenceCount,
+      targetJob,
       jobsCount,
       appliedJobsCount,
       variantsCount,
@@ -31,6 +33,17 @@ export async function getDashboardStats(userId?: string): Promise<DashboardStats
       userId
         ? prisma.evidenceItem.count({ where: { status: "verified", userId } })
         : Promise.resolve(0),
+      userId
+        ? prisma.job.findFirst({
+            where: {
+              OR: [
+                { userId },
+                { applications: { some: { userId } } },
+              ],
+            },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
       userId
         ? prisma.jobApplication.count({ where: { userId } })
         : Promise.resolve(0),
@@ -54,6 +67,7 @@ export async function getDashboardStats(userId?: string): Promise<DashboardStats
       masterResumeTitle: masterResume?.title ?? null,
       evidenceCount,
       verifiedEvidenceCount,
+      hasTargetJob: Boolean(targetJob),
       jobsCount,
       appliedJobsCount,
       variantsCount,
@@ -71,6 +85,7 @@ export function emptyGuestStats(): DashboardStats {
     masterResumeTitle: null,
     evidenceCount: 0,
     verifiedEvidenceCount: 0,
+    hasTargetJob: false,
     jobsCount: 0,
     appliedJobsCount: 0,
     variantsCount: 0,

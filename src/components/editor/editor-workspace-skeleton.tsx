@@ -48,8 +48,9 @@ function PreviewBulletBlock() {
 }
 
 /**
- * High-fidelity editor loading shell matching both the <1280px tabbed workspace
- * and the >=1280px 3-panel workspace (Typst source | Live preview paper | AI assistant).
+ * High-fidelity editor loading shell matching the <1024px tabbed workspace,
+ * the 1024-1279px 2-panel workspace, and the >=1280px 3-panel workspace
+ * (Typst source | Live preview paper | AI assistant).
  */
 export function EditorWorkspaceSkeleton({
   className,
@@ -82,13 +83,13 @@ export function EditorWorkspaceSkeleton({
                   ResumeForge
                 </span>
               </div>
-              <nav className="hidden items-center gap-1 xl:flex" aria-hidden>
+              <nav className="hidden items-center gap-1 lg:flex" aria-hidden>
                 {["Editor", "Evidence Bank", "Jobs", "Tailor", "Practice", "Settings"].map(
                   (label) => (
                     <span
                       key={label}
                       className={cn(
-                        "rounded-[6px] px-2.5 py-1 text-[11px] font-semibold",
+                        "rounded-[6px] px-2.5 py-1 text-xs font-semibold",
                         label === "Editor"
                           ? "bg-elevated text-foreground"
                           : "text-muted-foreground"
@@ -101,21 +102,21 @@ export function EditorWorkspaceSkeleton({
               </nav>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <Skeleton className="h-9 w-9 rounded-[6px] bg-elevated xl:hidden" />
+              <Skeleton className="h-9 w-9 rounded-[6px] bg-elevated lg:hidden" />
               <Skeleton className="h-7 w-16 rounded bg-elevated" />
             </div>
           </header>
-          <div className="flex min-h-10 shrink-0 items-center justify-between gap-3 border-b border-outline/70 bg-panel px-4 py-1 xl:h-10 xl:px-6">
+          <div className="flex min-h-10 shrink-0 items-center justify-between gap-3 border-b border-outline/70 bg-panel px-4 py-1 lg:h-10 lg:px-6">
             <div className="flex items-center gap-2">
               <Skeleton className="h-5 w-28 rounded bg-elevated" />
               <Skeleton className="h-5 w-24 rounded bg-elevated" />
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="inline-flex h-7 items-center gap-1.5 rounded border border-outline/70 px-2.5 text-[11px] text-text-secondary">
+              <span className="inline-flex h-7 items-center gap-1.5 rounded border border-outline/70 px-2.5 text-xs text-text-secondary">
                 <RotateCcw className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Revert to Master</span>
               </span>
-              <span className="inline-flex h-7 items-center gap-1.5 rounded bg-primary px-3 text-[11px] font-semibold text-primary-foreground">
+              <span className="inline-flex h-7 items-center gap-1.5 rounded bg-primary px-3 text-xs font-semibold text-primary-foreground">
                 <Save className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Save as Master Resume</span>
               </span>
@@ -124,8 +125,8 @@ export function EditorWorkspaceSkeleton({
         </>
       ) : null}
 
-      {/* Mobile / tablet panel selector bar (<1280px) */}
-      <div className="flex shrink-0 items-center border-b border-outline/70 bg-panel px-2 py-1.5 xl:hidden" aria-hidden>
+      {/* Mobile / tablet panel selector bar (<1024px) */}
+      <div className="flex shrink-0 items-center border-b border-outline/70 bg-panel px-2 py-1.5 lg:hidden" aria-hidden>
         <div className="grid w-full grid-cols-3 gap-1 rounded-[6px] border border-outline/70 bg-inset p-0.5 sm:inline-flex sm:w-auto">
           <Skeleton className="h-9 rounded-[4px] bg-primary/75 sm:w-20" />
           <Skeleton className="h-9 rounded-[4px] bg-elevated sm:w-20" />
@@ -135,7 +136,7 @@ export function EditorWorkspaceSkeleton({
 
       <div className="flex min-h-0 flex-1 gap-1.5 overflow-hidden bg-canvas px-1.5 pb-1.5 pt-0">
         {/* Panel 1 — Typst Source Editor */}
-        <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-panel xl:flex-[1.15]">
+        <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-panel lg:flex-1 xl:flex-[1.15]">
           <div className="flex h-8 shrink-0 items-center justify-between border-b border-outline/70 bg-panel px-2.5">
             <span className="flex items-center gap-2 text-xs font-semibold text-foreground">
               <span className="h-2 w-2 rounded-full bg-primary" />
@@ -148,7 +149,7 @@ export function EditorWorkspaceSkeleton({
           </div>
           <div className="relative flex-1 overflow-hidden bg-inset p-3 font-mono">
             <div className="flex gap-3">
-              <div className="flex w-5 shrink-0 flex-col gap-[13px] pt-0.5 text-right text-[10px] leading-none text-text-muted select-none">
+              <div className="flex w-5 shrink-0 flex-col gap-[13px] pt-0.5 text-right text-xs leading-none text-text-muted select-none">
                 {Array.from({ length: CODE_LINE_WIDTHS.length }).map((_, i) => (
                   <span key={i}>{i + 1}</span>
                 ))}
@@ -162,13 +163,13 @@ export function EditorWorkspaceSkeleton({
           </div>
         </section>
 
-        {/* Resize handle cue */}
-        <div className="hidden w-1.5 shrink-0 items-center justify-center self-stretch xl:flex" aria-hidden>
+        {/* Resize handle cue (visible in 2-pane >=1024px and 3-pane >=1280px) */}
+        <div className="hidden w-1.5 shrink-0 items-center justify-center self-stretch lg:flex" aria-hidden>
           <div className="h-8 w-1 rounded-full bg-outline/70" />
         </div>
 
         {/* Panel 2 — Live Document Preview */}
-        <section className="hidden min-w-0 flex-1 flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-inset xl:flex">
+        <section className="hidden min-w-0 flex-1 flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-inset lg:flex">
           <div className="flex h-8 shrink-0 items-center justify-between border-b border-outline/70 bg-panel px-2.5">
             <span className="flex items-center gap-2 text-xs font-semibold text-foreground">
               <span className="h-2 w-2 rounded-full bg-status-success" />

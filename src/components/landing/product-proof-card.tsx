@@ -18,15 +18,15 @@ export function ProductProofCard() {
       {/* Top header row matching palette-lab.html#ember .proof-top */}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             <BrandIcon name="stripe" className="h-3.5 w-3.5 shrink-0" />
-            ATS match · Stripe, Backend Eng.
+            ATS match · Stripe, SWE Intern
           </span>
           <span className="sr-only">Sample Workspace Layout · Protected Master</span>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-signal/40 bg-signal/10 px-2.5 py-0.5 text-xs font-semibold text-signal">
           <span className="h-1.5 w-1.5 rounded-full bg-signal" aria-hidden />
-          Live
+          Synthetic example
         </span>
       </div>
 
@@ -86,10 +86,10 @@ export function ProductProofCard() {
             color: "#ffb3ab",
           }}
         >
-          − Worked on payment services and databases.
+          − Built backend endpoints for a class project.
         </div>
         <div className="bg-signal/10 px-3 py-[7px] text-signal">
-          + Cut p99 settlement latency 38% by sharding PostgreSQL ledgers in Go.
+          + Implemented idempotent Go webhook handlers backed by PostgreSQL transactions.
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 bg-inset px-3 py-[7px] text-xs text-muted-foreground">
           <span>cites ev_0142 · ev_0157</span>
@@ -119,7 +119,7 @@ export function ProductProofCard() {
         </div>
         <Link
           href="/tailor"
-          className="font-mono text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           Sample Workspace Layout →
         </Link>

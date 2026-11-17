@@ -35,8 +35,8 @@ export function GuardrailFeedback({
         );
       case "retried":
         return (
-          <Badge variant="outline" className="border-amber-500/40 text-amber-400 bg-amber-950/30 gap-1">
-            <RotateCcw className="size-3 text-amber-400" />
+          <Badge variant="outline" className="border-status-warning/40 text-status-warning bg-status-warning/15 gap-1">
+            <RotateCcw className="size-3 text-status-warning" />
             Retried &amp; Cleared
           </Badge>
         );
@@ -65,7 +65,7 @@ export function GuardrailFeedback({
           <div className="flex items-center justify-between w-full">
             <div>
               <AlertTitle className="text-status-success-soft font-semibold">Mechanical Guardrail Verified</AlertTitle>
-              <AlertDescription className="text-xs text-status-success mt-0.5">
+              <AlertDescription className="text-sm text-status-success mt-0.5">
                 All claims, metrics, and employers conform strictly to frozen master facts.
               </AlertDescription>
             </div>
@@ -73,44 +73,44 @@ export function GuardrailFeedback({
           </div>
         </Alert>
       ) : hasHardViolations ? (
-        <Alert variant="destructive" className="border-red-800 bg-red-950/40 space-y-3">
+        <Alert variant="destructive" className="border-status-danger/30 bg-status-danger/10 space-y-3">
           <AlertOctagon className="size-4" />
           <div className="w-full">
             <div className="flex items-center justify-between">
-              <AlertTitle className="font-semibold text-red-200">Mechanical Guardrail Violation</AlertTitle>
+              <AlertTitle className="font-semibold text-status-danger">Mechanical Guardrail Violation</AlertTitle>
               {renderBadge(status)}
             </div>
-            <AlertDescription className="text-xs text-red-300/90 mt-1">
+            <AlertDescription className="text-sm text-status-danger/90 mt-1">
               Unverified claims detected. Hard violations disable document export until corrected.
             </AlertDescription>
 
-            <div className="mt-3 rounded-md border border-red-900/60 bg-black/40 overflow-hidden">
+            <div className="mt-3 rounded-md border border-status-danger/30 bg-black/40 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-red-900/60 hover:bg-transparent">
-                    <TableHead className="text-[11px] text-red-400 h-8">Kind</TableHead>
-                    <TableHead className="text-[11px] text-red-400 h-8">Severity</TableHead>
-                    <TableHead className="text-[11px] text-red-400 h-8">Message</TableHead>
-                    {onAlignViolation && <TableHead className="text-[11px] text-red-400 h-8 w-16">Action</TableHead>}
+                  <TableRow className="border-status-danger/30 hover:bg-transparent">
+                    <TableHead className="text-xs text-status-danger h-8">Kind</TableHead>
+                    <TableHead className="text-xs text-status-danger h-8">Severity</TableHead>
+                    <TableHead className="text-xs text-status-danger h-8">Message</TableHead>
+                    {onAlignViolation && <TableHead className="text-xs text-status-danger h-8 w-16">Action</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {violations.map((v, i) => (
-                    <TableRow key={i} className="border-red-900/40 text-xs hover:bg-red-950/20">
-                      <TableCell className="font-mono text-[11px] text-red-300 py-1.5 uppercase">{v.kind}</TableCell>
+                    <TableRow key={i} className="border-status-danger/25 text-xs hover:bg-status-danger/10">
+                      <TableCell className="font-mono text-xs text-status-danger py-1.5 uppercase">{v.kind}</TableCell>
                       <TableCell className="py-1.5">
-                        <Badge variant={v.severity === "HARD" ? "destructive" : "secondary"} className="text-[10px] py-0 px-1.5">
+                        <Badge variant={v.severity === "HARD" ? "destructive" : "secondary"} className="text-xs py-0 px-1.5">
                           {v.severity}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-red-200 py-1.5">{v.message}</TableCell>
+                      <TableCell className="text-status-danger py-1.5">{v.message}</TableCell>
                       {onAlignViolation && (
                         <TableCell className="py-1.5">
                           <button
                             type="button"
                             onClick={() => onAlignViolation(v)}
                             data-testid={`align-violation-btn-${i}`}
-                            className="text-[10px] text-amber-400 hover:underline inline-flex items-center gap-1 font-semibold cursor-pointer"
+                            className="text-xs text-status-warning hover:underline inline-flex items-center gap-1 font-semibold cursor-pointer"
                           >
                             Align
                           </button>
@@ -138,14 +138,14 @@ export function GuardrailFeedback({
           </div>
         </Alert>
       ) : (
-        <Alert className="border-amber-800/50 bg-amber-950/20 text-amber-300 space-y-2">
-          <AlertTriangle className="size-4 text-amber-400" />
+        <Alert className="border-status-warning/40 bg-status-warning/15 text-status-warning space-y-2">
+          <AlertTriangle className="size-4 text-status-warning" />
           <div className="w-full">
             <div className="flex items-center justify-between">
-              <AlertTitle className="text-amber-200 font-semibold">Guardrail Advisory</AlertTitle>
+              <AlertTitle className="text-status-warning font-semibold">Guardrail Advisory</AlertTitle>
               {renderBadge(status)}
             </div>
-            <AlertDescription className="text-xs text-amber-300/90 mt-1">
+            <AlertDescription className="text-sm text-status-warning/90 mt-1">
               Soft advisories found (unverified skills). Export remains permitted.
             </AlertDescription>
 

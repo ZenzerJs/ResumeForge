@@ -216,4 +216,98 @@ describe("Design tokens & Ember Ink taste invariants", () => {
     expect(brandIconSrc).toContain('fill="currentColor"');
     expect(brandIconSrc).toContain('aria-hidden="true"');
   });
+
+  it("forbids hardcoded -900 and -950 status classes across src/app and src/components", () => {
+    const hardcoded900sRe =
+      /\b(?:bg|border|text)-(?:red|amber|sky|blue|orange|yellow|rose|pink|purple|indigo|violet|cyan|lime|teal|emerald|green)-(?:900|950)\b/g;
+
+    const appAndComponents = sourceFiles.filter((file) => {
+      const rel = path.relative(SRC_DIR, file).replace(/\\/g, "/");
+      return rel.startsWith("app/") || rel.startsWith("components/");
+    });
+
+    const violations: string[] = [];
+    for (const file of appAndComponents) {
+      const src = fs.readFileSync(file, "utf8");
+      const matches = src.match(hardcoded900sRe);
+      if (matches && matches.length > 0) {
+        violations.push(`${path.relative(ROOT, file).replace(/\\/g, "/")}: ${matches.join(", ")}`);
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it("forbids numbered palette classes across src/**/*.{ts,tsx,css}", () => {
+    const numberedPaletteRe =
+      /\b(?:bg|text|border|ring|from|to|via)-(?:red|rose|amber|orange|yellow|purple|violet|blue|pink|indigo)-\d{2,3}\b/g;
+
+    const violations: string[] = [];
+    for (const file of sourceFiles) {
+      const src = fs.readFileSync(file, "utf8");
+      const matches = src.match(numberedPaletteRe);
+      if (matches && matches.length > 0) {
+        violations.push(`${path.relative(ROOT, file).replace(/\\/g, "/")}: ${matches.join(", ")}`);
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it("defaults confirmed to false in ConfirmMasterDialog", () => {
+    const dialogSrc = fs.readFileSync(
+      path.join(SRC_DIR, "components/editor/confirm-master-dialog.tsx"),
+      "utf8",
+    );
+    expect(dialogSrc).toMatch(/useState\(false\)/);
+    expect(dialogSrc).toContain("const [confirmed, setConfirmed] = useState(false)");
+  });
+
+  it("omits fake Live badge in ProductProofCard and sub-12px Math.max(8 floor in HomeLanding", () => {
+    const proofCardSrc = fs.readFileSync(
+      path.join(SRC_DIR, "components/landing/product-proof-card.tsx"),
+      "utf8",
+    );
+    const homeSrc = fs.readFileSync(
+      path.join(SRC_DIR, "components/landing/home-landing.tsx"),
+      "utf8",
+    );
+
+    expect(proofCardSrc).not.toContain(">Live<");
+    expect(proofCardSrc).not.toContain('"Live"');
+    expect(homeSrc).not.toContain("Math.max(8");
+  });
+
+  it("enforces the 12px typography floor across src/app and src/components", () => {
+    const collectTsx = (dir: string): string[] => {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      const results: string[] = [];
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          results.push(...collectTsx(full));
+        } else if (entry.name.endsWith(".tsx")) {
+          results.push(full);
+        }
+      }
+      return results;
+    };
+
+    const sub12Re = /\btext-\[(?:\d|1[01])(?:\.\d+)?px\]/g;
+    const files = [
+      ...collectTsx(path.join(SRC_DIR, "app")),
+      ...collectTsx(path.join(SRC_DIR, "components")),
+    ];
+    const violations: string[] = [];
+
+    for (const file of files) {
+      const src = fs.readFileSync(file, "utf8");
+      const matches = src.match(sub12Re);
+      if (matches && matches.length > 0) {
+        violations.push(`${path.relative(SRC_DIR, file)}: ${matches.join(", ")}`);
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
 });

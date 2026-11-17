@@ -40,6 +40,12 @@ import {
 } from "@/lib/guardrail/policy";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { AppShell } from "@/components/design-system/app-shell";
 import { clearDemoSamplesForPersonalResume, getDemoContextFromBrowser, initializeDemoSamples } from "@/lib/demo-client";
 import { fetchDemoConfig } from "@/components/auth/session-user";
@@ -150,7 +156,8 @@ export function EditorWorkspace() {
   const [lastSnapshotId, setLastSnapshotId] = useState<string | null>(null);
   const [isUndoing, setIsUndoing] = useState<boolean>(false);
   const [undoSuccess, setUndoSuccess] = useState<boolean>(false);
-  const [draftEvidenceFromMaster, setDraftEvidenceFromMaster] = useState<boolean>(true);
+  const [draftEvidenceFromMaster, setDraftEvidenceFromMaster] = useState<boolean>(false);
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [evidenceExtractToast, setEvidenceExtractToast] = useState<string | null>(null);
   const [isExtractingEvidence, setIsExtractingEvidence] = useState<boolean>(false);
   // Phase 11: Master Fact Snapshot state (strictly from frozen Master Resume + verified Evidence Bank)
@@ -190,26 +197,39 @@ export function EditorWorkspace() {
   const [layout, setLayout] = useState<Record<string, number>>(DEFAULT_EDITOR_LAYOUT.sizes);
   const [isAiCollapsed, setIsAiCollapsed] = useState<boolean>(DEFAULT_EDITOR_LAYOUT.isAiCollapsed);
   const [isAiPoppedOut, setIsAiPoppedOut] = useState<boolean>(false);
+  const [isAiSheetOpen, setIsAiSheetOpen] = useState<boolean>(false);
   const [aiMode, setAiMode] = useState<"chat" | "tailor">("chat");
   const [isLayoutReady, setIsLayoutReady] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
+  const [isXlDesktop, setIsXlDesktop] = useState(true);
   const [hosts, setHosts] = useState<EditorPaneHosts | null>(null);
   const isDesktopRef = useRef<boolean>(true);
+  const isXlDesktopRef = useRef<boolean>(true);
   const isAiCollapsedRef = useRef<boolean>(isAiCollapsed);
   const isAiPoppedOutRef = useRef<boolean>(isAiPoppedOut);
   const skipResizePersistRef = useRef(false);
   const suppressResizePersistUntilRef = useRef(0);
 
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1280px)");
+    const mqLg = window.matchMedia("(min-width: 1024px)");
+    const mqXl = window.matchMedia("(min-width: 1280px)");
     const sync = () => {
       suppressResizePersistUntilRef.current = Date.now() + 750;
-      isDesktopRef.current = mq.matches;
-      setIsDesktop(mq.matches);
+      isDesktopRef.current = mqLg.matches;
+      isXlDesktopRef.current = mqXl.matches;
+      setIsDesktop(mqLg.matches);
+      setIsXlDesktop(mqXl.matches);
+      if (mqXl.matches || !mqLg.matches) {
+        setIsAiSheetOpen(false);
+      }
     };
     sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
+    mqLg.addEventListener("change", sync);
+    mqXl.addEventListener("change", sync);
+    return () => {
+      mqLg.removeEventListener("change", sync);
+      mqXl.removeEventListener("change", sync);
+    };
   }, []);
 
   useEffect(() => {
@@ -257,7 +277,7 @@ export function EditorWorkspace() {
 
   // Collapse panel on mount (or when returning to >=1280px) if layout was persisted as collapsed or popped out
   useEffect(() => {
-    if (!isLayoutReady || !isDesktop) return;
+    if (!isLayoutReady || !isXlDesktop) return;
     if (isAiCollapsed || isAiPoppedOut) {
       suppressResizePersistUntilRef.current = Date.now() + 750;
       const timer = setTimeout(() => {
@@ -265,7 +285,7 @@ export function EditorWorkspace() {
       }, 50);
       return () => clearTimeout(timer);
     }
-  }, [aiPanelRef, isAiCollapsed, isAiPoppedOut, isDesktop, isLayoutReady]);
+  }, [aiPanelRef, isAiCollapsed, isAiPoppedOut, isXlDesktop, isLayoutReady]);
 
   const persistLayoutState = (sizes: Record<string, number>, collapsed: boolean) => {
     if (typeof window === "undefined") return;
@@ -280,7 +300,7 @@ export function EditorWorkspace() {
   };
 
   const handleLayoutChange = useCallback((layoutData: Record<string, number> | number[]) => {
-    if (!isDesktopRef.current) return;
+    if (!isXlDesktopRef.current) return;
     let layoutMap: Record<string, number>;
     if (Array.isArray(layoutData)) {
       layoutMap = {
@@ -309,7 +329,7 @@ export function EditorWorkspace() {
           // ignore
         }
       }
-      if (isDesktopRef.current) {
+      if (isXlDesktopRef.current) {
         if (next) {
           aiPanelRef.current?.collapse();
           updateAiCollapsedState(true);
@@ -373,6 +393,7 @@ export function EditorWorkspace() {
   const loadFrozenMasterSnapshot = useCallback(async () => {
     try {
       const demoConfig = await fetchDemoConfig();
+      setIsDemoMode(Boolean(demoConfig?.demoMode));
       if (demoConfig?.demoMode) {
         const rawSnapshot = localStorage.getItem("resumeforge_demo_master_facts");
         setMasterFacts(rawSnapshot ? JSON.parse(rawSnapshot) as ResumeFacts : null);
@@ -410,6 +431,9 @@ export function EditorWorkspace() {
     setHasAiPatchedBuffer(persistedAiPatched);
     try {
       const demoConfig = await fetchDemoConfig();
+      if (current()) {
+        setIsDemoMode(Boolean(demoConfig?.demoMode));
+      }
       if (demoConfig?.demoMode) {
         initializeDemoSamples();
         const personalSource = localStorage.getItem(STORAGE_KEY);
@@ -647,9 +671,11 @@ export function EditorWorkspace() {
   const handleTriggerRepair = useCallback(
     (context: { compileError: string; line?: number; column?: number; sourceExcerpt?: string }) => {
       setRepairContext(context);
-      if (isDesktopRef.current && isAiCollapsedRef.current && !isAiPoppedOutRef.current && aiPanelRef.current) {
+      if (isXlDesktopRef.current && isAiCollapsedRef.current && !isAiPoppedOutRef.current && aiPanelRef.current) {
         aiPanelRef.current.expand();
         updateAiCollapsedState(false);
+      } else if (isDesktopRef.current && !isXlDesktopRef.current) {
+        setIsAiSheetOpen(true);
       }
       setActiveTab("ai");
     },
@@ -709,18 +735,9 @@ export function EditorWorkspace() {
     handleSourceChange(starter);
   };
 
-  const handleSaveAsMaster = async () => {
+  const handleSaveAsMaster = () => {
+    setDraftEvidenceFromMaster(false);
     setShowSaveConfirm(true);
-    // Default checkbox: checked when Evidence Bank is empty; otherwise unchecked
-    try {
-      const res = await fetch("/api/evidence");
-      const json = await res.json();
-      const items = Array.isArray(json?.data) ? json.data : [];
-      const activeCount = items.filter((i: { status?: string }) => i.status !== "archived").length;
-      setDraftEvidenceFromMaster(activeCount === 0);
-    } catch {
-      setDraftEvidenceFromMaster(true);
-    }
   };
 
   const runEvidenceExtractAfterSave = async (typstSource: string) => {
@@ -778,6 +795,7 @@ export function EditorWorkspace() {
       setSaveSuccess(false);
 
       const demoConfig = await fetchDemoConfig();
+      setIsDemoMode(Boolean(demoConfig?.demoMode));
       if (demoConfig?.demoMode) {
         const demoContext = getDemoContextFromBrowser();
         const facts = extractResumeFacts(cleanMasterSource, demoContext?.evidenceItems || []);
@@ -900,7 +918,7 @@ export function EditorWorkspace() {
             {docMetadata.type === "MASTER_RESUME" && (
               <span
                 data-testid="doc-badge-master"
-                className="text-[11px] font-semibold px-2 py-0.5 rounded bg-elevated text-foreground border border-primary/40 flex items-center gap-1.5 whitespace-nowrap"
+                className="text-xs font-semibold px-2 py-0.5 rounded bg-elevated text-foreground border border-primary/40 flex items-center gap-1.5 whitespace-nowrap"
               >
                 <ShieldCheck className="h-3.5 w-3.5 text-primary" />
                 Master Resume
@@ -909,7 +927,7 @@ export function EditorWorkspace() {
             {docMetadata.type === "RESUME_VARIANT" && (
               <span
                 data-testid="doc-badge-variant"
-                className="text-[11px] font-semibold px-2 py-0.5 rounded bg-elevated text-foreground border border-status-info/40 flex items-center gap-1.5 whitespace-nowrap"
+                className="text-xs font-semibold px-2 py-0.5 rounded bg-elevated text-foreground border border-status-info/40 flex items-center gap-1.5 whitespace-nowrap"
               >
                 <Sparkles className="h-3.5 w-3.5 text-status-info" />
                 Tailored Variant ({docMetadata.title})
@@ -918,7 +936,7 @@ export function EditorWorkspace() {
             {docMetadata.type === "LOCAL_FALLBACK" && (
               <span
                 data-testid="doc-badge-fallback"
-                className="text-[11px] font-semibold px-2 py-0.5 rounded bg-elevated text-text-secondary border border-outline/70 flex items-center gap-1.5 whitespace-nowrap"
+                className="text-xs font-semibold px-2 py-0.5 rounded bg-elevated text-text-secondary border border-outline/70 flex items-center gap-1.5 whitespace-nowrap"
               >
                 <FileText className="h-3.5 w-3.5 text-text-muted" />
                 {docMetadata.title}
@@ -978,7 +996,9 @@ export function EditorWorkspace() {
               size="sm"
               variant="outline"
               onClick={() => {
-                if (isAiPoppedOut) {
+                if (!isXlDesktop) {
+                  setIsAiSheetOpen((prev) => !prev);
+                } else if (isAiPoppedOut) {
                   handleToggleAiPopOut();
                 } else if (isAiCollapsed) {
                   toggleAiSidebarCollapse();
@@ -986,25 +1006,37 @@ export function EditorWorkspace() {
                   handleToggleAiPopOut();
                 }
               }}
-              data-testid={isAiCollapsed ? "expand-ai-sidebar-btn" : "toggle-ai-assistant-btn"}
+              data-testid={
+                !isXlDesktop
+                  ? isAiSheetOpen
+                    ? "toggle-ai-assistant-btn"
+                    : "expand-ai-sidebar-btn"
+                  : isAiCollapsed
+                    ? "expand-ai-sidebar-btn"
+                    : "toggle-ai-assistant-btn"
+              }
               className={cn(
-                "h-7 shrink-0 gap-1.5 px-2.5 text-xs hidden xl:inline-flex transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                isAiPoppedOut || !isAiCollapsed
+                "h-7 shrink-0 gap-1.5 px-2.5 text-xs hidden lg:inline-flex transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                (isXlDesktop ? isAiPoppedOut || !isAiCollapsed : isAiSheetOpen)
                   ? "border-primary/60 bg-primary/15 text-primary hover:bg-primary/20"
                   : "border-outline/70 bg-elevated text-text-secondary hover:bg-muted hover:text-foreground"
               )}
               title={
-                isAiPoppedOut
-                  ? "AI Assistant is popped out in floating window (Click to dock)"
-                  : isAiCollapsed
-                  ? "Expand AI Assistant"
-                  : "Pop out AI Assistant into floating window"
+                !isXlDesktop
+                  ? isAiSheetOpen
+                    ? "Close AI Assistant"
+                    : "Open AI Assistant"
+                  : isAiPoppedOut
+                    ? "AI Assistant is popped out in floating window (Click to dock)"
+                    : isAiCollapsed
+                      ? "Expand AI Assistant"
+                      : "Pop out AI Assistant into floating window"
               }
             >
               <Bot className="h-3.5 w-3.5 text-primary" />
               <span>AI Assistant</span>
-              {isAiPoppedOut && (
-                <span className="text-[9px] bg-primary/20 px-1 py-0.5 rounded font-mono text-primary">
+              {isXlDesktop && isAiPoppedOut && (
+                <span className="text-xs bg-primary/20 px-1 py-0.5 rounded font-mono text-primary">
                   POP-OUT
                 </span>
               )}
@@ -1025,116 +1057,125 @@ export function EditorWorkspace() {
         </div>
       )}
 
-      {documentError && (
-        <div
-          data-testid="editor-error-state"
-          className="flex items-center justify-between px-4 py-2 bg-red-950/90 border-b border-red-800 text-xs text-red-200"
-        >
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
-            <span>{documentError}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setDocumentError(null)}
-            className="px-2.5 py-1 bg-red-900/60 hover:bg-red-800 text-red-100 rounded text-[11px] font-medium transition"
-          >
-            Dismiss Error
-          </button>
-        </div>
-      )}
-
-      {/* Task 9.1: PDF Conversion Status Banners */}
-      {!isConversionBannerDismissed && source.includes("// @conversion-path: fallback") && (
-        <div
-          data-testid="pdf-conversion-fallback-banner"
-          className="flex items-center justify-between px-4 py-2 bg-amber-950/80 border-b border-amber-800 text-xs text-amber-200"
-        >
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
-            <span>AI conversion unavailable — used basic formatting</span>
-          </div>
-          <button
-            type="button"
-            onClick={handleDismissConversionBanner}
-            className="p-2 text-amber-300 hover:text-white transition min-h-11 min-w-11 inline-flex items-center justify-center"
-            title="Dismiss banner"
-            data-testid="dismiss-conversion-banner-btn"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
-
-      {!isConversionBannerDismissed && source.includes("// @conversion-path: ai") && (
-        <div
-          data-testid="pdf-conversion-ai-banner"
-          className="flex items-center justify-between px-4 py-2 bg-status-success/15 border-b border-status-success/35 text-xs text-status-success-soft"
-        >
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 shrink-0 text-status-success" />
-            <span>AI-Converted Draft — Converted using BYOK AI provider</span>
-          </div>
-          <button
-            type="button"
-            onClick={handleDismissConversionBanner}
-            className="p-2 text-status-success-soft hover:text-foreground transition min-h-11 min-w-11 inline-flex items-center justify-center"
-            title="Dismiss banner"
-            data-testid="dismiss-conversion-banner-btn"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
-
-
-      {/* Task 7.9: Undo Overwrite Notification Banner */}
-      {lastSnapshotId && (
-        <div
-          data-testid="undo-overwrite-banner"
-          className="flex items-center justify-between px-4 py-2 bg-amber-950/90 border-b border-amber-800 text-xs text-amber-200"
-        >
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 shrink-0 text-amber-400" />
-            <span>Master Resume overwritten. A pre-save snapshot was saved to database history.</span>
-          </div>
-          <button
-            type="button"
-            onClick={handleUndoOverwrite}
-            disabled={isUndoing}
-            data-testid="undo-overwrite-btn"
-            className="flex items-center gap-1.5 px-3 py-1 bg-primary hover:bg-primary/90 text-primary-foreground rounded text-xs font-semibold transition"
-          >
-            {isUndoing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Undo2 className="h-3.5 w-3.5" />}
-            Undo Overwrite
-          </button>
-        </div>
-      )}
-
-      {undoSuccess && (
-        <div
-          data-testid="undo-success-banner"
-          className="flex items-center gap-2 px-4 py-2 bg-status-success/15 border-b border-status-success/35 text-xs text-status-success-soft"
-        >
-          <Check className="h-4 w-4 text-status-success" />
-          <span>Restored Master Resume to pre-overwrite snapshot!</span>
-        </div>
-      )}
-
-      {evidenceExtractToast && (
-        <div
-          data-testid="evidence-extract-toast"
-          className="flex items-center gap-2 px-4 py-2 bg-sky-950/90 border-b border-sky-800 text-xs text-sky-200"
-        >
-          <BookOpen className="h-4 w-4 text-sky-400 shrink-0" />
-          <span>{evidenceExtractToast}</span>
-          {evidenceExtractToast.includes("Library") && (
-            <Link
-              href="/library"
-              className="ml-auto text-sky-300 underline underline-offset-2 hover:text-sky-100"
+      {(documentError ||
+        (!isConversionBannerDismissed &&
+          (source.includes("// @conversion-path: fallback") ||
+            source.includes("// @conversion-path: ai"))) ||
+        lastSnapshotId ||
+        undoSuccess ||
+        evidenceExtractToast) && (
+        <div data-testid="editor-banner-slot" className="shrink-0 divide-y divide-hairline">
+          {documentError && (
+            <div
+              data-testid="editor-error-state"
+              className="flex items-center justify-between gap-2 px-4 py-1.5 bg-status-danger/10 border-b border-status-danger/30 text-xs text-status-danger"
             >
-              Open Library
-            </Link>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-status-danger" />
+                <span>{documentError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDocumentError(null)}
+                className="px-2.5 py-0.5 bg-status-danger/15 hover:bg-status-danger/25 text-foreground border border-status-danger/30 rounded text-xs font-medium transition"
+              >
+                Dismiss Error
+              </button>
+            </div>
+          )}
+
+          {/* Task 9.1: PDF Conversion Status Banners */}
+          {!isConversionBannerDismissed && source.includes("// @conversion-path: fallback") && (
+            <div
+              data-testid="pdf-conversion-fallback-banner"
+              className="flex items-center justify-between gap-2 px-4 py-1.5 bg-primary/10 border-b border-primary/30 text-xs text-primary"
+            >
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-primary" />
+                <span>AI conversion unavailable — used basic formatting</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleDismissConversionBanner}
+                className="p-1 text-primary/80 hover:text-foreground transition inline-flex items-center justify-center rounded"
+                title="Dismiss banner"
+                data-testid="dismiss-conversion-banner-btn"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {!isConversionBannerDismissed && source.includes("// @conversion-path: ai") && (
+            <div
+              data-testid="pdf-conversion-ai-banner"
+              className="flex items-center justify-between gap-2 px-4 py-1.5 bg-status-success/15 border-b border-status-success/35 text-xs text-status-info"
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 shrink-0 text-status-success" />
+                <span>AI-Converted Draft — Converted using BYOK AI provider</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleDismissConversionBanner}
+                className="p-1 text-status-info hover:text-foreground transition inline-flex items-center justify-center rounded"
+                title="Dismiss banner"
+                data-testid="dismiss-conversion-banner-btn"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Task 7.9: Undo Overwrite Notification Banner */}
+          {lastSnapshotId && (
+            <div
+              data-testid="undo-overwrite-banner"
+              className="flex items-center justify-between gap-2 px-4 py-1.5 bg-primary/10 border-b border-primary/30 text-xs text-foreground"
+            >
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary" />
+                <span>Master Resume overwritten. A pre-save snapshot was saved to database history.</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleUndoOverwrite}
+                disabled={isUndoing}
+                data-testid="undo-overwrite-btn"
+                className="flex items-center gap-1.5 px-2.5 py-0.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded text-xs font-semibold transition"
+              >
+                {isUndoing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Undo2 className="h-3.5 w-3.5" />}
+                Undo Overwrite
+              </button>
+            </div>
+          )}
+
+          {undoSuccess && (
+            <div
+              data-testid="undo-success-banner"
+              className="flex items-center gap-2 px-4 py-1.5 bg-status-success/15 border-b border-status-success/35 text-xs text-status-info"
+            >
+              <Check className="h-3.5 w-3.5 text-status-success" />
+              <span>Restored Master Resume to pre-overwrite snapshot!</span>
+            </div>
+          )}
+
+          {evidenceExtractToast && (
+            <div
+              data-testid="evidence-extract-toast"
+              className="flex items-center gap-2 px-4 py-1.5 bg-status-info/10 border-b border-status-info/30 text-xs text-foreground"
+            >
+              <BookOpen className="h-3.5 w-3.5 text-status-info shrink-0" />
+              <span>{evidenceExtractToast}</span>
+              {evidenceExtractToast.includes("Library") && (
+                <Link
+                  href="/library"
+                  className="ml-auto text-status-info underline underline-offset-2 hover:text-foreground"
+                >
+                  Open Library
+                </Link>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -1142,30 +1183,39 @@ export function EditorWorkspace() {
       {/* Phase 11: Confirm-Before-Master Fact Freezing Dialog */}
       <ConfirmMasterDialog
         open={showSaveConfirm}
-        onOpenChange={setShowSaveConfirm}
+        onOpenChange={(open) => {
+          setShowSaveConfirm(open);
+          if (!open) {
+            setDraftEvidenceFromMaster(false);
+          }
+        }}
         typstSource={source}
         priorSource={baselineSource}
         title={docMetadata.title}
         onConfirm={handleConfirmSaveAsMaster}
         isSaving={isSavingMaster}
+        draftEvidence={draftEvidenceFromMaster}
+        onDraftEvidenceChange={setDraftEvidenceFromMaster}
+        showDraftEvidence={!isDemoMode}
       />
 
       {/* Main Workspace Body */}
       <div className="flex flex-1 min-h-0 overflow-hidden bg-canvas px-1.5 pb-1.5 pt-0">
-        {/* Desktop 3-Panel Resizable Layout (>= xl screens) vs Mobile/Tablet Tabbed View (< xl screens) */}
+        {/* Desktop Resizable Layout (2-pane at >= lg, 3-pane at >= xl) vs Mobile/Tablet Tabbed View (< lg) */}
         {isDesktop ? (
           isLayoutReady && hosts ? (
             <ResizablePanelGroup
+              key={isXlDesktop ? "3-pane" : "2-pane"}
               id="editor-resizable-panel-group"
               orientation="horizontal"
               onLayoutChange={handleLayoutChange}
-              className="hidden xl:flex h-full w-full"
+              className="hidden lg:flex h-full w-full"
               data-testid="editor-resizable-panel-group"
             >
               {/* Panel 1: CodeMirror Editor */}
               <ResizablePanel
                 id="panel-code"
-                defaultSize={layout["panel-code"] ?? 45}
+                defaultSize={isXlDesktop ? (layout["panel-code"] ?? 45) : 50}
                 minSize={20}
                 className="h-full overflow-hidden"
                 data-testid="panel-code"
@@ -1178,7 +1228,7 @@ export function EditorWorkspace() {
               {/* Panel 2: Live Preview */}
               <ResizablePanel
                 id="panel-preview"
-                defaultSize={layout["panel-preview"] ?? 35}
+                defaultSize={isXlDesktop ? (layout["panel-preview"] ?? 35) : 50}
                 minSize={25}
                 className="h-full overflow-hidden"
                 data-testid="panel-preview"
@@ -1186,54 +1236,58 @@ export function EditorWorkspace() {
                 <PortalSlot host={hosts.preview} className="h-full min-h-0" />
               </ResizablePanel>
 
-              <ResizableHandle withHandle />
+              {isXlDesktop && (
+                <>
+                  <ResizableHandle withHandle />
 
-              {/* Panel 3: AI Sidebar (Collapsible) */}
-              <ResizablePanel
-                id="panel-ai"
-                panelRef={aiPanelRef}
-                defaultSize={isAiCollapsed || isAiPoppedOut ? 0 : (layout["panel-ai"] ?? 20)}
-                minSize={15}
-                collapsible={true}
-                collapsedSize={0}
-                onResize={(size) => {
-                  if (!isDesktopRef.current) return;
-                  if (skipResizePersistRef.current) return;
-                  if (Date.now() < suppressResizePersistUntilRef.current) return;
-                  const sizeNum =
-                    typeof size === "number"
-                      ? size
-                      : typeof size === "object" &&
-                          size !== null &&
-                          "asPercentage" in size &&
-                          typeof size.asPercentage === "number"
-                        ? size.asPercentage
-                        : 20;
-                  const isCurrentlyCollapsed = sizeNum <= 2;
-                  if (isCurrentlyCollapsed !== isAiCollapsedRef.current) {
-                    updateAiCollapsedState(isCurrentlyCollapsed);
-                    persistLayoutState(layout, isCurrentlyCollapsed);
-                  }
-                }}
-                className="h-full overflow-hidden"
-                data-testid="panel-ai"
-              >
-                {!isAiPoppedOut ? (
-                  <PortalSlot host={hosts.ai} className="h-full min-h-0" />
-                ) : (
-                  <div className="h-full min-h-0" />
-                )}
-              </ResizablePanel>
+                  {/* Panel 3: AI Sidebar (Collapsible, >= xl) */}
+                  <ResizablePanel
+                    id="panel-ai"
+                    panelRef={aiPanelRef}
+                    defaultSize={isAiCollapsed || isAiPoppedOut ? 0 : (layout["panel-ai"] ?? 20)}
+                    minSize={15}
+                    collapsible={true}
+                    collapsedSize={0}
+                    onResize={(size) => {
+                      if (!isXlDesktopRef.current) return;
+                      if (skipResizePersistRef.current) return;
+                      if (Date.now() < suppressResizePersistUntilRef.current) return;
+                      const sizeNum =
+                        typeof size === "number"
+                          ? size
+                          : typeof size === "object" &&
+                              size !== null &&
+                              "asPercentage" in size &&
+                              typeof size.asPercentage === "number"
+                            ? size.asPercentage
+                            : 20;
+                      const isCurrentlyCollapsed = sizeNum <= 2;
+                      if (isCurrentlyCollapsed !== isAiCollapsedRef.current) {
+                        updateAiCollapsedState(isCurrentlyCollapsed);
+                        persistLayoutState(layout, isCurrentlyCollapsed);
+                      }
+                    }}
+                    className="h-full overflow-hidden"
+                    data-testid="panel-ai"
+                  >
+                    {!isAiPoppedOut ? (
+                      <PortalSlot host={hosts.ai} className="h-full min-h-0" />
+                    ) : (
+                      <div className="h-full min-h-0" />
+                    )}
+                  </ResizablePanel>
+                </>
+              )}
             </ResizablePanelGroup>
           ) : (
             <div
-              className="hidden xl:flex h-full w-full"
+              className="hidden lg:flex h-full w-full"
               data-testid="editor-resizable-panel-group-placeholder"
               aria-hidden
             />
           )
         ) : (
-          <div className="flex h-full w-full flex-col xl:hidden" data-testid="editor-mobile-tabs">
+          <div className="flex h-full w-full flex-col lg:hidden" data-testid="editor-mobile-tabs">
             <div className="flex shrink-0 items-center border-b border-outline/70 bg-panel px-2 py-1.5">
               <div
                 role="tablist"
@@ -1316,8 +1370,26 @@ export function EditorWorkspace() {
         )}
       </div>
 
+      {/* AI Assistant Drawer (lg 1024px–1279px two-pane layout) */}
+      {isDesktop && !isXlDesktop && hosts && (
+        <Sheet open={isAiSheetOpen} onOpenChange={setIsAiSheetOpen}>
+          <SheetContent
+            side="right"
+            hideCloseButton
+            data-testid="editor-ai-sheet"
+            className="flex w-[400px] flex-col border-l border-outline bg-panel p-0 sm:max-w-[420px]"
+          >
+            <SheetTitle className="sr-only">AI Assistant</SheetTitle>
+            <SheetDescription className="sr-only">
+              AI Chat and Tailor Assistant
+            </SheetDescription>
+            <PortalSlot host={hosts.ai} className="h-full min-h-0 flex-1" />
+          </SheetContent>
+        </Sheet>
+      )}
+
       {/* Floating Portaled AI Assistant Window (desktop >=1280px only) */}
-      {isDesktop && isAiPoppedOut && hosts && (
+      {isXlDesktop && isAiPoppedOut && hosts && (
         <AiAssistantWindow
           open={isAiPoppedOut}
           onOpenChange={(open) => {
@@ -1330,7 +1402,7 @@ export function EditorWorkspace() {
                 // ignore
               }
             }
-            if (!open && isDesktopRef.current) {
+            if (!open && isXlDesktopRef.current) {
               aiPanelRef.current?.expand();
               updateAiCollapsedState(false);
             }
@@ -1372,12 +1444,16 @@ export function EditorWorkspace() {
           <AiSidebar
             source={source}
             onApplyToBuffer={handleApplyRepair}
-            isCollapsed={isDesktop ? (isAiPoppedOut ? false : isAiCollapsed) : false}
-            isPoppedOut={isDesktop ? isAiPoppedOut : false}
-            onPopOut={isDesktop ? handleToggleAiPopOut : undefined}
+            isCollapsed={isXlDesktop ? (isAiPoppedOut ? false : isAiCollapsed) : false}
+            isPoppedOut={isXlDesktop ? isAiPoppedOut : false}
+            onPopOut={isXlDesktop ? handleToggleAiPopOut : undefined}
             masterFacts={masterFacts}
             onToggleCollapse={
-              isDesktop && !isAiPoppedOut ? toggleAiSidebarCollapse : undefined
+              isXlDesktop && !isAiPoppedOut
+                ? toggleAiSidebarCollapse
+                : isDesktop && !isXlDesktop
+                  ? () => setIsAiSheetOpen(false)
+                  : undefined
             }
             repairContext={repairContext}
             onDismissRepair={() => setRepairContext(null)}

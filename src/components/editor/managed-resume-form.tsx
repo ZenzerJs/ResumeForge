@@ -71,10 +71,10 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
       </select>
       <button type="button" onClick={applyPreset} className="rounded bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">Apply to draft</button>
     </div>
-    <p className="text-xs text-text-muted">Changes apply when you leave a field. Use Typst Code for unsupported source changes.</p>
+    <p className="text-sm text-text-muted">Changes apply when you leave a field. Use Typst Code for unsupported source changes.</p>
     {links.length > 0 && <section className="space-y-3 rounded border border-outline/70 bg-canvas/40 p-3" aria-label="PDF link placement">
       <h2 className="text-sm font-semibold text-foreground">PDF link placement</h2>
-      <p className="text-xs text-text-secondary">Choose the matching text for each destination when needed. Editing resume text clears placement choices so they can be reviewed again.</p>
+      <p className="text-sm text-text-secondary">Choose the matching text for each destination when needed. Editing resume text clears placement choices so they can be reviewed again.</p>
       {links.map((link, index) => {
         const choices = occurrences([...new Set([link.label || link.url, "GitHub", "Live Demo", "Portfolio", "Website"])]);
         return <label key={`${index}-${link.url}`} className="block space-y-1 text-xs text-text-secondary">

@@ -117,7 +117,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
         {/* Company Filter Pills */}
         <div className="pt-2 border-t border-border">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            <span className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground flex-shrink-0">
+            <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground flex-shrink-0">
               Company:
             </span>
             <button
@@ -154,9 +154,11 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
       {/* Questions Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredQuestions.map(q => (
-          <div 
-            key={q.id} 
-            className="group flex flex-col justify-between rounded-[10px] surface-raised card-lift p-4 text-foreground cursor-pointer [content-visibility:auto] [contain-intrinsic-size:auto_132px]"
+          <button
+            key={q.id}
+            type="button"
+            aria-pressed={selectedQuestion?.id === q.id}
+            className="group flex w-full flex-col justify-between rounded-[10px] surface-raised card-lift p-4 text-left text-foreground cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background [content-visibility:auto] [contain-intrinsic-size:auto_132px]"
             onClick={() => setSelectedQuestion(q)}
           >
             <div>
@@ -164,7 +166,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                 <h3 className="font-semibold text-base text-foreground transition-colors line-clamp-1">
                   {q.title}
                 </h3>
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${getDifficultyBadgeColor(q.difficulty)}`}>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${getDifficultyBadgeColor(q.difficulty)}`}>
                   {q.difficulty}
                 </span>
               </div>
@@ -186,7 +188,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                   return (
                     <span 
                       key={tag} 
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-[11px] text-on-surface-variant"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-xs text-on-surface-variant"
                     >
                       {logo ?? (hasBrandIcon(tag) ? <BrandIcon name={tag} className="h-3 w-3 shrink-0" /> : null)}
                       <span>{comp?.name || tag}</span>
@@ -195,12 +197,12 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                 })}
               </div>
               {q.timeComplexity && (
-                <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                <span className="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                   {q.timeComplexity}
                 </span>
               )}
             </div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -241,7 +243,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                   <DialogTitle className="text-xl font-bold text-foreground text-balance md:text-2xl">
                     {selectedQuestion.title}
                   </DialogTitle>
-                  <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
+                  <DialogDescription className="mt-0.5 text-sm text-muted-foreground">
                     {selectedQuestion.sourceSet}
                   </DialogDescription>
                 </div>
@@ -300,7 +302,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
             {/* Rubric Guide */}
             <div>
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Discussion Rubric & Key Points</h4>
-              <div className="p-3.5 bg-inset border border-border rounded-[10px] text-xs text-on-surface-variant leading-relaxed whitespace-pre-wrap font-sans">
+              <div className="p-3.5 bg-inset border border-border rounded-[10px] text-sm text-on-surface-variant leading-relaxed whitespace-pre-wrap font-sans">
                 {selectedQuestion.rubricGuide}
               </div>
             </div>
@@ -308,7 +310,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
             {/* STAR Behavioral Framework Alignment */}
             {selectedQuestion.starRubric && (
               <div className="p-3.5 bg-primary/5 border border-primary/25 rounded-[10px] space-y-2">
-                <h4 className="text-xs font-bold text-primary uppercase tracking-wider">STAR Behavioral Response Framework</h4>
+                <h4 className="text-xs font-bold text-primary uppercase tracking-wider">Answer outline: fill in your own results</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   <div><span className="font-semibold text-foreground">Situation: </span><span className="text-muted-foreground">{selectedQuestion.starRubric.situation}</span></div>
                   <div><span className="font-semibold text-foreground">Task: </span><span className="text-muted-foreground">{selectedQuestion.starRubric.task}</span></div>

@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AppShell } from "@/components/design-system/app-shell";
+import { PageHeader } from "@/components/design-system/page-header";
 import { fetchDemoConfig } from "@/components/auth/session-user";
 import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
 import dynamic from "next/dynamic";
@@ -76,6 +77,7 @@ export interface EvidenceItem {
   bullets: Bullet[];
   needsReview?: boolean;
   duplicateTargetId?: string;
+  exactTitleOrgMatch?: boolean;
   similarityScore?: number;
   candidateBullet?: string;
   existingBullet?: string;
@@ -410,7 +412,7 @@ export function LibraryWorkspace() {
             ...item,
             needsReview: true,
             duplicateTargetId: earlierMatch.id,
-            similarityScore: 0.88,
+            exactTitleOrgMatch: true,
             candidateBullet: item.bullets?.[0]?.text || item.verifiedSummary,
             existingBullet: earlierMatch.bullets?.[0]?.text || earlierMatch.verifiedSummary,
           };
@@ -1713,13 +1715,7 @@ export function LibraryWorkspace() {
         </div>
         {/* Page Title Header */}
         <div className="space-y-6">
-          <div className="enter-once rounded-xl surface-raised edge-glow p-5 sm:p-6">
-            <div className="border-l-2 border-primary pl-3 sm:pl-4">
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-[-0.03em]">
-                Verified Evidence Bank Inventory
-              </h1>
-            </div>
-          </div>
+          <PageHeader title="Evidence Bank" />
           <BulkPdfDropzone onComplete={handlePdfIngestComplete} />
         </div>
 
@@ -1731,7 +1727,7 @@ export function LibraryWorkspace() {
             className={`p-3.5 rounded-lg border flex flex-wrap items-center justify-between gap-2 text-xs font-medium transition-colors duration-150 ease-out motion-reduce:transition-none ${
               notification.type === "success"
                 ? "bg-status-success/15 border-status-success/35 text-status-success-soft"
-                : "bg-red-500/10 border-red-500/30 text-red-400"
+                : "bg-status-danger/10 border-status-danger/30 text-status-danger"
             }`}
           >
             <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -1751,7 +1747,7 @@ export function LibraryWorkspace() {
                   disabled={isBulkSubmitting}
                   data-testid="undo-archive-btn"
                   onClick={() => void handleUndoArchive(notification.undoArchive!)}
-                  className="min-h-11 sm:min-h-7 h-auto sm:h-7 px-2.5 text-[11px] font-mono border-status-success/40 bg-status-success/15 text-status-success-soft hover:bg-status-success/25"
+                  className="min-h-11 sm:min-h-7 h-auto sm:h-7 px-2.5 text-xs font-mono border-status-success/40 bg-status-success/15 text-status-success-soft hover:bg-status-success/25"
                 >
                   <RotateCcw className="h-3 w-3 mr-1" />
                   Undo
@@ -1804,7 +1800,7 @@ export function LibraryWorkspace() {
           >
             Review Queue
             {reviewItems.length > 0 && (
-              <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums">
+              <span className="bg-primary text-primary-foreground text-xs font-bold px-1.5 py-0.5 rounded-full tabular-nums">
                 {reviewItems.length}
               </span>
             )}
@@ -1845,7 +1841,7 @@ export function LibraryWorkspace() {
                   aria-label="Filter evidence by status"
                   className="min-h-11 sm:min-h-0 w-full sm:w-auto max-w-full min-w-0 bg-inset border border-hairline text-foreground rounded-[6px] px-3 py-1.5 text-xs font-mono outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <option value="all">All, Verified, Draft, Archived</option>
+                  <option value="all">All statuses</option>
                   <option value="verified">Verified Only</option>
                   <option value="draft">Draft Only</option>
                   <option value="archived">Archived Only</option>
@@ -1964,10 +1960,12 @@ export function LibraryWorkspace() {
           <div className="rounded-xl border-dashed surface-raised p-12 text-center">
             <FileJson className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
             <h3 className="text-sm font-semibold text-foreground">No evidence items found</h3>
-            <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
+            <p className="mt-1 text-sm text-muted-foreground max-w-sm mx-auto">
               {searchQuery
                 ? `No evidence items matching search "${searchQuery}".`
-                : `No evidence items matching status filter "${filterStatus}".`}
+                : filterStatus === "all"
+                  ? "Add your first evidence item or drop a PDF resume above to get started."
+                  : `No evidence items matching status filter "${filterStatus}".`}
             </p>
           </div>
         ) : (
@@ -2036,7 +2034,7 @@ export function LibraryWorkspace() {
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                          <span className={`rounded-[5px] border px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider ${typeBadgeClass}`}>
+                          <span className={`rounded-[5px] border px-2 py-0.5 text-xs font-mono font-bold uppercase tracking-wider ${typeBadgeClass}`}>
                             {item.type}
                           </span>
                           <h2 className="text-base font-bold text-foreground tracking-tight break-words">
@@ -2044,7 +2042,7 @@ export function LibraryWorkspace() {
                             {item.organization ? ` @ ${item.organization}` : ""}
                           </h2>
                         </div>
-                        <p className="mt-2 text-xs text-text-secondary leading-relaxed max-w-3xl break-words">
+                        <p className="mt-2 text-sm text-text-secondary leading-relaxed max-w-3xl break-words">
                           {item.verifiedSummary}
                         </p>
                       </div>
@@ -2052,7 +2050,7 @@ export function LibraryWorkspace() {
 
                     <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:shrink-0">
                       <span
-                        className={`rounded-[5px] px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider ${
+                        className={`rounded-[5px] px-2.5 py-0.5 text-xs font-mono font-bold uppercase tracking-wider ${
                           item.status === "verified"
                             ? "bg-status-success/10 border border-status-success/35 text-status-success"
                             : "bg-inset border border-hairline text-muted-foreground"
@@ -2071,7 +2069,7 @@ export function LibraryWorkspace() {
                           size="sm"
                           data-testid="verify-evidence-btn"
                           onClick={() => void handleVerifyItem(item)}
-                          className="min-h-11 sm:min-h-8 h-auto sm:h-8 gap-1.5 border-status-success/35 bg-status-success/10 px-2.5 text-[11px] font-mono font-semibold text-status-success hover:bg-status-success/20 hover:text-status-success"
+                          className="min-h-11 sm:min-h-8 h-auto sm:h-8 gap-1.5 border-status-success/35 bg-status-success/10 px-2.5 text-xs font-mono font-semibold text-status-success hover:bg-status-success/20 hover:text-status-success"
                           aria-label={`Verify ${item.title}`}
                         >
                           <CheckCircle2 className="h-3.5 w-3.5" />
@@ -2086,7 +2084,7 @@ export function LibraryWorkspace() {
                           disabled={isBulkSubmitting}
                           data-testid={`restore-evidence-btn-${item.id}`}
                           onClick={() => void handleRestoreItem(item, "draft")}
-                          className="min-h-11 sm:min-h-8 h-auto sm:h-8 gap-1.5 border-hairline bg-inset px-2.5 text-[11px] font-mono font-semibold text-foreground hover:bg-elevated"
+                          className="min-h-11 sm:min-h-8 h-auto sm:h-8 gap-1.5 border-hairline bg-inset px-2.5 text-xs font-mono font-semibold text-foreground hover:bg-elevated"
                           aria-label={`Restore ${item.title}`}
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
@@ -2166,7 +2164,7 @@ export function LibraryWorkspace() {
                               role="menuitem"
                               data-testid={`item-delete-permanently-${item.id}`}
                               onClick={() => void handleRequestPermanentDelete([item])}
-                              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-status-danger hover:bg-red-500/10 transition-colors"
+                              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-status-danger hover:bg-status-danger/10 transition-colors"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                               Delete permanently…
@@ -2183,7 +2181,7 @@ export function LibraryWorkspace() {
                       {item.tags.map((t, idx) => (
                         <span
                           key={idx}
-                          className="inline-flex items-center gap-1.5 rounded-[6px] bg-inset border border-hairline px-2.5 py-1 text-[11px] font-mono text-text-secondary"
+                          className="inline-flex items-center gap-1.5 rounded-[6px] bg-inset border border-hairline px-2.5 py-1 text-xs font-mono text-text-secondary"
                         >
                           {hasBrandIcon(t) && <BrandIcon name={t} className="h-3 w-3 shrink-0" />}
                           <span>{t}</span>
@@ -2217,7 +2215,23 @@ export function LibraryWorkspace() {
                 No duplicate or overlapping evidence items need review.
               </div>
             ) : (
-              reviewItems.map((item) => (
+              reviewItems.map((item) => {
+                const similarityScore = item.similarityScore;
+                const hasNumericScore =
+                  typeof similarityScore === "number" && Number.isFinite(similarityScore);
+                const matchedTarget = item.duplicateTargetId
+                  ? items.find((i) => i.id === item.duplicateTargetId)
+                  : undefined;
+                const isExactTitleOrgMatch =
+                  Boolean(item.exactTitleOrgMatch) ||
+                  Boolean(
+                    matchedTarget &&
+                      matchedTarget.title.trim().toLowerCase() === item.title.trim().toLowerCase() &&
+                      (matchedTarget.organization || "").trim().toLowerCase() ===
+                        (item.organization || "").trim().toLowerCase()
+                  );
+
+                return (
                   <div
                     key={item.id}
                     data-testid={`duplicate-review-card-${item.id}`}
@@ -2233,28 +2247,38 @@ export function LibraryWorkspace() {
                     </div>
                     <div className="flex flex-col md:flex-row gap-4 mb-4">
                       <div className="flex-1 p-4 rounded-lg bg-inset border border-hairline">
-                        <div className="text-[11px] text-primary mb-1 font-mono uppercase">
+                        <div className="text-xs text-primary mb-1 font-mono uppercase">
                           Candidate Bullet
                         </div>
-                        <p className="text-xs text-text-secondary leading-relaxed">
+                        <p className="text-sm text-text-secondary leading-relaxed">
                           {item.candidateBullet || item.verifiedSummary || "N/A"}
                         </p>
                       </div>
                       <div className="flex items-center justify-center px-2">
                         <div className="text-center">
-                          <div className="text-ember font-bold text-lg font-mono tabular-nums">
-                            {Math.round((item.similarityScore || 0.75) * 100)}%
-                          </div>
-                          <div className="text-[10px] text-muted-foreground uppercase font-mono">
-                            Similarity
-                          </div>
+                          {hasNumericScore ? (
+                            <>
+                              <div className="text-ember font-bold text-lg font-mono tabular-nums">
+                                {Math.round(similarityScore * 100)}%
+                              </div>
+                              <div className="text-xs text-muted-foreground uppercase font-mono">
+                                Similarity
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-xs text-muted-foreground font-mono max-w-44">
+                              {isExactTitleOrgMatch
+                                ? "Exact match: same title and organization"
+                                : "Potential duplicate"}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex-1 p-4 rounded-lg bg-inset border border-hairline">
-                        <div className="text-[11px] text-signal mb-1 font-mono uppercase">
+                        <div className="text-xs text-signal mb-1 font-mono uppercase">
                           Existing Bullet
                         </div>
-                        <p className="text-xs text-text-secondary leading-relaxed">
+                        <p className="text-sm text-text-secondary leading-relaxed">
                           {item.existingBullet || "N/A"}
                         </p>
                       </div>
@@ -2433,7 +2457,8 @@ export function LibraryWorkspace() {
                       </Button>
                     </div>
                   </div>
-                ))
+                );
+              })
             )}
           </div>
         )}
@@ -2512,7 +2537,7 @@ export function LibraryWorkspace() {
                         role="menuitem"
                         data-testid="bulk-delete-permanently-btn"
                         onClick={() => void handleRequestPermanentDelete(selectedItems)}
-                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-status-danger hover:bg-red-500/10 transition-colors"
+                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-status-danger hover:bg-status-danger/10 transition-colors"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         Delete permanently…
@@ -2594,7 +2619,7 @@ export function LibraryWorkspace() {
             <DialogTitle className="text-base font-bold text-foreground">
               {editingItem ? "Edit Evidence Item" : "Create Evidence Item"}
             </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
+            <DialogDescription className="text-sm text-muted-foreground">
               Add or update verified experience, project, or skill evidence.
             </DialogDescription>
           </DialogHeader>

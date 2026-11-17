@@ -60,7 +60,7 @@ export function OutcomesPanel() {
       <div className="mx-auto w-full max-w-4xl space-y-6 p-4">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Pipeline outcomes</h2>
-          <p className="text-xs text-muted-foreground">Counts are yours only. Shared job listings stay SAVED for everyone else.</p>
+          <p className="text-sm text-muted-foreground">Counts are yours only. Shared job listings stay SAVED for everyone else.</p>
         </div>
 
         {guest && (
@@ -83,7 +83,7 @@ export function OutcomesPanel() {
                     key={status}
                     className={`rounded-xl surface-raised ${STAGE_TOP_RULE[status]} p-3.5`}
                   >
-                    <div className="font-mono text-[10px] font-semibold uppercase tracking-wider text-text-secondary">
+                    <div className="font-mono text-xs font-semibold uppercase tracking-wider text-text-secondary">
                       {status}
                     </div>
                     <div className="mt-1 text-2xl font-bold tabular-nums text-foreground">

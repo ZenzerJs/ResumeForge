@@ -6,7 +6,7 @@ test.describe("Phase 4 BYOK AI Gateway Settings UI", () => {
   });
 
   test("renders settings page with generic custom provider label", async ({ page }) => {
-    await expect(page.locator("h1")).toContainText("Bring-Your-Own-Key (BYOK) AI Configuration");
+    await expect(page.locator("h1")).toContainText("Connect an AI provider key (stored in this browser)");
 
     const providerSelect = page.locator("#provider-select");
     await expect(providerSelect).toBeVisible();
@@ -255,5 +255,132 @@ test.describe("Phase 4 BYOK AI Gateway Settings UI", () => {
     expect(postMigration.settings.provider).toBe("custom");
     expect(postMigration.settings.model).toBe("llama3");
     expect(postMigration.settings.apiKey).toBeUndefined();
+  });
+
+  test("shows selected-provider help before key input and clears prior provider help on switch", async ({ page }) => {
+    const expectedProviders = [
+      {
+        id: "gemini",
+        url: "https://aistudio.google.com/app/apikey",
+        label: "Google Gemini setup",
+        prerequisiteSnippet: "Google Cloud billing",
+      },
+      {
+        id: "openai",
+        url: "https://platform.openai.com/api-keys",
+        label: "OpenAI setup",
+        prerequisiteSnippet: "prepaid API billing credits",
+      },
+      {
+        id: "anthropic",
+        url: "https://platform.claude.com/settings/keys",
+        label: "Anthropic setup",
+        prerequisiteSnippet: "Claude Console organization",
+      },
+      {
+        id: "groq",
+        url: "https://console.groq.com/keys",
+        label: "Groq setup",
+        prerequisiteSnippet: "GroqCloud",
+      },
+    ] as const;
+
+    for (let i = 0; i < expectedProviders.length; i++) {
+      const current = expectedProviders[i];
+      await page.selectOption("#provider-select", current.id);
+
+      const helpBox = page.locator('[data-testid="provider-help"]');
+      await expect(helpBox).toBeVisible();
+      await expect(helpBox).toHaveAttribute("data-provider", current.id);
+      await expect(helpBox).toContainText(current.label);
+      await expect(helpBox).toContainText(current.prerequisiteSnippet);
+
+      const getKeyLink = page.locator('[data-testid="provider-get-key-link"]');
+      await expect(getKeyLink).toBeVisible();
+      await expect(getKeyLink).toHaveText(/Get an API key/);
+      await expect(getKeyLink).toHaveAttribute("href", current.url);
+      await expect(getKeyLink).toHaveAttribute("target", "_blank");
+      await expect(getKeyLink).toHaveAttribute("rel", "noopener noreferrer");
+
+      if (i > 0) {
+        const previous = expectedProviders[i - 1];
+        await expect(helpBox).not.toContainText(previous.label);
+      }
+
+      // Help appears directly before the API key input in document order
+      const isHelpBeforeKey = await page.evaluate(() => {
+        const help = document.querySelector('[data-testid="provider-help"]');
+        const input = document.querySelector("#api-key-input");
+        if (!help || !input) return false;
+        return Boolean(help.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING);
+      });
+      expect(isHelpBeforeKey).toBe(true);
+    }
+  });
+
+  test("collapses optional model and OpenAI endpoint override in Advanced, preserves values, and auto-expands on non-default load", async ({ page }) => {
+    const advanced = page.locator('[data-testid="advanced-settings-disclosure"]');
+    const summary = advanced.locator("summary");
+
+    await page.selectOption("#provider-select", "openai");
+    await expect(advanced).not.toHaveAttribute("open", "");
+    await expect(page.locator("#model-input")).toBeHidden();
+    await expect(page.locator("#base-url-input")).toBeHidden();
+
+    // Expand Advanced, customize model and endpoint override, collapse, and re-expand without resetting
+    await summary.click();
+    await expect(advanced).toHaveAttribute("open", "");
+    await expect(page.locator("#model-input")).toBeVisible();
+    await expect(page.locator("#base-url-input")).toBeVisible();
+
+    await page.fill("#model-input", "gpt-4o-mini");
+    await page.fill("#base-url-input", "https://proxy.example.test/v1");
+
+    await summary.click();
+    await expect(advanced).not.toHaveAttribute("open", "");
+    await expect(page.locator("#model-input")).toHaveValue("gpt-4o-mini");
+    await expect(page.locator("#base-url-input")).toHaveValue("https://proxy.example.test/v1");
+
+    await summary.click();
+    await expect(advanced).toHaveAttribute("open", "");
+    await expect(page.locator("#model-input")).toHaveValue("gpt-4o-mini");
+    await expect(page.locator("#base-url-input")).toHaveValue("https://proxy.example.test/v1");
+
+    // Reload with non-default values -> Advanced auto-expands
+    await page.reload();
+    await expect(page.locator("#provider-select")).toHaveValue("openai");
+    await expect(advanced).toHaveAttribute("open", "");
+    await expect(page.locator("#model-input")).toBeVisible();
+    await expect(page.locator("#model-input")).toHaveValue("gpt-4o-mini");
+    await expect(page.locator("#base-url-input")).toBeVisible();
+    await expect(page.locator("#base-url-input")).toHaveValue("https://proxy.example.test/v1");
+
+    // Reset to defaults and reload -> Advanced starts collapsed
+    await page.fill("#model-input", "gpt-4o");
+    await page.fill("#base-url-input", "");
+    await page.reload();
+    await expect(advanced).not.toHaveAttribute("open", "");
+    await expect(page.locator("#model-input")).toBeHidden();
+  });
+
+  test("keeps required Ollama and Custom endpoints visible outside Advanced", async ({ page }) => {
+    const advanced = page.locator('[data-testid="advanced-settings-disclosure"]');
+
+    // Ollama: endpoint visible when Advanced collapsed; no API key input
+    await page.selectOption("#provider-select", "ollama");
+    await expect(advanced).not.toHaveAttribute("open", "");
+    await expect(page.locator('[data-testid="provider-help"]')).toHaveCount(0);
+    await expect(page.locator("#base-url-input")).toBeVisible();
+    await expect(page.locator("#base-url-input")).toHaveValue("http://localhost:11434");
+    await expect(page.locator('[data-testid="vault-status"]')).toContainText("no API key required");
+    await expect(page.locator("#api-key-input")).toHaveCount(0);
+
+    // Custom: required endpoint and optional key both visible when Advanced collapsed
+    await page.selectOption("#provider-select", "custom");
+    await expect(advanced).not.toHaveAttribute("open", "");
+    await expect(page.locator('[data-testid="provider-help"]')).toHaveCount(0);
+    await expect(page.locator("#base-url-input")).toBeVisible();
+    await expect(page.locator("#api-key-input")).toBeVisible();
+    await expect(page.locator('label[for="api-key-input"]')).toContainText("Optional");
   });
 });

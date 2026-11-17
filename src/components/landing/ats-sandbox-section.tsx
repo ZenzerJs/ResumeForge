@@ -46,33 +46,33 @@ const SAMPLE_CANDIDATE: CandidateEvidenceInput = {
     "RESTful APIs",
     "Tailwind CSS",
   ],
-  totalYoe: 6,
+  totalYoe: 1,
   evidenceItems: [
     {
       id: "evid-01",
-      title: "Nova Distributed Microservices",
+      title: "Backend Engineering Intern — CloudScale Labs",
       tags: ["Go", "Python", "Docker", "PostgreSQL"],
       bullets: [
         {
           id: "b-1",
-          text: "Engineered scalable Go microservices processing 12,000 req/sec with PostgreSQL persistence.",
+          text: "Built Go RESTful APIs with PostgreSQL persistence and integration tests for internal job scheduling.",
           technologies: ["Go", "PostgreSQL", "RESTful APIs"],
         },
         {
           id: "b-2",
-          text: "Automated containerized deployment pipelines using Docker and Kubernetes cluster nodes.",
+          text: "Containerized local development and CI worker services using Docker and Kubernetes manifests.",
           technologies: ["Docker", "Kubernetes", "Python"],
         },
       ],
     },
     {
       id: "evid-02",
-      title: "WebCraft Enterprise Web Platform",
+      title: "Campus Course Planner (Capstone Project)",
       tags: ["React", "TypeScript", "Next.js", "Tailwind CSS"],
       bullets: [
         {
           id: "b-3",
-          text: "Architected high-performance Next.js and TypeScript frontend interfaces serving 1.5M monthly users.",
+          text: "Built accessible Next.js and TypeScript schedule-builder views styled with Tailwind CSS.",
           technologies: ["React", "Next.js", "TypeScript", "Tailwind CSS"],
         },
       ],
@@ -83,67 +83,67 @@ const SAMPLE_CANDIDATE: CandidateEvidenceInput = {
 const PRESETS: PresetRole[] = [
   {
     id: "backend",
-    name: "Senior Backend Engineer",
-    roleTitle: "Senior Backend Engineer",
+    name: "Backend SWE Intern",
+    roleTitle: "Backend Software Engineer Intern",
     company: "CloudScale Systems",
     job: {
       requiredSkills: ["Go", "Python", "PostgreSQL", "Docker"],
       tools: ["Kubernetes", "Redis"],
-      requiredYoe: 5,
+      requiredYoe: 0,
     },
-    description: `Senior Backend Engineer — CloudScale Systems
+    description: `Backend Software Engineer Intern — CloudScale Systems
 
-We are seeking a Senior Backend Engineer to architect our core microservices and data pipelines.
+We are seeking a Backend SWE Intern to help build reliable microservices and data pipelines alongside our platform team.
 
 Requirements:
-- 5+ years building distributed backend services in Go or Python.
-- Strong proficiency with PostgreSQL, transactional boundaries, and database query optimization.
-- Hands-on experience containerizing services with Docker and deploying to Kubernetes.
-- Experience building resilient, monitored RESTful APIs.
+- Pursuing a B.S./M.S. in Computer Science or equivalent project experience in Go or Python.
+- Familiarity with PostgreSQL, relational schemas, and writing clean SQL queries.
+- Hands-on project or internship experience containerizing services with Docker.
+- Experience building and testing RESTful APIs.
 
 Tools & Infra:
-- Docker, Kubernetes, Redis, Prometheus, Git.`,
-    typstSnippet: `// Tailored Variant: Senior Backend Engineer
+- Docker, Kubernetes, Redis, Git.`,
+    typstSnippet: `// Tailored Variant: Backend SWE Intern
 #let resume-section(title) = [ === #title ]
 #resume-section("Core Skills")
 Languages: Go, Python, TypeScript, SQL (PostgreSQL)
 Infrastructure: Docker, Kubernetes, Redis, RESTful APIs
 
-#resume-section("Experience")
-*Senior Software Engineer* | Nova Labs (2022 - Present)
-- Engineered scalable Go microservices processing 12,000 req/sec with PostgreSQL persistence.
-- Automated containerized deployment pipelines using Docker and Kubernetes cluster nodes.
+#resume-section("Experience & Projects")
+*Backend Engineering Intern* | CloudScale Labs (Summer 2025)
+- Built Go RESTful APIs with PostgreSQL persistence and integration tests for internal job scheduling.
+- Containerized local development and CI worker services using Docker and Kubernetes manifests.
 `,
   },
   {
     id: "frontend",
-    name: "Staff Frontend Architect",
-    roleTitle: "Staff Frontend Architect",
+    name: "New-Grad Frontend Engineer",
+    roleTitle: "New-Grad Frontend Engineer",
     company: "Veloce Web Technologies",
     job: {
       requiredSkills: ["TypeScript", "React", "Next.js", "Tailwind CSS"],
       tools: ["WebAssembly", "Docker"],
-      requiredYoe: 6,
+      requiredYoe: 1,
     },
-    description: `Staff Frontend Architect — Veloce Web Technologies
+    description: `New-Grad Frontend Engineer — Veloce Web Technologies
 
-Join our platform team to set frontend standards, component design systems, and client performance architecture.
+Join our product engineering team to build accessible design-system components and responsive client workflows.
 
 Key Requirements:
-- 6+ years of front-end engineering experience with modern web stacks.
-- Deep expertise in React, Next.js App Router, TypeScript, and modern state machines.
-- Advanced Tailwind CSS component development with accessible WAI-ARIA standards.
-- Familiarity with WebAssembly (WASM) and browser-based edge compute.`,
-    typstSnippet: `// Tailored Variant: Staff Frontend Architect
+- 0-1+ years of internship or project experience with modern web stacks.
+- Solid foundation in React, Next.js App Router, and TypeScript.
+- Experience building accessible UI components with Tailwind CSS and WAI-ARIA standards.
+- Interest in WebAssembly (WASM) or browser-based tooling.`,
+    typstSnippet: `// Tailored Variant: New-Grad Frontend Engineer
 #let resume-section(title) = [ === #title ]
 #resume-section("Skills")
 Frontend: React, Next.js, TypeScript, Tailwind CSS, WebAssembly (WASM)
-Tooling: Vitest, Playwright, Docker, Webpack, Turbopack
+Tooling: Vitest, Playwright, Docker, Turbopack
 
-#resume-section("Experience")
-*Frontend Systems Lead* | WebCraft Systems (2021 - Present)
-- Architected high-performance Next.js and TypeScript frontend interfaces serving 1.5M monthly users.
-- Reduced initial bundle payloads by 42% utilizing responsive component code splitting.
+#resume-section("Projects & Internships")
+*Campus Course Planner (Capstone)* | Open-Source Project (2025)
+- Built accessible Next.js and TypeScript schedule-builder views styled with Tailwind CSS.
+- Added keyboard navigation and unit tests for schedule conflict detection.
 `,
   },
   {
@@ -186,8 +186,8 @@ const PRESET_DEFAULT_SNIPPETS: Record<string, string> = {
 };
 
 const PRESET_STATIC_SVGS: Record<string, string> = {
-  backend: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">CORE SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Languages:</tspan> Go, Python, TypeScript, SQL (PostgreSQL)</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Infrastructure:</tspan> Docker, Kubernetes, Redis, RESTful APIs</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#181412"><tspan font-weight="700">Senior Software Engineer</tspan> | Nova Labs</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#7a6e65" text-anchor="end">2022 – Present</text><circle cx="42" cy="184" r="2" fill="#3a322f"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Engineered scalable Go microservices processing 12,000 req/sec with PostgreSQL persistence.</text><circle cx="42" cy="206" r="2" fill="#3a322f"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Automated containerized deployment pipelines using Docker and Kubernetes cluster nodes.</text></svg>`,
-  frontend: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Frontend:</tspan> React, Next.js, TypeScript, Tailwind CSS, WebAssembly (WASM)</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Tooling:</tspan> Vitest, Playwright, Docker, Webpack, Turbopack</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#181412"><tspan font-weight="700">Frontend Systems Lead</tspan> | WebCraft Systems</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#7a6e65" text-anchor="end">2021 – Present</text><circle cx="42" cy="184" r="2" fill="#3a322f"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Architected high-performance Next.js and TypeScript frontend interfaces serving 1.5M monthly users.</text><circle cx="42" cy="206" r="2" fill="#3a322f"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Reduced initial bundle payloads by 42% utilizing responsive component code splitting.</text></svg>`,
+  backend: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">CORE SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Languages:</tspan> Go, Python, TypeScript, SQL (PostgreSQL)</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Infrastructure:</tspan> Docker, Kubernetes, Redis, RESTful APIs</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">EXPERIENCE &amp; PROJECTS</text><line x1="36" y1="140" x2="559" y2="140" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#181412"><tspan font-weight="700">Backend Engineering Intern</tspan> | CloudScale Labs</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#7a6e65" text-anchor="end">Summer 2025</text><circle cx="42" cy="184" r="2" fill="#3a322f"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Built Go RESTful APIs with PostgreSQL persistence and integration tests for job scheduling.</text><circle cx="42" cy="206" r="2" fill="#3a322f"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Containerized local development and CI worker services using Docker and Kubernetes manifests.</text></svg>`,
+  frontend: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Frontend:</tspan> React, Next.js, TypeScript, Tailwind CSS, WebAssembly (WASM)</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Tooling:</tspan> Vitest, Playwright, Docker, Turbopack</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">PROJECTS &amp; INTERNSHIPS</text><line x1="36" y1="140" x2="559" y2="140" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#181412"><tspan font-weight="700">Campus Course Planner (Capstone)</tspan> | Open-Source Project</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#7a6e65" text-anchor="end">2025</text><circle cx="42" cy="184" r="2" fill="#3a322f"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Built accessible Next.js and TypeScript schedule-builder views styled with Tailwind CSS.</text><circle cx="42" cy="206" r="2" fill="#3a322f"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Added keyboard navigation and unit tests for schedule conflict detection.</text></svg>`,
   "ai-platform": `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 400" width="100%" height="100%"><rect width="595" height="400" fill="#ffffff"/><text x="36" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">TECHNICAL SKILLS</text><line x1="36" y1="52" x2="559" y2="52" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">Languages:</tspan> Python, Go, C++</text><text x="36" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#272120"><tspan font-weight="600">AI/Infra:</tspan> PyTorch, Docker, Kubernetes, Distributed Inference Systems</text><text x="36" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#181412" letter-spacing="0.05em">EXPERIENCE</text><line x1="36" y1="140" x2="559" y2="140" stroke="#d8d0c5" stroke-width="1"/><text x="36" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10.5" fill="#181412"><tspan font-weight="700">Infrastructure &amp; Backend Engineer</tspan> | Nova Labs</text><text x="559" y="162" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#7a6e65" text-anchor="end">2021 – Present</text><circle cx="42" cy="184" r="2" fill="#3a322f"/><text x="52" y="187" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Designed automated distributed training pipeline jobs utilizing Python, Docker, and Kubernetes.</text><circle cx="42" cy="206" r="2" fill="#3a322f"/><text x="52" y="209" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#3a322f">Maintained low-latency inference endpoints with 99.98% operational uptime.</text></svg>`,
 };
 
@@ -325,9 +325,14 @@ export function AtsSandboxSection() {
     >
       {/* Header */}
       <div className="mb-12 text-center max-w-3xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-signal/40 bg-signal/10 text-signal text-xs font-mono mb-4">
-          <ShieldCheck className="h-4 w-4" />
-          <span>ZERO-AUTH DETERMINISTIC SANDBOX</span>
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-4">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-signal/40 bg-signal/10 text-signal text-xs font-mono">
+            <ShieldCheck className="h-4 w-4" />
+            <span>ZERO-AUTH DETERMINISTIC SANDBOX</span>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-mono font-semibold text-primary">
+            Synthetic sample
+          </span>
         </div>
         <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground tracking-tight mb-4">
           Instant ATS &amp; Typst Sandbox
@@ -393,7 +398,7 @@ export function AtsSandboxSection() {
             />
             <div className="mt-2.5 flex items-center justify-between flex-wrap gap-2 text-xs font-mono text-muted-foreground tabular-nums">
               <span>{customDescription.length} characters</span>
-              <span>Candidate: Alex Rivera (6 YOE · Verified Evidence)</span>
+              <span>Candidate: Alex Rivera (1 YOE · Intern &amp; Project Evidence)</span>
             </div>
           </div>
 
@@ -586,7 +591,7 @@ export function AtsSandboxSection() {
                   }`}
                 >
                   <Eye className="h-4 w-4" />
-                  <span>Document Preview (WASM SVG)</span>
+                  <span>Resume preview</span>
                 </button>
 
                 <button
@@ -600,7 +605,7 @@ export function AtsSandboxSection() {
                   }`}
                 >
                   <FileCode className="h-4 w-4" />
-                  <span>Typst AST Source</span>
+                  <span>Resume source</span>
                 </button>
               </div>
 
@@ -664,7 +669,7 @@ export function AtsSandboxSection() {
                 <div data-testid="sandbox-typst-source-view" className="flex-1 flex flex-col min-h-0">
                   <div className="flex items-center justify-between pb-2 mb-2 border-b border-outline/70 text-xs font-mono">
                     <span className="text-muted-foreground">
-                      {isEditingSnippet ? "Live Typst editor (on-demand compile):" : "Typst AST Source Preview:"}
+                      {isEditingSnippet ? "Live Typst editor (on-demand compile):" : "Resume source"}
                     </span>
                     <div className="flex items-center gap-2">
                       <button

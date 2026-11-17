@@ -16,7 +16,7 @@ export default function PrivacyPage() {
         id="main-content"
         className="mx-auto w-full max-w-3xl px-4 pb-16 pt-[calc(6rem+env(safe-area-inset-top))] md:px-8"
       >
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Legal</p>
+        <p className="font-mono text-sm uppercase tracking-[0.2em] text-primary">Legal</p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">Privacy Policy</h1>
         <p className="mt-2 text-sm text-muted-foreground">Last updated: August 12, 2026</p>
 
@@ -92,7 +92,7 @@ export default function PrivacyPage() {
           </section>
         </div>
 
-        <p className="mt-10 text-xs text-muted-foreground">
+        <p className="mt-10 text-sm text-muted-foreground">
           <Link
             href="/"
             className="text-primary hover:underline rounded-[4px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

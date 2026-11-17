@@ -45,7 +45,7 @@ const FILE_EXT: Record<DsaLanguage, string> = {
 };
 
 const selectClass =
-  "min-h-11 sm:h-8 appearance-none rounded-md border border-hairline bg-elevated pl-2.5 pr-7 text-base sm:text-xs font-medium text-foreground transition-colors hover:border-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 cursor-pointer";
+  "min-h-11 sm:h-8 appearance-none rounded-md border border-hairline bg-elevated pl-2.5 pr-7 text-base sm:text-xs font-medium text-foreground transition-colors hover:border-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 cursor-pointer";
 
 export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
   const searchParams = useSearchParams();
@@ -278,9 +278,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
       case "Easy":
         return "bg-status-success/10 text-status-success-soft border-status-success/25";
       case "Medium":
-        return "bg-amber-500/10 text-amber-400 border-amber-500/20";
+        return "bg-status-warning/15 text-status-warning border-status-warning/40";
       case "Hard":
-        return "bg-rose-500/10 text-rose-400 border-rose-500/20";
+        return "bg-status-danger/10 text-status-danger border-status-danger/30";
     }
   };
 
@@ -289,12 +289,12 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
       case "Accepted":
         return "bg-status-success/15 text-status-success-soft border-status-success/35";
       case "Wrong Answer":
-        return "bg-rose-500/15 text-rose-400 border-rose-500/30";
+        return "bg-status-danger/10 text-status-danger border-status-danger/30";
       case "Time Limit Exceeded":
-        return "bg-amber-500/15 text-amber-400 border-amber-500/30";
+        return "bg-status-warning/15 text-status-warning border-status-warning/40";
       case "Runtime Error":
       case "Syntax Error":
-        return "bg-red-500/15 text-red-400 border-red-500/30";
+        return "bg-status-danger/10 text-status-danger border-status-danger/30";
     }
   };
 
@@ -337,16 +337,16 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
 
           <span
             className={cn(
-              "rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
+              "rounded-full border px-2.5 py-0.5 text-xs font-semibold",
               difficultyBadgeStyle(selectedProblem.difficulty)
             )}
           >
             {selectedProblem.difficulty}
           </span>
-          <span className="rounded-full border border-hairline bg-panel px-2.5 py-0.5 text-[11px] font-medium text-text-secondary">
+          <span className="rounded-full border border-hairline bg-panel px-2.5 py-0.5 text-xs font-medium text-text-secondary">
             {selectedProblem.pattern}
           </span>
-          <span className="hidden font-mono text-[11px] tabular-nums text-muted-foreground xl:inline">
+          <span className="hidden font-mono text-xs tabular-nums text-muted-foreground xl:inline">
             Time {selectedProblem.optimalTimeComplexity} · Space {selectedProblem.optimalSpaceComplexity}
           </span>
         </div>
@@ -355,9 +355,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
           type="button"
           onClick={() => setIsRecommenderOpen((prev) => !prev)}
           aria-expanded={isRecommenderOpen}
-          className="inline-flex min-h-11 sm:h-8 items-center gap-1.5 rounded-md border border-hairline bg-panel px-3 text-xs font-medium text-text-secondary transition-colors hover:border-control hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+          className="inline-flex min-h-11 sm:h-8 items-center gap-1.5 rounded-md border border-hairline bg-panel px-3 text-xs font-medium text-text-secondary transition-colors hover:border-control hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
         >
-          <Sparkles className="h-3.5 w-3.5 text-amber-400" aria-hidden />
+          <Sparkles className="h-3.5 w-3.5 text-status-warning" aria-hidden />
           <span>Match with Job Description</span>
           {isRecommenderOpen ? (
             <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
@@ -373,7 +373,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
           <div className="mx-auto max-w-5xl space-y-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-xs font-semibold text-foreground">Find problems for a target role</h2>
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 Ranks problems by keyword overlap with the job description
               </span>
             </div>
@@ -385,13 +385,13 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                 onChange={(e) => setJdInput(e.target.value)}
                 placeholder="Paste a job description snippet, e.g. backend systems, distributed caching…"
                 aria-label="Target job description snippet"
-                className="h-16 flex-1 resize-none rounded-lg border border-hairline bg-inset p-2.5 text-base sm:text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                className="h-16 flex-1 resize-none rounded-lg border border-hairline bg-inset p-2.5 text-base sm:text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
               />
               <button
                 type="button"
                 data-testid="dsa-jd-recommend-btn"
                 onClick={handleRecommend}
-                className="flex min-h-11 sm:min-h-0 shrink-0 items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-[#121010] transition-colors hover:bg-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 sm:w-44"
+                className="flex min-h-11 sm:min-h-0 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-44"
               >
                 <Sparkles className="h-3.5 w-3.5" aria-hidden />
                 <span>Rank Problems</span>
@@ -408,9 +408,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                       key={rec.problem.slug}
                       onClick={() => handleSelectProblem(rec.problem.slug)}
                       className={cn(
-                        "flex flex-col justify-between gap-1.5 rounded-lg border p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60",
+                        "flex flex-col justify-between gap-1.5 rounded-lg border p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                         isCurrent
-                          ? "border-amber-500/50 bg-amber-500/5"
+                          ? "border-status-warning/40 bg-status-warning/15"
                           : "border-hairline bg-inset hover:border-control"
                       )}
                     >
@@ -418,13 +418,13 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                         <span className="truncate text-xs font-semibold text-foreground">
                           {rec.problem.title}
                         </span>
-                        <span className="shrink-0 rounded-full bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-amber-300">
+                        <span className="shrink-0 rounded-full bg-status-warning/15 px-1.5 py-0.5 font-mono text-xs tabular-nums text-status-warning">
                           {rec.relevanceScore}% match
                         </span>
                       </span>
                       <span
                         data-testid="dsa-match-reason"
-                        className="line-clamp-2 text-[11px] leading-relaxed text-text-secondary"
+                        className="line-clamp-2 text-xs leading-relaxed text-text-secondary"
                       >
                         {rec.matchReason}
                       </span>
@@ -442,7 +442,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
         {/* Problem pane */}
         <section className="space-y-6 rounded-xl border border-hairline bg-panel p-5 lg:col-span-5 lg:overflow-y-auto">
           <div>
-            <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
               {selectedProblem.pattern}
             </p>
             <h1 className="mb-3 text-xl font-semibold tracking-tight text-foreground text-balance">
@@ -452,7 +452,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               {selectedProblem.categoryTags.map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-full border border-hairline px-2 py-0.5 text-[10px] font-medium text-text-secondary"
+                  className="rounded-full border border-hairline px-2 py-0.5 text-xs font-medium text-text-secondary"
                 >
                   {tag}
                 </span>
@@ -480,7 +480,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                   <span className="text-status-success-soft">{example.output}</span>
                 </div>
                 {example.explanation && (
-                  <div className="border-t border-hairline pt-1.5 font-sans text-[11px] leading-relaxed text-text-secondary">
+                  <div className="border-t border-hairline pt-1.5 font-sans text-xs leading-relaxed text-text-secondary">
                     {example.explanation}
                   </div>
                 )}
@@ -499,12 +499,12 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
 
           <div className="space-y-3 border-t border-hairline pt-5">
             <div className="flex items-center gap-1.5">
-              <Lightbulb className="h-4 w-4 text-amber-400" aria-hidden />
+              <Lightbulb className="h-4 w-4 text-status-warning" aria-hidden />
               <h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
                 Progressive Interview Hints
               </h2>
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Try solving without peeking first. Reveal hints progressively if stuck.
             </p>
 
@@ -525,21 +525,21 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                       data-testid={`dsa-hint-btn-${idx}`}
                       onClick={() => toggleHint(idx)}
                       aria-expanded={isRevealed}
-                      className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-text-secondary transition-colors hover:bg-elevated/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500/60"
+                      className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-text-secondary transition-colors hover:bg-elevated/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
                     >
                       <span className="flex items-center gap-2">
                         <Lightbulb
-                          className={cn("h-3.5 w-3.5", isRevealed ? "text-amber-400" : "text-muted-foreground")}
+                          className={cn("h-3.5 w-3.5", isRevealed ? "text-status-warning" : "text-muted-foreground")}
                           aria-hidden
                         />
                         <span>{label}</span>
                       </span>
-                      <span className="text-[11px] text-muted-foreground">{isRevealed ? "Hide" : "Reveal"}</span>
+                      <span className="text-xs text-muted-foreground">{isRevealed ? "Hide" : "Reveal"}</span>
                     </button>
                     {isRevealed && (
                       <div
                         data-testid={`dsa-hint-content-${idx}`}
-                        className="border-t border-hairline px-3 pb-3 pt-2 text-xs leading-relaxed text-text-secondary"
+                        className="border-t border-hairline px-3 pb-3 pt-2 text-sm leading-relaxed text-text-secondary"
                       >
                         {hintText}
                       </div>
@@ -557,17 +557,17 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
-                <Bot className="h-4 w-4 text-amber-400" aria-hidden />
+                <Bot className="h-4 w-4 text-status-warning" aria-hidden />
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
                   Socratic Interview Coach
                 </h2>
               </div>
-              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-amber-300">
+              <span className="rounded-full border border-status-warning/40 bg-status-warning/15 px-2 py-0.5 font-mono text-xs font-semibold text-status-warning">
                 Stage: {coachStage}
               </span>
             </div>
 
-            <p className="text-[11px] text-text-secondary">
+            <p className="text-sm text-text-secondary">
               Discuss constraints, walk through your Big-O approach, or request a Socratic nudge without spoiling the code.
             </p>
 
@@ -580,10 +580,10 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                       "rounded-md p-2 leading-relaxed",
                       msg.role === "user"
                         ? "ml-4 bg-elevated text-foreground"
-                        : "mr-2 border border-amber-500/20 bg-amber-500/5 text-foreground"
+                        : "mr-2 border border-status-warning/40 bg-status-warning/10 text-foreground"
                     )}
                   >
-                    <span className="mb-0.5 block font-mono text-[10px] uppercase text-muted-foreground">
+                    <span className="mb-0.5 block font-mono text-xs uppercase text-muted-foreground">
                       {msg.role === "user" ? "You" : "Socratic Coach"}
                     </span>
                     {msg.content}
@@ -606,14 +606,14 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                   }
                 }}
                 placeholder="Explain your approach or ask a clarifying question…"
-                className="min-h-11 sm:h-8 min-w-0 flex-1 rounded-md border border-hairline bg-inset px-2.5 text-base sm:text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                className="min-h-11 sm:h-8 min-w-0 flex-1 rounded-md border border-hairline bg-inset px-2.5 text-base sm:text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
               />
               <button
                 type="button"
                 data-testid="dsa-coach-send-btn"
                 disabled={isAskingCoach || !coachInput.trim()}
                 onClick={() => void handleAskCoach()}
-                className="inline-flex min-h-11 sm:h-8 shrink-0 items-center gap-1 rounded-md bg-elevated px-3 text-xs font-semibold text-amber-300 transition-colors hover:bg-panel disabled:opacity-50"
+                className="inline-flex min-h-11 sm:h-8 shrink-0 items-center gap-1 rounded-md bg-elevated px-3 text-xs font-semibold text-status-warning transition-colors hover:bg-panel disabled:opacity-50"
               >
                 {isAskingCoach ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -628,9 +628,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               <div
                 role="alert"
                 data-testid="dsa-coach-error"
-                className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-950/25 px-3 py-2 text-xs text-red-300"
+                className="flex items-start gap-2 rounded-lg border border-status-danger/30 bg-status-danger/10 px-3 py-2 text-xs text-status-danger"
               >
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" aria-hidden />
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-danger" aria-hidden />
                 <span>{coachError}</span>
               </div>
             )}
@@ -642,7 +642,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                   data-testid="dsa-audit-scorecard-btn"
                   disabled={isAuditing}
                   onClick={() => void handleAuditScorecard()}
-                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-300 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-status-warning/40 bg-status-warning/15 px-3 py-2 text-xs font-semibold text-status-warning transition-colors hover:bg-status-warning/25 disabled:opacity-50"
                 >
                   {isAuditing ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -658,9 +658,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               <div
                 role="alert"
                 data-testid="dsa-audit-error"
-                className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-950/25 px-3 py-2 text-xs text-red-300"
+                className="flex items-start gap-2 rounded-lg border border-status-danger/30 bg-status-danger/10 px-3 py-2 text-xs text-status-danger"
               >
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" aria-hidden />
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-danger" aria-hidden />
                 <span>{auditError}</span>
               </div>
             )}
@@ -673,28 +673,28 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-semibold text-foreground">
                     Interview Readiness Grade:{" "}
-                    <span className="font-mono text-sm text-amber-400">{scorecard.grade}</span>{" "}
+                    <span className="font-mono text-sm text-status-warning">{scorecard.grade}</span>{" "}
                     ({scorecard.overallScore}/100)
                   </span>
-                  <span className="font-mono text-[10px] uppercase text-muted-foreground">
+                  <span className="font-mono text-xs uppercase text-muted-foreground">
                     {scorecard.mode === "byok" ? "AI Audited" : "Heuristic Audit"}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-[11px]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-xs">
                   <div className="rounded border border-hairline bg-inset p-2">
-                    <span className="block text-[10px] text-muted-foreground">Time Complexity</span>
-                    <span className={scorecard.complexityAudit.isTimeOptimal ? "text-status-success-soft" : "text-amber-300"}>
+                    <span className="block text-xs text-muted-foreground">Time Complexity</span>
+                    <span className={scorecard.complexityAudit.isTimeOptimal ? "text-status-success-soft" : "text-status-warning"}>
                       {scorecard.complexityAudit.detectedTimeComplexity} (target {scorecard.complexityAudit.optimalTimeComplexity})
                     </span>
                   </div>
                   <div className="rounded border border-hairline bg-inset p-2">
-                    <span className="block text-[10px] text-muted-foreground">Space Complexity</span>
-                    <span className={scorecard.complexityAudit.isSpaceOptimal ? "text-status-success-soft" : "text-amber-300"}>
+                    <span className="block text-xs text-muted-foreground">Space Complexity</span>
+                    <span className={scorecard.complexityAudit.isSpaceOptimal ? "text-status-success-soft" : "text-status-warning"}>
                       {scorecard.complexityAudit.detectedSpaceComplexity} (target {scorecard.complexityAudit.optimalSpaceComplexity})
                     </span>
                   </div>
                 </div>
-                <p className="text-[11px] leading-relaxed text-text-secondary">
+                <p className="text-sm leading-relaxed text-text-secondary">
                   {scorecard.complexityAudit.actionableFeedback}
                 </p>
               </div>
@@ -707,7 +707,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
           <div className="flex min-h-[340px] flex-1 flex-col overflow-hidden rounded-xl border border-hairline bg-panel">
             <div className="flex flex-wrap shrink-0 items-center justify-between gap-2 sm:gap-3 border-b border-hairline px-3 py-2">
               <div className="flex min-w-0 items-center gap-3">
-                <span className="rounded-md border border-hairline bg-inset px-2 py-1 font-mono text-[11px] text-text-secondary">
+                <span className="rounded-md border border-hairline bg-inset px-2 py-1 font-mono text-xs text-text-secondary">
                   solution.{FILE_EXT[selectedLanguage]}
                 </span>
                 <div className="relative">
@@ -738,7 +738,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                   data-testid="dsa-reset-btn"
                   onClick={handleReset}
                   title="Reset code to the starter template"
-                  className="inline-flex min-h-11 sm:h-8 items-center gap-1.5 rounded-md px-2.5 text-xs text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                  className="inline-flex min-h-11 sm:h-8 items-center gap-1.5 rounded-md px-2.5 text-xs text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                 >
                   <RotateCcw className="h-3.5 w-3.5" aria-hidden />
                   <span>Reset</span>
@@ -750,7 +750,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                   disabled={isRunning}
                   onClick={handleRun}
                   title="Run (Ctrl or ⌘ + Enter)"
-                  className="inline-flex min-h-11 sm:h-8 items-center gap-1.5 rounded-md bg-amber-500 px-3.5 text-xs font-semibold text-[#121010] transition-colors hover:bg-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 disabled:cursor-not-allowed disabled:bg-elevated disabled:text-muted-foreground"
+                  className="inline-flex min-h-11 sm:h-8 items-center gap-1.5 rounded-md bg-primary px-3.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-elevated disabled:text-muted-foreground"
                 >
                   {isRunning ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -802,7 +802,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                 autoComplete="off"
                 autoCorrect="off"
                 wrap="off"
-                className="min-w-0 flex-1 resize-none whitespace-pre border-none bg-transparent p-4 font-mono text-[13px] leading-relaxed text-foreground caret-amber-400 selection:bg-amber-500/20"
+                className="min-w-0 flex-1 resize-none whitespace-pre border-none bg-transparent p-4 font-mono text-[13px] leading-relaxed text-foreground caret-primary selection:bg-primary/20"
                 placeholder="// Write your solution here…"
                 aria-label="Solution code"
               />
@@ -820,7 +820,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                     <div className="flex items-center gap-2">
                       <span
                         className={cn(
-                          "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
+                          "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold",
                           statusBadgeStyle(executionSummary.status)
                         )}
                       >
@@ -833,16 +833,16 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                         )}
                         <span>{executionSummary.status}</span>
                       </span>
-                      <span className="font-mono text-[11px] tabular-nums text-text-secondary">
+                      <span className="font-mono text-xs tabular-nums text-text-secondary">
                         {executionSummary.passedCount} / {executionSummary.totalCount} Passed
                       </span>
-                      <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                      <span className="font-mono text-xs tabular-nums text-muted-foreground">
                         ({executionSummary.totalTimeMs}ms)
                       </span>
                     </div>
                   ) : (
-                    <span className="text-[11px] text-muted-foreground">
-                      Press <kbd className="rounded border border-hairline px-1 font-mono text-[10px]">Run Code</kbd>{" "}
+                    <span className="text-xs text-muted-foreground">
+                      Press <kbd className="rounded border border-hairline px-1 font-mono text-xs">Run Code</kbd>{" "}
                       to test your solution
                     </span>
                   )}
@@ -850,7 +850,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               </div>
 
               {executionSummary?.errorMessage && (
-                <div className="flex max-w-sm items-center gap-1 truncate font-mono text-[11px] text-rose-400">
+                <div className="flex max-w-sm items-center gap-1 truncate font-mono text-xs text-status-danger">
                   <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden />
                   <span className="truncate">{executionSummary.errorMessage}</span>
                 </div>
@@ -870,9 +870,9 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                     onClick={() => setActiveTestCaseIndex(idx)}
                     aria-pressed={isActive}
                     className={cn(
-                      "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60",
+                      "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                       isActive
-                        ? "border-amber-500/40 bg-amber-500/15 text-amber-300"
+                        ? "border-status-warning/40 bg-status-warning/15 text-status-warning"
                         : "border-hairline bg-inset text-text-secondary hover:border-control hover:text-foreground"
                     )}
                   >
@@ -881,7 +881,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                       (res.passed ? (
                         <CheckCircle2 className="h-3 w-3 text-status-success" aria-label="Passed" />
                       ) : (
-                        <XCircle className="h-3 w-3 text-rose-400" aria-label="Failed" />
+                        <XCircle className="h-3 w-3 text-status-danger" aria-label="Failed" />
                       ))}
                   </button>
                 );
@@ -891,7 +891,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
             <div className="flex-1 space-y-3 overflow-y-auto p-3 font-mono text-xs text-text-secondary">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <span className="block font-sans text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <span className="block font-sans text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Input
                   </span>
                   <div className="whitespace-pre-wrap rounded-md border border-hairline bg-inset p-2 text-text-secondary">
@@ -901,13 +901,13 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
 
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="font-sans text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <span className="font-sans text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Expected Output
                     </span>
                     <span className="text-status-success-soft">{JSON.stringify(activeTestCase.expected)}</span>
                   </div>
 
-                  <span className="block pt-1 font-sans text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <span className="block pt-1 font-sans text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Actual Output
                   </span>
                   <div
@@ -917,7 +917,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                       activeResult
                         ? activeResult.passed
                           ? "border-status-success/35 text-status-success-soft"
-                          : "border-rose-500/30 text-rose-300"
+                          : "border-status-danger/30 text-status-danger"
                         : "border-hairline text-muted-foreground"
                     )}
                   >
@@ -931,13 +931,13 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               </div>
 
               <div className="space-y-1 pt-1">
-                <span className="flex items-center gap-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <span className="flex items-center gap-1.5 font-sans text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   <Terminal className="h-3 w-3 text-text-secondary" aria-hidden />
                   <span>Console output</span>
                 </span>
                 <pre
                   data-testid="dsa-stdout-output"
-                  className="max-h-24 overflow-y-auto whitespace-pre-wrap rounded-md border border-hairline bg-inset p-2 text-[11px] leading-relaxed text-text-secondary"
+                  className="max-h-24 overflow-y-auto whitespace-pre-wrap rounded-md border border-hairline bg-inset p-2 text-xs leading-relaxed text-text-secondary"
                 >
                   {activeResult?.stdout || "(no stdout captured)"}
                 </pre>

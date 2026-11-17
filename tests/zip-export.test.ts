@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
 import JSZip from "jszip";
 import {
   generateApplicationPackageZip,
@@ -293,5 +294,17 @@ jane.doe@example.com | San Francisco, CA
     expect(cleaned).toContain("--- EXPERIENCE ---");
     expect(cleaned).toContain("Stripe -- Software Engineer");
     expect(cleaned).not.toContain("#show");
+  });
+
+  it("cleans starter-resume.typ without leaking #, //, or =>", () => {
+    const starter = readFileSync("public/templates/starter-resume.typ", "utf8");
+    const cleaned = cleanTypstToText(starter);
+
+    expect(cleaned).not.toContain("#");
+    expect(cleaned.replace(/https?:\/\//g, "")).not.toContain("//");
+    expect(cleaned).not.toContain("=>");
+    expect(cleaned).toContain("Alex Morgan");
+    expect(cleaned).toContain("TechCorp Systems");
+    expect(cleaned).toContain("University of California, Berkeley");
   });
 });

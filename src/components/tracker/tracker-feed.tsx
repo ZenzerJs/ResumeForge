@@ -37,7 +37,7 @@ import {
   isPlaceholderDescription,
 } from "@/lib/ingestion/helpers";
 import { matchesPostedWithin, type PostedWithin } from "@/lib/jobs/posted-within";
-import { fetchDemoConfig } from "@/components/auth/session-user";
+import { fetchDemoConfig, fetchSessionUser } from "@/components/auth/session-user";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
 import {
   HydratedJobDetailSchema,
@@ -862,6 +862,12 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       scheduleNoticeClear();
       return;
     }
+    const sessionUser = await fetchSessionUser();
+    if (!sessionUser) {
+      setImportNotice("Live import needs sign-in.");
+      scheduleNoticeClear();
+      return;
+    }
     try {
       setIsImporting(true);
       setImportNotice("Syncing live feeds from public connectors & source listings…");
@@ -995,7 +1001,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           data-testid="import-status-notice"
           role="status"
           aria-live="polite"
-          className="border-b border-amber-800/80 bg-amber-950/80 px-4 py-2 text-center text-xs font-medium text-amber-200"
+          className="border-b border-status-warning/40 bg-status-warning/15 px-4 py-2 text-center text-xs font-medium text-status-warning"
         >
           {importNotice}
         </div>
@@ -1276,7 +1282,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                     <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
                       {STATUS_LABELS[stage]}
                     </span>
-                    <span className="rounded-full bg-elevated border border-hairline px-2 py-0.5 font-mono text-[11px] font-semibold text-primary">
+                    <span className="rounded-full bg-elevated border border-hairline px-2 py-0.5 font-mono text-xs font-semibold text-primary">
                       {stageJobs.length}
                     </span>
                   </div>
@@ -1307,7 +1313,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                               <h3 className="text-xs font-bold text-foreground group-hover:text-primary transition line-clamp-2">
                                 {job.roleTitle}
                               </h3>
-                              <p className="text-[11px] font-mono text-muted-foreground mt-0.5">
+                              <p className="text-xs font-mono text-muted-foreground mt-0.5">
                                 {job.company}
                               </p>
                             </button>
@@ -1320,7 +1326,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                                 void handleStatusChange(job.id, e.target.value as JobStatus)
                               }
                               aria-label={`Change status for ${job.roleTitle}`}
-                              className="rounded-[6px] border border-control/70 bg-inset px-2 py-0.5 text-[10px] font-mono text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                              className="rounded-[6px] border border-control/70 bg-inset px-2 py-0.5 text-xs font-mono text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                             >
                               {(["SAVED", "APPLIED", "INTERVIEWING", "OFFER", "REJECTED"] as JobStatus[]).map(
                                 (st) => (
@@ -1333,7 +1339,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
 
                             <Link
                               href={`/tailor?jobId=${job.id}&tab=overview`}
-                              className="text-[10px] font-mono font-semibold text-primary hover:underline"
+                              className="text-xs font-mono font-semibold text-primary hover:underline"
                             >
                               Tailor →
                             </Link>

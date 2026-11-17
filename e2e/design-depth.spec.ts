@@ -165,6 +165,12 @@ test.describe("Clear-window homepage glass, dynamic Ember Ink waves, and workspa
     );
     expect(homeBlobAnims.every((anim) => anim === "none")).toBe(true);
 
+    const card = page.locator(".card-lift").first();
+    await expect(card).toBeVisible();
+    await card.hover();
+    const hoverTransform = await card.evaluate((el) => getComputedStyle(el).transform);
+    expect(hoverTransform).toBe("none");
+
     await page.goto("/settings");
     await page.waitForLoadState("networkidle");
     const enterAnim = await page.evaluate(() => {
@@ -191,11 +197,5 @@ test.describe("Clear-window homepage glass, dynamic Ember Ink waves, and workspa
       return anim;
     });
     expect(skeletonGlintAnim).toBe("none");
-
-    const card = page.locator(".card-lift").first();
-    await expect(card).toBeVisible();
-    await card.hover();
-    const hoverTransform = await card.evaluate((el) => getComputedStyle(el).transform);
-    expect(hoverTransform).toBe("none");
   });
 });

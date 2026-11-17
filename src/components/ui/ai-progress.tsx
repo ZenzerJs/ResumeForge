@@ -111,21 +111,21 @@ export function AiProgress({
         className={cn(
           "inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-medium border transition-colors",
           isDone && "bg-status-success/15 border-status-success/40 text-status-success-soft",
-          isError && "bg-red-950/70 border-red-800/80 text-red-300",
-          !isDone && !isError && "bg-amber-950/60 border-amber-800/70 text-amber-200",
+          isError && "bg-status-danger/10 border-status-danger/30 text-status-danger",
+          !isDone && !isError && "bg-status-warning/15 border-status-warning/40 text-status-warning",
           className
         )}
       >
         {isDone ? (
           <CheckCircle2 className="h-3.5 w-3.5 text-status-success shrink-0" />
         ) : isError ? (
-          <AlertCircle className="h-3.5 w-3.5 text-red-400 shrink-0" />
+          <AlertCircle className="h-3.5 w-3.5 text-status-danger shrink-0" />
         ) : (
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400 shrink-0" />
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-status-warning shrink-0" />
         )}
         <span className="truncate">{message}</span>
         {!isDone && !isError && elapsed > 0 && (
-          <span className="font-mono text-[10px] text-amber-400/80 shrink-0">
+          <span className="font-mono text-xs text-status-warning/80 shrink-0">
             {elapsed}s
           </span>
         )}
@@ -141,7 +141,7 @@ export function AiProgress({
       className={cn(
         "rounded-lg border p-3.5 shadow-sm transition-all",
         isDone && "bg-status-success/10 border-status-success/35 text-status-success-soft",
-        isError && "bg-red-950/50 border-red-800/80 text-red-200",
+        isError && "bg-status-danger/10 border-status-danger/30 text-status-danger",
         !isDone && !isError && "bg-inset border-hairline text-foreground",
         className
       )}
@@ -154,11 +154,11 @@ export function AiProgress({
               <CheckCircle2 className="h-4 w-4" />
             </div>
           ) : isError ? (
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-500/20 text-red-400">
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-status-danger/15 text-status-danger">
               <AlertCircle className="h-4 w-4" />
             </div>
           ) : (
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-amber-400">
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-status-warning/15 text-status-warning">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             </div>
           )}
@@ -168,7 +168,7 @@ export function AiProgress({
               {message}
             </p>
             {!isError && !isDone && (
-              <p className="text-[11px] text-muted-foreground capitalize">
+              <p className="text-xs text-muted-foreground capitalize">
                 Stage {currentStageIndex >= 0 ? currentStageIndex + 1 : 1} of {stages.length}: {stage}
               </p>
             )}
@@ -177,7 +177,7 @@ export function AiProgress({
 
         <div className="flex items-center gap-2 shrink-0">
           {!isDone && !isError && (
-            <span className="flex items-center gap-1 font-mono text-xs text-amber-300/90 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/40">
+            <span className="flex items-center gap-1 font-mono text-xs text-status-warning bg-status-warning/15 px-2 py-0.5 rounded border border-status-warning/40">
               <Clock className="h-3 w-3" />
               {elapsed}s
             </span>
@@ -187,7 +187,7 @@ export function AiProgress({
             <button
               type="button"
               onClick={onDismissError}
-              className="px-2 py-0.5 rounded bg-red-900/60 hover:bg-red-800 text-[11px] font-medium text-red-100 transition"
+              className="px-2 py-0.5 rounded border border-status-danger/30 bg-status-danger/10 hover:bg-status-danger/20 text-xs font-medium text-status-danger transition"
             >
               Dismiss
             </button>
@@ -228,15 +228,15 @@ export function AiProgress({
                     className={cn(
                       "h-1.5 w-full rounded-full transition-all duration-300",
                       isPast && "bg-status-success",
-                      isCurrent && "bg-amber-400 animate-pulse",
+                      isCurrent && "bg-status-warning animate-pulse",
                       !isPast && !isCurrent && "bg-elevated"
                     )}
                   />
                   <span
                     className={cn(
-                      "text-[9px] font-mono capitalize transition-colors hidden sm:block truncate max-w-full text-center",
+                      "text-xs font-mono capitalize transition-colors hidden sm:block truncate max-w-full text-center",
                       isPast && "text-status-success font-medium",
-                      isCurrent && "text-amber-300 font-bold",
+                      isCurrent && "text-status-warning font-bold",
                       !isPast && !isCurrent && "text-muted-foreground"
                     )}
                   >
@@ -251,8 +251,8 @@ export function AiProgress({
 
       {/* Error Details Accordion */}
       {isError && error && showDetails && (
-        <div className="mt-2.5 pt-2 border-t border-red-800/50">
-          <pre className="text-[11px] font-mono text-red-300/90 whitespace-pre-wrap break-all bg-red-950/80 p-2 rounded border border-red-800/60 max-h-32 overflow-y-auto">
+        <div className="mt-2.5 pt-2 border-t border-status-danger/30">
+          <pre className="text-xs font-mono text-status-danger whitespace-pre-wrap break-all bg-status-danger/10 p-2 rounded border border-status-danger/30 max-h-32 overflow-y-auto">
             {error}
           </pre>
         </div>

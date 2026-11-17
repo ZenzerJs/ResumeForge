@@ -40,23 +40,23 @@ const VERDICT_STYLES: Record<
   },
   WEAK_EVIDENCE: {
     label: "Weak Evidence",
-    bg: "bg-amber-950/80",
-    text: "text-amber-300",
-    border: "border-amber-800/80",
+    bg: "bg-status-warning/15",
+    text: "text-status-warning",
+    border: "border-status-warning/40",
     icon: "⚠",
   },
   VAGUE_CLAIM: {
     label: "Vague Claim",
-    bg: "bg-purple-950/80",
-    text: "text-purple-300",
-    border: "border-purple-800/80",
+    bg: "bg-status-info/10",
+    text: "text-status-info",
+    border: "border-status-info/30",
     icon: "?",
   },
   KEYWORD_STUFFING: {
     label: "Keyword Stuffing",
-    bg: "bg-red-950/80",
-    text: "text-red-300",
-    border: "border-red-800/80",
+    bg: "bg-status-danger/10",
+    text: "text-status-danger",
+    border: "border-status-danger/30",
     icon: "✗",
   },
 };
@@ -104,7 +104,7 @@ export function QualitativeReviewPanel({
     result.jdContextAdjustment > 0
       ? "status-success-surface"
       : result.jdContextAdjustment < 0
-      ? "text-red-400 bg-red-950/60 border-red-800/80"
+      ? "text-status-danger bg-status-danger/10 border-status-danger/30"
       : "text-text-secondary bg-inset border-hairline";
 
   return (
@@ -121,11 +121,11 @@ export function QualitativeReviewPanel({
           <div>
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               AI Qualitative Reviewer
-              <span className="text-[10px] font-mono bg-signal/15 text-signal border border-signal/35 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-mono bg-signal/15 text-signal border border-signal/35 px-2 py-0.5 rounded-full">
                 BYOK Gateway Feedback
               </span>
             </h3>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               On-demand qualitative commentary & Bounded JD Context Adjustment (-10 to +10 pts)
             </p>
           </div>
@@ -199,7 +199,7 @@ export function QualitativeReviewPanel({
             className="border-t border-hairline pt-3 space-y-2"
             data-testid="adjustment-reasoning-list"
           >
-            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               JD Signal & Adjustment Traceability:
             </div>
             {result.adjustmentReasoning.map((item, idx) => (
@@ -217,13 +217,13 @@ export function QualitativeReviewPanel({
                     className={`font-mono text-xs font-bold px-2 py-0.5 rounded ${
                       item.points >= 0
                         ? "status-success-surface border"
-                        : "bg-red-950 text-red-300 border border-red-800"
+                        : "bg-status-danger/10 text-status-danger border border-status-danger/30"
                     }`}
                   >
                     {item.points >= 0 ? `+${item.points}` : item.points} pts ({item.targetCategory})
                   </span>
                 </div>
-                <p className="text-text-secondary text-xs mt-1">{item.explanation}</p>
+                <p className="text-text-secondary text-sm mt-1">{item.explanation}</p>
               </div>
             ))}
           </div>
@@ -238,7 +238,7 @@ export function QualitativeReviewPanel({
         </h4>
         <div
           data-testid="overview-commentary"
-          className="text-xs text-foreground bg-inset border border-hairline rounded-lg p-3.5 leading-relaxed"
+          className="text-sm text-foreground bg-inset border border-hairline rounded-lg p-3.5 leading-relaxed"
         >
           {result.overviewCommentary}
         </div>
@@ -262,7 +262,7 @@ export function QualitativeReviewPanel({
 
                 {cf.strengths.length > 0 && (
                   <div>
-                    <span className="text-[10px] text-status-success-soft font-semibold uppercase block">
+                    <span className="text-xs text-status-success-soft font-semibold uppercase block">
                       Strengths
                     </span>
                     <ul className="list-disc list-inside text-text-secondary space-y-0.5 mt-0.5">
@@ -275,7 +275,7 @@ export function QualitativeReviewPanel({
 
                 {cf.weaknesses.length > 0 && (
                   <div>
-                    <span className="text-[10px] text-amber-400 font-semibold uppercase block">
+                    <span className="text-xs text-status-warning font-semibold uppercase block">
                       Areas to Strengthen
                     </span>
                     <ul className="list-disc list-inside text-text-secondary space-y-0.5 mt-0.5">
@@ -311,13 +311,13 @@ export function QualitativeReviewPanel({
                       &quot;{bf.bulletText}&quot;
                     </p>
                     <span
-                      className={`shrink-0 px-2.5 py-1 rounded text-[10px] font-semibold border flex items-center gap-1 ${badge.bg} ${badge.text} ${badge.border}`}
+                      className={`shrink-0 px-2.5 py-1 rounded text-xs font-semibold border flex items-center gap-1 ${badge.bg} ${badge.text} ${badge.border}`}
                     >
                       <span>{badge.icon}</span> {badge.label}
                     </span>
                   </div>
-                  <p className="text-text-secondary">{bf.reasoning}</p>
-                  <p className="text-[11px] italic flex items-center gap-1 text-signal">
+                  <p className="text-sm text-text-secondary">{bf.reasoning}</p>
+                  <p className="text-sm italic flex items-center gap-1 text-signal">
                     <Info className="h-3 w-3 text-signal shrink-0" />
                     Advice: {bf.improvementAdvice}
                   </p>
@@ -335,7 +335,7 @@ export function QualitativeReviewPanel({
             <Wand2 className="h-4 w-4 text-signal" />
             Recommended Next Tailoring Actions
           </h4>
-          <p className="text-xs text-text-secondary">
+          <p className="text-sm text-text-secondary">
             Use these findings to guide your next edits in the Resume Editor or generate evidence-backed patches.
           </p>
           <ul className="space-y-1 text-xs text-foreground font-mono">

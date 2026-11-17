@@ -21,7 +21,6 @@ import {
   Clock,
   ChevronDown,
   Code2,
-  Terminal,
 } from "lucide-react";
 import { JobStatus } from "@/lib/db/jobs";
 import {
@@ -71,12 +70,12 @@ function parseCandidateInfoFromTypst(typst: string) {
   const githubMatch = typst.match(/https?:\/\/(?:www\.)?github\.com\/[^\s")\]]+/i);
 
   return {
-    name: nameMatch?.[1]?.trim() || "Candidate",
-    email: emailMatch?.[0] || "candidate@resumeforge.dev",
-    phone: phoneMatch?.[0] || "+1 (555) 019-2834",
-    linkedin: linkedinMatch?.[0] || "https://linkedin.com/in/candidate",
-    github: githubMatch?.[0] || "https://github.com/candidate",
-    portfolio: "https://resumeforge.dev",
+    name: nameMatch?.[1]?.trim() || "",
+    email: emailMatch?.[0] || "",
+    phone: phoneMatch?.[0] || "",
+    linkedin: linkedinMatch?.[0] || "",
+    github: githubMatch?.[0] || "",
+    portfolio: "",
   };
 }
 
@@ -609,7 +608,7 @@ export function JobDetailPane({
                         </div>
                       </div>
                       {checklist.needsVerification > 0 && (
-                        <p className="mb-3 rounded-[6px] border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-xs text-primary" data-testid="needs-verification-summary">
+                        <p className="mb-3 rounded-[6px] border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-sm text-primary" data-testid="needs-verification-summary">
                           <span className="tabular-nums font-semibold">{checklist.needsVerification}</span>{" "}
                           {checklist.needsVerification === 1 ? "requirement matches" : "requirements match"} only draft or unverified bullets (Needs verification).
                         </p>
@@ -626,7 +625,7 @@ export function JobDetailPane({
                             )}
                             <span className="min-w-0 truncate">{item.label}</span>
                             {item.status === "needs_verification" && (
-                              <span className="ml-auto shrink-0 rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                              <span className="ml-auto shrink-0 rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">
                                 Needs verification
                               </span>
                             )}
@@ -646,14 +645,14 @@ export function JobDetailPane({
                     TECHNICAL INTERVIEW PREP
                   </h3>
                   {oaProblems.length > 0 && (
-                    <span className="text-[10px] px-2 py-0.5 rounded font-mono font-semibold tabular-nums bg-primary/10 text-primary border border-primary/30">
+                    <span className="text-xs px-2 py-0.5 rounded font-mono font-semibold tabular-nums bg-primary/10 text-primary border border-primary/30">
                       {oaProblems.length} Problems
                     </span>
                   )}
                 </div>
 
                 <div className="space-y-3">
-                  <p className="text-xs text-on-surface-variant leading-relaxed">
+                  <p className="text-sm text-on-surface-variant leading-relaxed">
                     {oaMatched && oaProblems.length > 0
                       ? `Real technical interview & online assessment problems pulled from repository for ${detailJob.company}.`
                       : `Practice problems and technical mock interview simulator tailored to this role.`}
@@ -672,7 +671,7 @@ export function JobDetailPane({
                               href={prob.sourceUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-primary hover:underline shrink-0 p-1 flex items-center gap-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                              className="text-primary hover:underline shrink-0 p-1 flex items-center gap-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                               title="Practice problem"
                             >
                               <span>Practice</span>
@@ -692,15 +691,6 @@ export function JobDetailPane({
                       <Code2 className="w-3.5 h-3.5" />
                       <span>Practice in Interactive Workspace</span>
                     </Link>
-                    <button
-                      type="button"
-                      onClick={() => setPrepSheetOpen(true)}
-                      className="py-2 px-3 rounded-[6px] bg-surface-variant hover:bg-surface-variant/80 text-on-surface text-xs font-semibold flex items-center justify-center gap-1.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                      title="Open Quick Prep Modal"
-                    >
-                      <Terminal className="w-3.5 h-3.5" />
-                      <span>Prep Sheet</span>
-                    </button>
                   </div>
                 </div>
               </div>
@@ -772,18 +762,18 @@ export function JobDetailPane({
                     <span>Analyzing requirements…</span>
                   </div>
                 ) : extractionState === "unavailable" ? (
-                  <p className="text-xs text-on-surface-variant" data-testid="requirements-status-unavailable">
+                  <p className="text-sm text-on-surface-variant" data-testid="requirements-status-unavailable">
                     Requirements unavailable. Retry fetching the posting or paste the description in Tailor.
                   </p>
                 ) : extractionState === "empty" ? (
-                  <p className="text-xs text-on-surface-variant" data-testid="requirements-status-empty">
+                  <p className="text-sm text-on-surface-variant" data-testid="requirements-status-empty">
                     No explicit skills identified
                   </p>
                 ) : (
                   <div className="space-y-3" data-testid="requirements-groups">
                     {requiredSkills.length > 0 && (
                       <div>
-                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+                        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
                           Required
                         </p>
                         <div className="flex flex-wrap gap-1.5">
@@ -800,7 +790,7 @@ export function JobDetailPane({
                     )}
                     {preferredSkills.length > 0 && (
                       <div>
-                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+                        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
                           Preferred
                         </p>
                         <div className="flex flex-wrap gap-1.5">
@@ -817,7 +807,7 @@ export function JobDetailPane({
                     )}
                     {domainTerms.length > 0 && (
                       <div>
-                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+                        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
                           Domain terms
                         </p>
                         <div className="flex flex-wrap gap-1.5">
@@ -860,7 +850,7 @@ export function JobDetailPane({
                 </div>
 
                 {tier2Notice && (
-                  <p className="mb-2 text-xs italic text-primary/90">{tier2Notice}</p>
+                  <p className="mb-2 text-sm italic text-primary/90">{tier2Notice}</p>
                 )}
 
                 <div className="pr-2">

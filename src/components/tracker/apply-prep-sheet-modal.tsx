@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react";
 import Link from "next/link";
@@ -107,12 +107,12 @@ export function ApplyPrepSheetModal({
   coverLetter,
   matchedHighlights = [],
   candidateInfo = {
-    name: "Candidate",
-    email: "candidate@resumeforge.dev",
-    phone: "+1 (555) 019-2834",
-    linkedin: "https://linkedin.com/in/candidate",
-    github: "https://github.com/candidate",
-    portfolio: "https://candidate.dev",
+    name: "",
+    email: "",
+    phone: "",
+    linkedin: "",
+    github: "",
+    portfolio: "",
   },
   evidenceItems,
   prepResult,
@@ -214,6 +214,14 @@ export function ApplyPrepSheetModal({
     });
   }, [oaProblems, categoryFilter, problemSearch]);
 
+  const sanitizedCandidateInfo = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(candidateInfo).filter((entry): entry is [string, string] => Boolean(entry[1]?.trim()))
+      ),
+    [candidateInfo]
+  );
+
   const starPrep: StarInterviewPrepResult = useMemo(() => {
     if (prepResult) return prepResult;
     return synthesizeStarInterviewPrep({
@@ -223,9 +231,9 @@ export function ApplyPrepSheetModal({
         requirements: job.requirements,
       },
       evidenceItems: evidenceItems || [],
-      candidateInfo,
+      candidateInfo: sanitizedCandidateInfo,
     });
-  }, [prepResult, job, evidenceItems, candidateInfo]);
+  }, [prepResult, job, evidenceItems, sanitizedCandidateInfo]);
 
   const mockInterviewerPrompt = useMemo(() => {
     const matchedProblemsStr =
@@ -297,7 +305,7 @@ export function ApplyPrepSheetModal({
           <Badge
             variant="outline"
             data-testid="grounding-badge-direct"
-            className="border-status-success/45 text-status-success-soft bg-status-success/15 text-[10px] font-semibold gap-1"
+            className="border-status-success/45 text-status-success-soft bg-status-success/15 text-xs font-semibold gap-1"
           >
             <CheckCircle2 className="size-3 text-status-success" />
             <span>✓ Direct Verified Evidence</span>
@@ -308,9 +316,9 @@ export function ApplyPrepSheetModal({
           <Badge
             variant="outline"
             data-testid="grounding-badge-transferable"
-            className="border-amber-500/60 text-amber-300 bg-amber-950/40 text-[10px] font-semibold gap-1"
+            className="border-status-warning/40 text-status-warning bg-status-warning/15 text-xs font-semibold gap-1"
           >
-            <Sparkles className="size-3 text-amber-400" />
+            <Sparkles className="size-3 text-status-warning" />
             <span>~ Transferable Evidence</span>
           </Badge>
         );
@@ -319,9 +327,9 @@ export function ApplyPrepSheetModal({
           <Badge
             variant="outline"
             data-testid="grounding-badge-gap"
-            className="border-red-500/60 text-red-300 bg-red-950/40 text-[10px] font-semibold gap-1"
+            className="border-status-danger/30 text-status-danger bg-status-danger/10 text-xs font-semibold gap-1"
           >
-            <AlertCircle className="size-3 text-red-400" />
+            <AlertCircle className="size-3 text-status-danger" />
             <span>✗ Unverified Gap — Mitigation Plan</span>
           </Badge>
         );
@@ -350,7 +358,7 @@ export function ApplyPrepSheetModal({
               <DialogTitle className="text-sm font-bold text-foreground">
                 Application &amp; Interview Prep — {job.company}
               </DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground">
+              <DialogDescription className="text-sm text-muted-foreground">
                 {job.title}
               </DialogDescription>
             </div>
@@ -384,7 +392,7 @@ export function ApplyPrepSheetModal({
             <Code2 className="size-3.5" />
             <span>Technical Interview &amp; Practice Problems</span>
             {oaProblems.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-panel text-primary font-mono">
+              <span className="text-xs px-1.5 py-0.2 rounded-full bg-panel text-primary font-mono">
                 {oaProblems.length}
               </span>
             )}
@@ -403,7 +411,7 @@ export function ApplyPrepSheetModal({
             <Sparkles className="size-3.5" />
             <span>STAR Behavioral Stories</span>
             {starPrep.stories.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-panel text-primary font-mono">
+              <span className="text-xs px-1.5 py-0.2 rounded-full bg-panel text-primary font-mono">
                 {starPrep.stories.length}
               </span>
             )}
@@ -458,10 +466,10 @@ export function ApplyPrepSheetModal({
           {fallbackText && (
             <div
               data-testid="clipboard-fallback-container"
-              className="p-3 rounded-lg bg-amber-950/70 border border-amber-800 text-xs text-amber-200 space-y-2"
+              className="p-3 rounded-lg bg-status-warning/15 border border-status-warning/40 text-xs text-status-warning space-y-2"
             >
               <div className="flex items-center justify-between">
-                <div data-testid="clipboard-fallback-notice" className="font-semibold text-amber-300">
+                <div data-testid="clipboard-fallback-notice" className="font-semibold text-status-warning">
                   Copy unavailable — select and copy the text below.
                 </div>
                 <button
@@ -476,7 +484,7 @@ export function ApplyPrepSheetModal({
                 readOnly
                 value={fallbackText}
                 data-testid="clipboard-fallback-textarea"
-                className="w-full h-24 p-2 bg-inset border border-control/70 rounded-[6px] text-foreground font-mono text-[11px] select-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+                className="w-full h-24 p-2 bg-inset border border-control/70 rounded-[6px] text-foreground font-mono text-xs select-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
                 onFocus={(e) => e.target.select()}
               />
             </div>
@@ -502,7 +510,7 @@ export function ApplyPrepSheetModal({
                         ? `Real Interview & OA Problems for ${job.company}`
                         : `Technical Interview Practice Problems`}
                     </span>
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       {oaMatched && oaProblems.length > 0
                         ? `Loaded ${oaProblems.length} verified assessment problems pulled directly from the Tech OA repository for ${job.company}.`
                         : `Showing curated technical interview questions from our 1,929+ problem repository.`}
@@ -513,18 +521,18 @@ export function ApplyPrepSheetModal({
                 <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-auto">
                   <Link
                     href={`/practice?company=${encodeURIComponent(job.company || "")}`}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-status-warning/15 hover:bg-status-warning/25 text-status-warning border border-status-warning/40 text-xs font-semibold transition"
                     title="Open in dedicated Practice Workspace"
                   >
                     <span>Full Practice Workspace</span>
                     <ExternalLink className="size-3" />
                   </Link>
                   {oaMatched && oaProblems.length > 0 ? (
-                    <Badge variant="outline" className="border-status-success/45 bg-status-success/15 text-status-success-soft text-[10px] shrink-0">
+                    <Badge variant="outline" className="border-status-success/45 bg-status-success/15 text-status-success-soft text-xs shrink-0">
                       ✓ Verified {job.company} Bank ({oaProblems.length})
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className="border-hairline bg-elevated text-text-secondary text-[10px] shrink-0">
+                    <Badge variant="outline" className="border-hairline bg-elevated text-text-secondary text-xs shrink-0">
                       Curated Tech Repository
                     </Badge>
                   )}
@@ -560,9 +568,9 @@ export function ApplyPrepSheetModal({
                       type="button"
                       onClick={() => setCategoryFilter(cat)}
                       className={cn(
-                        "px-2.5 py-1 rounded text-[11px] font-mono transition-colors",
+                        "px-2.5 py-1 rounded text-xs font-mono transition-colors",
                         categoryFilter === cat
-                          ? "bg-amber-500/20 border border-amber-500/60 text-amber-300 font-bold"
+                          ? "bg-status-warning/15 border border-status-warning/40 text-status-warning font-bold"
                           : "bg-inset border border-hairline text-muted-foreground hover:text-foreground"
                       )}
                     >
@@ -589,7 +597,7 @@ export function ApplyPrepSheetModal({
                             .join("\n")
                         )
                       }
-                      className="text-[11px] text-primary hover:underline flex items-center gap-1"
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
                     >
                       {copiedKey === "all-oa-questions" ? <Check className="size-3" /> : <Copy className="size-3" />}
                       Copy Problems List
@@ -599,7 +607,7 @@ export function ApplyPrepSheetModal({
 
                 {isFetchingOa ? (
                   <div className="p-8 text-center text-muted-foreground">
-                    <p>Loading real interview problems from repository...</p>
+                    <p className="text-sm">Loading real interview problems from repository...</p>
                   </div>
                 ) : filteredProblems.length > 0 ? (
                   <div className="grid grid-cols-1 gap-2.5">
@@ -621,18 +629,18 @@ export function ApplyPrepSheetModal({
                           <div className="min-w-0 flex-1 space-y-1.5">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="font-bold text-foreground text-xs">{prob.title}</span>
-                              <Badge variant="secondary" className="bg-elevated text-text-secondary border border-hairline text-[10px]">
+                              <Badge variant="secondary" className="bg-elevated text-text-secondary border border-hairline text-xs">
                                 {prob.category || "OA"}
                               </Badge>
                               {prob.difficulty && (
                                 <span
                                   className={cn(
-                                    "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded",
+                                    "text-xs font-mono font-bold px-1.5 py-0.5 rounded",
                                     prob.difficulty.toLowerCase().includes("easy")
                                       ? "bg-status-success/15 text-status-success-soft border border-status-success/35"
                                       : prob.difficulty.toLowerCase().includes("hard")
-                                      ? "bg-red-950/80 text-red-400 border border-red-800/60"
-                                      : "bg-amber-950/80 text-amber-400 border border-amber-800/60"
+                                      ? "bg-status-danger/10 text-status-danger border border-status-danger/30"
+                                      : "bg-status-warning/15 text-status-warning border border-status-warning/40"
                                   )}
                                 >
                                   {prob.difficulty}
@@ -640,14 +648,14 @@ export function ApplyPrepSheetModal({
                               )}
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                               {dateStr && (
                                 <span className="font-mono text-muted-foreground">Observed: {dateStr}</span>
                               )}
                               {prob.tags && prob.tags.length > 0 && (
                                 <div className="flex flex-wrap gap-1">
                                   {prob.tags.map((t, i) => (
-                                    <span key={i} className="px-1.5 py-0.2 rounded bg-elevated text-[10px] text-muted-foreground font-mono">
+                                    <span key={i} className="px-1.5 py-0.2 rounded bg-elevated text-xs text-muted-foreground font-mono">
                                       #{t}
                                     </span>
                                   ))}
@@ -661,7 +669,7 @@ export function ApplyPrepSheetModal({
                               href={practiceUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold transition"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-status-warning/15 hover:bg-status-warning/25 text-status-warning border border-status-warning/40 text-xs font-semibold transition"
                               title="Open problem in new tab to practice"
                             >
                               <span>Practice Problem</span>
@@ -686,7 +694,7 @@ export function ApplyPrepSheetModal({
                   </div>
                 ) : (
                   <div className="p-6 rounded-lg bg-inset/60 border border-hairline text-center text-muted-foreground space-y-2">
-                    <p>No practice problems matching &quot;{problemSearch}&quot;.</p>
+                    <p className="text-sm">No practice problems matching &quot;{problemSearch}&quot;.</p>
                     <button
                       type="button"
                       onClick={() => {
@@ -710,16 +718,16 @@ export function ApplyPrepSheetModal({
                   <button
                     type="button"
                     onClick={() => copyToClipboard("mock-prompt", mockInterviewerPrompt)}
-                    className="text-[11px] text-primary hover:underline flex items-center gap-1"
+                    className="text-xs text-primary hover:underline flex items-center gap-1"
                   >
                     {copiedKey === "mock-prompt" ? <Check className="size-3" /> : <Copy className="size-3" />}
                     Copy Full Prompt
                   </button>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   Copy this prompt into ChatGPT, Claude, or Gemini to run a realistic technical mock interview tailored to {job.company}&apos;s real assessment problems and your resume highlights.
                 </p>
-                <div className="max-h-72 overflow-y-auto rounded-lg border border-hairline bg-inset p-3.5 font-mono text-[11px] text-text-secondary whitespace-pre-wrap leading-relaxed">
+                <div className="max-h-72 overflow-y-auto rounded-lg border border-hairline bg-inset p-3.5 font-mono text-xs text-text-secondary whitespace-pre-wrap leading-relaxed">
                   {mockInterviewerPrompt}
                 </div>
               </div>
@@ -735,7 +743,7 @@ export function ApplyPrepSheetModal({
                   <h3 className="font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5" /> Verified STAR Stories &amp; Mitigations
                   </h3>
-                  <span className="text-[11px] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     Grounded strictly in verified Evidence Bank items
                   </span>
                 </div>
@@ -754,10 +762,10 @@ export function ApplyPrepSheetModal({
                               {renderGroundingBadge(story.grounding)}
                               <span className="font-bold text-sm text-foreground">{story.requirement}</span>
                             </div>
-                            <p className="text-[11px] text-muted-foreground font-medium">
+                            <p className="text-xs text-muted-foreground font-medium">
                               Source: {story.evidenceTitle}
                               {story.evidenceIds.length > 0 && (
-                                <span className="ml-1 font-mono text-[10px] text-muted-foreground">
+                                <span className="ml-1 font-mono text-xs text-muted-foreground">
                                   ({story.evidenceIds.join(", ")})
                                 </span>
                               )}
@@ -770,7 +778,7 @@ export function ApplyPrepSheetModal({
                               copyToClipboard(`star-${idx}`, formatStarStoryForClipboard(story))
                             }
                             data-testid="copy-star-story-btn"
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-elevated hover:bg-control/30 text-foreground border border-hairline text-[11px] transition-colors shrink-0"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-elevated hover:bg-control/30 text-foreground border border-hairline text-xs transition-colors shrink-0"
                             title="Copy formatted story/mitigation to clipboard"
                           >
                             {copiedKey === `star-${idx}` ? (
@@ -789,11 +797,11 @@ export function ApplyPrepSheetModal({
 
                         {/* If GAP: Render Honest Mitigation Plan Card */}
                         {story.grounding === "GAP" ? (
-                          <div className="p-3 rounded-lg border border-red-900/40 bg-red-950/20 space-y-1.5">
-                            <span className="font-bold text-red-300 uppercase tracking-wide text-[10px] block">
+                          <div className="p-3 rounded-lg border border-status-danger/30 bg-status-danger/10 space-y-1.5">
+                            <span className="font-bold text-status-danger uppercase tracking-wide text-xs block">
                               Honest Gap Mitigation Strategy
                             </span>
-                            <p className="text-text-secondary leading-relaxed text-xs">
+                            <p className="text-text-secondary leading-relaxed text-sm">
                               {story.mitigationPlan}
                             </p>
                           </div>
@@ -801,39 +809,39 @@ export function ApplyPrepSheetModal({
                           /* If DIRECT or TRANSFERABLE: Render STAR Grid */
                           <div className="grid grid-cols-1 gap-2 pt-1 font-sans text-xs">
                             <div className="p-2.5 rounded bg-panel border border-hairline">
-                              <span className="font-bold text-primary uppercase tracking-wide text-[10px] block mb-0.5">
+                              <span className="font-bold text-primary uppercase tracking-wide text-xs block mb-0.5">
                                 S — Situation
                               </span>
-                              <p className="text-text-secondary leading-relaxed">{story.situation}</p>
+                              <p className="text-sm text-text-secondary leading-relaxed">{story.situation}</p>
                             </div>
 
                             <div className="p-2.5 rounded bg-panel border border-hairline">
-                              <span className="font-bold text-signal uppercase tracking-wide text-[10px] block mb-0.5">
+                              <span className="font-bold text-signal uppercase tracking-wide text-xs block mb-0.5">
                                 T — Task
                               </span>
-                              <p className="text-text-secondary leading-relaxed">{story.task}</p>
+                              <p className="text-sm text-text-secondary leading-relaxed">{story.task}</p>
                             </div>
 
                             <div className="p-2.5 rounded bg-panel border border-hairline">
-                              <span className="font-bold text-ember uppercase tracking-wide text-[10px] block mb-0.5">
+                              <span className="font-bold text-ember uppercase tracking-wide text-xs block mb-0.5">
                                 A — Action
                               </span>
-                              <p className="text-text-secondary leading-relaxed">{story.action}</p>
+                              <p className="text-sm text-text-secondary leading-relaxed">{story.action}</p>
                             </div>
 
                             <div className="p-2.5 rounded bg-panel border border-hairline">
-                              <span className="font-bold text-status-success uppercase tracking-wide text-[10px] block mb-0.5">
+                              <span className="font-bold text-status-success uppercase tracking-wide text-xs block mb-0.5">
                                 R — Result
                               </span>
-                              <p className="text-text-secondary leading-relaxed">{story.result}</p>
+                              <p className="text-sm text-text-secondary leading-relaxed">{story.result}</p>
                             </div>
 
                             {story.mitigationPlan && (
-                              <div className="p-2.5 rounded bg-amber-950/30 border border-amber-900/50">
-                                <span className="font-bold text-amber-300 uppercase tracking-wide text-[10px] block mb-0.5">
+                              <div className="p-2.5 rounded bg-status-warning/15 border border-status-warning/40">
+                                <span className="font-bold text-status-warning uppercase tracking-wide text-xs block mb-0.5">
                                   Transferable Bridge Strategy
                                 </span>
-                                <p className="text-amber-200/90 leading-relaxed">{story.mitigationPlan}</p>
+                                <p className="text-sm text-status-warning/90 leading-relaxed">{story.mitigationPlan}</p>
                               </div>
                             )}
                           </div>
@@ -845,7 +853,7 @@ export function ApplyPrepSheetModal({
                             {story.technologies.map((t, i) => (
                               <span
                                 key={i}
-                                className="px-2 py-0.5 rounded bg-elevated text-[10px] text-text-secondary border border-hairline"
+                                className="px-2 py-0.5 rounded bg-elevated text-xs text-text-secondary border border-hairline"
                               >
                                 {t}
                               </span>
@@ -857,7 +865,7 @@ export function ApplyPrepSheetModal({
                   </div>
                 ) : (
                   <div className="p-4 rounded-lg bg-inset/60 border border-hairline text-center text-muted-foreground">
-                    <p>No verified evidence items loaded yet. Add items to Evidence Bank in Library.</p>
+                    <p className="text-sm">No verified evidence items loaded yet. Add items to Evidence Bank in Library.</p>
                   </div>
                 )}
               </div>
@@ -873,17 +881,17 @@ export function ApplyPrepSheetModal({
                       <div
                         key={idx}
                         data-testid="gap-mitigation-card"
-                        className="rounded-lg border border-amber-900/40 bg-amber-950/20 p-3 space-y-1.5"
+                        className="rounded-lg border border-status-warning/40 bg-status-warning/15 p-3 space-y-1.5"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-semibold text-amber-300">Missing: {gap.requirement}</span>
+                          <span className="font-semibold text-status-warning">Missing: {gap.requirement}</span>
                           {gap.transferableSkills.length > 0 && (
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               Transferable: {gap.transferableSkills.join(", ")}
                             </span>
                           )}
                         </div>
-                        <p className="text-text-secondary leading-relaxed text-xs">{gap.mitigationStrategy}</p>
+                        <p className="text-text-secondary leading-relaxed text-sm">{gap.mitigationStrategy}</p>
                       </div>
                     ))}
                   </div>
@@ -902,7 +910,7 @@ export function ApplyPrepSheetModal({
                       onClick={() =>
                         copyToClipboard("talking-points", starPrep.talkingPoints.join("\n- "))
                       }
-                      className="text-[11px] text-primary hover:underline flex items-center gap-1"
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
                     >
                       {copiedKey === "talking-points" ? <Check className="size-3" /> : <Copy className="size-3" />}
                       Copy All Points
@@ -936,31 +944,36 @@ export function ApplyPrepSheetModal({
                 <span className="font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
                   <User className="h-3.5 w-3.5" /> Candidate Information
                 </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-hairline bg-inset/70 p-3">
-                  {Object.entries(candidateInfo).map(([key, val]) => {
-                    if (!val) return null;
-                    const isCopied = copiedKey === `contact-${key}`;
-                    return (
-                      <div
-                        key={key}
-                        className="flex items-center justify-between gap-2 rounded bg-elevated px-2.5 py-1.5"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <span className="text-[10px] uppercase text-muted-foreground block">{key}</span>
-                          <span className="truncate text-foreground block">{val}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(`contact-${key}`, val)}
-                          className="shrink-0 p-1 text-muted-foreground hover:text-primary transition-colors"
-                          title={`Copy ${key}`}
+                {Object.keys(sanitizedCandidateInfo).length === 0 ? (
+                  <div className="rounded-lg border border-hairline bg-inset/70 p-3 text-muted-foreground">
+                    Not found in resume
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-hairline bg-inset/70 p-3">
+                    {Object.entries(sanitizedCandidateInfo).map(([key, val]) => {
+                      const isCopied = copiedKey === `contact-${key}`;
+                      return (
+                        <div
+                          key={key}
+                          className="flex items-center justify-between gap-2 rounded bg-elevated px-2.5 py-1.5"
                         >
-                          {isCopied ? <Check className="h-3.5 w-3.5 text-status-success" /> : <Copy className="h-3.5 w-3.5" />}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
+                          <div className="min-w-0 flex-1">
+                            <span className="text-xs uppercase text-muted-foreground block">{key}</span>
+                            <span className="truncate text-foreground block">{val}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(`contact-${key}`, val)}
+                            className="shrink-0 p-1 text-muted-foreground hover:text-primary transition-colors"
+                            title={`Copy ${key}`}
+                          >
+                            {isCopied ? <Check className="h-3.5 w-3.5 text-status-success" /> : <Copy className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Matched Highlights */}
@@ -975,7 +988,7 @@ export function ApplyPrepSheetModal({
                       onClick={() =>
                         copyToClipboard("all-highlights", matchedHighlights.join("\n\n"))
                       }
-                      className="text-[11px] text-primary hover:underline flex items-center gap-1"
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
                     >
                       {copiedKey === "all-highlights" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                       Copy All Bullets
@@ -1019,7 +1032,7 @@ export function ApplyPrepSheetModal({
                   <button
                     type="button"
                     onClick={() => copyToClipboard("cover-letter", coverLetter)}
-                    className="text-[11px] text-primary hover:underline flex items-center gap-1"
+                    className="text-xs text-primary hover:underline flex items-center gap-1"
                   >
                     {copiedKey === "cover-letter" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                     Copy Full Letter
@@ -1033,7 +1046,7 @@ export function ApplyPrepSheetModal({
                 </div>
               ) : (
                 <div className="p-6 rounded-lg bg-inset/60 border border-hairline text-center text-muted-foreground">
-                  <p>No cover letter draft generated for this job application yet.</p>
+                  <p className="text-sm">No cover letter draft generated for this job application yet.</p>
                 </div>
               )}
             </div>
@@ -1042,7 +1055,7 @@ export function ApplyPrepSheetModal({
 
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-hairline px-6 py-3 bg-inset/70">
-          <span className="text-[11px] text-muted-foreground">Ready to submit application</span>
+          <span className="text-xs text-muted-foreground">Ready to submit application</span>
           <div className="flex items-center gap-2">
             {job.applyUrl && isSafeHref(job.applyUrl) && (
               <a

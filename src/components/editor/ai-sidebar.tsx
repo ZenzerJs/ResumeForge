@@ -108,8 +108,8 @@ interface GapItem {
 }
 
 const SEVERITY_COLORS = {
-  CRITICAL: "text-red-400 bg-red-950/50 border-red-800/50",
-  MODERATE: "text-amber-400 bg-amber-950/50 border-amber-800/50",
+  CRITICAL: "text-status-danger bg-status-danger/10 border-status-danger/30",
+  MODERATE: "text-status-warning bg-status-warning/15 border-status-warning/40",
   MINOR: "text-text-secondary bg-elevated/60 border-hairline",
 };
 
@@ -703,7 +703,7 @@ export function AiSidebar({
           )}
           <Link
             href="/settings"
-            className="flex items-center gap-1 text-[11px] text-text-muted hover:text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+            className="flex items-center gap-1 text-xs text-text-muted hover:text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
           >
             <Settings className="h-3 w-3" />
             Settings
@@ -717,7 +717,7 @@ export function AiSidebar({
               data-testid="popout-ai-window-btn"
             >
               {isPoppedOut ? (
-                <Dock className="h-3.5 w-3.5 text-amber-400" />
+                <Dock className="h-3.5 w-3.5 text-status-warning" />
               ) : (
                 <ExternalLink className="h-3.5 w-3.5" />
               )}
@@ -732,7 +732,7 @@ export function AiSidebar({
               data-testid="toggle-ai-sidebar-btn"
             >
               {isCollapsed ? (
-                <PanelRightOpen className="h-3.5 w-3.5 text-amber-400" />
+                <PanelRightOpen className="h-3.5 w-3.5 text-status-warning" />
               ) : (
                 <PanelRightClose className="h-3.5 w-3.5" />
               )}
@@ -754,9 +754,9 @@ export function AiSidebar({
             aria-selected={mode === "chat"}
             data-testid="ai-tab-chat"
             onClick={() => handleModeChange("chat")}
-            className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+            className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
               mode === "chat"
-                ? "bg-amber-500 text-[#121010]"
+                ? "bg-primary text-primary-foreground"
                 : "text-text-secondary hover:text-foreground hover:bg-elevated"
             }`}
           >
@@ -768,9 +768,9 @@ export function AiSidebar({
             aria-selected={mode === "tailor"}
             data-testid="ai-tab-tailor"
             onClick={() => handleModeChange("tailor")}
-            className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+            className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
               mode === "tailor"
-                ? "bg-amber-500 text-[#121010]"
+                ? "bg-primary text-primary-foreground"
                 : "text-text-secondary hover:text-foreground hover:bg-elevated"
             }`}
           >
@@ -785,9 +785,9 @@ export function AiSidebar({
       <div className="flex flex-1 min-h-0 flex-col overflow-y-auto p-4 gap-4">
         {/* Task 10.5: Typst Repair Assist Mode Card */}
         {repairContext && (
-          <div className="rounded-lg border border-amber-500/40 bg-amber-950/30 p-3.5 text-xs text-amber-200 shadow-md space-y-3">
-            <div className="flex items-center justify-between border-b border-amber-500/30 pb-2">
-              <div className="flex items-center gap-2 font-bold text-amber-400">
+          <div className="rounded-lg border border-status-warning/40 bg-status-warning/15 p-3.5 text-xs text-foreground shadow-md space-y-3">
+            <div className="flex items-center justify-between border-b border-status-warning/40 pb-2">
+              <div className="flex items-center gap-2 font-bold text-status-warning">
                 <Sparkles className="h-4 w-4" />
                 <span>Typst Repair Assist</span>
               </div>
@@ -803,11 +803,11 @@ export function AiSidebar({
               )}
             </div>
 
-            <div className="space-y-1 font-mono text-[11px] bg-inset p-2.5 rounded border border-hairline">
-              <div className="text-red-400 font-semibold">Compiler Error:</div>
+            <div className="space-y-1 font-mono text-xs bg-inset p-2.5 rounded border border-hairline">
+              <div className="text-status-danger font-semibold">Compiler Error:</div>
               <div className="text-text-secondary break-words">{repairContext.compileError}</div>
               {repairContext.line && (
-                <div className="text-muted-foreground text-[10px]">Line: {repairContext.line}</div>
+                <div className="text-muted-foreground text-xs">Line: {repairContext.line}</div>
               )}
             </div>
 
@@ -827,46 +827,46 @@ export function AiSidebar({
                 type="button"
                 disabled={isRepairing}
                 onClick={handleGenerateRepair}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-[#121010] font-bold text-xs shadow transition cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground font-bold text-xs shadow transition cursor-pointer"
                 data-testid="generate-repair-btn"
               >
                 {isRepairing ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-[#121010]" />
+                  <Loader2 className="h-4 w-4 animate-spin text-primary-foreground" />
                 ) : (
-                  <Sparkles className="h-4 w-4 text-[#121010]" />
+                  <Sparkles className="h-4 w-4 text-primary-foreground" />
                 )}
                 {isRepairing ? "Diagnosing & Generating Fix..." : "Generate AI Repair Proposal"}
               </button>
             )}
 
             {repairProposal && (
-              <div className="space-y-3 pt-1 border-t border-amber-500/30">
+              <div className="space-y-3 pt-1 border-t border-status-warning/40">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-amber-300 text-xs">Proposal Summary</span>
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${
+                  <span className="font-bold text-status-warning text-xs">Proposal Summary</span>
+                  <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded border ${
                     repairProposal.confidence === "high"
                       ? "bg-status-success/15 text-status-success-soft border-status-success/35"
                       : repairProposal.confidence === "medium"
-                      ? "bg-amber-950 text-amber-400 border-amber-800"
-                      : "bg-red-950 text-red-400 border-red-800"
+                      ? "bg-status-warning/15 text-status-warning border-status-warning/40"
+                      : "bg-status-danger/10 text-status-danger border-status-danger/30"
                   }`}>
                     {repairProposal.confidence} confidence
                   </span>
                 </div>
 
-                <p className="text-text-secondary leading-relaxed font-sans">{repairProposal.summary}</p>
-                <div className="text-muted-foreground text-[11px] italic font-sans">{repairProposal.errorAnalysis}</div>
+                <p className="text-sm text-text-secondary leading-relaxed font-sans">{repairProposal.summary}</p>
+                <div className="text-muted-foreground text-xs italic font-sans">{repairProposal.errorAnalysis}</div>
 
                 {/* Pre-compilation status badge */}
                 {preValidationValid === true && (
-                  <div className="flex items-center gap-1.5 text-status-success-soft bg-status-success/15 border border-status-success/35 p-2 rounded text-[11px]">
+                  <div className="flex items-center gap-1.5 text-status-success-soft bg-status-success/15 border border-status-success/35 p-2 rounded text-xs">
                     <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success" />
                     <span>Pre-compilation verification: PASSED</span>
                   </div>
                 )}
 
                 {preValidationValid === false && (
-                  <div className="flex items-center gap-1.5 text-red-400 bg-red-950/40 border border-red-800/40 p-2 rounded text-[11px]">
+                  <div className="flex items-center gap-1.5 text-status-danger bg-status-danger/10 border border-status-danger/30 p-2 rounded text-xs">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
                     <span>Pre-compilation verification: FAILED ({preValidationError})</span>
                   </div>
@@ -883,20 +883,20 @@ export function AiSidebar({
                   return (
                     <>
                       {isLargeDiff && (
-                        <div className="p-2.5 rounded bg-amber-950/60 border border-amber-700 text-amber-300 text-[11px] space-y-2">
-                          <div className="flex items-center gap-1.5 font-bold text-amber-400">
+                        <div className="p-2.5 rounded bg-status-warning/15 border border-status-warning/40 text-status-warning text-xs space-y-2">
+                          <div className="flex items-center gap-1.5 font-bold text-status-warning">
                             <AlertTriangle className="h-4 w-4 shrink-0" />
                             <span>Large Repair Warning ({repairProposal.changedLinesCount} lines changed, &gt;25% of document)</span>
                           </div>
-                          <p className="text-[10px] text-amber-200/90 leading-tight">
+                          <p className="text-sm text-foreground/90 leading-tight">
                             Applying this proposal will replace a substantial portion of your document. Confirm below to enable Apply Fix.
                           </p>
-                          <label className="flex items-start gap-2 text-[11px] text-amber-300 cursor-pointer pt-0.5">
+                          <label className="flex items-start gap-2 text-xs text-status-warning cursor-pointer pt-0.5">
                             <input
                               type="checkbox"
                               checked={confirmLargeRepair}
                               onChange={(e) => setConfirmLargeRepair(e.target.checked)}
-                              className="mt-0.5 rounded border-amber-600 bg-inset text-amber-500 focus:ring-amber-500"
+                              className="mt-0.5 rounded border-status-warning bg-inset text-primary focus:ring-ring"
                               data-testid="confirm-large-repair-checkbox"
                             />
                             <span>I confirm I want to replace &gt;25% of my document.</span>
@@ -905,7 +905,7 @@ export function AiSidebar({
                       )}
 
                       {repairProposal.warnings && repairProposal.warnings.length > 0 && (
-                        <ul className="list-disc pl-4 text-[10px] text-amber-400 space-y-0.5">
+                        <ul className="list-disc pl-4 text-xs text-status-warning space-y-0.5">
                           {repairProposal.warnings.map((w, idx) => (
                             <li key={idx}>{w}</li>
                           ))}
@@ -954,28 +954,28 @@ export function AiSidebar({
         {seededFeedback && (
           <div
             data-testid="seeded-feedback-banner"
-            className="p-3.5 bg-amber-950/40 border border-amber-800/60 rounded-xl space-y-2 text-xs shadow-md"
+            className="p-3.5 bg-status-warning/15 border border-status-warning/40 rounded-xl space-y-2 text-xs shadow-md"
           >
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-amber-300 flex items-center gap-1.5 text-[11px] uppercase tracking-wide">
-                <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+              <span className="font-semibold text-status-warning flex items-center gap-1.5 text-xs uppercase tracking-wide">
+                <Sparkles className="h-3.5 w-3.5 text-status-warning" />
                 Seeded Feedback from Tailor Review
               </span>
               <button
                 type="button"
                 onClick={handleDismissSeededFeedback}
                 data-testid="dismiss-seeded-feedback-btn"
-                className="text-amber-400 hover:text-amber-200 text-[10px] underline font-medium"
+                className="text-status-warning hover:text-status-warning/80 text-xs underline font-medium"
               >
                 Dismiss Context
               </button>
             </div>
-            <p className="text-text-secondary text-xs leading-relaxed italic bg-inset p-2 rounded border border-hairline">
+            <p className="text-text-secondary text-sm leading-relaxed italic bg-inset p-2 rounded border border-hairline">
               &quot;{seededFeedback.overviewCommentary}&quot;
             </p>
             {seededFeedback.nextStepsAdvice && seededFeedback.nextStepsAdvice.length > 0 && (
-              <div className="text-[10px] text-amber-200 space-y-0.5 pt-1">
-                <span className="font-semibold block text-amber-400">Recommended Actions:</span>
+              <div className="text-xs text-foreground space-y-0.5 pt-1">
+                <span className="font-semibold block text-status-warning">Recommended Actions:</span>
                 <ul className="list-disc list-inside space-y-0.5 text-text-secondary">
                   {seededFeedback.nextStepsAdvice.map((adv: string, idx: number) => (
                     <li key={idx}>{adv}</li>
@@ -988,7 +988,7 @@ export function AiSidebar({
 
         {/* JD Input */}
         <div className="space-y-2">
-          <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Job Description
           </label>
           <textarea
@@ -1000,7 +1000,7 @@ export function AiSidebar({
               setNoKeyError(false);
             }}
             placeholder={"Paste the job posting here…\n\n(or navigate to a job in the Tracker and click Copy JD to auto-fill)"}
-            className="w-full bg-inset border border-hairline rounded-lg p-3 text-xs text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 resize-none font-mono leading-relaxed"
+            className="w-full bg-inset border border-hairline rounded-lg p-3 text-xs text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none font-mono leading-relaxed"
           />
         </div>
 
@@ -1016,7 +1016,7 @@ export function AiSidebar({
             {noKeyError && (
               <Link
                 href="/settings"
-                className="mt-2 block underline underline-offset-2 text-amber-400 hover:text-amber-300 text-xs font-medium"
+                className="mt-2 block underline underline-offset-2 text-status-warning hover:text-status-warning/80 text-xs font-medium"
               >
                 → Configure your API key in Settings
               </Link>
@@ -1029,7 +1029,7 @@ export function AiSidebar({
           type="button"
           onClick={handleTailor}
           disabled={isGenerating || !jdText.trim()}
-          className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-[#121010] font-semibold text-xs py-2.5 rounded-lg shadow shadow-amber-500/20 transition"
+          className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground font-semibold text-xs py-2.5 rounded-lg shadow shadow-primary/20 transition"
         >
           {isGenerating ? (
             <>
@@ -1057,27 +1057,27 @@ export function AiSidebar({
             {unverifiedSkillsInAccepted.length > 0 && (
               <div
                 data-testid="unverified-skills-ack-box"
-                className="p-3 rounded-lg bg-amber-950/40 border border-amber-800/60 space-y-2 text-xs text-amber-200"
+                className="p-3 rounded-lg bg-status-warning/15 border border-status-warning/40 space-y-2 text-xs text-status-warning"
               >
-                <div className="flex items-center gap-1.5 font-semibold text-amber-300">
-                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+                <div className="flex items-center gap-1.5 font-semibold text-status-warning">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-status-warning" />
                   <span>Acknowledge unverified skills</span>
                 </div>
-                <p className="text-[11px] text-text-secondary leading-relaxed">
+                <p className="text-sm text-text-secondary leading-relaxed">
                   Only add if you have real experience; log it in your Evidence Bank first, or check below to confirm before applying:
                 </p>
                 <div className="space-y-1 pt-0.5">
                   {unverifiedSkillsInAccepted.map((skill) => (
                     <label
                       key={skill}
-                      className="flex items-center gap-2 text-[11px] text-amber-200 cursor-pointer"
+                      className="flex items-center gap-2 text-xs text-foreground cursor-pointer"
                     >
                       <input
                         type="checkbox"
                         checked={acknowledgedSkills.has(skill)}
                         onChange={() => toggleSkillAck(skill)}
                         data-testid={`ack-skill-checkbox-${skill}`}
-                        className="rounded border-amber-600 bg-inset text-amber-500 focus:ring-amber-500"
+                        className="rounded border-status-warning bg-inset text-primary focus:ring-ring"
                       />
                       <span>I have real experience with <strong>{skill}</strong></span>
                     </label>
@@ -1087,10 +1087,10 @@ export function AiSidebar({
             )}
 
             <div className="flex items-center justify-between">
-              <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 {suggestions.length} suggestion{suggestions.length !== 1 ? "s" : ""}
                 {pendingCount > 0 && (
-                  <span className="ml-2 text-amber-400">{pendingCount} pending</span>
+                  <span className="ml-2 text-status-warning">{pendingCount} pending</span>
                 )}
               </h3>
               {acceptedIds.size > 0 && (
@@ -1098,10 +1098,10 @@ export function AiSidebar({
                   type="button"
                   onClick={handleApplyAccepted}
                   disabled={isGenerating || hasApplied}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition ${
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${
                     hasApplied
                       ? "bg-status-success/15 text-status-success-soft border border-status-success/35"
-                      : "bg-amber-500 hover:bg-amber-400 text-[#121010]"
+                      : "bg-primary hover:bg-primary/90 text-primary-foreground"
                   }`}
                 >
                   {hasApplied ? (
@@ -1137,37 +1137,37 @@ export function AiSidebar({
                     <span className="font-medium text-foreground leading-snug line-clamp-2">
                       {s.targetSection}
                     </span>
-                    <span className="shrink-0 text-[10px] font-mono text-muted-foreground">
+                    <span className="shrink-0 text-xs font-mono text-muted-foreground">
                       {Math.round(s.confidence * 100)}%
                     </span>
                   </div>
 
                   {s.before && (
-                    <div className="text-[10px] bg-red-950/30 border border-red-900/40 rounded p-2 text-red-300 font-mono line-clamp-2">
+                    <div className="text-xs bg-status-danger/10 border border-status-danger/30 rounded p-2 text-status-danger font-mono line-clamp-2">
                       − {s.before}
                     </div>
                   )}
                   {s.after && (
-                    <div className="text-[10px] bg-status-success/10 border border-status-success/30 rounded p-2 text-status-success-soft font-mono line-clamp-2">
+                    <div className="text-xs bg-status-success/10 border border-status-success/30 rounded p-2 text-status-success-soft font-mono line-clamp-2">
                       + {s.after}
                     </div>
                   )}
 
-                  <AiMarkdownRenderer content={s.rationale} className="text-text-secondary text-[11px]" />
+                  <AiMarkdownRenderer content={s.rationale} className="text-text-secondary text-xs" />
 
                   {!isAccepted && !isRejected && (
                     <div className="flex gap-1.5 pt-1">
                       <button
                         type="button"
                         onClick={() => handleAccept(s.id)}
-                        className="flex-1 py-1 rounded bg-status-success/15 hover:bg-status-success/25 text-status-success-soft border border-status-success/25 text-[10px] font-semibold transition"
+                        className="flex-1 py-1 rounded bg-status-success/15 hover:bg-status-success/25 text-status-success-soft border border-status-success/25 text-xs font-semibold transition"
                       >
                         Accept
                       </button>
                       <button
                         type="button"
                         onClick={() => handleReject(s.id)}
-                        className="flex-1 py-1 rounded bg-elevated hover:bg-panel text-text-secondary border border-hairline text-[10px] font-semibold transition"
+                        className="flex-1 py-1 rounded bg-elevated hover:bg-panel text-text-secondary border border-hairline text-xs font-semibold transition"
                       >
                         Skip
                       </button>
@@ -1180,7 +1180,7 @@ export function AiSidebar({
                         setAcceptedIds((p) => { const n = new Set(p); n.delete(s.id); return n; });
                         setRejectedIds((p) => { const n = new Set(p); n.delete(s.id); return n; });
                       }}
-                      className="text-[10px] text-muted-foreground hover:text-foreground transition flex items-center gap-1"
+                      className="text-xs text-muted-foreground hover:text-foreground transition flex items-center gap-1"
                     >
                       <X className="h-3 w-3" />
                       Undo
@@ -1198,7 +1198,7 @@ export function AiSidebar({
             <button
               type="button"
               onClick={() => setShowGaps((v) => !v)}
-              className="flex items-center justify-between w-full text-[10px] font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition"
+              className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition"
             >
               <span>{gaps.length} gap{gaps.length !== 1 ? "s" : ""} identified</span>
               {showGaps ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -1207,10 +1207,10 @@ export function AiSidebar({
               gaps.map((g, i) => (
                 <div
                   key={i}
-                  className={`rounded-lg border p-2.5 text-[11px] ${SEVERITY_COLORS[g.severity]}`}
+                  className={`rounded-lg border p-2.5 text-xs ${SEVERITY_COLORS[g.severity]}`}
                 >
                   <p className="font-semibold">{g.requirement}</p>
-                  <p className="mt-1 text-[10px] opacity-80">{g.recommendation}</p>
+                  <p className="mt-1 text-sm opacity-80">{g.recommendation}</p>
                 </div>
               ))}
           </div>
@@ -1219,18 +1219,18 @@ export function AiSidebar({
         {/* Empty state */}
         {!isGenerating && suggestions.length === 0 && !error && (
           <div className="flex flex-col items-center justify-center flex-1 text-center py-6 gap-3">
-            <div className="rounded-full bg-amber-500/10 border border-amber-500/20 p-3">
-              <Bot className="h-6 w-6 text-amber-400" />
+            <div className="rounded-full bg-status-warning/15 border border-status-warning/40 p-3">
+              <Bot className="h-6 w-6 text-status-warning" />
             </div>
             <div className="space-y-1">
               <p className="text-xs font-medium text-foreground">Tailoring Assistant</p>
-              <p className="text-[11px] text-muted-foreground max-w-[200px] leading-relaxed">
+              <p className="text-sm text-muted-foreground max-w-[200px] leading-relaxed">
                 Paste a job description and click Generate to get evidence-backed resume suggestions.
               </p>
             </div>
             <Link
               href="/tracker"
-              className="text-[11px] text-amber-400/80 hover:text-amber-400 underline underline-offset-2 transition"
+              className="text-xs text-status-warning/80 hover:text-status-warning underline underline-offset-2 transition"
             >
               Browse saved jobs in Tracker →
             </Link>

@@ -76,7 +76,7 @@ test.describe("Phase 6 Job Application Tracker E2E Tests", () => {
 
     // Check Library workspace header
     await page.goto("/library");
-    await page.waitForSelector("text=Verified Evidence Bank", { timeout: 10000 });
+    await page.waitForSelector("text=Evidence Bank", { timeout: 10000 });
     await expect(page.locator("header a[href^='/tracker']").first()).toBeVisible();
 
     // Check Tailor workspace header
@@ -86,7 +86,7 @@ test.describe("Phase 6 Job Application Tracker E2E Tests", () => {
 
     // Check Settings workspace header
     await page.goto("/settings");
-    await page.waitForSelector("text=AI Provider Gateway Settings", { timeout: 10000 });
+    await page.waitForSelector("text=Connect an AI provider key (stored in this browser)", { timeout: 10000 });
     await expect(page.locator("header a[href^='/tracker']").first()).toBeVisible();
   });
 

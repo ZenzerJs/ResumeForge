@@ -110,4 +110,13 @@ describe("Question Database & Curricula", () => {
       expect(svgElement).toBeDefined();
     }
   });
+
+  it("contains no fabricated digits or percentages in any starRubric.result", () => {
+    for (const q of ALL_QUESTIONS) {
+      if (q.starRubric) {
+        expect(q.starRubric.result).toBeTruthy();
+        expect(q.starRubric.result).not.toMatch(/[\d%]/);
+      }
+    }
+  });
 });

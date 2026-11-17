@@ -264,7 +264,7 @@ export function CoverLetterPanel({
               Evidence Grounded
             </span>
           </h3>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Generate an evidence-backed cover letter grounded strictly in candidate Evidence Bank achievements.
           </p>
         </div>
@@ -294,11 +294,11 @@ export function CoverLetterPanel({
       {generateError && (
         <div
           data-testid="cover-letter-error"
-          className="p-4 bg-red-950/60 border border-red-800/80 rounded-xl flex items-start gap-3 text-xs text-red-300"
+          className="p-4 bg-status-danger/10 border border-status-danger/30 rounded-xl flex items-start gap-3 text-xs text-status-danger"
         >
-          <AlertTriangle className="h-5 w-5 shrink-0 text-red-400 mt-0.5" />
+          <AlertTriangle className="h-5 w-5 shrink-0 text-status-danger mt-0.5" />
           <div className="space-y-1">
-            <span className="font-semibold block text-red-200">Generation Error</span>
+            <span className="font-semibold block text-status-danger">Generation Error</span>
             <span>{generateError}</span>
           </div>
         </div>
@@ -384,14 +384,14 @@ export function CoverLetterPanel({
           {/* Evidence Citations Badges */}
           {coverLetter.evidenceCitations && coverLetter.evidenceCitations.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 text-xs bg-signal/10 border border-signal/30 rounded-lg p-3">
-              <span className="text-signal font-semibold uppercase text-[10px] tracking-wider">
+              <span className="text-signal font-semibold uppercase text-xs tracking-wider">
                 Grounded Evidence Citations ({coverLetter.evidenceCitations.length}):
               </span>
               {coverLetter.evidenceCitations.map((cid) => (
                 <span
                   key={cid}
                   data-testid="evidence-citation-badge"
-                  className="text-[10px] font-mono px-2 py-0.5 rounded bg-signal/15 text-signal border border-signal/35"
+                  className="text-xs font-mono px-2 py-0.5 rounded bg-signal/15 text-signal border border-signal/35"
                 >
                   ✓ {cid}
                 </span>
@@ -410,28 +410,28 @@ export function CoverLetterPanel({
           ) : (
             <div className="space-y-3" data-testid="cover-letter-plain-view">
               <div className="bg-inset border border-hairline rounded-xl p-4 space-y-2">
-                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                <span className="text-xs uppercase font-bold text-muted-foreground tracking-wider">
                   Salutation & Opening Hook
                 </span>
-                <p className="text-xs text-foreground font-medium">{coverLetter.salutation}</p>
-                <p className="text-xs text-text-secondary leading-relaxed font-sans">{coverLetter.openingParagraph}</p>
+                <p className="text-sm text-foreground font-medium">{coverLetter.salutation}</p>
+                <p className="text-sm text-text-secondary leading-relaxed font-sans">{coverLetter.openingParagraph}</p>
               </div>
 
               {coverLetter.bodyParagraphs.map((para, idx) => (
                 <div key={idx} className="bg-inset border border-hairline rounded-xl p-4 space-y-2">
-                  <span className="text-[10px] uppercase font-bold text-signal tracking-wider">
+                  <span className="text-xs uppercase font-bold text-signal tracking-wider">
                     Body Paragraph {idx + 1}
                   </span>
-                  <p className="text-xs text-foreground leading-relaxed font-sans">{para}</p>
+                  <p className="text-sm text-foreground leading-relaxed font-sans">{para}</p>
                 </div>
               ))}
 
               <div className="bg-inset border border-hairline rounded-xl p-4 space-y-2">
-                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                <span className="text-xs uppercase font-bold text-muted-foreground tracking-wider">
                   Closing Statement
                 </span>
-                <p className="text-xs text-text-secondary leading-relaxed font-sans">{coverLetter.closingParagraph}</p>
-                <p className="text-xs text-muted-foreground font-medium whitespace-pre-line">
+                <p className="text-sm text-text-secondary leading-relaxed font-sans">{coverLetter.closingParagraph}</p>
+                <p className="text-sm text-muted-foreground font-medium whitespace-pre-line">
                   {`Sincerely,\n${
                     coverLetter.fullMarkdown.match(/Sincerely,\s*\n([^\n]+)/i)?.[1]?.trim() || "Candidate"
                   }`}

@@ -36,6 +36,9 @@ export interface ConfirmMasterDialogProps {
   title?: string;
   onConfirm: () => Promise<void> | void;
   isSaving?: boolean;
+  draftEvidence: boolean;
+  onDraftEvidenceChange: (next: boolean) => void;
+  showDraftEvidence?: boolean;
 }
 
 export function ConfirmMasterDialog({
@@ -46,8 +49,11 @@ export function ConfirmMasterDialog({
   title = "Master Resume",
   onConfirm,
   isSaving = false,
+  draftEvidence,
+  onDraftEvidenceChange,
+  showDraftEvidence = true,
 }: ConfirmMasterDialogProps) {
-  const [confirmed, setConfirmed] = useState(true);
+  const [confirmed, setConfirmed] = useState(false);
   const [activeTab, setActiveTab] = useState<"facts" | "diff">("facts");
   const confirmingRef = React.useRef(false);
   const [localSaving, setLocalSaving] = useState(false);
@@ -94,14 +100,14 @@ export function ConfirmMasterDialog({
         className="max-w-2xl bg-panel border-hairline text-foreground shadow-2xl"
       >
         <DialogHeader>
-          <div className="flex items-center gap-2 text-amber-400">
-            <ShieldCheck className="size-5 text-amber-400" />
+          <div className="flex items-center gap-2 text-status-warning">
+            <ShieldCheck className="size-5 text-status-warning" />
             <DialogTitle className="text-lg font-bold text-foreground">
               Confirm &amp; Freeze Master Fact Snapshot
             </DialogTitle>
           </div>
-          <DialogDescription className="text-xs text-text-secondary">
-            Saving as <strong className="text-amber-300">{title}</strong> will freeze an immutable fact baseline.
+          <DialogDescription className="text-sm text-text-secondary">
+            Saving as <strong className="text-status-warning">{title}</strong> will freeze an immutable fact baseline.
             Future AI tailoring and exports will be guarded against these verified claims.
           </DialogDescription>
         </DialogHeader>
@@ -123,7 +129,7 @@ export function ConfirmMasterDialog({
             className={cn(
               "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5",
               activeTab === "facts"
-                ? "bg-amber-500 text-[#121010] font-bold"
+                ? "bg-primary text-primary-foreground font-bold"
                 : "text-text-secondary hover:text-foreground hover:bg-elevated"
             )}
           >
@@ -141,16 +147,16 @@ export function ConfirmMasterDialog({
             className={cn(
               "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5",
               activeTab === "diff"
-                ? "bg-amber-500 text-[#121010] font-bold"
+                ? "bg-primary text-primary-foreground font-bold"
                 : "text-text-secondary hover:text-foreground hover:bg-elevated"
             )}
           >
             <GitCompare className="size-3.5" />
             <span>Source Diff Review</span>
             {diff && (diff.stats.addedCount > 0 || diff.stats.deletedCount > 0) && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-inset border border-hairline">
+              <span className="inline-flex items-center gap-1 text-xs font-mono px-1.5 py-0.5 rounded bg-inset border border-hairline">
                 <span className="text-status-success-soft font-bold">+{diff.stats.addedCount}</span>
-                <span className="text-red-400 font-bold">-{diff.stats.deletedCount}</span>
+                <span className="text-status-danger font-bold">-{diff.stats.deletedCount}</span>
               </span>
             )}
           </button>
@@ -167,7 +173,7 @@ export function ConfirmMasterDialog({
             {/* Employers */}
             <div className="p-3 bg-inset rounded-lg border border-hairline space-y-1.5">
               <div className="flex items-center gap-1.5 font-semibold text-foreground text-xs">
-                <Briefcase className="size-3.5 text-blue-400" />
+                <Briefcase className="size-3.5 text-status-info" />
                 <span>Extracted Employers ({facts.employers.length})</span>
               </div>
               <div className="flex flex-wrap gap-1.5 pt-1">
@@ -186,7 +192,7 @@ export function ConfirmMasterDialog({
             {/* Titles */}
             <div className="p-3 bg-inset rounded-lg border border-hairline space-y-1.5">
               <div className="flex items-center gap-1.5 font-semibold text-foreground text-xs">
-                <Award className="size-3.5 text-amber-400" />
+                <Award className="size-3.5 text-status-warning" />
                 <span>Extracted Job Titles ({facts.titles.length})</span>
               </div>
               <div className="flex flex-wrap gap-1.5 pt-1">
@@ -226,12 +232,12 @@ export function ConfirmMasterDialog({
             {/* Skills */}
             <div className="p-3 bg-inset rounded-lg border border-hairline space-y-1.5">
               <div className="flex items-center gap-1.5 font-semibold text-foreground text-xs">
-                <Wrench className="size-3.5 text-purple-400" />
+                <Wrench className="size-3.5 text-status-info" />
                 <span>Extracted Skills ({facts.skills.length})</span>
               </div>
               <div className="flex flex-wrap gap-1 pt-1 max-h-24 overflow-y-auto">
                 {facts.skills.map((s, i) => (
-                  <span key={i} className="px-2 py-0.5 rounded bg-elevated text-[11px] text-text-secondary border border-hairline">
+                  <span key={i} className="px-2 py-0.5 rounded bg-elevated text-xs text-text-secondary border border-hairline">
                     {s}
                   </span>
                 ))}
@@ -244,8 +250,8 @@ export function ConfirmMasterDialog({
         {activeTab === "diff" && (
           <div id="panel-diff" role="tabpanel" aria-labelledby="tab-diff" className="max-h-[48vh] overflow-y-auto pr-1 space-y-2">
             {diff?.isTruncated && (
-              <div className="p-2.5 rounded bg-amber-950/50 border border-amber-800 text-xs text-amber-300 flex items-center gap-2">
-                <AlertTriangle className="size-4 shrink-0 text-amber-400" />
+              <div className="p-2.5 rounded bg-status-warning/15 border border-status-warning/40 text-xs text-status-warning flex items-center gap-2">
+                <AlertTriangle className="size-4 shrink-0 text-status-warning" />
                 <span>Document exceeds 2,000 lines. Diff truncated for display performance.</span>
               </div>
             )}
@@ -255,14 +261,14 @@ export function ConfirmMasterDialog({
                 data-testid="master-diff-container"
                 className="p-4 rounded-lg bg-inset border border-hairline text-xs text-text-secondary space-y-2"
               >
-                <div className="flex items-center gap-2 text-amber-400 font-semibold">
+                <div className="flex items-center gap-2 text-status-warning font-semibold">
                   <Info className="size-4" />
                   <span>Initial Master Baseline Creation</span>
                 </div>
                 <p className="text-muted-foreground leading-relaxed">
                   No prior baseline exists. Freezing this document will create the initial master fact snapshot.
                 </p>
-                <div className="mt-3 p-2.5 rounded bg-panel border border-hairline font-mono text-[11px] text-text-secondary max-h-40 overflow-y-auto whitespace-pre-wrap">
+                <div className="mt-3 p-2.5 rounded bg-panel border border-hairline font-mono text-xs text-text-secondary max-h-40 overflow-y-auto whitespace-pre-wrap">
                   {typstSource}
                 </div>
               </div>
@@ -282,7 +288,7 @@ export function ConfirmMasterDialog({
             ) : (
               <div
                 data-testid="master-diff-container"
-                className="font-mono text-[11px] leading-relaxed max-h-[45vh] overflow-y-auto rounded-lg border border-hairline bg-inset p-2 space-y-0.5"
+                className="font-mono text-xs leading-relaxed max-h-[45vh] overflow-y-auto rounded-lg border border-hairline bg-inset p-2 space-y-0.5"
               >
                 {diff?.lines.map((line, idx) => {
                   if (line.type === "add") {
@@ -291,10 +297,10 @@ export function ConfirmMasterDialog({
                         key={idx}
                         className="flex items-start gap-2 px-2 py-0.5 bg-status-success/15 text-status-success-soft border-l-2 border-status-success rounded-sm"
                       >
-                        <span className="w-8 text-right select-none text-status-success/75 text-[10px]">
+                        <span className="w-8 text-right select-none text-status-success/75 text-xs">
                           {line.lineNew}
                         </span>
-                        <span className="select-none text-status-success font-bold px-1 rounded bg-status-success/20 text-[10px]">+</span>
+                        <span className="select-none text-status-success font-bold px-1 rounded bg-status-success/20 text-xs">+</span>
                         <span className="flex-1 whitespace-pre-wrap break-words">{line.text || " "}</span>
                       </div>
                     );
@@ -303,12 +309,12 @@ export function ConfirmMasterDialog({
                     return (
                       <div
                         key={idx}
-                        className="flex items-start gap-2 px-2 py-0.5 bg-red-950/50 text-red-300 border-l-2 border-red-500 rounded-sm line-through opacity-85"
+                        className="flex items-start gap-2 px-2 py-0.5 bg-status-danger/10 text-status-danger border-l-2 border-status-danger rounded-sm line-through opacity-85"
                       >
-                        <span className="w-8 text-right select-none text-red-600 text-[10px]">
+                        <span className="w-8 text-right select-none text-status-danger/75 text-xs">
                           {line.lineOld}
                         </span>
-                        <span className="select-none text-red-400 font-bold px-1 rounded bg-red-900/40 text-[10px]">-</span>
+                        <span className="select-none text-status-danger font-bold px-1 rounded bg-status-danger/20 text-xs">-</span>
                         <span className="flex-1 whitespace-pre-wrap break-words">{line.text || " "}</span>
                       </div>
                     );
@@ -318,7 +324,7 @@ export function ConfirmMasterDialog({
                       key={idx}
                       className="flex items-start gap-2 px-2 py-0.5 text-text-secondary hover:bg-panel/50 rounded-sm"
                     >
-                      <span className="w-8 text-right select-none text-muted-foreground text-[10px]">
+                      <span className="w-8 text-right select-none text-muted-foreground text-xs">
                         {line.lineNew}
                       </span>
                       <span className="select-none text-muted-foreground w-3 text-center"> </span>
@@ -332,23 +338,41 @@ export function ConfirmMasterDialog({
         )}
 
         {/* Confirmation Checkbox */}
-        <div className="flex items-start gap-2.5 p-3 rounded-lg border border-amber-900/60 bg-amber-950/20 mt-1">
+        <div className="flex items-start gap-2.5 p-3 rounded-lg border border-status-warning/40 bg-status-warning/15 mt-1">
           <Checkbox
             id="confirm-master-checkbox"
             checked={confirmed}
             onCheckedChange={(checked) => setConfirmed(Boolean(checked))}
             data-testid="confirm-master-checkbox"
-            className="mt-0.5 border-amber-600 data-[state=checked]:bg-amber-500 data-[state=checked]:text-[#121010]"
+            className="mt-0.5 border-status-warning data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
           />
           <label
             htmlFor="confirm-master-checkbox"
-            data-testid="extract-evidence-checkbox"
-            className="text-[11px] text-amber-200 leading-snug cursor-pointer select-none"
+            className="text-xs text-status-warning leading-snug cursor-pointer select-none"
           >
             I confirm these extracted facts and document changes accurately represent my verified career experience.
-            I understand future AI tailoring and exports will be fail-closed against this baseline.
+            I understand future AI tailoring and exports of tailored documents are checked against this baseline.
           </label>
         </div>
+
+        {/* Optional Evidence Bank Drafting Consent */}
+        {showDraftEvidence && (
+          <div className="flex items-start gap-2.5 p-3 rounded-lg border border-hairline bg-inset">
+            <Checkbox
+              id="extract-evidence-checkbox"
+              checked={draftEvidence}
+              onCheckedChange={(checked) => onDraftEvidenceChange(Boolean(checked))}
+              data-testid="extract-evidence-checkbox"
+              className="mt-0.5"
+            />
+            <label
+              htmlFor="extract-evidence-checkbox"
+              className="text-xs text-text-secondary leading-snug cursor-pointer select-none"
+            >
+              Also draft Evidence Bank items from this Master (one AI call on my provider key)
+            </label>
+          </div>
+        )}
 
         <DialogFooter className="gap-2 pt-2">
           <Button
@@ -364,7 +388,7 @@ export function ConfirmMasterDialog({
             onClick={() => handleConfirm()}
             disabled={!confirmed || busy}
             data-testid="confirm-save-master-btn"
-            className="bg-amber-500 hover:bg-amber-400 text-[#121010] font-semibold text-xs gap-1.5 shadow-lg shadow-amber-500/20"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs gap-1.5 shadow-lg shadow-primary/20"
           >
             {busy ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
             Confirm &amp; Freeze Master

@@ -1,28 +1,11 @@
 import React from "react";
-import {
-  Sparkles,
-  FileCode,
-  ShieldCheck,
-  Database,
-  BarChart2,
-  Briefcase,
-  Terminal,
-  Building2,
-  Layers,
-  FileCheck,
-} from "lucide-react";
+import { Sparkles, FileCode, ShieldCheck, BarChart2 } from "lucide-react";
 
 const CAPABILITY_ITEMS = [
-  { label: "Typst WASM Engine", icon: FileCode },
-  { label: "Verified Evidence Bank", icon: Database },
-  { label: "BYOK AI Gateway", icon: Sparkles },
-  { label: "100-Point ATS Rubric", icon: BarChart2 },
-  { label: "Protected Master Resume", icon: ShieldCheck },
-  { label: "Kanban Job Pipeline", icon: Briefcase },
-  { label: "Company OA Question Bank", icon: Terminal },
-  { label: "Culture & Intel Dossier", icon: Building2 },
-  { label: "Multi-Format ZIP Bundle", icon: Layers },
-  { label: "STAR Story Synthesizer", icon: FileCheck },
+  { label: "Clean PDF export", icon: FileCode },
+  { label: "Verified work history", icon: ShieldCheck },
+  { label: "Bring your own AI key", icon: Sparkles },
+  { label: "Instant ATS scoring", icon: BarChart2 },
 ];
 
 export function CapabilityMarquee() {

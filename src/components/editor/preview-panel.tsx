@@ -382,6 +382,20 @@ export function PreviewPanel({
     setShowGrade((prev) => !prev);
   };
 
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  const hasHydratedSource = hasMounted && source.trim().length > 0;
+  const hasJobRequirements = Boolean(
+    extractedRequirements &&
+      (extractedRequirements.requiredSkills.length > 0 ||
+        extractedRequirements.preferredSkills.length > 0 ||
+        extractedRequirements.domainTerms.length > 0)
+  );
+
   // Synchronous client-side Ember Ink ATS Grade computation for the docked Editor grade rail
   const liveAtsGrade = useMemo<AtsEvaluationResult>(() => {
     return evaluateAtsScore(
@@ -548,12 +562,9 @@ export function PreviewPanel({
               }}
               aria-pressed={showDockedGrade && !showGrade}
               data-testid="preview-split-grade-toggle"
-              className="hidden xl:inline-flex items-center gap-1.5 font-mono text-[11px] tabular-nums text-text-secondary hover:text-foreground transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+              className="hidden xl:inline-flex items-center gap-1.5 font-mono text-xs tabular-nums text-text-secondary hover:text-foreground transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
               title="Toggle docked ATS Grade column alongside paper preview"
             >
-              <span className="hidden 2xl:inline">
-                <b className="font-semibold text-status-success">1 / 1</b> page · fits ·
-              </span>
               <span className={showDockedGrade && !showGrade ? "text-signal font-semibold" : "text-text-secondary"}>
                 Preview · Grade ▸
               </span>
@@ -562,7 +573,7 @@ export function PreviewPanel({
           {isCompiling && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />}
           {v2 && (
             <div
-              className="inline-flex min-w-0 items-center gap-x-2 text-[11px] font-mono tabular-nums text-text-secondary overflow-hidden"
+              className="inline-flex min-w-0 items-center gap-x-2 text-xs font-mono tabular-nums text-text-secondary overflow-hidden"
               role="status"
               data-testid="layout-page-status"
             >
@@ -610,7 +621,7 @@ export function PreviewPanel({
             type="button"
             onClick={() => setPreviewView((v) => (v === "fit" ? "actual" : "fit"))}
             data-testid="preview-view-toggle-btn"
-            className="inline-flex h-6 items-center rounded border border-outline/70 bg-elevated px-2 text-[11px] font-mono tabular-nums text-text-secondary hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex h-6 items-center rounded border border-outline/70 bg-elevated px-2 text-xs font-mono tabular-nums text-text-secondary hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             title="Toggle page preview sizing (Fit pane width or 100% scale)"
           >
             {previewView === "fit" ? "Fit" : "100%"}
@@ -620,7 +631,7 @@ export function PreviewPanel({
             type="button"
             onClick={handleToggleGrade}
             data-testid="grade-resume-btn"
-            className={`inline-flex h-6 items-center gap-1 rounded border px-2 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`inline-flex h-6 items-center gap-1 rounded border px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               showGrade
                 ? "border-primary/60 bg-primary/15 text-primary"
                 : "border-outline/70 bg-elevated text-foreground hover:bg-muted"
@@ -637,7 +648,7 @@ export function PreviewPanel({
                 type="button"
                 disabled={isExporting}
                 data-testid="export-dropdown-btn"
-                className="inline-flex h-6 items-center gap-1 rounded bg-primary px-2.5 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="inline-flex h-6 items-center gap-1 rounded bg-primary px-2.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {isExporting ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -777,16 +788,16 @@ export function PreviewPanel({
                 <div className="flex items-center gap-2 font-semibold">
                   <span>Compilation Error</span>
                   {typeof error.line === "number" && (
-                    <span className="rounded bg-status-danger/20 border border-status-danger/40 px-1.5 py-0.5 text-[10px] font-bold text-status-danger tabular-nums">
+                    <span className="rounded bg-status-danger/20 border border-status-danger/40 px-1.5 py-0.5 text-xs font-bold text-status-danger tabular-nums">
                       Line {error.line}
                     </span>
                   )}
                 </div>
-                <p className="mt-1 font-mono text-[11px] leading-relaxed break-words whitespace-pre-wrap text-text-secondary">
+                <p className="mt-1 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap text-text-secondary">
                   {error.message}
                 </p>
                 <div className="mt-2 flex items-center justify-between">
-                  <p className="text-[10px] text-text-muted">
+                  <p className="text-sm text-text-muted">
                     Showing last valid compilation preview below.
                   </p>
                   {onTriggerRepair && (
@@ -838,12 +849,12 @@ export function PreviewPanel({
               </button>
             </div>
             <div className="flex items-center gap-2 pt-1 border-t border-outline/60">
-              <span className="text-[11px] text-text-secondary font-semibold">Fallback direct downloads:</span>
+              <span className="text-xs text-text-secondary font-semibold">Fallback direct downloads:</span>
               <button
                 type="button"
                 onClick={handleExportPdf}
                 data-testid="fallback-download-pdf-btn"
-                className="px-2 py-0.5 rounded bg-elevated border border-outline/70 text-primary hover:bg-muted font-semibold text-[11px] inline-flex items-center gap-1"
+                className="px-2 py-0.5 rounded bg-elevated border border-outline/70 text-primary hover:bg-muted font-semibold text-xs inline-flex items-center gap-1"
               >
                 <Download className="size-3" />
                 <span>PDF</span>
@@ -852,7 +863,7 @@ export function PreviewPanel({
                 type="button"
                 onClick={handleExportDocx}
                 data-testid="fallback-download-docx-btn"
-                className="px-2 py-0.5 rounded bg-elevated border border-outline/70 text-status-info hover:bg-muted font-semibold text-[11px] inline-flex items-center gap-1"
+                className="px-2 py-0.5 rounded bg-elevated border border-outline/70 text-status-info hover:bg-muted font-semibold text-xs inline-flex items-center gap-1"
               >
                 <FileText className="size-3" />
                 <span>DOCX</span>
@@ -942,37 +953,47 @@ export function PreviewPanel({
                 type="button"
                 data-testid="preview-mode-grade"
                 onClick={handleToggleGrade}
-                className="font-mono text-[11px] font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                className="font-mono text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
               >
                 Full Rubric ▸
               </button>
             </div>
 
-            <div className="flex items-center gap-3.5">
-              <div
-                className="relative grid h-[72px] w-[72px] shrink-0 place-items-center rounded-full"
-                style={{
-                  background: `conic-gradient(rgb(var(--accent-contrast)) ${liveAtsGrade.overallScore}%, rgb(214 196 176 / 0.14) 0)`,
-                  filter: "drop-shadow(0 0 14px rgb(var(--accent-contrast) / 0.35))",
-                }}
-              >
-                <div className="grid h-[58px] w-[58px] place-items-center rounded-full bg-panel font-sans text-[22px] font-bold tracking-[-0.03em] tabular-nums text-foreground">
-                  {liveAtsGrade.overallScore}
+            {hasHydratedSource ? (
+              <>
+                <div className="flex items-center gap-3.5">
+                  <div
+                    className="relative grid h-[72px] w-[72px] shrink-0 place-items-center rounded-full"
+                    style={{
+                      background: `conic-gradient(rgb(var(--accent-contrast)) ${liveAtsGrade.overallScore}%, rgb(214 196 176 / 0.14) 0)`,
+                      filter: "drop-shadow(0 0 14px rgb(var(--accent-contrast) / 0.35))",
+                    }}
+                  >
+                    <div className="grid h-[58px] w-[58px] place-items-center rounded-full bg-panel font-sans text-[22px] font-bold tracking-[-0.03em] tabular-nums text-foreground">
+                      {liveAtsGrade.overallScore}
+                    </div>
+                  </div>
+                  <div className="min-w-0">
+                    {hasJobRequirements ? (
+                      <>
+                        <strong className="block text-sm font-semibold text-foreground">
+                          {liveAtsGrade.overallScore >= 80
+                            ? "Strong"
+                            : liveAtsGrade.overallScore >= 60
+                            ? "Solid"
+                            : "Developing"}
+                        </strong>
+                        <p className="mt-0.5 text-xs text-muted-foreground truncate">
+                          {roleTitle ? `vs. ${roleTitle}` : "General ATS readiness"}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground leading-snug">
+                        No job loaded: base checks only
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="min-w-0">
-                <strong className="block text-sm font-semibold text-foreground">
-                  {liveAtsGrade.overallScore >= 80
-                    ? "Strong"
-                    : liveAtsGrade.overallScore >= 60
-                    ? "Solid"
-                    : "Developing"}
-                </strong>
-                <p className="mt-0.5 text-xs text-muted-foreground truncate">
-                  {roleTitle ? `vs. ${roleTitle}` : "General ATS readiness"}
-                </p>
-              </div>
-            </div>
 
             <div className="flex flex-col gap-2.5 text-xs">
               <div className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1">
@@ -1029,7 +1050,7 @@ export function PreviewPanel({
                       className="flex items-start gap-2.5 rounded-[8px] border border-hairline bg-inset p-2.5 text-xs text-text-secondary"
                     >
                       <span
-                        className={`shrink-0 rounded-[5px] border px-1.5 py-0.5 text-[10.5px] font-semibold ${
+                        className={`shrink-0 rounded-[5px] border px-1.5 py-0.5 text-xs font-semibold ${
                           isUrgent
                             ? "border-status-danger/40 bg-status-danger/10 text-status-danger"
                             : "border-primary/40 bg-primary/10 text-primary"
@@ -1045,7 +1066,7 @@ export function PreviewPanel({
                 })
               ) : (
                 <div className="flex items-start gap-2.5 rounded-[8px] border border-hairline bg-inset p-2.5 text-xs text-text-secondary">
-                  <span className="shrink-0 rounded-[5px] border border-signal/40 bg-signal/10 px-1.5 py-0.5 text-[10.5px] font-semibold text-signal">
+                  <span className="shrink-0 rounded-[5px] border border-signal/40 bg-signal/10 px-1.5 py-0.5 text-xs font-semibold text-signal">
                     Ready
                   </span>
                   <span className="leading-snug">
@@ -1054,6 +1075,12 @@ export function PreviewPanel({
                 </div>
               )}
             </div>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Waiting for resume source...
+              </p>
+            )}
           </aside>
         )}
       </div>
