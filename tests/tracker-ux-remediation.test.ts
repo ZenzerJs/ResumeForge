@@ -304,6 +304,32 @@ describe("Tracker UX Remediation & Deduplication", () => {
       expect(cohereList.meta.total).toBe(2);
       expect(cohereList.meta.counts).toEqual({ applied: 2, interviewing: 1 });
       expect(cohereList.data.map((d) => d.id)).toEqual(expect.arrayContaining([sep1.id, sep2.id]));
+
+      // Newly pasted SAVED personal job (no requisition URL) must stay visible alongside an earlier APPLIED job with the same company/title
+      const olderAppliedPasted = await createJob({
+        userId: user.id,
+        company: "Stripe",
+        roleTitle: "Staff Software Engineer",
+        rawDescription: "TypeScript, Node.js, Distributed Systems",
+        source: "pasted",
+      });
+      await upsertApplication(user.id, olderAppliedPasted.id, { status: "APPLIED" });
+
+      const newerSavedPasted = await createJob({
+        userId: user.id,
+        company: "Stripe",
+        roleTitle: "Staff Software Engineer",
+        rawDescription: "TypeScript, Node.js, Distributed Systems",
+        source: "pasted",
+      });
+
+      const stripeStaffList = await getJobsList({
+        userId: user.id,
+        q: "Staff Software Engineer",
+      });
+      const stripeIds = stripeStaffList.data.map((d) => d.id);
+      expect(stripeIds).toContain(olderAppliedPasted.id);
+      expect(stripeIds).toContain(newerSavedPasted.id);
     });
 
     it("preserves both rows in collapseDuplicateTrackerJobs when both carry variants or notes, and collapses untouched duplicates", () => {

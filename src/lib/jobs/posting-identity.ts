@@ -414,16 +414,17 @@ export function collapseDuplicateTrackerJobs<T extends TrackerDedupeCandidate>(r
       }
     }
 
-    if (matchedIndex === null && companyTitleKey) {
+    const isUserCreatedOrPasted = (candidate: TrackerDedupeCandidate) => {
+      const src = (candidate.source ?? "").trim().toLowerCase();
+      return src === "pasted" || src === "manual" || Boolean(candidate.userId);
+    };
+
+    if (matchedIndex === null && companyTitleKey && !reqUrl && !hasHistory && !isUserCreatedOrPasted(row)) {
       const candidates = byCompanyTitle.get(companyTitleKey) ?? [];
       for (const idx of candidates) {
         const existing = entries[idx]!;
-        if (existing.hasHistory && hasHistory) continue;
-        if (reqUrl && existing.reqUrl && reqUrl !== existing.reqUrl) continue;
+        if (existing.hasHistory || existing.reqUrl || isUserCreatedOrPasted(existing.row)) continue;
         if (!arePostingLocationsCompatible(existing.location, location)) continue;
-        // Without a shared requisition URL, only collapse identical company+title+location
-        // when at least one side lacks a requisition URL and neither side conflicts.
-        if (reqUrl || existing.reqUrl) continue;
         matchedIndex = idx;
         break;
       }
