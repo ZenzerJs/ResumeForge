@@ -1456,7 +1456,7 @@ export function TailorWorkspace() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 space-y-1">
                     <p className="font-semibold text-status-danger break-words">{structuredPatchError.message}</p>
-                    <p className="text-xs text-text-secondary break-words">
+                    <p className="text-sm text-text-secondary break-words">
                       Suggested recovery:{" "}
                       {structuredPatchError.recoveryAction === "review_evidence"
                         ? "Verify or restore evidence citations in your Evidence Bank."
@@ -2141,7 +2141,7 @@ export function TailorWorkspace() {
               />
             ) : (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-hairline bg-inset p-4">
-                <p className="text-xs text-on-surface-variant">
+                <p className="text-sm text-on-surface-variant">
                   Save the current job posting to generate an evidence-grounded cover letter tailored to{" "}
                   <span className="text-primary font-semibold">{company || "this role"}</span>.
                 </p>

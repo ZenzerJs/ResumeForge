@@ -797,7 +797,7 @@ export function PreviewPanel({
                   {error.message}
                 </p>
                 <div className="mt-2 flex items-center justify-between">
-                  <p className="text-xs text-text-muted">
+                  <p className="text-sm text-text-muted">
                     Showing last valid compilation preview below.
                   </p>
                   {onTriggerRepair && (

@@ -1007,7 +1007,7 @@ export function PatchDiffReview({
                             <p className="font-semibold text-status-danger">
                               {ERROR_CATEGORY_LABELS[applyError.category]}: {applyError.message}
                             </p>
-                            <p className="text-text-secondary">{applyError.recoveryAction}</p>
+                            <p className="text-sm text-text-secondary">{applyError.recoveryAction}</p>
                             {renderRecoveryActions(applyError.category, {
                               onRegenerate: onRegeneratePatches,
                               onRetry: handleApplyAccepted,
@@ -1207,11 +1207,11 @@ export function PatchDiffReview({
                             Needs review
                           </span>
                         </div>
-                        <p className="text-xs text-status-warning leading-relaxed break-words">
+                        <p className="text-sm text-status-warning leading-relaxed break-words">
                           {pf.reason}
                         </p>
                         {pf.recoveryAction && (
-                          <p className="text-xs text-text-secondary leading-relaxed">
+                          <p className="text-sm text-text-secondary leading-relaxed">
                             {pf.recoveryAction}
                           </p>
                         )}
@@ -1239,7 +1239,7 @@ export function PatchDiffReview({
                     <ShieldAlert className="h-4 w-4" aria-hidden />
                     Rejected Patches — Invalid Citations ({rejected.length})
                   </h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
                     These proposals were blocked because they cited evidence IDs that are missing,
                     unverified, archived, or unowned. Review your Evidence Bank or generate updated
                     suggestions.
@@ -1306,7 +1306,7 @@ export function PatchDiffReview({
                 <AlertTriangle className="h-4 w-4 shrink-0 text-status-warning" aria-hidden />
                 <span>Acknowledge unverified skills before applying</span>
               </div>
-              <p className="text-xs text-text-secondary leading-relaxed">
+              <p className="text-sm text-text-secondary leading-relaxed">
                 Only add skills if you have real experience; log them in your Evidence Bank first, or
                 check below to confirm each skill:
               </p>
@@ -1343,7 +1343,7 @@ export function PatchDiffReview({
                 <p className="font-semibold text-status-danger">
                   {ERROR_CATEGORY_LABELS[applyError.category]}: {applyError.message}
                 </p>
-                <p className="text-text-secondary leading-relaxed">{applyError.recoveryAction}</p>
+                <p className="text-sm text-text-secondary leading-relaxed">{applyError.recoveryAction}</p>
                 {renderRecoveryActions(applyError.category, {
                   onRegenerate: onRegeneratePatches,
                   onRetry: handleApplyAccepted,

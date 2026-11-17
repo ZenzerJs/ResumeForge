@@ -41,7 +41,7 @@ export function PageHeader({
           {statusBadge ? <div className="max-w-full shrink-0">{statusBadge}</div> : null}
         </div>
         {description ? (
-          <p className="max-w-2xl break-words font-sans text-xs text-rf-meta md:text-sm">
+          <p className="max-w-2xl break-words font-sans text-sm text-rf-meta">
             {description}
           </p>
         ) : null}

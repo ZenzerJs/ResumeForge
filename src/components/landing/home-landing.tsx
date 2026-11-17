@@ -12,7 +12,7 @@ import {
   Upload,
   FileText,
   FolderOpen,
-  Settings,
+  Wand2,
   Briefcase,
   Send,
   ShieldCheck,
@@ -130,9 +130,9 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
         clearDemoSamplesForPersonalResume(json.data.typstSource);
         localStorage.setItem("resumeforge_typst_source", json.data.typstSource);
         localStorage.setItem("resumeforge_has_guest_draft", "true");
-        router.push("/editor");
+        router.push("/editor?mode=visual");
       } else if (res.ok && json.success && json.data?.id) {
-        router.push(`/editor?resumeId=${json.data.id}`);
+        router.push(`/editor?resumeId=${json.data.id}&mode=visual`);
       } else {
         setNotification({
           type: "error",
@@ -374,7 +374,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                         <h3 className="text-sm font-bold text-foreground mb-1">
                           Create or Import Resume
                         </h3>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
+                        <p className="text-sm text-muted-foreground leading-relaxed">
                           Upload an existing PDF or use the Guided Visual Builder—no code required.
                         </p>
                       </div>
@@ -419,7 +419,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                         <h3 className="text-sm font-bold text-foreground mb-1">
                           Verify Evidence Bank
                         </h3>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
+                        <p className="text-sm text-muted-foreground leading-relaxed">
                           Store your real project &amp; work bullets so AI tailoring never hallucinates.
                         </p>
                       </div>
@@ -455,7 +455,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                         <h3 className="text-sm font-bold text-foreground mb-1">
                           Connect AI Key (BYOK)
                         </h3>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
+                        <p className="text-sm text-muted-foreground leading-relaxed">
                           Add a Gemini, OpenAI, Anthropic, or local Ollama key encrypted in this browser.
                         </p>
                       </div>
@@ -491,7 +491,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                         <h3 className="text-sm font-bold text-foreground mb-1">
                           Tailor to Target Job
                         </h3>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
+                        <p className="text-sm text-muted-foreground leading-relaxed">
                           Paste a job posting to score ATS fit, apply verified patches, and export PDF.
                         </p>
                       </div>
@@ -522,7 +522,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-12">
               <h2 className="text-2xl md:text-3xl text-foreground font-bold tracking-[-0.03em] mb-2">How ResumeForge Operates</h2>
-              <p className="text-muted-foreground font-mono text-xs md:text-sm">Five steps from master resume to tailored PDF.</p>
+              <p className="text-muted-foreground font-mono text-sm">Five steps from master resume to tailored PDF.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-6" data-testid="workflow-active-panel">
               <div className="flex flex-col items-center text-center p-4">
@@ -530,7 +530,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                   <Upload className="h-5 w-5 text-primary" aria-hidden />
                 </div>
                 <h3 className="font-mono text-xs md:text-sm uppercase tracking-wider text-foreground font-semibold mb-1.5">1. IMPORT</h3>
-                <p className="text-on-surface-variant text-xs md:text-sm leading-relaxed">Load your master CV.</p>
+                <p className="text-on-surface-variant text-sm leading-relaxed">Load your master CV.</p>
               </div>
 
               <div className="flex flex-col items-center text-center p-4 relative">
@@ -539,7 +539,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                   <Anchor className="h-5 w-5 text-primary" aria-hidden />
                 </div>
                 <h3 className="font-mono text-xs md:text-sm uppercase tracking-wider text-foreground font-semibold mb-1.5">2. GROUND</h3>
-                <p className="text-on-surface-variant text-xs md:text-sm leading-relaxed">Extract verified facts.</p>
+                <p className="text-on-surface-variant text-sm leading-relaxed">Extract verified facts.</p>
               </div>
 
               <div className="flex flex-col items-center text-center p-4 relative">
@@ -548,7 +548,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                   <Sparkles className="h-5 w-5 text-primary" aria-hidden />
                 </div>
                 <h3 className="font-mono text-xs md:text-sm uppercase tracking-wider text-foreground font-semibold mb-1.5">3. TAILOR</h3>
-                <p className="text-on-surface-variant text-xs md:text-sm leading-relaxed">Align to Job Description.</p>
+                <p className="text-on-surface-variant text-sm leading-relaxed">Align to Job Description.</p>
               </div>
 
               <div className="flex flex-col items-center text-center p-4 relative">
@@ -557,7 +557,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                   <ShieldCheck className="h-5 w-5 text-on-surface-variant" aria-hidden />
                 </div>
                 <h3 className="font-mono text-xs md:text-sm uppercase tracking-wider text-foreground font-semibold mb-1.5">4. VERIFY</h3>
-                <p className="text-on-surface-variant text-xs md:text-sm leading-relaxed">Audit against evidence.</p>
+                <p className="text-on-surface-variant text-sm leading-relaxed">Audit against evidence.</p>
               </div>
 
               <div className="flex flex-col items-center text-center p-4 relative">
@@ -566,7 +566,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                   <Send className="h-5 w-5 text-primary" aria-hidden />
                 </div>
                 <h3 className="font-mono text-xs md:text-sm uppercase tracking-wider text-foreground font-semibold mb-1.5">5. APPLY</h3>
-                <p className="text-on-surface-variant text-xs md:text-sm leading-relaxed">Export tailored PDF.</p>
+                <p className="text-on-surface-variant text-sm leading-relaxed">Export tailored PDF.</p>
               </div>
             </div>
           </div>
@@ -634,7 +634,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                 <div className="surface-raised card-lift edge-glow rounded-[10px] p-6 flex flex-col justify-between min-h-[260px] lg:col-span-1 md:col-span-2 lg:row-span-2">
                   <div>
                     <div className="w-10 h-10 rounded-[6px] bg-primary/10 border border-primary/30 flex items-center justify-center mb-6">
-                      <Settings className="h-5 w-5 text-primary" aria-hidden />
+                      <Wand2 className="h-5 w-5 text-primary" aria-hidden />
                     </div>
                     <h3 className="text-xl md:text-2xl font-bold text-foreground mb-3 tracking-tight">Tailor Engine &amp; AI Gateway</h3>
                     <p className="text-on-surface-variant text-sm leading-relaxed mb-6">
@@ -645,7 +645,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                         <span className="text-foreground font-semibold">Evidence-linked edits</span>
                         <span className="text-primary text-xs">Evidence-Cited</span>
                       </div>
-                      <p className="text-muted-foreground text-xs leading-relaxed">
+                      <p className="text-muted-foreground text-sm leading-relaxed">
                         Every proposed edit cites an `evidenceId` or surfaces an explicit Gap item.
                       </p>
                     </div>

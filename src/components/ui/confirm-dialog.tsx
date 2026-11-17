@@ -92,7 +92,7 @@ export function ConfirmDialog({
             <DialogTitle className="text-base font-bold text-foreground">
               {title}
             </DialogTitle>
-            <DialogDescription className="text-xs leading-relaxed text-muted-foreground">
+            <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
               {description}
             </DialogDescription>
           </DialogHeader>

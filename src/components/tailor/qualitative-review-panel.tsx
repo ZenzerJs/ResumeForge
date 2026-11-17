@@ -125,7 +125,7 @@ export function QualitativeReviewPanel({
                 BYOK Gateway Feedback
               </span>
             </h3>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               On-demand qualitative commentary & Bounded JD Context Adjustment (-10 to +10 pts)
             </p>
           </div>
@@ -223,7 +223,7 @@ export function QualitativeReviewPanel({
                     {item.points >= 0 ? `+${item.points}` : item.points} pts ({item.targetCategory})
                   </span>
                 </div>
-                <p className="text-text-secondary text-xs mt-1">{item.explanation}</p>
+                <p className="text-text-secondary text-sm mt-1">{item.explanation}</p>
               </div>
             ))}
           </div>
@@ -238,7 +238,7 @@ export function QualitativeReviewPanel({
         </h4>
         <div
           data-testid="overview-commentary"
-          className="text-xs text-foreground bg-inset border border-hairline rounded-lg p-3.5 leading-relaxed"
+          className="text-sm text-foreground bg-inset border border-hairline rounded-lg p-3.5 leading-relaxed"
         >
           {result.overviewCommentary}
         </div>
@@ -316,8 +316,8 @@ export function QualitativeReviewPanel({
                       <span>{badge.icon}</span> {badge.label}
                     </span>
                   </div>
-                  <p className="text-text-secondary">{bf.reasoning}</p>
-                  <p className="text-xs italic flex items-center gap-1 text-signal">
+                  <p className="text-sm text-text-secondary">{bf.reasoning}</p>
+                  <p className="text-sm italic flex items-center gap-1 text-signal">
                     <Info className="h-3 w-3 text-signal shrink-0" />
                     Advice: {bf.improvementAdvice}
                   </p>
@@ -335,7 +335,7 @@ export function QualitativeReviewPanel({
             <Wand2 className="h-4 w-4 text-signal" />
             Recommended Next Tailoring Actions
           </h4>
-          <p className="text-xs text-text-secondary">
+          <p className="text-sm text-text-secondary">
             Use these findings to guide your next edits in the Resume Editor or generate evidence-backed patches.
           </p>
           <ul className="space-y-1 text-xs text-foreground font-mono">

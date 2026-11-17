@@ -169,7 +169,7 @@ export function CompanyIntelDossierPanel({
     return (
       <div className="p-6 text-center text-muted-foreground border border-hairline rounded-lg bg-inset/70">
         <Building2 className="size-8 mx-auto mb-2 text-muted-foreground/60" />
-        <p className="text-xs">No company specified for this job record.</p>
+        <p className="text-sm">No company specified for this job record.</p>
       </div>
     );
   }
@@ -209,7 +209,7 @@ export function CompanyIntelDossierPanel({
           <h3 className="text-sm font-bold text-foreground">
             Company Intelligence for {company}
           </h3>
-          <p className="text-xs text-muted-foreground max-w-md mx-auto">
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
             Generate an engineering dossier covering real interview formats, evaluation criteria, WLB metrics, and culture signals.
           </p>
         </div>
@@ -233,7 +233,7 @@ export function CompanyIntelDossierPanel({
           </button>
         </div>
 
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Uses your configured LLM API key. Never fires automatically to conserve your tokens.
         </p>
       </div>
@@ -246,7 +246,7 @@ export function CompanyIntelDossierPanel({
         <RefreshCw className="size-7 mx-auto text-status-success animate-spin" />
         <div className="space-y-1">
           <h3 className="text-xs font-bold text-foreground">Synthesizing Company Intel for {company}...</h3>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Analyzing interview loops, evaluation criteria, deployment velocity, and engineering culture.
           </p>
         </div>
@@ -280,7 +280,7 @@ export function CompanyIntelDossierPanel({
               )}
             </div>
             {dossier?.processNotes && (
-              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{dossier.processNotes}</p>
+              <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">{dossier.processNotes}</p>
             )}
           </div>
         </div>
@@ -429,8 +429,8 @@ export function CompanyIntelDossierPanel({
         {dossier?.recentSignals && (
           <div className="p-3.5 rounded-lg border border-hairline bg-inset/70 space-y-1.5">
             <span className="text-xs uppercase font-semibold text-muted-foreground">Recent Signals &amp; Market Intel</span>
-            <p className="text-text-secondary leading-relaxed text-xs">{dossier.recentSignals}</p>
-            <p className="text-xs text-muted-foreground italic">
+            <p className="text-text-secondary leading-relaxed text-sm">{dossier.recentSignals}</p>
+            <p className="text-sm text-muted-foreground italic">
               Model-generated intelligence — verify before relying on it.
             </p>
           </div>

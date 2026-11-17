@@ -259,7 +259,7 @@ export function AtsScorePanel({
               Deterministic Engine
             </span>
           </h2>
-          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
             {appearance === "tailor" ? "See how your resume aligns with this job and where evidence is missing." : "Rule-based evaluation of tailored ResumeVariant against job description & role overlay"}
           </p>
         </div>
@@ -491,7 +491,7 @@ export function AtsScorePanel({
                       </span>
                     </div>
                     {se.matchedContext && (
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed break-words">
+                      <p className="text-sm text-muted-foreground mt-1 leading-relaxed break-words">
                         {se.matchedContext}
                       </p>
                     )}
@@ -516,7 +516,7 @@ export function AtsScorePanel({
             <AlertTriangle className="h-4 w-4 text-primary" />
             Actionable Gaps Guidance (Truthful Recommendations)
           </h3>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Recommendations point to real, verifiable evidence additions or formatting improvements. No keyword stuffing or hidden text.
           </p>
           <ul className="space-y-2 text-xs text-on-surface-variant leading-relaxed">

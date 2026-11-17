@@ -854,7 +854,7 @@ export function AiSidebar({
                   </span>
                 </div>
 
-                <p className="text-text-secondary leading-relaxed font-sans">{repairProposal.summary}</p>
+                <p className="text-sm text-text-secondary leading-relaxed font-sans">{repairProposal.summary}</p>
                 <div className="text-muted-foreground text-xs italic font-sans">{repairProposal.errorAnalysis}</div>
 
                 {/* Pre-compilation status badge */}
@@ -888,7 +888,7 @@ export function AiSidebar({
                             <AlertTriangle className="h-4 w-4 shrink-0" />
                             <span>Large Repair Warning ({repairProposal.changedLinesCount} lines changed, &gt;25% of document)</span>
                           </div>
-                          <p className="text-xs text-foreground/90 leading-tight">
+                          <p className="text-sm text-foreground/90 leading-tight">
                             Applying this proposal will replace a substantial portion of your document. Confirm below to enable Apply Fix.
                           </p>
                           <label className="flex items-start gap-2 text-xs text-status-warning cursor-pointer pt-0.5">
@@ -970,7 +970,7 @@ export function AiSidebar({
                 Dismiss Context
               </button>
             </div>
-            <p className="text-text-secondary text-xs leading-relaxed italic bg-inset p-2 rounded border border-hairline">
+            <p className="text-text-secondary text-sm leading-relaxed italic bg-inset p-2 rounded border border-hairline">
               &quot;{seededFeedback.overviewCommentary}&quot;
             </p>
             {seededFeedback.nextStepsAdvice && seededFeedback.nextStepsAdvice.length > 0 && (
@@ -1063,7 +1063,7 @@ export function AiSidebar({
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-status-warning" />
                   <span>Acknowledge unverified skills</span>
                 </div>
-                <p className="text-xs text-text-secondary leading-relaxed">
+                <p className="text-sm text-text-secondary leading-relaxed">
                   Only add if you have real experience; log it in your Evidence Bank first, or check below to confirm before applying:
                 </p>
                 <div className="space-y-1 pt-0.5">
@@ -1210,7 +1210,7 @@ export function AiSidebar({
                   className={`rounded-lg border p-2.5 text-xs ${SEVERITY_COLORS[g.severity]}`}
                 >
                   <p className="font-semibold">{g.requirement}</p>
-                  <p className="mt-1 text-xs opacity-80">{g.recommendation}</p>
+                  <p className="mt-1 text-sm opacity-80">{g.recommendation}</p>
                 </div>
               ))}
           </div>
@@ -1224,7 +1224,7 @@ export function AiSidebar({
             </div>
             <div className="space-y-1">
               <p className="text-xs font-medium text-foreground">Tailoring Assistant</p>
-              <p className="text-xs text-muted-foreground max-w-[200px] leading-relaxed">
+              <p className="text-sm text-muted-foreground max-w-[200px] leading-relaxed">
                 Paste a job description and click Generate to get evidence-backed resume suggestions.
               </p>
             </div>

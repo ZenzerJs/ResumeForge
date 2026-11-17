@@ -127,7 +127,7 @@ export function CompetitiveMatrixSection() {
                         <div className="font-bold text-sm md:text-base text-status-success mb-1.5">
                           {row.title}
                         </div>
-                        <p className="text-on-surface-variant leading-relaxed text-xs md:text-sm">
+                        <p className="text-on-surface-variant leading-relaxed text-sm">
                           {row.summary}
                         </p>
                       </div>

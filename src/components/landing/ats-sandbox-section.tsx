@@ -591,7 +591,7 @@ export function AtsSandboxSection() {
                   }`}
                 >
                   <Eye className="h-4 w-4" />
-                  <span>Document Preview (WASM SVG)</span>
+                  <span>Resume preview</span>
                 </button>
 
                 <button
@@ -605,7 +605,7 @@ export function AtsSandboxSection() {
                   }`}
                 >
                   <FileCode className="h-4 w-4" />
-                  <span>Typst AST Source</span>
+                  <span>Resume source</span>
                 </button>
               </div>
 
@@ -669,7 +669,7 @@ export function AtsSandboxSection() {
                 <div data-testid="sandbox-typst-source-view" className="flex-1 flex flex-col min-h-0">
                   <div className="flex items-center justify-between pb-2 mb-2 border-b border-outline/70 text-xs font-mono">
                     <span className="text-muted-foreground">
-                      {isEditingSnippet ? "Live Typst editor (on-demand compile):" : "Typst AST Source Preview:"}
+                      {isEditingSnippet ? "Live Typst editor (on-demand compile):" : "Resume source"}
                     </span>
                     <div className="flex items-center gap-2">
                       <button

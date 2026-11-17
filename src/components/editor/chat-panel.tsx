@@ -274,7 +274,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
     <div className="flex h-full min-h-0 flex-col" data-testid="chat-panel">
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-3">
         {demoMode && (
-          <p className="rounded-lg border border-hairline bg-inset p-3 text-xs text-text-secondary">
+          <p className="rounded-lg border border-hairline bg-inset p-3 text-sm text-text-secondary">
             Career Assistant chat is unavailable in the public demo because it reads saved account data. Use Tailoring and ATS review with your local draft instead.
           </p>
         )}
@@ -285,7 +285,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
             </div>
             <div className="space-y-1">
               <p className="text-xs font-medium text-foreground">Career Assistant</p>
-              <p className="text-xs text-muted-foreground max-w-[220px] leading-relaxed">
+              <p className="text-sm text-muted-foreground max-w-[220px] leading-relaxed">
                 Ask about your {resumeTitle || "resume"}, evidence bank, ATS fit, or a saved job.
               </p>
             </div>

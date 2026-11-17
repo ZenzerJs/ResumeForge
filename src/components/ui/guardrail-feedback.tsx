@@ -65,7 +65,7 @@ export function GuardrailFeedback({
           <div className="flex items-center justify-between w-full">
             <div>
               <AlertTitle className="text-status-success-soft font-semibold">Mechanical Guardrail Verified</AlertTitle>
-              <AlertDescription className="text-xs text-status-success mt-0.5">
+              <AlertDescription className="text-sm text-status-success mt-0.5">
                 All claims, metrics, and employers conform strictly to frozen master facts.
               </AlertDescription>
             </div>
@@ -80,7 +80,7 @@ export function GuardrailFeedback({
               <AlertTitle className="font-semibold text-status-danger">Mechanical Guardrail Violation</AlertTitle>
               {renderBadge(status)}
             </div>
-            <AlertDescription className="text-xs text-status-danger/90 mt-1">
+            <AlertDescription className="text-sm text-status-danger/90 mt-1">
               Unverified claims detected. Hard violations disable document export until corrected.
             </AlertDescription>
 
@@ -145,7 +145,7 @@ export function GuardrailFeedback({
               <AlertTitle className="text-status-warning font-semibold">Guardrail Advisory</AlertTitle>
               {renderBadge(status)}
             </div>
-            <AlertDescription className="text-xs text-status-warning/90 mt-1">
+            <AlertDescription className="text-sm text-status-warning/90 mt-1">
               Soft advisories found (unverified skills). Export remains permitted.
             </AlertDescription>
 

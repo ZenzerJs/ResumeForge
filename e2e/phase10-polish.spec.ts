@@ -8,7 +8,7 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
     const header = page.locator("h1", { hasText: "Page not found" });
     await expect(header).toBeVisible();
 
-    const returnBtn = page.locator('a:has-text("Return to Dashboard")');
+    const returnBtn = page.locator('a:has-text("Back to home")');
     await expect(returnBtn).toBeVisible();
     await returnBtn.click();
 

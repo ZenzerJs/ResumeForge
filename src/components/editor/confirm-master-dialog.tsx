@@ -104,7 +104,7 @@ export function ConfirmMasterDialog({
               Confirm &amp; Freeze Master Fact Snapshot
             </DialogTitle>
           </div>
-          <DialogDescription className="text-xs text-text-secondary">
+          <DialogDescription className="text-sm text-text-secondary">
             Saving as <strong className="text-status-warning">{title}</strong> will freeze an immutable fact baseline.
             Future AI tailoring and exports will be guarded against these verified claims.
           </DialogDescription>

@@ -427,7 +427,7 @@ export function SuggestionPreview({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold text-foreground">Review on resume</h3>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Suggested is a temporary preview; applying creates the saved result.
           </p>
         </div>
@@ -446,7 +446,7 @@ export function SuggestionPreview({
         </div>
       </div>
       {candidate.excluded.length ? (
-        <p role="status" className="text-xs text-status-warning">
+        <p role="status" className="text-sm text-status-warning">
           {candidate.excluded.length} conflicting or invalid suggestion(s) are
           excluded from the candidate. Review the list below.
         </p>
@@ -456,7 +456,7 @@ export function SuggestionPreview({
           Compiling and locating suggestions…
         </p>
       ) : active.error ? (
-        <p role="alert" className="text-xs text-status-danger transition-opacity duration-150 motion-reduce:transition-none">
+        <p role="alert" className="text-sm text-status-danger transition-opacity duration-150 motion-reduce:transition-none">
           Preview compilation failed: {active.error}
         </p>
       ) : (
@@ -506,7 +506,7 @@ export function SuggestionPreview({
         </div>
       )}
       {active && active.pages !== null && !active.error && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {active.isProbing
             ? "Locating suggestions on preview…"
             : `${patches.filter((patch) => !active.locations[patch.id]).length} suggestion(s) have no verified location in this view; use the review list below.`}
@@ -528,10 +528,10 @@ export function SuggestionPreview({
           <p className="break-words leading-relaxed">
             <strong>After:</strong> {selectedPatch.after || "(empty)"}
           </p>
-          <p className="break-words text-xs leading-relaxed text-text-secondary">
+          <p className="break-words text-sm leading-relaxed text-text-secondary">
             <strong>Reason:</strong> {selectedPatch.rationale}
           </p>
-          <p className="break-words text-xs text-text-secondary">
+          <p className="break-words text-sm text-text-secondary">
             <strong>Evidence:</strong>{" "}
             {selectedPatch.evidenceIds
               .map((eid) => evidenceTitles?.[eid] || eid)

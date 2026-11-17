@@ -264,7 +264,7 @@ export function CoverLetterPanel({
               Evidence Grounded
             </span>
           </h3>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Generate an evidence-backed cover letter grounded strictly in candidate Evidence Bank achievements.
           </p>
         </div>
@@ -413,8 +413,8 @@ export function CoverLetterPanel({
                 <span className="text-xs uppercase font-bold text-muted-foreground tracking-wider">
                   Salutation & Opening Hook
                 </span>
-                <p className="text-xs text-foreground font-medium">{coverLetter.salutation}</p>
-                <p className="text-xs text-text-secondary leading-relaxed font-sans">{coverLetter.openingParagraph}</p>
+                <p className="text-sm text-foreground font-medium">{coverLetter.salutation}</p>
+                <p className="text-sm text-text-secondary leading-relaxed font-sans">{coverLetter.openingParagraph}</p>
               </div>
 
               {coverLetter.bodyParagraphs.map((para, idx) => (
@@ -422,7 +422,7 @@ export function CoverLetterPanel({
                   <span className="text-xs uppercase font-bold text-signal tracking-wider">
                     Body Paragraph {idx + 1}
                   </span>
-                  <p className="text-xs text-foreground leading-relaxed font-sans">{para}</p>
+                  <p className="text-sm text-foreground leading-relaxed font-sans">{para}</p>
                 </div>
               ))}
 
@@ -430,8 +430,8 @@ export function CoverLetterPanel({
                 <span className="text-xs uppercase font-bold text-muted-foreground tracking-wider">
                   Closing Statement
                 </span>
-                <p className="text-xs text-text-secondary leading-relaxed font-sans">{coverLetter.closingParagraph}</p>
-                <p className="text-xs text-muted-foreground font-medium whitespace-pre-line">
+                <p className="text-sm text-text-secondary leading-relaxed font-sans">{coverLetter.closingParagraph}</p>
+                <p className="text-sm text-muted-foreground font-medium whitespace-pre-line">
                   {`Sincerely,\n${
                     coverLetter.fullMarkdown.match(/Sincerely,\s*\n([^\n]+)/i)?.[1]?.trim() || "Candidate"
                   }`}

@@ -1841,7 +1841,7 @@ export function LibraryWorkspace() {
                   aria-label="Filter evidence by status"
                   className="min-h-11 sm:min-h-0 w-full sm:w-auto max-w-full min-w-0 bg-inset border border-hairline text-foreground rounded-[6px] px-3 py-1.5 text-xs font-mono outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <option value="all">All, Verified, Draft, Archived</option>
+                  <option value="all">All statuses</option>
                   <option value="verified">Verified Only</option>
                   <option value="draft">Draft Only</option>
                   <option value="archived">Archived Only</option>
@@ -1960,7 +1960,7 @@ export function LibraryWorkspace() {
           <div className="rounded-xl border-dashed surface-raised p-12 text-center">
             <FileJson className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
             <h3 className="text-sm font-semibold text-foreground">No evidence items found</h3>
-            <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
+            <p className="mt-1 text-sm text-muted-foreground max-w-sm mx-auto">
               {searchQuery
                 ? `No evidence items matching search "${searchQuery}".`
                 : filterStatus === "all"
@@ -2042,7 +2042,7 @@ export function LibraryWorkspace() {
                             {item.organization ? ` @ ${item.organization}` : ""}
                           </h2>
                         </div>
-                        <p className="mt-2 text-xs text-text-secondary leading-relaxed max-w-3xl break-words">
+                        <p className="mt-2 text-sm text-text-secondary leading-relaxed max-w-3xl break-words">
                           {item.verifiedSummary}
                         </p>
                       </div>
@@ -2250,7 +2250,7 @@ export function LibraryWorkspace() {
                         <div className="text-xs text-primary mb-1 font-mono uppercase">
                           Candidate Bullet
                         </div>
-                        <p className="text-xs text-text-secondary leading-relaxed">
+                        <p className="text-sm text-text-secondary leading-relaxed">
                           {item.candidateBullet || item.verifiedSummary || "N/A"}
                         </p>
                       </div>
@@ -2278,7 +2278,7 @@ export function LibraryWorkspace() {
                         <div className="text-xs text-signal mb-1 font-mono uppercase">
                           Existing Bullet
                         </div>
-                        <p className="text-xs text-text-secondary leading-relaxed">
+                        <p className="text-sm text-text-secondary leading-relaxed">
                           {item.existingBullet || "N/A"}
                         </p>
                       </div>
@@ -2619,7 +2619,7 @@ export function LibraryWorkspace() {
             <DialogTitle className="text-base font-bold text-foreground">
               {editingItem ? "Edit Evidence Item" : "Create Evidence Item"}
             </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
+            <DialogDescription className="text-sm text-muted-foreground">
               Add or update verified experience, project, or skill evidence.
             </DialogDescription>
           </DialogHeader>

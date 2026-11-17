@@ -11,6 +11,7 @@ import {
   ByokProvider,
 } from "@/lib/byok-vault";
 import {
+  ArrowLeft,
   CheckCircle2,
   XCircle,
   Loader2,
@@ -60,7 +61,9 @@ export function SettingsWorkspace() {
   } | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [isSessionLoaded, setIsSessionLoaded] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
+  const [isFromTailor, setIsFromTailor] = useState(false);
   const [usernameDraft, setUsernameDraft] = useState("");
   const [usernameStatus, setUsernameStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isSavingUsername, setIsSavingUsername] = useState(false);
@@ -131,10 +134,16 @@ export function SettingsWorkspace() {
       if (cancelled) return;
       setSessionUser(user);
       setUsernameDraft(user?.username ?? "");
+      setIsSessionLoaded(true);
     });
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setIsFromTailor(params.get("from") === "tailor");
   }, []);
 
   const handleSaveUsername = async () => {
@@ -290,14 +299,25 @@ export function SettingsWorkspace() {
           <PageHeader
             eyebrow="Control room"
             title="Connect an AI provider key (stored in this browser)"
-            description="Configure your preferred LLM provider or local OpenAI-compatible endpoint. API keys are encrypted in your browser's Web Crypto vault and never written to the database or server logs."
+            description="Your API key stays in this browser and is sent only with your own AI request. It is never stored in our database or server logs."
+            actions={
+              isFromTailor ? (
+                <Link
+                  href="/tailor"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-hairline bg-elevated px-3.5 text-sm font-medium text-foreground hover:bg-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <ArrowLeft className="h-4 w-4" aria-hidden />
+                  Back to Tailor
+                </Link>
+              ) : undefined
+            }
           />
 
           <Surface variant="raised" className="edge-glow p-6 space-y-5" data-testid="account-settings">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">Account</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Sign in to save resumes, evidence, and jobs. The nav shows your username, not your email.
                 </p>
               </div>
@@ -388,7 +408,7 @@ export function SettingsWorkspace() {
                 {!demoMode && <option value="ollama">Ollama (Local Inference)</option>}
                 {!demoMode && <option value="custom">Custom OpenAI-compatible endpoint (Local / self-hosted endpoint)</option>}
               </select>
-              {demoMode && <p className="mt-2 text-xs text-muted-foreground">Demo BYOK supports Gemini, OpenAI, Anthropic, and Groq. Custom and local Ollama endpoints are disabled.</p>}
+              {demoMode && <p className="mt-2 text-sm text-muted-foreground">Demo BYOK supports Gemini, OpenAI, Anthropic, and Groq. Custom and local Ollama endpoints are disabled.</p>}
             </div>
 
             {/* API Key Input (Hidden for Ollama) */}
@@ -503,6 +523,11 @@ export function SettingsWorkspace() {
             </div>
 
             {/* Action Buttons & Status */}
+            {isSessionLoaded && !sessionUser && !demoMode && (
+              <p className="text-sm text-muted-foreground">
+                The connection test requires sign-in.
+              </p>
+            )}
             <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-hairline">
               <button
                 type="button"
@@ -543,7 +568,7 @@ export function SettingsWorkspace() {
                     <div className="font-semibold">
                       {testResult.success ? "Connection Verified" : "Connection Failed"}
                     </div>
-                    <p className="text-xs opacity-90">{testResult.message}</p>
+                    <p className="text-sm opacity-90">{testResult.message}</p>
                     {testResult.latencyMs !== undefined && (
                       <div className="text-xs opacity-75">
                         Latency: {testResult.latencyMs}ms

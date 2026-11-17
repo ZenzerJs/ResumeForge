@@ -358,7 +358,7 @@ export function ApplyPrepSheetModal({
               <DialogTitle className="text-sm font-bold text-foreground">
                 Application &amp; Interview Prep — {job.company}
               </DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground">
+              <DialogDescription className="text-sm text-muted-foreground">
                 {job.title}
               </DialogDescription>
             </div>
@@ -607,7 +607,7 @@ export function ApplyPrepSheetModal({
 
                 {isFetchingOa ? (
                   <div className="p-8 text-center text-muted-foreground">
-                    <p>Loading real interview problems from repository...</p>
+                    <p className="text-sm">Loading real interview problems from repository...</p>
                   </div>
                 ) : filteredProblems.length > 0 ? (
                   <div className="grid grid-cols-1 gap-2.5">
@@ -694,7 +694,7 @@ export function ApplyPrepSheetModal({
                   </div>
                 ) : (
                   <div className="p-6 rounded-lg bg-inset/60 border border-hairline text-center text-muted-foreground space-y-2">
-                    <p>No practice problems matching &quot;{problemSearch}&quot;.</p>
+                    <p className="text-sm">No practice problems matching &quot;{problemSearch}&quot;.</p>
                     <button
                       type="button"
                       onClick={() => {
@@ -724,7 +724,7 @@ export function ApplyPrepSheetModal({
                     Copy Full Prompt
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   Copy this prompt into ChatGPT, Claude, or Gemini to run a realistic technical mock interview tailored to {job.company}&apos;s real assessment problems and your resume highlights.
                 </p>
                 <div className="max-h-72 overflow-y-auto rounded-lg border border-hairline bg-inset p-3.5 font-mono text-xs text-text-secondary whitespace-pre-wrap leading-relaxed">
@@ -801,7 +801,7 @@ export function ApplyPrepSheetModal({
                             <span className="font-bold text-status-danger uppercase tracking-wide text-xs block">
                               Honest Gap Mitigation Strategy
                             </span>
-                            <p className="text-text-secondary leading-relaxed text-xs">
+                            <p className="text-text-secondary leading-relaxed text-sm">
                               {story.mitigationPlan}
                             </p>
                           </div>
@@ -812,28 +812,28 @@ export function ApplyPrepSheetModal({
                               <span className="font-bold text-primary uppercase tracking-wide text-xs block mb-0.5">
                                 S — Situation
                               </span>
-                              <p className="text-text-secondary leading-relaxed">{story.situation}</p>
+                              <p className="text-sm text-text-secondary leading-relaxed">{story.situation}</p>
                             </div>
 
                             <div className="p-2.5 rounded bg-panel border border-hairline">
                               <span className="font-bold text-signal uppercase tracking-wide text-xs block mb-0.5">
                                 T — Task
                               </span>
-                              <p className="text-text-secondary leading-relaxed">{story.task}</p>
+                              <p className="text-sm text-text-secondary leading-relaxed">{story.task}</p>
                             </div>
 
                             <div className="p-2.5 rounded bg-panel border border-hairline">
                               <span className="font-bold text-ember uppercase tracking-wide text-xs block mb-0.5">
                                 A — Action
                               </span>
-                              <p className="text-text-secondary leading-relaxed">{story.action}</p>
+                              <p className="text-sm text-text-secondary leading-relaxed">{story.action}</p>
                             </div>
 
                             <div className="p-2.5 rounded bg-panel border border-hairline">
                               <span className="font-bold text-status-success uppercase tracking-wide text-xs block mb-0.5">
                                 R — Result
                               </span>
-                              <p className="text-text-secondary leading-relaxed">{story.result}</p>
+                              <p className="text-sm text-text-secondary leading-relaxed">{story.result}</p>
                             </div>
 
                             {story.mitigationPlan && (
@@ -841,7 +841,7 @@ export function ApplyPrepSheetModal({
                                 <span className="font-bold text-status-warning uppercase tracking-wide text-xs block mb-0.5">
                                   Transferable Bridge Strategy
                                 </span>
-                                <p className="text-status-warning/90 leading-relaxed">{story.mitigationPlan}</p>
+                                <p className="text-sm text-status-warning/90 leading-relaxed">{story.mitigationPlan}</p>
                               </div>
                             )}
                           </div>
@@ -865,7 +865,7 @@ export function ApplyPrepSheetModal({
                   </div>
                 ) : (
                   <div className="p-4 rounded-lg bg-inset/60 border border-hairline text-center text-muted-foreground">
-                    <p>No verified evidence items loaded yet. Add items to Evidence Bank in Library.</p>
+                    <p className="text-sm">No verified evidence items loaded yet. Add items to Evidence Bank in Library.</p>
                   </div>
                 )}
               </div>
@@ -891,7 +891,7 @@ export function ApplyPrepSheetModal({
                             </span>
                           )}
                         </div>
-                        <p className="text-text-secondary leading-relaxed text-xs">{gap.mitigationStrategy}</p>
+                        <p className="text-text-secondary leading-relaxed text-sm">{gap.mitigationStrategy}</p>
                       </div>
                     ))}
                   </div>
@@ -1046,7 +1046,7 @@ export function ApplyPrepSheetModal({
                 </div>
               ) : (
                 <div className="p-6 rounded-lg bg-inset/60 border border-hairline text-center text-muted-foreground">
-                  <p>No cover letter draft generated for this job application yet.</p>
+                  <p className="text-sm">No cover letter draft generated for this job application yet.</p>
                 </div>
               )}
             </div>

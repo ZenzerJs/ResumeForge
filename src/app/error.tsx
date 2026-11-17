@@ -24,13 +24,13 @@ export default function Error({
         </div>
 
         <div className="space-y-2">
-          <p className="text-xs font-mono font-semibold text-status-danger">
+          <p className="text-sm font-mono font-semibold text-status-danger">
             Application Error
           </p>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">
             Something Went Wrong
           </h1>
-          <p className="text-xs text-muted-foreground leading-relaxed max-w-sm mx-auto">
+          <p className="text-sm text-muted-foreground leading-relaxed max-w-sm mx-auto">
             An unhandled runtime error occurred while rendering this workspace view.
           </p>
         </div>
@@ -39,7 +39,7 @@ export default function Error({
           <span className="text-xs text-muted-foreground uppercase font-semibold block">
             Error Details
           </span>
-          <p className="text-status-danger break-words text-xs">
+          <p className="text-status-danger break-words text-sm">
             {error.message || "An unexpected application error occurred."}
           </p>
           {error.digest && (

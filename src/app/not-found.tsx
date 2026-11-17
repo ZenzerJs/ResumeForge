@@ -11,13 +11,13 @@ export default function NotFound() {
         </div>
 
         <div className="space-y-2">
-          <p className="text-xs font-mono font-semibold text-primary">
+          <p className="text-sm font-mono font-semibold text-primary">
             404 — Page Not Found
           </p>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">
             Page not found
           </h1>
-          <p className="text-xs text-muted-foreground leading-relaxed max-w-sm mx-auto">
+          <p className="text-sm text-muted-foreground leading-relaxed max-w-sm mx-auto">
             The workspace route or document you requested doesn&apos;t exist or may have moved.
           </p>
         </div>
@@ -28,7 +28,7 @@ export default function NotFound() {
             className="w-full min-h-11 py-2.5 px-4 bg-primary hover:opacity-95 text-primary-foreground font-semibold text-xs rounded-[6px] flex items-center justify-center gap-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
           >
             <Home className="h-4 w-4" aria-hidden />
-            Return to Dashboard
+            Back to home
           </Link>
 
           <Link

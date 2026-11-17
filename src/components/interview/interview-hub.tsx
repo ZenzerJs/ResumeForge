@@ -243,7 +243,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                   <DialogTitle className="text-xl font-bold text-foreground text-balance md:text-2xl">
                     {selectedQuestion.title}
                   </DialogTitle>
-                  <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
+                  <DialogDescription className="mt-0.5 text-sm text-muted-foreground">
                     {selectedQuestion.sourceSet}
                   </DialogDescription>
                 </div>
@@ -302,7 +302,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
             {/* Rubric Guide */}
             <div>
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Discussion Rubric & Key Points</h4>
-              <div className="p-3.5 bg-inset border border-border rounded-[10px] text-xs text-on-surface-variant leading-relaxed whitespace-pre-wrap font-sans">
+              <div className="p-3.5 bg-inset border border-border rounded-[10px] text-sm text-on-surface-variant leading-relaxed whitespace-pre-wrap font-sans">
                 {selectedQuestion.rubricGuide}
               </div>
             </div>

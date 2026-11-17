@@ -504,7 +504,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                 Progressive Interview Hints
               </h2>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Try solving without peeking first. Reveal hints progressively if stuck.
             </p>
 
@@ -539,7 +539,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                     {isRevealed && (
                       <div
                         data-testid={`dsa-hint-content-${idx}`}
-                        className="border-t border-hairline px-3 pb-3 pt-2 text-xs leading-relaxed text-text-secondary"
+                        className="border-t border-hairline px-3 pb-3 pt-2 text-sm leading-relaxed text-text-secondary"
                       >
                         {hintText}
                       </div>
@@ -567,7 +567,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               </span>
             </div>
 
-            <p className="text-xs text-text-secondary">
+            <p className="text-sm text-text-secondary">
               Discuss constraints, walk through your Big-O approach, or request a Socratic nudge without spoiling the code.
             </p>
 
@@ -694,7 +694,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                     </span>
                   </div>
                 </div>
-                <p className="text-xs leading-relaxed text-text-secondary">
+                <p className="text-sm leading-relaxed text-text-secondary">
                   {scorecard.complexityAudit.actionableFeedback}
                 </p>
               </div>

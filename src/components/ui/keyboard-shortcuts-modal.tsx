@@ -86,7 +86,7 @@ export function KeyboardShortcutsModal() {
               <DialogTitle className="text-sm font-bold text-foreground">
                 Keyboard Shortcuts
               </DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground">
+              <DialogDescription className="text-sm text-muted-foreground">
                 Speed up your workflow across ResumeForge
               </DialogDescription>
             </DialogHeader>

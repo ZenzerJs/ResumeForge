@@ -205,7 +205,7 @@ export function QuickAddEvidenceModal({
               <DialogTitle className="text-sm font-bold text-foreground">
                 Add Evidence for &ldquo;{initialSkill}&rdquo;
               </DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground">
+              <DialogDescription className="text-sm text-muted-foreground">
                 Close the gap by recording your project or work experience
               </DialogDescription>
             </DialogHeader>

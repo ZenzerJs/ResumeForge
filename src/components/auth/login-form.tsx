@@ -357,7 +357,7 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
           {effectiveMode === "signup"
             ? "Already have an account? Sign in"
             : "Don't have an account? Create one"}
-        </button> : <p className="text-xs text-muted-foreground">Public signup is disabled in the demo. Self-host ResumeForge to create an account.</p>}
+        </button> : <p className="text-sm text-muted-foreground">Public signup is disabled in the demo. Self-host ResumeForge to create an account.</p>}
 
         <Link
           href="/"

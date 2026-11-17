@@ -185,7 +185,7 @@ export function GuestMigrationModal({
               Unsaved Guest Draft Detected
             </DialogTitle>
           </div>
-          <DialogDescription className="text-xs text-text-secondary">
+          <DialogDescription className="text-sm text-text-secondary">
             We found a resume draft in this browser from your unauthenticated session. Choose how to synchronize it with your account.
           </DialogDescription>
         </DialogHeader>
@@ -307,7 +307,7 @@ export function GuestMigrationModal({
                 <ShieldAlert className="size-4 text-primary shrink-0" />
                 <span>Critical: Master Overwrite Verification</span>
               </div>
-              <p className="text-text-secondary text-xs leading-relaxed">
+              <p className="text-text-secondary text-sm leading-relaxed">
                 This action creates an automated snapshot of your previous master and updates your primary baseline to this draft.
               </p>
               <label className="flex items-start gap-2 pt-0.5 cursor-pointer select-none">

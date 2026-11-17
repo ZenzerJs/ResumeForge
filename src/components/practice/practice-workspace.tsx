@@ -146,7 +146,7 @@ export function PracticeWorkspace() {
                   >
                     Target Role Context
                   </label>
-                  <p className="text-xs text-text-secondary">
+                  <p className="text-sm text-text-secondary">
                     Select a tracked job to focus interview questions and behavioral rubrics on your target role.
                   </p>
                 </div>

@@ -60,7 +60,7 @@ export function OutcomesPanel() {
       <div className="mx-auto w-full max-w-4xl space-y-6 p-4">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Pipeline outcomes</h2>
-          <p className="text-xs text-muted-foreground">Counts are yours only. Shared job listings stay SAVED for everyone else.</p>
+          <p className="text-sm text-muted-foreground">Counts are yours only. Shared job listings stay SAVED for everyone else.</p>
         </div>
 
         {guest && (

@@ -108,7 +108,7 @@ export function ApplySheetPatchCard({
         <div className="rounded bg-status-danger/10 p-2 text-text-secondary"><span className="mb-1 block text-xs uppercase text-muted-foreground">Before</span>{patch.before || "(empty)"}</div>
         <div className="rounded bg-status-success/15 p-2 text-status-success-soft"><span className="mb-1 block text-xs uppercase text-muted-foreground">After</span>{patch.after || "(empty)"}</div>
       </div>
-      <p className="text-xs text-muted-foreground">{patch.rationale}</p>
+      <p className="text-sm text-muted-foreground">{patch.rationale}</p>
     </article>
   );
 }
@@ -669,7 +669,7 @@ export function ApplySheet({
           )}
           {(patchBatch || demoLocalPatches) && skillsNeedingAck.length > 0 && (
             <div className="space-y-2 rounded-lg border border-status-warning/40 bg-status-warning/15 p-3 text-xs text-status-warning">
-              <p>Confirm any unverified skills you have real experience with before applying:</p>
+              <p className="text-sm">Confirm any unverified skills you have real experience with before applying:</p>
               {skillsNeedingAck.map((skill) => (
                 <label key={skill} className="flex items-center gap-2">
                   <input type="checkbox" checked={acknowledgedSkills.includes(skill)} onChange={() => setAcknowledgedSkills((current) => current.includes(skill) ? current.filter((item) => item !== skill) : [...current, skill])} />
@@ -682,11 +682,11 @@ export function ApplySheet({
             <div className="space-y-1 rounded-lg border border-status-warning/40 bg-status-warning/15 p-3 text-xs text-status-warning" data-testid="apply-sheet-gaps">
               <p className="font-semibold">Requirements not covered by verified evidence</p>
               {patchGaps.map((gap, index) => (
-                <p key={`${gap.requirement}-${index}`}>{gap.requirement}: {gap.recommendation}</p>
+                <p key={`${gap.requirement}-${index}`} className="text-sm">{gap.requirement}: {gap.recommendation}</p>
               ))}
             </div>
           )}
-          {tailoringNotice && <p className="rounded-lg border border-hairline bg-inset p-3 text-xs text-text-secondary" role="status">{tailoringNotice}</p>}
+          {tailoringNotice && <p className="rounded-lg border border-hairline bg-inset p-3 text-sm text-text-secondary" role="status">{tailoringNotice}</p>}
           {guardrailResult && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -720,7 +720,7 @@ export function ApplySheet({
                   {atsScore.overallScore} / 100
                 </Badge>
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 Matches {atsScore.requiredMatch.score}/{atsScore.requiredMatch.maxScore} required skills points.
               </p>
             </div>

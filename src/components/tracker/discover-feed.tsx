@@ -961,7 +961,7 @@ export function DiscoverFeed() {
           <div className="flex flex-col items-center gap-3 rounded-xl border-dashed surface-raised p-12 text-center">
             <Building2 className="h-10 w-10 text-muted-foreground" />
             <h3 className="text-sm font-semibold text-foreground">No jobs match your filters</h3>
-            <p className="max-w-sm text-xs text-muted-foreground">
+            <p className="max-w-sm text-sm text-muted-foreground">
               Try adjusting your city, radius, salary, or workplace filters, or click &quot;Sync Feeds Now&quot; to fetch new roles.
             </p>
             <button
