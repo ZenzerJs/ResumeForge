@@ -124,8 +124,9 @@ test.describe("WS0 — UX Bug Fixes & Staged AI Feedback", () => {
     await expect(marqueeTrack).toBeVisible();
 
     // Verify presence of capability items inside static capability strip
-    await expect(marqueeTrack.getByText("Typst WASM Engine").first()).toBeVisible();
-    await expect(marqueeTrack.getByText("Verified Evidence Bank").first()).toBeVisible();
-    await expect(marqueeTrack.getByText("100-Point ATS Rubric").first()).toBeVisible();
+    await expect(marqueeTrack.getByText("Clean PDF export").first()).toBeVisible();
+    await expect(marqueeTrack.getByText("Verified work history").first()).toBeVisible();
+    await expect(marqueeTrack.getByText("Bring your own AI key").first()).toBeVisible();
+    await expect(marqueeTrack.getByText("Instant ATS scoring").first()).toBeVisible();
   });
 });

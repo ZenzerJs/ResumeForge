@@ -37,7 +37,7 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
 
     // Switch to Frontend Preset
     await frontendPreset.click();
-    await expect(jdInput).toHaveValue(/Staff Frontend Architect/);
+    await expect(jdInput).toHaveValue(/New-Grad Frontend Engineer/);
 
     // Test Expandable Formula Derivation Audit Log
     const derivationBtn = page.getByTestId("toggle-derivation-log-btn");
@@ -88,17 +88,17 @@ test.describe("Jobright Upgrade Features: Instant ATS Sandbox, Competitive Matri
     // Verify Competitive Matrix Section
     const matrixSection = page.getByTestId("competitive-matrix-section");
     await expect(matrixSection).toBeVisible();
-    await expect(matrixSection).toContainText("The Engineering Wedge: Why ResumeForge");
+    await expect(matrixSection).toContainText("How ResumeForge Is Built");
 
-    // Check table moats and competitors
+    // Check table moats and architecture columns
     await expect(matrixSection).toContainText("Hallucination Prevention");
     await expect(matrixSection).toContainText("Cost & Quotas");
     await expect(matrixSection).toContainText("Data Privacy & Ownership");
     await expect(matrixSection).toContainText("Document Quality & Layout");
     await expect(matrixSection).toContainText("ATS Evaluation Engine");
 
+    await expect(matrixSection).toContainText("Capability");
     await expect(matrixSection).toContainText("ResumeForge (Guest / Postgres)");
-    await expect(matrixSection).toContainText("Competitors");
     await expect(matrixSection).not.toContainText(/\bTeal\b/i);
     await expect(matrixSection).not.toContainText(/\bSimplify\b/i);
   });

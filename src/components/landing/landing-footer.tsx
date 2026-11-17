@@ -1,9 +1,6 @@
 import React from "react";
 import Link from "next/link";
 import { FileText, ArrowRight } from "lucide-react";
-import { BrandIcon } from "@/components/design-system/brand-icon";
-
-const FOOTER_STACK = ["Typst", "Next.js", "PostgreSQL", "CodeMirror", "Prisma"] as const;
 
 export function LandingFooter() {
   return (
@@ -12,27 +9,11 @@ export function LandingFooter() {
       className="relative z-20 mt-auto w-full min-w-0 shrink-0 border-t border-outline/70 bg-panel py-10 px-4 md:px-8 text-muted-foreground"
     >
       <div className="mx-auto flex w-full max-w-5xl min-w-0 flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-        <div className="space-y-1">
-          <div className="flex items-center justify-center sm:justify-start gap-2">
-            <div className="h-6 w-6 rounded-[6px] bg-inset border border-primary/40 text-primary font-semibold font-mono flex items-center justify-center text-xs">
-              RF
-            </div>
-            <span className="text-foreground font-bold tracking-tight text-sm">ResumeForge</span>
+        <div className="flex items-center justify-center sm:justify-start gap-2">
+          <div className="h-6 w-6 rounded-[6px] bg-inset border border-primary/40 text-primary font-semibold font-mono flex items-center justify-center text-xs">
+            RF
           </div>
-          <p className="text-xs text-muted-foreground font-mono">
-            Guest browser drafts · Optional Postgres sync · IndexedDB BYOK relay
-          </p>
-          <div
-            className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 pt-1 text-[11px] font-mono text-muted-foreground/85 sm:justify-start"
-            aria-label="Core stack"
-          >
-            {FOOTER_STACK.map((tech) => (
-              <span key={tech} className="inline-flex items-center gap-1.5">
-                <BrandIcon name={tech} className="h-3.5 w-3.5 shrink-0" />
-                <span>{tech}</span>
-              </span>
-            ))}
-          </div>
+          <span className="text-foreground font-bold tracking-tight text-sm">ResumeForge</span>
         </div>
 
         <nav

@@ -21,7 +21,6 @@ import {
   X,
 } from "lucide-react";
 import { TopNav } from "@/components/navigation/top-nav";
-import { BrandIcon } from "@/components/design-system/brand-icon";
 import { LandingAtmosphere } from "@/components/landing/landing-atmosphere";
 import { AmbientColorBlobs } from "@/components/design-system/workspace-atmosphere";
 import { ProductProofCard } from "@/components/landing/product-proof-card";
@@ -29,7 +28,7 @@ import { CapabilityMarquee } from "@/components/landing/capability-marquee";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { AtsSandboxSection } from "@/components/landing/ats-sandbox-section";
 import { CompetitiveMatrixSection } from "@/components/landing/competitive-matrix-section";
-import { resolveClientProviderConfig } from "@/lib/byok-vault";
+import { getActiveConfig, resolveClientProviderConfig } from "@/lib/byok-vault";
 import type { DashboardStats } from "@/lib/db/stats";
 import { clearDemoSamplesForPersonalResume } from "@/lib/demo-client";
 import {
@@ -53,6 +52,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [hasAiKey, setHasAiKey] = useState(false);
+  const [aiKeyless, setAiKeyless] = useState(false);
   const [hasLocalResume, setHasLocalResume] = useState(false);
   const [hasLocalEvidence, setHasLocalEvidence] = useState(false);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
@@ -76,8 +76,9 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
         setHasLocalEvidence(true);
       }
     } catch {}
-    void resolveClientProviderConfig().then((cfg) => {
-      setHasAiKey(Boolean(cfg));
+    void getActiveConfig().then((cfg) => {
+      setHasAiKey(cfg.hasKey);
+      setAiKeyless(cfg.keyless);
     });
   }, []);
 
@@ -231,11 +232,11 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
               </div>
 
               <h1 className="text-4xl md:text-5xl lg:text-6xl text-foreground leading-tight font-bold tracking-[-0.04em] text-pretty">
-                Make every application feel <span className="text-ember-gradient">intentional.</span>
+                Tailor your resume. <span className="text-ember-gradient">Keep every claim true.</span>
               </h1>
 
               <p className="text-on-surface-variant text-base md:text-lg max-w-xl leading-relaxed">
-                Craft evidence-grounded, job-tailored resume variants from one protected master resume. Guest drafts stay in this browser until you sign in to persist in Postgres, while AI actions relay only to your chosen BYOK provider.
+                Built for internship and early-career applicants. Tailor a protected master resume to each role, review every proposed edit before it applies, and use your own AI key.
               </p>
 
               <div className="flex items-center gap-4 pt-2 flex-wrap">
@@ -329,7 +330,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                       <div className="w-32 bg-inset h-2 rounded-full overflow-hidden">
                         <div
                           className="ombre-bar h-full rounded-full transition-all duration-300"
-                          style={{ width: `${Math.max(8, progressPct)}%` }}
+                          style={{ width: `${progressPct}%` }}
                         />
                       </div>
                       <button
@@ -462,7 +463,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                         href="/settings"
                         className="text-xs font-mono font-semibold text-primary hover:underline flex items-center gap-1 pt-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
                       >
-                        {step3Done ? "AI Connected · Manage" : "Connect Key"}{" "}
+                        {aiKeyless ? "Local AI · not verified" : step3Done ? "AI Connected · Manage" : "Connect Key"}{" "}
                         <ArrowRight className="h-3 w-3" />
                       </Link>
                     </div>
@@ -521,7 +522,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-12">
               <h2 className="text-2xl md:text-3xl text-foreground font-bold tracking-[-0.03em] mb-2">How ResumeForge Operates</h2>
-              <p className="text-muted-foreground font-mono text-xs md:text-sm">Guest drafts stay in browser until sign-in. Evidence-grounded output.</p>
+              <p className="text-muted-foreground font-mono text-xs md:text-sm">Five steps from master resume to tailored PDF.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-6" data-testid="workflow-active-panel">
               <div className="flex flex-col items-center text-center p-4">
@@ -580,7 +581,7 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
               data-testid="capability-grid-section"
             >
               <div className="text-center mb-14">
-                <h2 className="text-3xl md:text-4xl font-bold text-foreground tracking-[-0.03em]">Workspace Capability Modules</h2>
+                <h2 className="text-3xl md:text-4xl font-bold text-foreground tracking-[-0.03em]">Workspace tools</h2>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="capability-cards-grid">
                 {/* Card 1: Master Resume Editor */}
@@ -593,22 +594,14 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                     <p className="text-on-surface-variant text-sm leading-relaxed">
                       Edit your protected Typst master resume with WASM compilation and instant live preview.
                     </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-mono text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5 rounded-[4px] border border-outline/60 bg-inset px-2 py-0.5">
-                        <BrandIcon name="typst" className="h-3 w-3 shrink-0" />
-                        <span>Typst</span>
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 rounded-[4px] border border-outline/60 bg-inset px-2 py-0.5">
-                        <BrandIcon name="codemirror" className="h-3 w-3 shrink-0" />
-                        <span>CodeMirror</span>
-                      </span>
-                    </div>
                   </div>
                   <div className="mt-6 pt-4 border-t border-outline/70 flex items-center justify-between">
-                    <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant tabular-nums">
-                      {`${stats.hasMasterResume ? 1 : 0} MASTER RESUME`}
-                    </span>
-                    <Link className="text-primary font-mono text-xs md:text-sm flex items-center gap-1 hover:underline" href="/editor">
+                    {stats.hasMasterResume ? (
+                      <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant tabular-nums">
+                        1 MASTER RESUME
+                      </span>
+                    ) : null}
+                    <Link className="ml-auto text-primary font-mono text-xs md:text-sm flex items-center gap-1 hover:underline" href="/editor">
                       Open <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                     </Link>
                   </div>
@@ -626,10 +619,12 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                     </p>
                   </div>
                   <div className="mt-6 pt-4 border-t border-outline/70 flex items-center justify-between">
-                    <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant tabular-nums">
-                      {`${stats.evidenceCount} TOTAL ITEMS`}
-                    </span>
-                    <Link className="text-on-surface-variant hover:text-foreground font-mono text-xs md:text-sm flex items-center gap-1 transition-colors" href="/library">
+                    {stats.evidenceCount > 0 ? (
+                      <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant tabular-nums">
+                        {`${stats.evidenceCount} TOTAL ITEMS`}
+                      </span>
+                    ) : null}
+                    <Link className="ml-auto text-on-surface-variant hover:text-foreground font-mono text-xs md:text-sm flex items-center gap-1 transition-colors" href="/library">
                       Open <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                     </Link>
                   </div>
@@ -643,33 +638,25 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                     </div>
                     <h3 className="text-xl md:text-2xl font-bold text-foreground mb-3 tracking-tight">Tailor Engine &amp; AI Gateway</h3>
                     <p className="text-on-surface-variant text-sm leading-relaxed mb-6">
-                      Map verified evidence to job descriptions and inspect atomic diffs before applying changes. Guest drafts stay in this browser; signed-in workspaces persist in hosted Postgres; AI calls relay only when triggered using your BYOK key.
+                      Map verified evidence to job descriptions and inspect atomic diffs before applying changes.
                     </p>
                     <div className="bg-inset border border-outline/70 rounded-[6px] p-3.5 font-mono text-xs text-on-surface-variant space-y-1.5 mb-4">
                       <div className="flex justify-between items-center">
-                        <span className="text-foreground font-semibold">Patch Contract</span>
+                        <span className="text-foreground font-semibold">Evidence-linked edits</span>
                         <span className="text-primary text-xs">Evidence-Cited</span>
                       </div>
                       <p className="text-muted-foreground text-xs leading-relaxed">
                         Every proposed edit cites an `evidenceId` or surfaces an explicit Gap item.
                       </p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5 rounded-[4px] border border-outline/60 bg-inset px-2 py-0.5">
-                        <BrandIcon name="postgresql" className="h-3 w-3 shrink-0" />
-                        <span>PostgreSQL</span>
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 rounded-[4px] border border-outline/60 bg-inset px-2 py-0.5">
-                        <BrandIcon name="prisma" className="h-3 w-3 shrink-0" />
-                        <span>Prisma</span>
-                      </span>
-                    </div>
                   </div>
                   <div className="mt-auto pt-4 border-t border-outline/70 flex items-center justify-between">
-                    <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant tabular-nums">
-                      {`${stats.variantsCount} VARIANTS GENERATED`}
-                    </span>
-                    <Link className="bg-primary text-primary-foreground font-bold px-4 py-2 rounded-[6px] flex items-center gap-1.5 hover:opacity-95 transition-opacity text-xs md:text-sm" href="/tailor">
+                    {stats.variantsCount > 0 ? (
+                      <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant tabular-nums">
+                        {`${stats.variantsCount} VARIANTS GENERATED`}
+                      </span>
+                    ) : null}
+                    <Link className="ml-auto bg-primary text-primary-foreground font-bold px-4 py-2 rounded-[6px] flex items-center gap-1.5 hover:opacity-95 transition-opacity text-xs md:text-sm" href="/tailor">
                       Tailor Now
                     </Link>
                   </div>
@@ -706,14 +693,26 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
                     </p>
                   </div>
                   <div className="mt-6 pt-4 border-t border-outline/70 flex items-center justify-between">
-                    <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant tabular-nums">
-                      {`${stats.jobsCount} JOBS TRACKED`}
-                    </span>
-                    <Link className="text-primary font-mono text-xs md:text-sm flex items-center gap-1 hover:underline" href="/tracker">
+                    {stats.jobsCount > 0 ? (
+                      <span className="font-mono text-xs uppercase tracking-wider px-2.5 py-1 rounded-[4px] bg-inset border border-outline/70 text-on-surface-variant tabular-nums">
+                        {`${stats.jobsCount} JOBS TRACKED`}
+                      </span>
+                    ) : null}
+                    <Link className="ml-auto text-primary font-mono text-xs md:text-sm flex items-center gap-1 hover:underline" href="/tracker">
                       Open <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                     </Link>
                   </div>
                 </div>
+              </div>
+              <div className="mt-8 flex items-center justify-center">
+                <Link
+                  href="/practice"
+                  data-testid="landing-practice-link"
+                  className="inline-flex items-center gap-2 rounded-[6px] border border-outline/70 bg-panel px-4 py-2.5 text-xs md:text-sm font-mono font-semibold text-foreground hover:bg-elevated hover:border-primary/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span>Prepare for interviews in Practice</span>
+                  <ArrowRight className="h-3.5 w-3.5 text-primary" aria-hidden />
+                </Link>
               </div>
             </section>
 

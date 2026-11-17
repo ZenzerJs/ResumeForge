@@ -4,7 +4,6 @@ import React from "react";
 import {
   ShieldCheck,
   CheckCircle2,
-  XCircle,
   Zap,
   Lock,
   FileCode,
@@ -12,106 +11,53 @@ import {
 } from "lucide-react";
 
 interface MatrixRow {
-  moat: string;
+  area: string;
   category: string;
   icon: React.ComponentType<{ className?: string }>;
-  resumeForge: {
-    title: string;
-    summary: string;
-    status: "winner";
-  };
-  competitors: {
-    title: string;
-    summary: string;
-    status: "drawback";
-  };
+  title: string;
+  summary: string;
 }
 
 const MATRIX_DATA: MatrixRow[] = [
   {
-    moat: "Hallucination Prevention",
+    area: "Hallucination Prevention",
     category: "AI Safety & Grounding",
     icon: ShieldCheck,
-    resumeForge: {
-      title: "Deterministic Evidence Bank",
-      summary:
-        "Every tailored bullet must cite verified atomic evidence IDs. Gaps are surfaced explicitly; the engine refuses to invent experience.",
-      status: "winner",
-    },
-    competitors: {
-      title: "Black-Box Rewrites & Rephrasing",
-      summary:
-        "Opaque generative prompts and synonym wrappers without a candidate evidence repository or citation verification pipeline—inviting fabricated metrics and unverified skills.",
-      status: "drawback",
-    },
+    title: "Deterministic Evidence Bank",
+    summary:
+      "Every tailored bullet must cite verified atomic evidence IDs. Gaps are surfaced explicitly; the engine refuses to invent experience.",
   },
   {
-    moat: "Cost & Quotas",
+    area: "Cost & Quotas",
     category: "Pricing Ergonomics",
     icon: Zap,
-    resumeForge: {
-      title: "Unmetered Open Workspace",
-      summary:
-        "No subscription paywalls or artificial daily credit pools for Typst compilation, ATS checks, or PDF export. Connect your own BYOK model key when using AI actions.",
-      status: "winner",
-    },
-    competitors: {
-      title: "$20–$40/mo Paywalls & Daily Quotas",
-      summary:
-        "Core ATS analysis, unlimited keyword checks, and exports gated behind recurring subscriptions or split credit pools designed to force tier upgrades.",
-      status: "drawback",
-    },
+    title: "Unmetered Open Workspace",
+    summary:
+      "No subscription paywalls or artificial daily credit pools for Typst compilation, ATS checks, or PDF export. Connect your own BYOK model key when using AI actions.",
   },
   {
-    moat: "Data Privacy & Ownership",
+    area: "Data Privacy & Ownership",
     category: "Architecture Invariants",
     icon: Lock,
-    resumeForge: {
-      title: "Browser Guest Mode + Hosted Postgres Sync",
-      summary:
-        "Guest drafts stay in browser localStorage until you sign in to persist in Postgres. BYOK API keys stay encrypted in IndexedDB and relay only to your chosen provider on AI actions.",
-      status: "winner",
-    },
-    competitors: {
-      title: "Centralized Cloud & Telemetry Capture",
-      summary:
-        "Resumes, work history, and form inputs are synced to centralized servers or captured by browser extensions, with terms often permitting analytics or recruiter indexing.",
-      status: "drawback",
-    },
+    title: "Browser Guest Mode + Hosted Postgres Sync",
+    summary:
+      "Guest drafts stay in browser localStorage until you sign in to persist in Postgres. BYOK API keys stay encrypted in IndexedDB and relay only to your chosen provider on AI actions.",
   },
   {
-    moat: "Document Quality & Layout",
+    area: "Document Quality & Layout",
     category: "Typesetting & Output",
     icon: FileCode,
-    resumeForge: {
-      title: "Typst WASM Typesetting Engine",
-      summary:
-        "Sub-millimeter algorithmic typesetting running client-side. Strict single-page constraints, crisp vector rendering, and zero layout overflow.",
-      status: "winner",
-    },
-    competitors: {
-      title: "HTML-to-PDF & Basic Print Exports",
-      summary:
-        "Headless DOM/CSS print stylesheets and basic HTML builders prone to awkward line breaks, orphan headings, limited typographic control, and multi-page spillover.",
-      status: "drawback",
-    },
+    title: "Typst WASM Typesetting Engine",
+    summary:
+      "Client-side Typst WASM typesetting for crisp vector PDFs, consistent spacing, and single-page layout control.",
   },
   {
-    moat: "ATS Evaluation Engine",
+    area: "ATS Evaluation Engine",
     category: "Scoring Methodology",
     icon: Calculator,
-    resumeForge: {
-      title: "Explainable Mathematical Formula",
-      summary:
-        "Deterministic composite formula: 50% Core Stack + 20% Seniority + 15% Tools + 15% Evidence Coverage. Step-by-step audit logs with framework aliasing.",
-      status: "winner",
-    },
-    competitors: {
-      title: "Opaque Heuristics & Raw String Matching",
-      summary:
-        "Unpredictable LLM scores or naive keyword density counters that miss tech aliases (e.g., React implies JavaScript) and ignore seniority gap deductions.",
-      status: "drawback",
-    },
+    title: "Explainable Mathematical Formula",
+    summary:
+      "Deterministic composite formula: 50% Core Stack + 20% Seniority + 15% Tools + 15% Evidence Coverage. Step-by-step audit logs with framework aliasing.",
   },
 ];
 
@@ -124,30 +70,27 @@ export function CompetitiveMatrixSection() {
       <div className="mb-14 text-center max-w-3xl mx-auto">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[6px] border border-outline/70 bg-panel text-primary text-xs font-mono mb-4">
           <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
-          <span>ARCHITECTURAL BENCHMARK</span>
+          <span>PRODUCT ARCHITECTURE</span>
         </div>
         <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground tracking-tight mb-4">
-          The Engineering Wedge: Why ResumeForge
+          How ResumeForge Is Built
         </h2>
         <p className="text-on-surface-variant text-sm md:text-base lg:text-lg leading-relaxed">
-          Engineers don&apos;t trust black-box LLM hallucinations or predatory credit meters.
-          Compare our deterministic, evidence-grounded architecture against competitors.
+          Every tailored bullet is grounded in your Evidence Bank, scored with a
+          transparent formula, and typeset client-side in Typst WASM.
         </p>
       </div>
 
-      {/* Comparison Table */}
+      {/* Architecture Breakdown Table */}
       <div className="overflow-x-auto rounded-[10px] surface-raised edge-glow">
-        <table className="w-full text-left border-collapse min-w-[680px]">
+        <table className="w-full text-left border-collapse min-w-[560px]">
           <thead>
             <tr className="border-b border-outline/70 bg-inset">
-              <th className="p-4 md:p-5 text-xs md:text-sm font-mono uppercase tracking-wider text-on-surface-variant w-[26%]">
-                Architectural Moat
+              <th className="p-4 md:p-5 text-xs md:text-sm font-mono uppercase tracking-wider text-on-surface-variant w-[32%]">
+                Capability
               </th>
-              <th className="p-4 md:p-5 text-xs md:text-sm font-mono uppercase tracking-wider text-primary bg-primary/10 border-x border-primary/30 w-[38%]">
+              <th className="p-4 md:p-5 text-xs md:text-sm font-mono uppercase tracking-wider text-primary bg-primary/10 border-l border-primary/30 w-[68%]">
                 ResumeForge (Guest / Postgres)
-              </th>
-              <th className="p-4 md:p-5 text-xs md:text-sm font-mono uppercase tracking-wider text-on-surface-variant w-[36%]">
-                Competitors
               </th>
             </tr>
           </thead>
@@ -156,10 +99,10 @@ export function CompetitiveMatrixSection() {
               const IconComp = row.icon;
               return (
                 <tr
-                  key={row.moat}
+                  key={row.area}
                   className={idx % 2 === 0 ? "bg-transparent" : "bg-inset/50"}
                 >
-                  {/* Category / Moat Column */}
+                  {/* Capability Column */}
                   <td className="p-4 md:p-5 align-top">
                     <div className="flex items-start gap-3">
                       <div className="p-2 rounded-[6px] bg-inset border border-outline/70 text-primary shrink-0 mt-0.5">
@@ -167,7 +110,7 @@ export function CompetitiveMatrixSection() {
                       </div>
                       <div>
                         <span className="font-bold text-sm md:text-base text-foreground block">
-                          {row.moat}
+                          {row.area}
                         </span>
                         <span className="font-mono text-xs text-muted-foreground block mt-1">
                           {row.category}
@@ -176,31 +119,16 @@ export function CompetitiveMatrixSection() {
                     </div>
                   </td>
 
-                  {/* ResumeForge (Winner) Column */}
-                  <td className="p-4 md:p-5 align-top bg-primary/[0.04] border-x border-primary/25">
+                  {/* ResumeForge Column */}
+                  <td className="p-4 md:p-5 align-top bg-primary/[0.04] border-l border-primary/25">
                     <div className="flex items-start gap-2.5">
                       <CheckCircle2 className="h-4 w-4 text-status-success shrink-0 mt-0.5" aria-hidden />
                       <div>
                         <div className="font-bold text-sm md:text-base text-status-success mb-1.5">
-                          {row.resumeForge.title}
+                          {row.title}
                         </div>
                         <p className="text-on-surface-variant leading-relaxed text-xs md:text-sm">
-                          {row.resumeForge.summary}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Competitors Column */}
-                  <td className="p-4 md:p-5 align-top text-on-surface-variant">
-                    <div className="flex items-start gap-2">
-                      <XCircle className="h-4 w-4 text-status-danger shrink-0 mt-0.5" aria-hidden />
-                      <div>
-                        <div className="font-semibold text-xs md:text-sm text-status-danger mb-1.5">
-                          {row.competitors.title}
-                        </div>
-                        <p className="text-on-surface-variant leading-relaxed text-xs md:text-sm">
-                          {row.competitors.summary}
+                          {row.summary}
                         </p>
                       </div>
                     </div>
@@ -213,16 +141,11 @@ export function CompetitiveMatrixSection() {
       </div>
 
       {/* Trust Invariant Footer Banner */}
-      <div className="mt-6 p-4 md:p-5 rounded-[10px] border border-outline/70 bg-panel flex flex-col md:flex-row items-center justify-between gap-4 text-xs md:text-sm font-sans">
-        <div className="flex items-center gap-2.5 text-on-surface-variant">
-          <Lock className="h-4 w-4 text-status-success shrink-0" aria-hidden />
-          <span>
-            Data Architecture: Guest drafts stay in this browser; signed-in data persists in hosted Postgres; BYOK keys stay encrypted in IndexedDB and relay only to your chosen provider on AI actions.
-          </span>
-        </div>
-        <div className="text-muted-foreground font-mono text-xs shrink-0">
-          Source code open &amp; auditable
-        </div>
+      <div className="mt-6 p-4 md:p-5 rounded-[10px] border border-outline/70 bg-panel flex items-center gap-2.5 text-on-surface-variant text-xs md:text-sm font-sans">
+        <Lock className="h-4 w-4 text-status-success shrink-0" aria-hidden />
+        <span>
+          Data Architecture: Guest drafts stay in this browser; signed-in data persists in hosted Postgres; BYOK keys stay encrypted in IndexedDB and relay only to your chosen provider on AI actions.
+        </span>
       </div>
     </section>
   );

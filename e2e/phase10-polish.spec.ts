@@ -99,7 +99,7 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
     await page.waitForLoadState("networkidle");
 
     const heroTitle = page.locator("h1");
-    await expect(heroTitle).toContainText("Make every application feel");
+    await expect(heroTitle).toContainText("Tailor your resume. Keep every claim true.");
   });
 
   test("9. Responsive viewports (375px mobile, 768px tablet, 1200px desktop) render without horizontal overflow", async ({ page }) => {
