@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useDeferredValue, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useDeferredValue, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -430,6 +430,10 @@ export function TailorWorkspace() {
   const [editorMode, setEditorMode] = useState<EditorModeParam | null>(() =>
     normalizeEditorModeParam(modeParam)
   );
+  const activeVariantIdRef = useRef<string | null>(activeVariantId);
+  activeVariantIdRef.current = activeVariantId;
+  const editorModeRef = useRef<EditorModeParam | null>(editorMode);
+  editorModeRef.current = editorMode;
 
   const selectTab = useCallback(
     (nextTab: TailorWorkspaceTab, options?: { preserveReturnRoute?: boolean }) => {
@@ -505,6 +509,8 @@ export function TailorWorkspace() {
   const [isDemo, setIsDemo] = useState(false);
   const [resumeReady, setResumeReady] = useState<boolean | null>(null);
   const [masterResumeId, setMasterResumeId] = useState<string | null>(null);
+  const masterResumeIdRef = useRef<string | null>(masterResumeId);
+  masterResumeIdRef.current = masterResumeId;
   const [masterTypstSource, setMasterTypstSource] = useState<string>("");
   const [masterFactsSnapshot, setMasterFactsSnapshot] = useState<ResumeFacts | null>(null);
   const [validationContext, setValidationContext] = useState<TailoringValidationContext | null>(null);
@@ -522,8 +528,13 @@ export function TailorWorkspace() {
   const savedJobIdRef = useRef<string | null>(null);
   const navControllerRef = useRef(createSaveBeforeNavigationController());
   const navigationErrorRef = useRef<HTMLDivElement>(null);
-  const lastFailedNavTargetRef = useRef<((jobId: string | null) => string) | null>(null);
-  const [isOpeningSettings, setIsOpeningSettings] = useState(false);
+  const lastFailedNavTargetRef = useRef<{
+    target: "settings" | "editor" | "library";
+    buildHref: (jobId: string | null) => string;
+  } | null>(null);
+  const [pendingNavTarget, setPendingNavTarget] = useState<"settings" | "editor" | "library" | null>(null);
+  const isOpeningSettings = pendingNavTarget === "settings";
+  const isNavigatingAway = pendingNavTarget !== null;
   const [navigationError, setNavigationError] = useState<string | null>(null);
   const [jobLoadError, setJobLoadError] = useState<{
     kind: "not-found" | "forbidden" | "error";
@@ -1376,9 +1387,12 @@ export function TailorWorkspace() {
             tab: activeTabRef.current,
             roleTitle: job.roleTitle ?? undefined,
             company: job.company ?? undefined,
-            variantId: activeVariantId ?? undefined,
-            resumeId: masterResumeId && masterResumeId !== "demo-local" ? masterResumeId : undefined,
-            mode: editorMode ?? undefined,
+            variantId: activeVariantIdRef.current ?? undefined,
+            resumeId:
+              masterResumeIdRef.current && masterResumeIdRef.current !== "demo-local"
+                ? masterResumeIdRef.current
+                : undefined,
+            mode: editorModeRef.current ?? undefined,
           },
           resolvedScope
         );
@@ -1407,7 +1421,7 @@ export function TailorWorkspace() {
 
     void loadJobById(targetJobToLoad);
     return () => controller.abort();
-  }, [targetJobToLoad, fetchMatches, triggerTier2Fetch, activeVariantId, masterResumeId, editorMode]);
+  }, [targetJobToLoad, fetchMatches, triggerTier2Fetch]);
 
   const handleRemoveRequirement = (category: "required" | "preferred" | "domain", termToRemove: string) => {
     if (!extractedRequirements) return;
@@ -1575,38 +1589,46 @@ export function TailorWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Measure active tab pill for segmented control
-  useEffect(() => {
+  // Measure active tab pill synchronously before paint; animate only between two visible primary tabs
+  const prevTabIndicatorRef = useRef<typeof tabIndicator>(null);
+  useLayoutEffect(() => {
     const container = tabListRef.current;
     if (!container) return;
 
     const measure = () => {
       const activeEl = container.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
       if (!activeEl) {
+        prevTabIndicatorRef.current = null;
+        setAnimateTabIndicator(false);
         setTabIndicator(null);
         return;
       }
-      setTabIndicator({
+      const hadPreviousIndicator = prevTabIndicatorRef.current !== null;
+      const next = {
         left: activeEl.offsetLeft,
         top: activeEl.offsetTop,
         width: activeEl.offsetWidth,
         height: activeEl.offsetHeight,
-      });
+      };
+      prevTabIndicatorRef.current = next;
+      setAnimateTabIndicator(hadPreviousIndicator);
+      setTabIndicator(next);
     };
 
     measure();
-    let rafId: number | null = null;
-    if (!animateTabIndicator) {
-      rafId = requestAnimationFrame(() => setAnimateTabIndicator(true));
+    if (typeof document !== "undefined" && document.fonts?.ready) {
+      void document.fonts.ready.then(() => {
+        if (tabListRef.current === container) measure();
+      });
     }
 
     const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
     observer?.observe(container);
+    container.querySelectorAll<HTMLElement>('[role="tab"]').forEach((tabEl) => observer?.observe(tabEl));
     return () => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
       observer?.disconnect();
     };
-  }, [activeTab, isBootstrapping, animateTabIndicator]);
+  }, [activeTab, isBootstrapping, isLoadingJob]);
 
   const tabButtonClass = (tab: TailorPrimaryTab) =>
     `relative z-10 flex min-h-11 items-center gap-1.5 sm:gap-2 rounded-lg px-2.5 sm:px-3 text-sm font-medium whitespace-nowrap transition-colors ${
@@ -1674,11 +1696,14 @@ export function TailorWorkspace() {
     }
   };
 
-  const navigateWithSave = async (buildTargetHref: (resolvedJobId: string | null) => string) => {
+  const navigateWithSave = async (
+    target: "settings" | "editor" | "library",
+    buildTargetHref: (resolvedJobId: string | null) => string
+  ) => {
     if (navControllerRef.current.isPending) return;
-    setIsOpeningSettings(true);
+    setPendingNavTarget(target);
     setNavigationError(null);
-    lastFailedNavTargetRef.current = buildTargetHref;
+    lastFailedNavTargetRef.current = { target, buildHref: buildTargetHref };
 
     const currentJobId = savedJobIdRef.current || jobIdParam;
     const hasPendingSave = userEditedRef.current && Boolean(rawDescription.trim());
@@ -1723,14 +1748,14 @@ export function TailorWorkspace() {
 
     if (outcome.status === "failed") {
       setNavigationError(outcome.error);
-      setIsOpeningSettings(false);
+      setPendingNavTarget(null);
     } else if (outcome.status === "cancelled") {
-      setIsOpeningSettings(false);
+      setPendingNavTarget(null);
     }
   };
 
   const handleOpenSettings = async () => {
-    await navigateWithSave((activeJobId) =>
+    await navigateWithSave("settings", (activeJobId) =>
       buildSettingsHref({
         from: "tailor",
         tab: activeTab,
@@ -1743,7 +1768,7 @@ export function TailorWorkspace() {
   };
 
   const handleOpenEditor = async (overrideVariantId?: string | null) => {
-    await navigateWithSave((activeJobId) =>
+    await navigateWithSave("editor", (activeJobId) =>
       buildEditorHref({
         variantId: overrideVariantId ?? activeVariantId,
         resumeId: masterResumeId && masterResumeId !== "demo-local" ? masterResumeId : null,
@@ -1756,7 +1781,7 @@ export function TailorWorkspace() {
   };
 
   const handleOpenLibrary = async (skill?: string) => {
-    await navigateWithSave((activeJobId) =>
+    await navigateWithSave("library", (activeJobId) =>
       buildLibraryHref({
         from: "tailor",
         tab: activeTab,
@@ -1831,7 +1856,7 @@ export function TailorWorkspace() {
                         <button
                           type="button"
                           onClick={() => void handleOpenSettings()}
-                          disabled={isOpeningSettings}
+                          disabled={isNavigatingAway}
                           className="text-left font-medium underline underline-offset-2 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 disabled:opacity-60"
                         >
                           {isOpeningSettings ? "Saving…" : "Configure in Settings"}
@@ -1840,19 +1865,23 @@ export function TailorWorkspace() {
                         <button
                           type="button"
                           onClick={() => void handleOpenEditor()}
-                          disabled={isOpeningSettings}
+                          disabled={isNavigatingAway}
                           className="text-left font-medium underline underline-offset-2 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 disabled:opacity-60"
                         >
-                          {isOpeningSettings ? "Saving…" : isDemo ? "Open resume draft" : "Save in Editor"}
+                          {pendingNavTarget === "editor"
+                            ? "Saving…"
+                            : isDemo
+                              ? "Open resume draft"
+                              : "Save in Editor"}
                         </button>
                       ) : label === "Evidence Bank" && nextStep !== "evidence" && verifiedEvidenceCount === 0 ? (
                         <button
                           type="button"
                           onClick={() => void handleOpenLibrary()}
-                          disabled={isOpeningSettings}
+                          disabled={isNavigatingAway}
                           className="text-left font-medium underline underline-offset-2 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 disabled:opacity-60"
                         >
-                          {isOpeningSettings ? "Saving…" : "Open Evidence Bank"}
+                          {pendingNavTarget === "library" ? "Saving…" : "Open Evidence Bank"}
                         </button>
                       ) : <span>{detail}</span>}
                     </div>
@@ -1867,17 +1896,25 @@ export function TailorWorkspace() {
                   </Button>
                 )}
                 {nextStep === "resume" && (
-                  <Button onClick={() => void handleOpenEditor()} disabled={isOpeningSettings}>
-                    {isOpeningSettings ? "Saving…" : isDemo ? "Open resume draft" : "Save a master résumé"}
+                  <Button onClick={() => void handleOpenEditor()} disabled={isNavigatingAway}>
+                    {pendingNavTarget === "editor"
+                      ? "Saving…"
+                      : isDemo
+                        ? "Open resume draft"
+                        : "Save a master résumé"}
                   </Button>
                 )}
                 {nextStep === "evidence" && (
-                  <Button onClick={() => void handleOpenLibrary()} disabled={isOpeningSettings}>
-                    {isOpeningSettings ? "Saving…" : verifiedEvidenceCount === 0 ? "Verify evidence" : "Open Evidence Bank"}
+                  <Button onClick={() => void handleOpenLibrary()} disabled={isNavigatingAway}>
+                    {pendingNavTarget === "library"
+                      ? "Saving…"
+                      : verifiedEvidenceCount === 0
+                        ? "Verify evidence"
+                        : "Open Evidence Bank"}
                   </Button>
                 )}
                 {nextStep === "provider" && (
-                  <Button onClick={() => void handleOpenSettings()} disabled={isOpeningSettings || !providerConfigStatus.checked}>
+                  <Button onClick={() => void handleOpenSettings()} disabled={isNavigatingAway || !providerConfigStatus.checked}>
                     {isOpeningSettings ? "Saving…" : "Configure in Settings"}
                   </Button>
                 )}
@@ -1905,7 +1942,7 @@ export function TailorWorkspace() {
                       type="button"
                       onClick={() => {
                         const retryTarget = lastFailedNavTargetRef.current;
-                        if (retryTarget) void navigateWithSave(retryTarget);
+                        if (retryTarget) void navigateWithSave(retryTarget.target, retryTarget.buildHref);
                       }}
                       className="rounded border border-status-danger/40 bg-status-danger/10 px-2.5 py-1 text-xs font-semibold text-status-danger hover:bg-status-danger/20"
                     >
@@ -2044,10 +2081,10 @@ export function TailorWorkspace() {
                       <button
                         type="button"
                         onClick={() => void handleOpenLibrary()}
-                        disabled={isOpeningSettings}
+                        disabled={isNavigatingAway}
                         className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-status-danger/40 bg-status-danger/15 px-3 text-xs font-semibold text-status-danger hover:bg-status-danger/25 disabled:opacity-60"
                       >
-                        {isOpeningSettings ? "Saving…" : "Review evidence"}
+                        {pendingNavTarget === "library" ? "Saving…" : "Review evidence"}
                       </button>
                     )}
                     <button
@@ -2281,13 +2318,15 @@ export function TailorWorkspace() {
             {/* Compact Context Bar */}
             <div className="rounded-xl surface-raised px-4 py-3 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2.5 min-w-0">
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
                   <Briefcase className="h-4 w-4 text-primary shrink-0" aria-hidden />
                   <span className="text-sm font-semibold text-foreground break-words">
                     {roleTitle || "Untitled role"}
                   </span>
                   {company && (
-                    <span className="text-xs text-muted-foreground break-words">· {company}</span>
+                    <span className="text-xs text-muted-foreground break-words">
+                      ·{"\u00A0"}{company}
+                    </span>
                   )}
                 </div>
                 {atsResult && (
