@@ -1,7 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
+  ArrowLeft,
   Plus,
   Edit2,
   Archive,
@@ -25,7 +28,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AppShell } from "@/components/design-system/app-shell";
 import { PageHeader } from "@/components/design-system/page-header";
-import { fetchDemoConfig } from "@/components/auth/session-user";
+import { fetchDemoConfig, fetchSessionUser } from "@/components/auth/session-user";
+import {
+  parseTailorReturnContext,
+  type ApplicationAccountScope,
+} from "@/lib/tailor/application-context";
 import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -288,6 +295,10 @@ function writeGuestEvidenceToStorage(items: EvidenceItem[]): void {
 }
 
 export function LibraryWorkspace() {
+  const searchParams = useSearchParams();
+  const [accountScope, setAccountScope] = useState<ApplicationAccountScope>({
+    scopeResolved: false,
+  });
   const [items, setItems] = useState<EvidenceItem[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<"library" | "review">("library");
@@ -346,6 +357,32 @@ export function LibraryWorkspace() {
   });
 
   const fetchAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([fetchSessionUser(), fetchDemoConfig()])
+      .then(([user, demoConfig]) => {
+        if (cancelled) return;
+        setAccountScope({
+          userId: user?.id ?? null,
+          demoMode: demoConfig?.demoMode === true,
+          scopeResolved: true,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAccountScope({ userId: null, demoMode: false, scopeResolved: true });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const tailorReturnContext = useMemo(
+    () => parseTailorReturnContext(searchParams, { scope: accountScope }),
+    [searchParams, accountScope]
+  );
 
   const fetchItems = useCallback(async () => {
     fetchAbortRef.current?.abort();
@@ -1669,41 +1706,7 @@ export function LibraryWorkspace() {
   };
 
   return (
-    <AppShell
-      variant="library"
-      actions={
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileImport}
-            accept=".json"
-            className="hidden"
-          />
-          <button
-            type="button"
-            disabled={isImporting}
-            onClick={() => fileInputRef.current?.click()}
-            className="flex min-h-11 xl:min-h-0 items-center gap-2 px-3.5 py-1.5 rounded-[6px] border border-hairline bg-elevated text-xs font-mono text-text-secondary hover:bg-muted hover:text-foreground transition-colors"
-          >
-            {isImporting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-            ) : (
-              <Upload className="h-3.5 w-3.5 text-primary" />
-            )}
-            Import JSON
-          </button>
-          <button
-            type="button"
-            onClick={(e) => openCreateModal(e.currentTarget)}
-            className="flex min-h-11 xl:min-h-0 items-center gap-1.5 rounded-[6px] border border-primary/40 bg-primary/10 px-3.5 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add Evidence Item
-          </button>
-        </div>
-      }
-    >
+    <AppShell variant="library">
       {/* Main Content Area with Header Margin Clearance matching preview (1).webp */}
       <div
         className={`mx-auto max-w-5xl w-full px-4 sm:px-6 pt-6 sm:pt-8 ${
@@ -1715,7 +1718,53 @@ export function LibraryWorkspace() {
         </div>
         {/* Page Title Header */}
         <div className="space-y-6">
-          <PageHeader title="Evidence Bank" />
+          <PageHeader
+            title="Evidence Bank"
+            actions={
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                {tailorReturnContext ? (
+                  <Link
+                    href={tailorReturnContext.href}
+                    data-testid="library-back-to-tailor-link"
+                    className="flex min-h-11 sm:min-h-9 items-center gap-1.5 rounded-[6px] border border-hairline bg-elevated px-3.5 py-1.5 text-body-dense font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  >
+                    <ArrowLeft className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                    <span>{tailorReturnContext.label}</span>
+                  </Link>
+                ) : null}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileImport}
+                  accept=".json"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  disabled={isImporting}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex min-h-11 sm:min-h-9 items-center gap-2 rounded-[6px] border border-hairline bg-elevated px-3.5 py-1.5 text-xs font-mono text-text-secondary transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50"
+                >
+                  {isImporting ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" aria-hidden />
+                  ) : (
+                    <Upload className="h-3.5 w-3.5 text-primary" aria-hidden />
+                  )}
+                  Import JSON
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => openCreateModal(e.currentTarget)}
+                  className="flex min-h-11 sm:min-h-9 items-center gap-1.5 rounded-[6px] border border-primary/40 bg-primary/10 px-3.5 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                >
+                  <Plus className="h-3.5 w-3.5" aria-hidden />
+                  Add Evidence Item
+                </button>
+              </div>
+            }
+          />
           <BulkPdfDropzone onComplete={handlePdfIngestComplete} />
         </div>
 
@@ -1825,7 +1874,7 @@ export function LibraryWorkspace() {
                 autoComplete="off"
                 value={searchQuery}
                 onChange={(e) => handleSearchQueryChange(e.target.value)}
-                placeholder="Search evidence by title, org, summary, or tags…"
+                placeholder="Search evidence…"
                 className="w-full h-11 pl-9 pr-4 rounded-[6px] bg-inset border border-hairline text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring text-xs font-mono"
               />
             </div>
@@ -1839,7 +1888,7 @@ export function LibraryWorkspace() {
                   onChange={(e) => handleFilterStatusChange(e.target.value)}
                   data-testid="evidence-status-filter"
                   aria-label="Filter evidence by status"
-                  className="min-h-11 sm:min-h-0 w-full sm:w-auto max-w-full min-w-0 bg-inset border border-hairline text-foreground rounded-[6px] px-3 py-1.5 text-xs font-mono outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="h-11 sm:h-9 w-full sm:w-auto max-w-full min-w-0 whitespace-nowrap bg-inset border border-hairline text-foreground rounded-[6px] px-3 py-0 leading-normal text-xs font-mono outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <option value="all">All statuses</option>
                   <option value="verified">Verified Only</option>

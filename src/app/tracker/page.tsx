@@ -1,7 +1,7 @@
 import { TrackerFeed } from "@/components/tracker/tracker-feed";
 
 export const metadata = {
-  title: "Application Tracker — ResumeForge",
+  title: "Application Tracker",
   description: "Track job applications, tailored resume variants, cover letters, and application lifecycle status.",
 };
 
