@@ -1025,116 +1025,125 @@ export function EditorWorkspace() {
         </div>
       )}
 
-      {documentError && (
-        <div
-          data-testid="editor-error-state"
-          className="flex items-center justify-between px-4 py-2 bg-red-950/90 border-b border-red-800 text-xs text-red-200"
-        >
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
-            <span>{documentError}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setDocumentError(null)}
-            className="px-2.5 py-1 bg-red-900/60 hover:bg-red-800 text-red-100 rounded text-[11px] font-medium transition"
-          >
-            Dismiss Error
-          </button>
-        </div>
-      )}
-
-      {/* Task 9.1: PDF Conversion Status Banners */}
-      {!isConversionBannerDismissed && source.includes("// @conversion-path: fallback") && (
-        <div
-          data-testid="pdf-conversion-fallback-banner"
-          className="flex items-center justify-between px-4 py-2 bg-amber-950/80 border-b border-amber-800 text-xs text-amber-200"
-        >
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
-            <span>AI conversion unavailable — used basic formatting</span>
-          </div>
-          <button
-            type="button"
-            onClick={handleDismissConversionBanner}
-            className="p-2 text-amber-300 hover:text-white transition min-h-11 min-w-11 inline-flex items-center justify-center"
-            title="Dismiss banner"
-            data-testid="dismiss-conversion-banner-btn"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
-
-      {!isConversionBannerDismissed && source.includes("// @conversion-path: ai") && (
-        <div
-          data-testid="pdf-conversion-ai-banner"
-          className="flex items-center justify-between px-4 py-2 bg-status-success/15 border-b border-status-success/35 text-xs text-status-success-soft"
-        >
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 shrink-0 text-status-success" />
-            <span>AI-Converted Draft — Converted using BYOK AI provider</span>
-          </div>
-          <button
-            type="button"
-            onClick={handleDismissConversionBanner}
-            className="p-2 text-status-success-soft hover:text-foreground transition min-h-11 min-w-11 inline-flex items-center justify-center"
-            title="Dismiss banner"
-            data-testid="dismiss-conversion-banner-btn"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
-
-
-      {/* Task 7.9: Undo Overwrite Notification Banner */}
-      {lastSnapshotId && (
-        <div
-          data-testid="undo-overwrite-banner"
-          className="flex items-center justify-between px-4 py-2 bg-amber-950/90 border-b border-amber-800 text-xs text-amber-200"
-        >
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 shrink-0 text-amber-400" />
-            <span>Master Resume overwritten. A pre-save snapshot was saved to database history.</span>
-          </div>
-          <button
-            type="button"
-            onClick={handleUndoOverwrite}
-            disabled={isUndoing}
-            data-testid="undo-overwrite-btn"
-            className="flex items-center gap-1.5 px-3 py-1 bg-primary hover:bg-primary/90 text-primary-foreground rounded text-xs font-semibold transition"
-          >
-            {isUndoing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Undo2 className="h-3.5 w-3.5" />}
-            Undo Overwrite
-          </button>
-        </div>
-      )}
-
-      {undoSuccess && (
-        <div
-          data-testid="undo-success-banner"
-          className="flex items-center gap-2 px-4 py-2 bg-status-success/15 border-b border-status-success/35 text-xs text-status-success-soft"
-        >
-          <Check className="h-4 w-4 text-status-success" />
-          <span>Restored Master Resume to pre-overwrite snapshot!</span>
-        </div>
-      )}
-
-      {evidenceExtractToast && (
-        <div
-          data-testid="evidence-extract-toast"
-          className="flex items-center gap-2 px-4 py-2 bg-sky-950/90 border-b border-sky-800 text-xs text-sky-200"
-        >
-          <BookOpen className="h-4 w-4 text-sky-400 shrink-0" />
-          <span>{evidenceExtractToast}</span>
-          {evidenceExtractToast.includes("Library") && (
-            <Link
-              href="/library"
-              className="ml-auto text-sky-300 underline underline-offset-2 hover:text-sky-100"
+      {(documentError ||
+        (!isConversionBannerDismissed &&
+          (source.includes("// @conversion-path: fallback") ||
+            source.includes("// @conversion-path: ai"))) ||
+        lastSnapshotId ||
+        undoSuccess ||
+        evidenceExtractToast) && (
+        <div data-testid="editor-banner-slot" className="shrink-0 divide-y divide-hairline">
+          {documentError && (
+            <div
+              data-testid="editor-error-state"
+              className="flex items-center justify-between gap-2 px-4 py-1.5 bg-status-danger/10 border-b border-status-danger/30 text-xs text-status-danger"
             >
-              Open Library
-            </Link>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-status-danger" />
+                <span>{documentError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDocumentError(null)}
+                className="px-2.5 py-0.5 bg-status-danger/15 hover:bg-status-danger/25 text-foreground border border-status-danger/30 rounded text-[11px] font-medium transition"
+              >
+                Dismiss Error
+              </button>
+            </div>
+          )}
+
+          {/* Task 9.1: PDF Conversion Status Banners */}
+          {!isConversionBannerDismissed && source.includes("// @conversion-path: fallback") && (
+            <div
+              data-testid="pdf-conversion-fallback-banner"
+              className="flex items-center justify-between gap-2 px-4 py-1.5 bg-primary/10 border-b border-primary/30 text-xs text-primary"
+            >
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-primary" />
+                <span>AI conversion unavailable — used basic formatting</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleDismissConversionBanner}
+                className="p-1 text-primary/80 hover:text-foreground transition inline-flex items-center justify-center rounded"
+                title="Dismiss banner"
+                data-testid="dismiss-conversion-banner-btn"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {!isConversionBannerDismissed && source.includes("// @conversion-path: ai") && (
+            <div
+              data-testid="pdf-conversion-ai-banner"
+              className="flex items-center justify-between gap-2 px-4 py-1.5 bg-status-success/15 border-b border-status-success/35 text-xs text-status-info"
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 shrink-0 text-status-success" />
+                <span>AI-Converted Draft — Converted using BYOK AI provider</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleDismissConversionBanner}
+                className="p-1 text-status-info hover:text-foreground transition inline-flex items-center justify-center rounded"
+                title="Dismiss banner"
+                data-testid="dismiss-conversion-banner-btn"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Task 7.9: Undo Overwrite Notification Banner */}
+          {lastSnapshotId && (
+            <div
+              data-testid="undo-overwrite-banner"
+              className="flex items-center justify-between gap-2 px-4 py-1.5 bg-primary/10 border-b border-primary/30 text-xs text-foreground"
+            >
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary" />
+                <span>Master Resume overwritten. A pre-save snapshot was saved to database history.</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleUndoOverwrite}
+                disabled={isUndoing}
+                data-testid="undo-overwrite-btn"
+                className="flex items-center gap-1.5 px-2.5 py-0.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded text-xs font-semibold transition"
+              >
+                {isUndoing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Undo2 className="h-3.5 w-3.5" />}
+                Undo Overwrite
+              </button>
+            </div>
+          )}
+
+          {undoSuccess && (
+            <div
+              data-testid="undo-success-banner"
+              className="flex items-center gap-2 px-4 py-1.5 bg-status-success/15 border-b border-status-success/35 text-xs text-status-info"
+            >
+              <Check className="h-3.5 w-3.5 text-status-success" />
+              <span>Restored Master Resume to pre-overwrite snapshot!</span>
+            </div>
+          )}
+
+          {evidenceExtractToast && (
+            <div
+              data-testid="evidence-extract-toast"
+              className="flex items-center gap-2 px-4 py-1.5 bg-status-info/10 border-b border-status-info/30 text-xs text-foreground"
+            >
+              <BookOpen className="h-3.5 w-3.5 text-status-info shrink-0" />
+              <span>{evidenceExtractToast}</span>
+              {evidenceExtractToast.includes("Library") && (
+                <Link
+                  href="/library"
+                  className="ml-auto text-status-info underline underline-offset-2 hover:text-foreground"
+                >
+                  Open Library
+                </Link>
+              )}
+            </div>
           )}
         </div>
       )}

@@ -78,6 +78,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { AppShell } from "@/components/design-system/app-shell";
+import { PageHeader } from "@/components/design-system/page-header";
 import { PageSkeleton } from "@/components/design-system/page-skeleton";
 import { isPlaceholderDescription } from "@/lib/ingestion/helpers";
 import { JD_PASTE_TEMPLATE, convertHtmlToCleanMarkdown } from "@/lib/ingestion/jd-format";
@@ -1205,6 +1206,22 @@ export function TailorWorkspace() {
   const effectiveSecondaryTab: "preview" | "ats" | "job" =
     patchVerified.length === 0 && secondaryDeskTab === "preview" ? "ats" : secondaryDeskTab;
 
+  const isSampleJob = !savedJobId && company === "Nova Labs" && rawDescription === SAMPLE_BACKEND_JD;
+  const isReadyForPatchReview = Boolean(
+    extractedRequirements && extractedRequirements.requiredSkills.length > 0 && masterResumeId
+  );
+
+  const handleClearSampleJob = () => {
+    userEditedRef.current = true;
+    setCompany("");
+    setRoleTitle("");
+    setRawDescription("");
+    setExtractedRequirements(null);
+    setCustomUserReqs([]);
+    setActiveTab("job-info");
+    setJobInfoSubTab("original");
+  };
+
   if (isBootstrapping) {
     return <PageSkeleton variant="tailor" />;
   }
@@ -1212,73 +1229,92 @@ export function TailorWorkspace() {
   return (
     <AppShell variant="tailor">
       <div className="relative z-10 flex-1 pt-8 pb-12 px-4 md:px-8 max-w-[1600px] mx-auto w-full font-body-regular motion-reduce:[&_*]:transition-none motion-reduce:[&_.animate-spin]:animate-none motion-reduce:[&_.animate-pulse]:animate-none">
-        <div className="flex justify-between items-end mb-6 gap-4 flex-wrap">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-[32px] leading-tight font-bold text-foreground mb-1">Tailor</h1>
-              {isAutoScanning && (
-                <span
-                  data-testid="auto-scanning-indicator"
-                  className="flex items-center gap-1.5 rounded-full border border-status-warning/40 bg-status-warning/15 px-2.5 py-0.5 text-[11px] font-mono text-status-warning animate-pulse"
+        <PageHeader
+          title="Tailor"
+          description="Analyze job requirements and forge targeted materials from your master resume + Evidence Bank."
+          className="mb-6"
+          statusBadge={
+            isAutoScanning ? (
+              <span
+                data-testid="auto-scanning-indicator"
+                className="flex items-center gap-1.5 rounded-full border border-status-warning/40 bg-status-warning/15 px-2.5 py-0.5 text-[11px] font-mono text-status-warning animate-pulse"
+              >
+                <Loader2 className="h-3 w-3 animate-spin" /> Auto-rescanning...
+              </span>
+            ) : undefined
+          }
+          actions={
+            <div className="flex w-full sm:w-auto flex-wrap items-center gap-3">
+              <div className="flex min-h-11 w-full sm:w-auto items-center justify-between sm:justify-start gap-3 rounded-md border border-hairline bg-panel px-3">
+                <label
+                  htmlFor="tailor-role-profile-select"
+                  className="text-sm text-muted-foreground font-medium whitespace-nowrap"
                 >
-                  <Loader2 className="h-3 w-3 animate-spin" /> Auto-rescanning...
-                </span>
-              )}
-            </div>
-            <p className="text-muted-foreground text-sm sm:text-base leading-relaxed">
-              Analyze job requirements and forge targeted materials from your master resume + Evidence Bank.
-            </p>
-          </div>
+                  Target Profile:
+                </label>
+                <select
+                  id="tailor-role-profile-select"
+                  value={selectedRoleProfile}
+                  onChange={(e) => setSelectedRoleProfile(e.target.value as RoleProfile)}
+                  className="min-h-11 min-w-0 bg-transparent text-base sm:text-sm font-medium text-foreground outline-none cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded"
+                  data-testid="tailor-role-profile-select"
+                >
+                  {ROLE_PROFILES.map((p) => (
+                    <option key={p} value={p} className="bg-panel text-foreground">
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="flex w-full sm:w-auto flex-wrap items-center gap-3">
-            <div className="flex min-h-11 w-full sm:w-auto items-center justify-between sm:justify-start gap-3 rounded-md border border-hairline bg-panel px-3">
-              <label
-                htmlFor="tailor-role-profile-select"
-                className="text-sm text-muted-foreground font-medium whitespace-nowrap"
+              <button
+                type="button"
+                onClick={handleGeneratePatches}
+                disabled={isGeneratingPatches}
+                data-testid="generate-patches-btn"
+                className="min-h-11 w-full sm:w-auto justify-center bg-primary text-primary-foreground font-semibold px-5 rounded-md text-sm hover:opacity-90 transition-opacity flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 disabled:opacity-60"
               >
-                Target Profile:
-              </label>
-              <select
-                id="tailor-role-profile-select"
-                value={selectedRoleProfile}
-                onChange={(e) => setSelectedRoleProfile(e.target.value as RoleProfile)}
-                className="min-h-11 min-w-0 bg-transparent text-base sm:text-sm font-medium text-foreground outline-none cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded"
-                data-testid="tailor-role-profile-select"
-              >
-                {ROLE_PROFILES.map((p) => (
-                  <option key={p} value={p} className="bg-panel text-foreground">
-                    {p}
-                  </option>
-                ))}
-              </select>
+                {isGeneratingPatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                Generate AI patches
+              </button>
             </div>
-
-            <button
-              type="button"
-              onClick={handleGeneratePatches}
-              disabled={isGeneratingPatches}
-              data-testid="generate-patches-btn"
-              className="min-h-11 w-full sm:w-auto justify-center bg-primary text-primary-foreground font-semibold px-5 rounded-md text-sm hover:opacity-90 transition-opacity flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 disabled:opacity-60"
-            >
-              {isGeneratingPatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              Generate AI patches
-            </button>
-          </div>
-        </div>
+          }
+        />
 
         <div
           data-testid="active-job-header-banner"
           className="mb-6 rounded-xl surface-raised edge-glow px-5 py-4 flex flex-wrap items-center justify-between gap-3"
         >
           <div className="min-w-0">
-            <p className="text-xs font-medium text-muted-foreground">{company || "Untitled company"}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-medium text-muted-foreground">{company || "Untitled company"}</p>
+              {isSampleJob && (
+                <span
+                  data-testid="sample-job-badge"
+                  className="inline-flex items-center rounded-full border border-status-warning/40 bg-status-warning/15 px-2 py-0.5 text-[11px] font-semibold text-status-warning"
+                >
+                  Sample job
+                </span>
+              )}
+            </div>
             <p className="mt-0.5 break-words text-xl font-semibold leading-snug text-foreground">
               {roleTitle || "Untitled role"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs font-mono tabular-nums">
+            {isSampleJob && (
+              <button
+                type="button"
+                data-testid="clear-sample-job-btn"
+                onClick={handleClearSampleJob}
+                className="min-h-8 inline-flex items-center gap-1 rounded-md border border-control bg-panel px-2.5 py-1 font-sans text-xs font-medium text-foreground hover:bg-elevated transition-colors"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden />
+                Clear sample &amp; paste job
+              </button>
+            )}
             <span className="rounded-md border border-hairline bg-elevated px-2.5 py-1 text-on-surface-variant">
-              {savedJobId ? "Saved posting" : "Working draft"}
+              {savedJobId ? "Saved posting" : isSampleJob ? "Sample preset" : "Working draft"}
             </span>
             {atsResult && (
               <span className="rounded-md border border-hairline bg-inset px-2.5 py-1 text-foreground">
@@ -1309,12 +1345,12 @@ export function TailorWorkspace() {
               <div
                 role="alert"
                 data-testid="generate-patches-structured-error"
-                className="rounded-xl border border-red-800/60 bg-red-950/35 p-4 text-sm text-red-200 transition-opacity duration-150 motion-reduce:transition-none space-y-3"
+                className="rounded-xl border border-status-danger/40 bg-status-danger/10 p-4 text-sm text-foreground transition-opacity duration-150 motion-reduce:transition-none space-y-3"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 space-y-1">
-                    <p className="font-semibold text-red-100 break-words">{structuredPatchError.message}</p>
-                    <p className="text-xs text-red-200/85 break-words">
+                    <p className="font-semibold text-status-danger break-words">{structuredPatchError.message}</p>
+                    <p className="text-xs text-text-secondary break-words">
                       Suggested recovery:{" "}
                       {structuredPatchError.recoveryAction === "review_evidence"
                         ? "Verify or restore evidence citations in your Evidence Bank."
@@ -1325,7 +1361,7 @@ export function TailorWorkspace() {
                     {structuredPatchError.recoveryAction === "review_evidence" && (
                       <Link
                         href="/library"
-                        className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-red-700/60 bg-red-950/60 px-3 text-xs font-semibold text-red-100 hover:bg-red-900/50"
+                        className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-status-danger/40 bg-status-danger/15 px-3 text-xs font-semibold text-status-danger hover:bg-status-danger/25"
                       >
                         Review evidence
                       </Link>
@@ -1347,13 +1383,13 @@ export function TailorWorkspace() {
                       type="button"
                       onClick={() => setShowErrorTechDetails((prev) => !prev)}
                       aria-expanded={showErrorTechDetails}
-                      className="inline-flex items-center gap-1 text-xs font-mono text-red-300 hover:underline"
+                      className="inline-flex items-center gap-1 text-xs font-mono text-status-danger hover:underline"
                     >
                       <ChevronDown className={`h-3.5 w-3.5 ${showErrorTechDetails ? "rotate-180" : ""}`} aria-hidden />
                       Technical details ({structuredPatchError.category})
                     </button>
                     {showErrorTechDetails && (
-                      <pre className="mt-2 overflow-x-auto rounded border border-red-800/50 bg-inset p-2.5 font-mono text-[11px] text-red-200 break-all whitespace-pre-wrap">
+                      <pre className="mt-2 overflow-x-auto rounded border border-status-danger/35 bg-inset p-2.5 font-mono text-[11px] text-text-secondary break-all whitespace-pre-wrap">
                         {JSON.stringify(structuredPatchError.details, null, 2)}
                       </pre>
                     )}
@@ -1367,8 +1403,8 @@ export function TailorWorkspace() {
         {(errorMessage || saveStatus) && (
           <div className="mb-4 space-y-2">
             {errorMessage && (
-              <div className="rounded-lg border border-red-800/60 bg-red-950/40 px-3 py-2 text-xs text-red-300 flex items-center gap-2">
-                <AlertTriangle className="h-3.5 w-3.5" /> {errorMessage}
+              <div className="rounded-lg border border-status-danger/40 bg-status-danger/10 px-3 py-2 text-xs text-status-danger flex items-center gap-2">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {errorMessage}
               </div>
             )}
             {saveStatus && (
@@ -1383,7 +1419,7 @@ export function TailorWorkspace() {
           <div
             className={`mb-4 rounded-lg border px-3 py-2 text-xs flex items-start gap-2 ${
               tier2Status.type === "error"
-                ? "border-red-800/60 bg-red-950/40 text-red-300"
+                ? "border-status-danger/40 bg-status-danger/10 text-status-danger"
                 : tier2Status.type === "success"
                 ? "status-success-surface"
                 : "border-hairline bg-panel text-text-secondary"
@@ -1637,10 +1673,16 @@ export function TailorWorkspace() {
                   <div className="rounded-xl border border-hairline bg-inset p-5 space-y-4">
                     <div className="space-y-1.5">
                       <h3 className="text-base font-semibold text-foreground">
-                        Ready to review evidence-grounded suggestions
+                        {isReadyForPatchReview
+                          ? "Ready to review evidence-grounded suggestions"
+                          : "Prepare your job posting and resume first"}
                       </h3>
                       <p className="text-sm text-muted-foreground leading-relaxed">
-                        Generate patches to compare proposed wording against your master resume side by side with live paper preview and citation checks.
+                        {isReadyForPatchReview
+                          ? "Generate patches to compare proposed wording against your master resume side by side with live paper preview and citation checks."
+                          : !masterResumeId
+                          ? "Load or create a master resume in Resume Studio before generating suggestions."
+                          : "Paste a job description and extract requirements in Job Info before generating suggestions."}
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
@@ -1652,22 +1694,36 @@ export function TailorWorkspace() {
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleGeneratePatches}
-                        disabled={isGeneratingPatches || !extractedRequirements}
-                        className="min-h-11 inline-flex items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                      >
-                        {isGeneratingPatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                        Generate AI patches
-                      </button>
+                      {isReadyForPatchReview ? (
+                        <button
+                          type="button"
+                          onClick={handleGeneratePatches}
+                          disabled={isGeneratingPatches}
+                          className="min-h-11 inline-flex items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                        >
+                          {isGeneratingPatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                          Generate AI patches
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreviousTab("3-pane");
+                            setActiveTab("job-info");
+                          }}
+                          className="min-h-11 inline-flex items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                        >
+                          <Briefcase className="h-4 w-4" aria-hidden />
+                          Review Job Info
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setShowTypstSource((prev) => !prev)}
                         className="min-h-11 inline-flex items-center gap-1.5 rounded-md border border-control bg-panel px-3 text-xs font-medium text-foreground hover:bg-elevated"
                       >
                         <Code2 className="h-3.5 w-3.5" aria-hidden />
-                        {showTypstSource ? "Hide Typst source" : "View Typst source"}
+                        {showTypstSource ? "Hide resume source" : "View resume source"}
                       </button>
                     </div>
                   </div>
@@ -1676,7 +1732,7 @@ export function TailorWorkspace() {
                 {showTypstSource && (
                   <div className="flex flex-col space-y-2 pt-3 border-t border-hairline">
                     <div className="flex items-center justify-between text-xs text-muted-foreground font-mono tabular-nums">
-                      <span>Raw Typst AST ({activeVariantContent ? "Tailored Variant" : "Master Resume"})</span>
+                      <span>Resume source ({activeVariantContent ? "Tailored Variant" : "Master Resume"})</span>
                       <span>{(activeVariantContent || masterTypstSource).split("\n").length} lines</span>
                     </div>
                     <pre
@@ -1947,7 +2003,7 @@ export function TailorWorkspace() {
               <div className="flex items-center gap-2 min-w-0">
                 <FileText className="h-4 w-4 text-primary shrink-0" aria-hidden />
                 <h2 className="text-lg text-foreground font-semibold">
-                  Generated Cover Letter
+                  {coverLetterDraft ? "Generated Cover Letter" : "Cover Letter"}
                 </h2>
               </div>
             </div>
@@ -2041,9 +2097,9 @@ export function TailorWorkspace() {
                     {jobDoc.diagnostics.status === "PARTIAL_EXTRACTION" && (
                       <div
                         data-testid="confidence-banner-partial-extraction"
-                        className="p-3 rounded-lg bg-amber-950/60 border border-amber-800 text-sm text-amber-300 flex items-start gap-2"
+                        className="p-3 rounded-lg bg-status-warning/10 border border-status-warning/35 text-sm text-status-warning flex items-start gap-2"
                       >
-                        <AlertTriangle className="size-4 text-amber-400 shrink-0" />
+                        <AlertTriangle className="size-4 text-status-warning shrink-0" />
                         <span>Partial Extraction: Description may be incomplete. Paste full description below.</span>
                       </div>
                     )}
@@ -2167,10 +2223,10 @@ export function TailorWorkspace() {
                               {customUserReqs.map((req) => (
                                 <span
                                   key={req.id}
-                                  className="px-2 py-0.5 rounded bg-amber-950/60 border border-amber-800 text-[11px] text-amber-300 flex items-center gap-1"
+                                  className="px-2 py-0.5 rounded bg-status-warning/10 border border-status-warning/35 text-[11px] text-status-warning flex items-center gap-1"
                                 >
                                   <span>{req.label}</span>
-                                  <span className="text-[9px] px-1 rounded bg-amber-900 text-amber-100 font-bold">
+                                  <span className="text-[9px] px-1 rounded bg-status-warning/25 text-status-warning font-bold">
                                     USER_ADDED
                                   </span>
                                 </span>
@@ -2228,7 +2284,7 @@ export function TailorWorkspace() {
                             onClick={handleExtract}
                             disabled={isExtracting}
                             data-testid="extract-reqs-btn"
-                            className="min-h-11 text-sm text-amber-400 hover:underline"
+                            className="min-h-11 text-sm text-primary hover:underline"
                           >
                             {isExtracting ? "Scanning..." : "Extract Requirements"}
                           </button>

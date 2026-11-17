@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AppShell } from "@/components/design-system/app-shell";
+import { PageHeader } from "@/components/design-system/page-header";
 import { fetchDemoConfig } from "@/components/auth/session-user";
 import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
 import dynamic from "next/dynamic";
@@ -1713,13 +1714,7 @@ export function LibraryWorkspace() {
         </div>
         {/* Page Title Header */}
         <div className="space-y-6">
-          <div className="enter-once rounded-xl surface-raised edge-glow p-5 sm:p-6">
-            <div className="border-l-2 border-primary pl-3 sm:pl-4">
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-[-0.03em]">
-                Verified Evidence Bank Inventory
-              </h1>
-            </div>
-          </div>
+          <PageHeader title="Evidence Bank" />
           <BulkPdfDropzone onComplete={handlePdfIngestComplete} />
         </div>
 
@@ -1967,7 +1962,9 @@ export function LibraryWorkspace() {
             <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
               {searchQuery
                 ? `No evidence items matching search "${searchQuery}".`
-                : `No evidence items matching status filter "${filterStatus}".`}
+                : filterStatus === "all"
+                  ? "Add your first evidence item or drop a PDF resume above to get started."
+                  : `No evidence items matching status filter "${filterStatus}".`}
             </p>
           </div>
         ) : (

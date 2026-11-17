@@ -15,7 +15,7 @@ export default function NotFound() {
             404 — Page Not Found
           </p>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">
-            Document Not Found
+            Page not found
           </h1>
           <p className="text-xs text-muted-foreground leading-relaxed max-w-sm mx-auto">
             The workspace route or document you requested doesn&apos;t exist or may have moved.
