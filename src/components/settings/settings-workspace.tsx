@@ -23,6 +23,8 @@ import {
   LogIn,
   UserRound,
   Lock,
+  ExternalLink,
+  ChevronDown,
 } from "lucide-react";
 import { AppShell } from "@/components/design-system/app-shell";
 import { PageHeader } from "@/components/design-system/page-header";
@@ -47,6 +49,67 @@ const DEFAULT_MODELS: Record<string, string> = {
   custom: "llama3",
 };
 
+export type CloudProviderId = "gemini" | "openai" | "anthropic" | "groq";
+
+export interface ProviderHelpInfo {
+  label: string;
+  whatIsNeeded: string;
+  getKeyUrl: string;
+  prerequisites: string;
+}
+
+export const PROVIDER_HELP: Record<CloudProviderId, ProviderHelpInfo> = {
+  gemini: {
+    label: "Google Gemini",
+    whatIsNeeded: "A Google account and a Gemini API key from Google AI Studio.",
+    getKeyUrl: "https://aistudio.google.com/app/apikey",
+    prerequisites:
+      "Google AI Studio includes a rate-limited Free tier with no credit card required (prompts may be used to improve Google products). Higher limits and private data handling require linking a Google Cloud billing account.",
+  },
+  openai: {
+    label: "OpenAI",
+    whatIsNeeded: "An OpenAI Platform account and a secret API key.",
+    getKeyUrl: "https://platform.openai.com/api-keys",
+    prerequisites:
+      "Separate from a ChatGPT subscription. Requires an OpenAI Platform organization with a payment method and prepaid API billing credits before requests succeed.",
+  },
+  anthropic: {
+    label: "Anthropic",
+    whatIsNeeded: "A Claude Console account and an API key.",
+    getKeyUrl: "https://platform.claude.com/settings/keys",
+    prerequisites:
+      "Separate from consumer Claude plans. Requires a Claude Console organization with prepaid usage credits configured in Billing before API calls succeed.",
+  },
+  groq: {
+    label: "Groq",
+    whatIsNeeded: "A GroqCloud account (Google, GitHub, or email) and an API key.",
+    getKeyUrl: "https://console.groq.com/keys",
+    prerequisites:
+      "GroqCloud offers a rate-limited Free tier with no credit card required to sign up. Upgrading to the pay-as-you-go Developer tier requires adding a payment method in Billing.",
+  },
+};
+
+export function isCloudProvider(provider: ProviderType): provider is CloudProviderId {
+  return (
+    provider === "gemini" ||
+    provider === "openai" ||
+    provider === "anthropic" ||
+    provider === "groq"
+  );
+}
+
+export function hasNonDefaultAdvancedConfig(
+  provider: ProviderType,
+  model: string,
+  baseUrl: string
+): boolean {
+  const trimmedModel = model.trim();
+  const defaultModel = DEFAULT_MODELS[provider] || "";
+  const hasCustomModel = Boolean(trimmedModel && trimmedModel !== defaultModel);
+  const hasOpenAiEndpointOverride = provider === "openai" && baseUrl.trim().length > 0;
+  return hasCustomModel || hasOpenAiEndpointOverride;
+}
+
 export function SettingsWorkspace() {
   const [provider, setProvider] = useState<ProviderType>("gemini");
   const [apiKey, setApiKey] = useState<string>("");
@@ -68,6 +131,7 @@ export function SettingsWorkspace() {
   const [usernameStatus, setUsernameStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isSavingUsername, setIsSavingUsername] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
   // Load saved settings and vault key on mount
   useEffect(() => {
@@ -112,6 +176,9 @@ export function SettingsWorkspace() {
           setBaseUrl(activeBaseUrl);
           setApiKey(key || "");
           setHasVaultKey(Boolean(key && key.trim().length > 0));
+          setIsAdvancedOpen(
+            hasNonDefaultAdvancedConfig(activeProvider, activeModel, activeBaseUrl)
+          );
         }
       } catch (err) {
         console.error("Failed to load BYOK settings:", err);
@@ -212,6 +279,9 @@ export function SettingsWorkspace() {
     const storedKey = await getKey(nextProvider);
     setApiKey(storedKey || "");
     setHasVaultKey(Boolean(storedKey && storedKey.trim().length > 0));
+    if (hasNonDefaultAdvancedConfig(nextProvider, nextModel, nextUrl)) {
+      setIsAdvancedOpen(true);
+    }
 
     saveSettingsToStorage(nextProvider, nextUrl, nextModel);
   };
@@ -301,6 +371,8 @@ export function SettingsWorkspace() {
   if (!isHydrated) {
     return <PageSkeleton variant="settings" />;
   }
+
+  const cloudHelp = isCloudProvider(provider) ? PROVIDER_HELP[provider] : null;
 
   return (
     <AppShell variant="settings" className="overflow-y-auto">
@@ -402,7 +474,7 @@ export function SettingsWorkspace() {
           <Surface variant="raised" className="edge-glow p-6 space-y-6">
             {/* Provider Selection */}
             <div className="rounded-lg border border-hairline bg-inset/60 p-4">
-              <label htmlFor="provider-select" className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+              <label htmlFor="provider-select" className="block font-mono text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
                 Select AI Provider
               </label>
               <select
@@ -421,116 +493,198 @@ export function SettingsWorkspace() {
               {demoMode && <p className="mt-2 text-sm text-muted-foreground">Demo BYOK supports Gemini, OpenAI, Anthropic, and Groq. Custom and local Ollama endpoints are disabled.</p>}
             </div>
 
-            {/* API Key Input (Hidden for Ollama) */}
-            {provider !== "ollama" ? (
-              <div className="rounded-lg border border-hairline bg-inset/60 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                  <label htmlFor="api-key-input" className="block text-xs font-semibold text-text-secondary uppercase tracking-wider">
-                    API Key {provider === "custom" ? "(Optional)" : ""}
+            {/* Required Endpoint for Custom / Ollama (never hidden under Advanced) */}
+            {(provider === "custom" || provider === "ollama") && (
+              <div className="rounded-lg border border-hairline bg-inset/60 p-4 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label htmlFor="base-url-input" className="block font-mono text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                    {provider === "ollama" ? "Ollama Endpoint" : "Endpoint Base URL"}
                   </label>
-                  {apiKey && (
-                    <button
-                      type="button"
-                      id="clear-key-btn"
-                      data-testid="clear-key-btn"
-                      onClick={handleClearKey}
-                      className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 text-xs text-status-danger hover:text-status-danger/80 transition-colors"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      Clear Key
-                    </button>
-                  )}
+                  <span className="font-mono text-xs text-muted-foreground">Required</span>
                 </div>
-                <div className="relative">
-                  <input
-                    id="api-key-input"
-                    type="password"
-                    value={apiKey}
-                    onChange={handleKeyChange}
-                    aria-invalid={testResult && !testResult.success ? true : undefined}
-                    aria-describedby={testResult && !testResult.success ? "test-result-banner" : undefined}
-                    placeholder={
-                      provider === "openai"
-                        ? "sk-proj-..."
-                        : provider === "anthropic"
-                        ? "sk-ant-..."
-                        : provider === "gemini"
-                        ? "AIzaSy..."
-                        : provider === "groq"
-                        ? "gsk_..."
-                        : "Optional API Key for custom endpoint"
-                    }
-                    className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
-                  />
-                </div>
-                {apiKey && (
-                  <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-                    <Key className="h-3.5 w-3.5 text-status-warning" />
-                    <span>Configured key: <code className="text-text-secondary font-mono">{maskKey(apiKey)}</code></span>
-                  </div>
-                )}
-                {/* Visual Status Indicator */}
-                <div data-testid="vault-status" className="mt-2 flex items-center gap-2 text-xs">
-                  {hasVaultKey ? (
-                    <div className="flex items-center gap-1.5 text-status-success-soft">
-                      <Lock className="h-4 w-4 text-status-success" />
-                      <span>Key encrypted in browser IndexedDB (AES-GCM vault)</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                      <Key className="h-4 w-4 text-muted-foreground" />
-                      <span>No encrypted key in vault for {provider}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-lg border border-hairline bg-inset/60 p-4">
-                {/* Ollama Visual Status Indicator */}
-                <div data-testid="vault-status" className="flex items-center gap-2 text-xs text-status-success-soft">
-                  <Server className="h-4 w-4 text-status-success" />
-                  <span>Local daemon endpoint (no API key required)</span>
-                </div>
-              </div>
-            )}
-
-            {/* Custom/Ollama Endpoint Base URL Input */}
-            {(provider === "custom" || provider === "openai" || provider === "ollama") && (
-              <div className="rounded-lg border border-hairline bg-inset/60 p-4">
-                <label htmlFor="base-url-input" className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
-                  {provider === "ollama" ? "Ollama Endpoint" : `Endpoint Base URL ${provider === "custom" ? "" : "(Optional Override)"}`}
-                </label>
                 <input
                   id="base-url-input"
                   data-testid="ollama-endpoint"
                   type="url"
                   value={baseUrl}
                   onChange={handleBaseUrlChange}
-                  placeholder={provider === "ollama" ? "http://localhost:11434" : provider === "custom" ? "http://localhost:8000" : "https://api.openai.com"}
+                  placeholder={provider === "ollama" ? "http://localhost:11434" : "http://localhost:8000"}
                   className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
                 />
+                {provider === "ollama" ? (
+                  <div data-testid="vault-status" className="flex items-center gap-2 text-xs text-status-success-soft pt-0.5">
+                    <Server className="h-4 w-4 shrink-0 text-status-success" aria-hidden="true" />
+                    <span>Local daemon endpoint (no API key required)</span>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Enter the base URL for your OpenAI-compatible server. An API key below is optional.
+                  </p>
+                )}
               </div>
             )}
 
-            {/* Model Name Input */}
-            <div className="rounded-lg border border-hairline bg-inset/60 p-4">
-              <label htmlFor="model-input" className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
-                Model Name <span className="text-muted-foreground font-normal normal-case">(optional — leave blank for provider default)</span>
-              </label>
-              <input
-                id="model-input"
-                type="text"
-                value={model}
-                onChange={handleModelChange}
-                placeholder={
-                  DEFAULT_MODELS[provider] || "gemini-2.5-flash"
-                }
-                className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
-              />
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                Default for {provider}: <code className="text-text-secondary font-mono">{DEFAULT_MODELS[provider]}</code>
-              </p>
-            </div>
+            {/* Contextual Help + API Key Input (Hidden for Ollama) */}
+            {provider !== "ollama" && (
+              <div className="rounded-lg border border-hairline bg-inset/60 p-4 space-y-4">
+                {cloudHelp && (
+                  <div
+                    key={provider}
+                    data-testid="provider-help"
+                    data-provider={provider}
+                    className="rounded-lg border border-hairline bg-panel/70 p-3.5 space-y-2"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                        {cloudHelp.label} setup
+                      </span>
+                      <a
+                        href={cloudHelp.getKeyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-testid="provider-get-key-link"
+                        className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-hairline bg-elevated px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
+                      >
+                        Get an API key
+                        <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                      </a>
+                    </div>
+                    <p className="text-sm text-foreground leading-relaxed">
+                      {cloudHelp.whatIsNeeded}
+                    </p>
+                    <p className="text-xs text-text-secondary leading-relaxed">
+                      <span className="font-semibold text-foreground">Account &amp; billing: </span>
+                      {cloudHelp.prerequisites}
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <label htmlFor="api-key-input" className="block font-mono text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                      API Key {provider === "custom" ? "(Optional)" : ""}
+                    </label>
+                    {apiKey && (
+                      <button
+                        type="button"
+                        id="clear-key-btn"
+                        data-testid="clear-key-btn"
+                        onClick={handleClearKey}
+                        className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 text-xs text-status-danger hover:text-status-danger/80 transition-colors"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Clear Key
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      id="api-key-input"
+                      type="password"
+                      value={apiKey}
+                      onChange={handleKeyChange}
+                      aria-invalid={testResult && !testResult.success ? true : undefined}
+                      aria-describedby={testResult && !testResult.success ? "test-result-banner" : undefined}
+                      placeholder={
+                        provider === "openai"
+                          ? "sk-proj-..."
+                          : provider === "anthropic"
+                          ? "sk-ant-..."
+                          : provider === "gemini"
+                          ? "AIzaSy..."
+                          : provider === "groq"
+                          ? "gsk_..."
+                          : "Optional API Key for custom endpoint"
+                      }
+                      className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
+                    />
+                  </div>
+                  {apiKey && (
+                    <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+                      <Key className="h-3.5 w-3.5 text-status-warning" />
+                      <span>Configured key: <code className="text-text-secondary font-mono">{maskKey(apiKey)}</code></span>
+                    </div>
+                  )}
+                  {/* Visual Vault Status Indicator (distinct from connection test status) */}
+                  <div data-testid="vault-status" className="mt-2 flex items-center gap-2 text-xs">
+                    {hasVaultKey ? (
+                      <div className="flex items-center gap-1.5 text-status-success-soft">
+                        <Lock className="h-4 w-4 text-status-success" />
+                        <span>Key encrypted in browser IndexedDB (AES-GCM vault)</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Key className="h-4 w-4 text-muted-foreground" />
+                        <span>No encrypted key in vault for {provider}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Advanced Disclosure: Optional Model Name + OpenAI Endpoint Override */}
+            <details
+              open={isAdvancedOpen}
+              onToggle={(event) => {
+                setIsAdvancedOpen(event.currentTarget.open);
+              }}
+              data-testid="advanced-settings-disclosure"
+              className="group rounded-lg border border-hairline bg-inset/60"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg p-4 text-sm font-medium text-foreground hover:bg-elevated/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                <div className="flex flex-wrap items-center gap-2 min-w-0">
+                  <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                    Advanced
+                  </span>
+                  <span className="text-xs text-muted-foreground font-normal">
+                    {provider === "openai"
+                      ? "Optional model name and endpoint override"
+                      : "Optional model name"}
+                  </span>
+                </div>
+                <ChevronDown
+                  className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none"
+                  aria-hidden="true"
+                />
+              </summary>
+
+              <div className="space-y-4 border-t border-hairline p-4">
+                {provider === "openai" && (
+                  <div>
+                    <label htmlFor="base-url-input" className="block font-mono text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+                      Endpoint Base URL <span className="font-sans text-muted-foreground font-normal normal-case">(optional override)</span>
+                    </label>
+                    <input
+                      id="base-url-input"
+                      data-testid="ollama-endpoint"
+                      type="url"
+                      value={baseUrl}
+                      onChange={handleBaseUrlChange}
+                      placeholder="https://api.openai.com"
+                      className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label htmlFor="model-input" className="block font-mono text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+                    Model Name <span className="font-sans text-muted-foreground font-normal normal-case">(optional — leave blank for provider default)</span>
+                  </label>
+                  <input
+                    id="model-input"
+                    type="text"
+                    value={model}
+                    onChange={handleModelChange}
+                    placeholder={DEFAULT_MODELS[provider] || "gemini-2.5-flash"}
+                    className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
+                  />
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Default for {provider}: <code className="text-text-secondary font-mono">{DEFAULT_MODELS[provider]}</code>
+                  </p>
+                </div>
+              </div>
+            </details>
 
             {/* Action Buttons & Status */}
             {isSessionLoaded && !sessionUser && !demoMode && (
