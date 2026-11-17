@@ -36,6 +36,8 @@ export interface ConfirmMasterDialogProps {
   title?: string;
   onConfirm: () => Promise<void> | void;
   isSaving?: boolean;
+  draftEvidence: boolean;
+  onDraftEvidenceChange: (next: boolean) => void;
 }
 
 export function ConfirmMasterDialog({
@@ -46,6 +48,8 @@ export function ConfirmMasterDialog({
   title = "Master Resume",
   onConfirm,
   isSaving = false,
+  draftEvidence,
+  onDraftEvidenceChange,
 }: ConfirmMasterDialogProps) {
   const [confirmed, setConfirmed] = useState(false);
   const [activeTab, setActiveTab] = useState<"facts" | "diff">("facts");
@@ -342,11 +346,27 @@ export function ConfirmMasterDialog({
           />
           <label
             htmlFor="confirm-master-checkbox"
-            data-testid="extract-evidence-checkbox"
             className="text-xs text-amber-200 leading-snug cursor-pointer select-none"
           >
             I confirm these extracted facts and document changes accurately represent my verified career experience.
-            I understand future AI tailoring and exports will be fail-closed against this baseline.
+            I understand future AI tailoring and exports of tailored documents are checked against this baseline.
+          </label>
+        </div>
+
+        {/* Optional Evidence Bank Drafting Consent */}
+        <div className="flex items-start gap-2.5 p-3 rounded-lg border border-hairline bg-inset">
+          <Checkbox
+            id="extract-evidence-checkbox"
+            checked={draftEvidence}
+            onCheckedChange={(checked) => onDraftEvidenceChange(Boolean(checked))}
+            data-testid="extract-evidence-checkbox"
+            className="mt-0.5"
+          />
+          <label
+            htmlFor="extract-evidence-checkbox"
+            className="text-xs text-text-secondary leading-snug cursor-pointer select-none"
+          >
+            Also draft Evidence Bank items from this Master (one AI call on my provider key)
           </label>
         </div>
 

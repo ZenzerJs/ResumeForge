@@ -163,9 +163,10 @@ test.describe("Phase 2 Persistence & Evidence Bank E2E Tests", () => {
     // Open Save as Master modal
     await page.click("button:has-text('Save as Master Resume')");
 
-    // Checkbox should be visible in modal
+    // Checkbox should be visible and unchecked by default in modal
     const checkbox = page.locator("[data-testid='extract-evidence-checkbox']");
     await expect(checkbox).toBeVisible();
+    await expect(checkbox).not.toBeChecked();
 
     // Confirm save
     await page.click("[data-testid='confirm-master-checkbox']");

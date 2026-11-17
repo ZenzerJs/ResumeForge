@@ -156,7 +156,7 @@ export function EditorWorkspace() {
   const [lastSnapshotId, setLastSnapshotId] = useState<string | null>(null);
   const [isUndoing, setIsUndoing] = useState<boolean>(false);
   const [undoSuccess, setUndoSuccess] = useState<boolean>(false);
-  const [draftEvidenceFromMaster, setDraftEvidenceFromMaster] = useState<boolean>(true);
+  const [draftEvidenceFromMaster, setDraftEvidenceFromMaster] = useState<boolean>(false);
   const [evidenceExtractToast, setEvidenceExtractToast] = useState<string | null>(null);
   const [isExtractingEvidence, setIsExtractingEvidence] = useState<boolean>(false);
   // Phase 11: Master Fact Snapshot state (strictly from frozen Master Resume + verified Evidence Bank)
@@ -730,18 +730,9 @@ export function EditorWorkspace() {
     handleSourceChange(starter);
   };
 
-  const handleSaveAsMaster = async () => {
+  const handleSaveAsMaster = () => {
+    setDraftEvidenceFromMaster(false);
     setShowSaveConfirm(true);
-    // Default checkbox: checked when Evidence Bank is empty; otherwise unchecked
-    try {
-      const res = await fetch("/api/evidence");
-      const json = await res.json();
-      const items = Array.isArray(json?.data) ? json.data : [];
-      const activeCount = items.filter((i: { status?: string }) => i.status !== "archived").length;
-      setDraftEvidenceFromMaster(activeCount === 0);
-    } catch {
-      setDraftEvidenceFromMaster(true);
-    }
   };
 
   const runEvidenceExtractAfterSave = async (typstSource: string) => {
@@ -1186,12 +1177,19 @@ export function EditorWorkspace() {
       {/* Phase 11: Confirm-Before-Master Fact Freezing Dialog */}
       <ConfirmMasterDialog
         open={showSaveConfirm}
-        onOpenChange={setShowSaveConfirm}
+        onOpenChange={(open) => {
+          setShowSaveConfirm(open);
+          if (!open) {
+            setDraftEvidenceFromMaster(false);
+          }
+        }}
         typstSource={source}
         priorSource={baselineSource}
         title={docMetadata.title}
         onConfirm={handleConfirmSaveAsMaster}
         isSaving={isSavingMaster}
+        draftEvidence={draftEvidenceFromMaster}
+        onDraftEvidenceChange={setDraftEvidenceFromMaster}
       />
 
       {/* Main Workspace Body */}
