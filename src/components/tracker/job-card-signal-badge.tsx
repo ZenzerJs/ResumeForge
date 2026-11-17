@@ -76,10 +76,10 @@ export function JobCardSignalBadge({
       );
 
       const derivation: string[] = [
-        `+${(0.5 * coreStack).toFixed(1)} pts (Core Stack: 50% weight) â€” ${coreStack}% based on ${compatibility.matchedSkills.length}/${compatibility.totalRequiredCount} required skills matched`,
-        `+${(0.2 * seniority).toFixed(1)} pts (Seniority: 20% weight) â€” Candidate qualifications verified`,
-        `+${(0.15 * tools).toFixed(1)} pts (Tools & Preferred: 15% weight) â€” ${tools}% across tooling requirements`,
-        `+${(0.15 * coverage).toFixed(1)} pts (Evidence Coverage: 15% weight) â€” ${compatibility.matchedEvidenceCount} verified evidence bank items backing skills`,
+        `+${(0.5 * coreStack).toFixed(1)} pts (Core Stack: 50% weight) — ${coreStack}% based on ${compatibility.matchedSkills.length}/${compatibility.totalRequiredCount} required skills matched`,
+        `+${(0.2 * seniority).toFixed(1)} pts (Seniority: 20% weight) — Candidate qualifications verified`,
+        `+${(0.15 * tools).toFixed(1)} pts (Tools & Preferred: 15% weight) — ${tools}% across tooling requirements`,
+        `+${(0.15 * coverage).toFixed(1)} pts (Evidence Coverage: 15% weight) — ${compatibility.matchedEvidenceCount} verified evidence bank items backing skills`,
       ];
 
       if (compatibility.missingSkills.length > 0) {

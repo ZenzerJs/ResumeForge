@@ -297,7 +297,7 @@ export async function executeServerTool(
         const lines = params.typstSource.split("\n");
         const nonEmptyLines = lines.filter((l) => l.trim().length > 0);
         const totalChars = params.typstSource.length;
-        const bulletLines = lines.filter((l) => l.trim().startsWith("-") || l.trim().startsWith("â€¢"));
+        const bulletLines = lines.filter((l) => l.trim().startsWith("-") || l.trim().startsWith("•"));
 
         return {
           tool: toolName,

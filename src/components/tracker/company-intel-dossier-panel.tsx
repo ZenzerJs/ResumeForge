@@ -229,7 +229,7 @@ export function CompanyIntelDossierPanel({
             className="inline-flex items-center gap-2 rounded-lg bg-status-success px-4 py-2 text-xs font-semibold text-contrast-ink shadow-md hover:bg-status-success/90 transition"
           >
             <Sparkles className="size-3.5" />
-            <span>âš¡ Generate Company Intel with AI</span>
+            <span>⚡ Generate Company Intel with AI</span>
           </button>
         </div>
 
@@ -275,7 +275,7 @@ export function CompanyIntelDossierPanel({
                   className="border-status-success/45 bg-status-success/15 text-status-success-soft text-xs font-semibold gap-1"
                 >
                   <CheckCircle2 className="size-3 text-status-success" />
-                  <span>âœ“ No Whiteboard Trivia â€” per Hiring Without Whiteboards</span>
+                  <span>✓ No Whiteboard Trivia — per Hiring Without Whiteboards</span>
                 </Badge>
               )}
             </div>
@@ -395,7 +395,7 @@ export function CompanyIntelDossierPanel({
                   <div className="space-y-1">
                     {culture.cons.map((con, idx) => (
                       <div key={idx} className="flex items-start gap-1.5 text-text-secondary text-xs">
-                        <span className="text-rose-400 font-bold">âˆ’</span>
+                        <span className="text-rose-400 font-bold">−</span>
                         <span>{con}</span>
                       </div>
                     ))}
@@ -431,7 +431,7 @@ export function CompanyIntelDossierPanel({
             <span className="text-xs uppercase font-semibold text-muted-foreground">Recent Signals &amp; Market Intel</span>
             <p className="text-text-secondary leading-relaxed text-xs">{dossier.recentSignals}</p>
             <p className="text-xs text-muted-foreground italic">
-              Model-generated intelligence â€” verify before relying on it.
+              Model-generated intelligence — verify before relying on it.
             </p>
           </div>
         )}
@@ -441,7 +441,7 @@ export function CompanyIntelDossierPanel({
       <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-hairline text-xs text-muted-foreground">
         <div className="flex items-center gap-2">
           <span>Updated {daysAgo === 0 ? "today" : `${daysAgo}d ago`}</span>
-          <span>Â·</span>
+          <span>·</span>
           <span>Source: {dossier?.source || "seed+llm"}</span>
           {isStale && (
             <Badge variant="outline" className="border-amber-500/60 text-amber-300 text-xs">

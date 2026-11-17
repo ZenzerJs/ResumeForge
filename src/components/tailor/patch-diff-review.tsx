@@ -628,7 +628,7 @@ export function PatchDiffReview({
         const errorMsg = "error" in compileResult ? compileResult.error.message : "Unknown compilation error";
         setApplyError({
           category: "compile_failed",
-          message: `Typst compilation failed â€” cannot apply patches: ${errorMsg}`,
+          message: `Typst compilation failed — cannot apply patches: ${errorMsg}`,
           recoveryAction: getPatchRecoveryAction("compile_failed"),
           details: { compileError: errorMsg, acceptedPatchIds: acceptedIds },
         });
@@ -664,7 +664,7 @@ export function PatchDiffReview({
           revisionToken: batch.revisionToken,
           acceptedPatchIds: acceptedIds,
           acknowledgedSkills: Array.from(acknowledgedSkills),
-          variantTitle: `AI Tailored Variant â€” ${new Date().toLocaleDateString()}`,
+          variantTitle: `AI Tailored Variant — ${new Date().toLocaleDateString()}`,
           ...(expectedEvidenceRevision ? { expectedEvidenceRevision } : {}),
         }),
       });
@@ -854,7 +854,7 @@ export function PatchDiffReview({
                   })}
                 </div>
                 <span className="text-xs text-muted-foreground font-mono tabular-nums">
-                  {acceptedPatches.length} accepted Â· {rejectedByUser.length} rejected Â· {pendingPatches.length} pending
+                  {acceptedPatches.length} accepted · {rejectedByUser.length} rejected · {pendingPatches.length} pending
                 </span>
               </div>
 
@@ -1130,7 +1130,7 @@ export function PatchDiffReview({
             <div className="surface-raised rounded-xl p-6 text-center text-sm text-muted-foreground space-y-2">
               <p>
                 {blockedCount > 0
-                  ? `No ready suggestions right now â€” inspect Blocked (${blockedCount}) to review citation or anchor issues.`
+                  ? `No ready suggestions right now — inspect Blocked (${blockedCount}) to review citation or anchor issues.`
                   : "No actionable patch proposals in this batch."}
               </p>
             </div>
@@ -1190,7 +1190,7 @@ export function PatchDiffReview({
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-amber-300 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4" aria-hidden />
-                    Needs Review â€” Preflight Blocked ({preflightBlockedPatches.length})
+                    Needs Review — Preflight Blocked ({preflightBlockedPatches.length})
                   </h3>
                   {preflightBlockedPatches.map((patch) => {
                     const pf = preflightById[patch.id];
@@ -1224,7 +1224,7 @@ export function PatchDiffReview({
                             Technical IDs
                           </summary>
                           <div className="mt-1 rounded bg-inset p-2 font-mono text-xs text-muted-foreground break-all">
-                            patchId: {patch.id} Â· evidenceIds: {patch.evidenceIds.join(", ")}
+                            patchId: {patch.id} · evidenceIds: {patch.evidenceIds.join(", ")}
                           </div>
                         </details>
                       </div>
@@ -1237,7 +1237,7 @@ export function PatchDiffReview({
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-red-400 flex items-center gap-2">
                     <ShieldAlert className="h-4 w-4" aria-hidden />
-                    Rejected Patches â€” Invalid Citations ({rejected.length})
+                    Rejected Patches — Invalid Citations ({rejected.length})
                   </h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     These proposals were blocked because they cited evidence IDs that are missing,
@@ -1407,10 +1407,10 @@ export function PatchDiffReview({
           >
             <div className="flex flex-wrap items-center gap-2 text-xs font-mono tabular-nums text-text-secondary">
               <span className="font-semibold text-foreground">
-                {acceptedPatches.length} accepted Â· {pendingPatches.length} pending
+                {acceptedPatches.length} accepted · {pendingPatches.length} pending
               </span>
               {rejectedByUser.length > 0 && (
-                <span className="text-muted-foreground">Â· {rejectedByUser.length} rejected</span>
+                <span className="text-muted-foreground">· {rejectedByUser.length} rejected</span>
               )}
             </div>
 

@@ -260,15 +260,15 @@ export function ApplyPrepSheetModal({
       matchedProblemsStr || "No company-specific problems on file (state generic fallback).",
       "",
       "### RULES",
-      `- ONLY use problems from section 3 for the OA simulator. Never invent a "historical" problem. If section 3 is empty, state that no company-specific problems are on file and instead pick ONE classic problem that exercises the top skill keyword in the job description â€” clearly labeled as a generic fallback.`,
+      `- ONLY use problems from section 3 for the OA simulator. Never invent a "historical" problem. If section 3 is empty, state that no company-specific problems are on file and instead pick ONE classic problem that exercises the top skill keyword in the job description — clearly labeled as a generic fallback.`,
       "- Probe claims, don't flatter them. If a bullet cites a metric (latency %, QPS, scale, users), ask how it was measured and what breaks at 10x scale.",
       "- **Cite the Exact Bullet:** Before each Resume Deep-Dive question, quote the exact tailored bullet you are targeting in a `>` blockquote so the candidate knows which claim is on trial.",
       "- **Include Expected Engineering Trade-offs:** Under each Resume Deep-Dive question, include a collapsible or bulleted *\"What a strong answer covers\"* checklist (e.g., idempotency keys, connection pooling under concurrency, hash collision / sandbox escape vectors) grounded in the candidate's actual tech stack.",
       "",
       "### OUTPUT (markdown, exactly these three sections)",
-      "1. **Round 1 OA Simulator** â€” one problem from section 3, restated with input/output constraints and one worked example. Do not include the full solution.",
-      "2. **Resume Deep-Dive** â€” two rigorous technical questions probing specific claims in the tailored bullets (concurrency safety, edge cases, metric validity).",
-      "3. **STAR Cheat Sheet** â€” bulleted talking points drawn strictly from the candidate's verified project background provided above.",
+      "1. **Round 1 OA Simulator** — one problem from section 3, restated with input/output constraints and one worked example. Do not include the full solution.",
+      "2. **Resume Deep-Dive** — two rigorous technical questions probing specific claims in the tailored bullets (concurrency safety, edge cases, metric validity).",
+      "3. **STAR Cheat Sheet** — bulleted talking points drawn strictly from the candidate's verified project background provided above.",
     ].join("\n");
   }, [job, oaProblems, matchedHighlights]);
 
@@ -300,7 +300,7 @@ export function ApplyPrepSheetModal({
             className="border-status-success/45 text-status-success-soft bg-status-success/15 text-xs font-semibold gap-1"
           >
             <CheckCircle2 className="size-3 text-status-success" />
-            <span>âœ“ Direct Verified Evidence</span>
+            <span>✓ Direct Verified Evidence</span>
           </Badge>
         );
       case "TRANSFERABLE":
@@ -322,7 +322,7 @@ export function ApplyPrepSheetModal({
             className="border-red-500/60 text-red-300 bg-red-950/40 text-xs font-semibold gap-1"
           >
             <AlertCircle className="size-3 text-red-400" />
-            <span>âœ— Unverified Gap â€” Mitigation Plan</span>
+            <span>✗ Unverified Gap — Mitigation Plan</span>
           </Badge>
         );
     }
@@ -348,7 +348,7 @@ export function ApplyPrepSheetModal({
             </div>
             <div>
               <DialogTitle className="text-sm font-bold text-foreground">
-                Application &amp; Interview Prep â€” {job.company}
+                Application &amp; Interview Prep — {job.company}
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
                 {job.title}
@@ -462,7 +462,7 @@ export function ApplyPrepSheetModal({
             >
               <div className="flex items-center justify-between">
                 <div data-testid="clipboard-fallback-notice" className="font-semibold text-amber-300">
-                  Copy unavailable â€” select and copy the text below.
+                  Copy unavailable — select and copy the text below.
                 </div>
                 <button
                   type="button"
@@ -521,7 +521,7 @@ export function ApplyPrepSheetModal({
                   </Link>
                   {oaMatched && oaProblems.length > 0 ? (
                     <Badge variant="outline" className="border-status-success/45 bg-status-success/15 text-status-success-soft text-xs shrink-0">
-                      âœ“ Verified {job.company} Bank ({oaProblems.length})
+                      ✓ Verified {job.company} Bank ({oaProblems.length})
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="border-hairline bg-elevated text-text-secondary text-xs shrink-0">
@@ -802,28 +802,28 @@ export function ApplyPrepSheetModal({
                           <div className="grid grid-cols-1 gap-2 pt-1 font-sans text-xs">
                             <div className="p-2.5 rounded bg-panel border border-hairline">
                               <span className="font-bold text-primary uppercase tracking-wide text-xs block mb-0.5">
-                                S â€” Situation
+                                S — Situation
                               </span>
                               <p className="text-text-secondary leading-relaxed">{story.situation}</p>
                             </div>
 
                             <div className="p-2.5 rounded bg-panel border border-hairline">
                               <span className="font-bold text-signal uppercase tracking-wide text-xs block mb-0.5">
-                                T â€” Task
+                                T — Task
                               </span>
                               <p className="text-text-secondary leading-relaxed">{story.task}</p>
                             </div>
 
                             <div className="p-2.5 rounded bg-panel border border-hairline">
                               <span className="font-bold text-ember uppercase tracking-wide text-xs block mb-0.5">
-                                A â€” Action
+                                A — Action
                               </span>
                               <p className="text-text-secondary leading-relaxed">{story.action}</p>
                             </div>
 
                             <div className="p-2.5 rounded bg-panel border border-hairline">
                               <span className="font-bold text-status-success uppercase tracking-wide text-xs block mb-0.5">
-                                R â€” Result
+                                R — Result
                               </span>
                               <p className="text-text-secondary leading-relaxed">{story.result}</p>
                             </div>
@@ -987,7 +987,7 @@ export function ApplyPrepSheetModal({
                         key={idx}
                         className="flex items-start justify-between gap-2 rounded bg-elevated p-2 text-text-secondary"
                       >
-                        <span className="flex-1 leading-relaxed">â€¢ {hl}</span>
+                        <span className="flex-1 leading-relaxed">• {hl}</span>
                         <button
                           type="button"
                           onClick={() => copyToClipboard(`hl-${idx}`, hl)}
