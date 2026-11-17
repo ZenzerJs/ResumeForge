@@ -198,4 +198,87 @@ describe("per-user application outcomes", () => {
     expect(listMultiStatus.data.some((j) => j.id === job.id)).toBe(true);
     expect(listMultiStatus.data.some((j) => j.id === job2.id)).toBe(true);
   });
+
+  it("isolates DashboardStats.hasTargetJob and verifiedEvidenceCount per user", async () => {
+    const owner = await createTestUser();
+    const trackerUser = await createTestUser();
+    const bystander = await createTestUser();
+    userIds.push(owner.user.id, trackerUser.user.id, bystander.user.id);
+
+    // Anonymous viewer sees false/zero
+    const anonStats = await getDashboardStats();
+    expect(anonStats.hasTargetJob).toBe(false);
+    expect(anonStats.verifiedEvidenceCount).toBe(0);
+
+    // Untouched shared-catalog job (userId: null, no application) does not mark any user complete
+    const sharedCatalogJob = await createJob({
+      company: "Catalog Corp",
+      roleTitle: "Catalog Engineer",
+      rawDescription: "Shared catalog posting requiring TypeScript.",
+    });
+    jobIds.push(sharedCatalogJob.id);
+
+    expect((await getDashboardStats(owner.user.id)).hasTargetJob).toBe(false);
+    expect((await getDashboardStats(trackerUser.user.id)).hasTargetJob).toBe(false);
+    expect((await getDashboardStats(bystander.user.id)).hasTargetJob).toBe(false);
+
+    // Personal job owned by `owner` without a JobApplication satisfies hasTargetJob for `owner` only
+    const privateJob = await createJob({
+      company: "Private Co",
+      roleTitle: "Backend Engineer",
+      rawDescription: "Private pasted job description with Node.js and Postgres.",
+      userId: owner.user.id,
+    });
+    jobIds.push(privateJob.id);
+
+    const ownerDash = await getDashboardStats(owner.user.id);
+    expect(ownerDash.hasTargetJob).toBe(true);
+    expect(ownerDash.jobsCount).toBe(0);
+    expect((await getDashboardStats(trackerUser.user.id)).hasTargetJob).toBe(false);
+    expect((await getDashboardStats(bystander.user.id)).hasTargetJob).toBe(false);
+
+    // Tracked shared-catalog job satisfies hasTargetJob for `trackerUser` only
+    const trackRes = await PATCH(
+      authedRequest(
+        `http://localhost/api/jobs/${sharedCatalogJob.id}`,
+        { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "SAVED" }) },
+        trackerUser.cookie
+      ),
+      { params: Promise.resolve({ id: sharedCatalogJob.id }) }
+    );
+    expect(trackRes.status).toBe(200);
+
+    expect((await getDashboardStats(trackerUser.user.id)).hasTargetJob).toBe(true);
+    expect((await getDashboardStats(bystander.user.id)).hasTargetJob).toBe(false);
+
+    // Draft evidence does not increment verifiedEvidenceCount; verifying then archiving toggles it
+    const evidence = await prisma.evidenceItem.create({
+      data: {
+        userId: bystander.user.id,
+        type: "project",
+        title: "Isolated Project",
+        verifiedSummary: "Built a deterministic parser.",
+        status: "draft",
+      },
+    });
+
+    const draftDash = await getDashboardStats(bystander.user.id);
+    expect(draftDash.evidenceCount).toBe(1);
+    expect(draftDash.verifiedEvidenceCount).toBe(0);
+
+    await prisma.evidenceItem.update({
+      where: { id: evidence.id },
+      data: { status: "verified" },
+    });
+    expect((await getDashboardStats(bystander.user.id)).verifiedEvidenceCount).toBe(1);
+    expect((await getDashboardStats(owner.user.id)).verifiedEvidenceCount).toBe(0);
+
+    await prisma.evidenceItem.update({
+      where: { id: evidence.id },
+      data: { status: "archived" },
+    });
+    expect((await getDashboardStats(bystander.user.id)).verifiedEvidenceCount).toBe(0);
+
+    await prisma.evidenceItem.delete({ where: { id: evidence.id } });
+  });
 });

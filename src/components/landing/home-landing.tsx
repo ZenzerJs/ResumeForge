@@ -40,6 +40,446 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+export interface GuestEvidenceSummary {
+  personalVerifiedCount: number;
+  personalDraftCount: number;
+  hasSampleVerified: boolean;
+}
+
+export interface GuestJobsSummary {
+  personalCount: number;
+  hasSampleJob: boolean;
+}
+
+export interface OnboardingChecklistInput {
+  stats: DashboardStats;
+  hasLocalResume: boolean;
+  guestEvidence: GuestEvidenceSummary;
+  guestJobs: GuestJobsSummary;
+  hasAiKey: boolean;
+  aiKeyless: boolean;
+}
+
+export interface OnboardingChecklistState {
+  step1Done: boolean;
+  step2Done: boolean;
+  step3Done: boolean;
+  step4Done: boolean;
+  completedCount: number;
+  progressPct: number;
+}
+
+const DEMO_SAMPLE_ID_PREFIX = "demo-sample-";
+
+const EMPTY_GUEST_EVIDENCE: GuestEvidenceSummary = {
+  personalVerifiedCount: 0,
+  personalDraftCount: 0,
+  hasSampleVerified: false,
+};
+
+const EMPTY_GUEST_JOBS: GuestJobsSummary = {
+  personalCount: 0,
+  hasSampleJob: false,
+};
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || value === null || typeof value === "string";
+}
+
+export function hasLocalPersonalResume(raw: string | null): boolean {
+  return Boolean(
+    raw &&
+      raw.trim().length > 30 &&
+      !raw.includes("// Starter Typst Resume")
+  );
+}
+
+/**
+ * Parses `resumeforge_guest_evidence` strictly, counting only records whose
+ * status is `"verified"` and distinguishing `demo-sample-` fixtures from personal entries.
+ */
+export function parseGuestEvidenceSummary(raw: string | null): GuestEvidenceSummary {
+  if (!raw) return { ...EMPTY_GUEST_EVIDENCE };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ...EMPTY_GUEST_EVIDENCE };
+  }
+  if (!Array.isArray(parsed)) return { ...EMPTY_GUEST_EVIDENCE };
+
+  let personalVerifiedCount = 0;
+  let personalDraftCount = 0;
+  let hasSampleVerified = false;
+
+  for (const item of parsed) {
+    if (!isPlainRecord(item)) continue;
+    if (!isNonEmptyString(item.id)) continue;
+    if (
+      item.title !== undefined &&
+      item.title !== null &&
+      !isNonEmptyString(item.title)
+    ) {
+      continue;
+    }
+    if (!isOptionalString(item.status)) continue;
+
+    const isSample = item.id.trim().startsWith(DEMO_SAMPLE_ID_PREFIX);
+    if (item.status === "verified") {
+      if (isSample) {
+        hasSampleVerified = true;
+      } else {
+        personalVerifiedCount += 1;
+      }
+    } else if (!isSample && item.status === "draft") {
+      personalDraftCount += 1;
+    }
+  }
+
+  return { personalVerifiedCount, personalDraftCount, hasSampleVerified };
+}
+
+/**
+ * Parses `resumeforge_guest_jobs` strictly, requiring record identity and
+ * non-empty job content while separating `demo-sample-` fixtures from personal jobs.
+ */
+export function parseGuestJobsSummary(raw: string | null): GuestJobsSummary {
+  if (!raw) return { ...EMPTY_GUEST_JOBS };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ...EMPTY_GUEST_JOBS };
+  }
+  if (!Array.isArray(parsed)) return { ...EMPTY_GUEST_JOBS };
+
+  let personalCount = 0;
+  let hasSampleJob = false;
+
+  for (const item of parsed) {
+    if (!isPlainRecord(item)) continue;
+    if (!isNonEmptyString(item.id)) continue;
+    if (
+      !isOptionalString(item.rawDescription) ||
+      !isOptionalString(item.company) ||
+      !isOptionalString(item.roleTitle)
+    ) {
+      continue;
+    }
+
+    const hasContent =
+      isNonEmptyString(item.rawDescription) ||
+      isNonEmptyString(item.roleTitle) ||
+      isNonEmptyString(item.company);
+    if (!hasContent) continue;
+
+    if (item.id.trim().startsWith(DEMO_SAMPLE_ID_PREFIX)) {
+      hasSampleJob = true;
+    } else {
+      personalCount += 1;
+    }
+  }
+
+  return { personalCount, hasSampleJob };
+}
+
+export function computeOnboardingChecklistState({
+  stats,
+  hasLocalResume,
+  guestEvidence,
+  guestJobs,
+  hasAiKey,
+  aiKeyless,
+}: OnboardingChecklistInput): OnboardingChecklistState {
+  const step1Done = Boolean(stats.hasMasterResume || hasLocalResume);
+  const step2Done = Boolean(
+    stats.verifiedEvidenceCount > 0 || guestEvidence.personalVerifiedCount > 0
+  );
+  const step3Done = Boolean(hasAiKey) && !aiKeyless;
+  const step4Done = Boolean(stats.hasTargetJob || guestJobs.personalCount > 0);
+  const completedCount = [step1Done, step2Done, step3Done, step4Done].filter(Boolean).length;
+  const progressPct = Math.round((completedCount / 4) * 100);
+
+  return {
+    step1Done,
+    step2Done,
+    step3Done,
+    step4Done,
+    completedCount,
+    progressPct,
+  };
+}
+
+interface SetupChecklistProps extends OnboardingChecklistInput {
+  onUploadPdf: () => void;
+  onDismiss: () => void;
+}
+
+export function SetupChecklist({
+  stats,
+  hasLocalResume,
+  guestEvidence,
+  guestJobs,
+  hasAiKey,
+  aiKeyless,
+  onUploadPdf,
+  onDismiss,
+}: SetupChecklistProps) {
+  const {
+    step1Done,
+    step2Done,
+    step3Done,
+    step4Done,
+    completedCount,
+    progressPct,
+  } = computeOnboardingChecklistState({
+    stats,
+    hasLocalResume,
+    guestEvidence,
+    guestJobs,
+    hasAiKey,
+    aiKeyless,
+  });
+
+  const verifiedEvidenceCount =
+    stats.verifiedEvidenceCount > 0
+      ? stats.verifiedEvidenceCount
+      : guestEvidence.personalVerifiedCount;
+
+  return (
+    <div className="rounded-[10px] surface-raised edge-glow p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-outline/70">
+        <div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="rounded-[4px] bg-primary/10 border border-primary/30 px-2.5 py-0.5 font-mono text-xs font-semibold uppercase tracking-wider text-primary">
+              Quick Start Guide
+            </span>
+            <span
+              data-testid="onboarding-progress-badge"
+              aria-live="polite"
+              className="font-mono text-xs text-muted-foreground tabular-nums"
+            >
+              {completedCount} of 4 steps completed ({progressPct}%)
+            </span>
+          </div>
+          <h2 className="mt-1.5 text-lg md:text-xl font-bold text-foreground tracking-tight">
+            Prepare your workspace for truthful tailoring.
+          </h2>
+        </div>
+        <div className="flex items-center gap-3">
+          <div
+            role="progressbar"
+            aria-label="Workspace setup progress"
+            aria-valuemin={0}
+            aria-valuemax={4}
+            aria-valuenow={completedCount}
+            className="w-32 bg-inset h-2 rounded-full overflow-hidden"
+          >
+            <div
+              className="ombre-bar h-full rounded-full transition-all duration-300"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={onDismiss}
+            data-testid="dismiss-onboarding-btn"
+            aria-label="Dismiss quick start guide"
+            className="rounded-[6px] p-1.5 text-muted-foreground hover:bg-elevated hover:text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-5">
+        {/* Step 1: Master Resume */}
+        <div
+          data-testid="onboarding-step-1"
+          data-complete={step1Done ? "true" : "false"}
+          className={`rounded-[8px] border p-4 flex flex-col justify-between gap-3 transition ${
+            step1Done
+              ? "border-status-success/30 bg-status-success/10"
+              : "border-primary/40 bg-inset"
+          }`}
+        >
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Step 1
+              </span>
+              {step1Done ? (
+                <CheckCircle2 className="h-4 w-4 text-status-success" aria-hidden="true" />
+              ) : (
+                <span className="h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
+              )}
+            </div>
+            <h3 className="text-sm font-bold text-foreground mb-1">
+              Create or import your resume
+            </h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Upload an existing PDF or use the Guided Visual Builder—no code required.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onUploadPdf}
+              className="text-xs font-mono font-semibold px-2.5 py-1.5 rounded-[6px] bg-elevated border border-outline text-foreground hover:bg-muted transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Upload PDF
+            </button>
+            <Link
+              href="/editor?mode=visual"
+              data-testid="onboarding-open-visual-editor"
+              className="text-xs font-mono font-semibold text-primary hover:underline flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
+            >
+              Visual Builder <ArrowRight className="h-3 w-3" aria-hidden="true" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Step 2: Evidence Bank */}
+        <div
+          data-testid="onboarding-step-2"
+          data-complete={step2Done ? "true" : "false"}
+          className={`rounded-[8px] border p-4 flex flex-col justify-between gap-3 transition ${
+            step2Done
+              ? "border-status-success/30 bg-status-success/10"
+              : "border-outline/70 bg-inset"
+          }`}
+        >
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Step 2
+              </span>
+              {step2Done ? (
+                <CheckCircle2 className="h-4 w-4 text-status-success" aria-hidden="true" />
+              ) : (
+                <span className="h-2 w-2 rounded-full bg-text-muted" aria-hidden="true" />
+              )}
+            </div>
+            <h3 className="text-sm font-bold text-foreground mb-1">
+              Verify your first evidence item
+            </h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Store real project and work bullets and verify at least one so tailoring stays grounded.
+            </p>
+            {!step2Done && guestEvidence.hasSampleVerified ? (
+              <p
+                data-testid="onboarding-step-2-sample-note"
+                className="mt-2 font-mono text-xs text-muted-foreground"
+              >
+                Synthetic sample available · verify your own item
+              </p>
+            ) : null}
+          </div>
+          <Link
+            href="/library"
+            className="text-xs font-mono font-semibold text-primary hover:underline flex items-center gap-1 pt-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
+          >
+            {step2Done ? `View ${verifiedEvidenceCount} Verified` : "Verify Evidence"}{" "}
+            <ArrowRight className="h-3 w-3" aria-hidden="true" />
+          </Link>
+        </div>
+
+        {/* Step 3: Add AI Provider Key */}
+        <div
+          data-testid="onboarding-step-3"
+          data-complete={step3Done ? "true" : "false"}
+          className={`rounded-[8px] border p-4 flex flex-col justify-between gap-3 transition ${
+            step3Done
+              ? "border-status-success/30 bg-status-success/10"
+              : "border-outline/70 bg-inset"
+          }`}
+        >
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Step 3
+              </span>
+              {step3Done ? (
+                <CheckCircle2 className="h-4 w-4 text-status-success" aria-hidden="true" />
+              ) : (
+                <span className="h-2 w-2 rounded-full bg-text-muted" aria-hidden="true" />
+              )}
+            </div>
+            <h3 className="text-sm font-bold text-foreground mb-1">
+              Add your AI provider key
+            </h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {aiKeyless
+                ? "Local provider selected; test in Settings"
+                : "Add a Gemini, OpenAI, Anthropic, or local Ollama key encrypted in this browser."}
+            </p>
+          </div>
+          <Link
+            href="/settings"
+            className="text-xs font-mono font-semibold text-primary hover:underline flex items-center gap-1 pt-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
+          >
+            {step3Done ? "Key saved · Manage" : aiKeyless ? "Open Settings" : "Add Key"}{" "}
+            <ArrowRight className="h-3 w-3" aria-hidden="true" />
+          </Link>
+        </div>
+
+        {/* Step 4: Add Target Job */}
+        <div
+          data-testid="onboarding-step-4"
+          data-complete={step4Done ? "true" : "false"}
+          className={`rounded-[8px] border p-4 flex flex-col justify-between gap-3 transition ${
+            step4Done
+              ? "border-status-success/30 bg-status-success/10"
+              : "border-outline/70 bg-inset"
+          }`}
+        >
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Step 4
+              </span>
+              {step4Done ? (
+                <CheckCircle2 className="h-4 w-4 text-status-success" aria-hidden="true" />
+              ) : (
+                <span className="h-2 w-2 rounded-full bg-text-muted" aria-hidden="true" />
+              )}
+            </div>
+            <h3 className="text-sm font-bold text-foreground mb-1">
+              Add a target job
+            </h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Save a job description, then open Tailor to review matches and proposed edits.
+            </p>
+            {!step4Done && guestJobs.hasSampleJob ? (
+              <p
+                data-testid="onboarding-step-4-sample-note"
+                className="mt-2 font-mono text-xs text-muted-foreground"
+              >
+                Synthetic sample available · save your own job
+              </p>
+            ) : null}
+          </div>
+          <Link
+            href="/tailor"
+            className="text-xs font-mono font-semibold text-primary hover:underline flex items-center gap-1 pt-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
+          >
+            {step4Done ? "Open Tailor" : "Add Target Job"}{" "}
+            <ArrowRight className="h-3 w-3" aria-hidden="true" />
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface HomeLandingProps {
   initialStats: DashboardStats;
 }
@@ -54,32 +494,52 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
   const [hasAiKey, setHasAiKey] = useState(false);
   const [aiKeyless, setAiKeyless] = useState(false);
   const [hasLocalResume, setHasLocalResume] = useState(false);
-  const [hasLocalEvidence, setHasLocalEvidence] = useState(false);
+  const [guestEvidence, setGuestEvidence] = useState<GuestEvidenceSummary>(EMPTY_GUEST_EVIDENCE);
+  const [guestJobs, setGuestJobs] = useState<GuestJobsSummary>(EMPTY_GUEST_JOBS);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const cancelClearBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
+    setStats(initialStats);
+  }, [initialStats]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
-    if (localStorage.getItem("rf_onboarding_dismissed") === "true") {
-      setOnboardingDismissed(true);
-    }
-    const storedResume = localStorage.getItem("resumeforge_typst_source");
-    if (storedResume && storedResume.trim().length > 30 && !storedResume.includes("// Starter Typst Resume")) {
-      setHasLocalResume(true);
-    }
-    try {
-      const storedEvidence = localStorage.getItem("resumeforge_guest_evidence");
-      const parsed = storedEvidence ? JSON.parse(storedEvidence) : [];
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        setHasLocalEvidence(true);
+    let cancelled = false;
+
+    const refreshLocalState = () => {
+      if (localStorage.getItem("rf_onboarding_dismissed") === "true") {
+        setOnboardingDismissed(true);
       }
-    } catch {}
-    void getActiveConfig().then((cfg) => {
-      setHasAiKey(cfg.hasKey);
-      setAiKeyless(cfg.keyless);
-    });
+      setHasLocalResume(
+        hasLocalPersonalResume(localStorage.getItem("resumeforge_typst_source"))
+      );
+      setGuestEvidence(
+        parseGuestEvidenceSummary(localStorage.getItem("resumeforge_guest_evidence"))
+      );
+      setGuestJobs(
+        parseGuestJobsSummary(localStorage.getItem("resumeforge_guest_jobs"))
+      );
+      void getActiveConfig().then((cfg) => {
+        if (cancelled) return;
+        setHasAiKey(cfg.hasKey);
+        setAiKeyless(cfg.keyless);
+      });
+    };
+
+    refreshLocalState();
+    window.addEventListener("focus", refreshLocalState);
+    window.addEventListener("storage", refreshLocalState);
+    window.addEventListener("resumeforge:evidence-changed", refreshLocalState);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", refreshLocalState);
+      window.removeEventListener("storage", refreshLocalState);
+      window.removeEventListener("resumeforge:evidence-changed", refreshLocalState);
+    };
   }, []);
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -299,214 +759,21 @@ export function HomeLanding({ initialStats }: HomeLandingProps) {
             data-testid="consumer-onboarding-checklist"
             className="max-w-7xl mx-auto w-full px-6 md:px-12 pb-12 z-10"
           >
-            {(() => {
-              const step1Done = Boolean(stats.hasMasterResume || hasLocalResume);
-              const step2Done = Boolean(stats.evidenceCount > 0 || hasLocalEvidence);
-              const step3Done = Boolean(hasAiKey) && !aiKeyless;
-              const step4Done = Boolean(stats.variantsCount > 0 || stats.jobsCount > 0);
-              const completedCount = [step1Done, step2Done, step3Done, step4Done].filter(Boolean).length;
-              const progressPct = Math.round((completedCount / 4) * 100);
-
-              return (
-                <div className="rounded-[10px] surface-raised edge-glow p-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-outline/70">
-                    <div>
-                      <div className="flex items-center gap-2.5">
-                        <span className="rounded-[4px] bg-primary/10 border border-primary/30 px-2.5 py-0.5 font-mono text-xs font-semibold uppercase tracking-wider text-primary">
-                          Quick Start Guide
-                        </span>
-                        <span
-                          data-testid="onboarding-progress-badge"
-                          className="font-mono text-xs text-muted-foreground tabular-nums"
-                        >
-                          {completedCount} of 4 steps completed ({progressPct}%)
-                        </span>
-                      </div>
-                      <h2 className="mt-1.5 text-lg md:text-xl font-bold text-foreground tracking-tight">
-                        Set up your workspace in under 3 minutes
-                      </h2>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-32 bg-inset h-2 rounded-full overflow-hidden">
-                        <div
-                          className="ombre-bar h-full rounded-full transition-all duration-300"
-                          style={{ width: `${progressPct}%` }}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOnboardingDismissed(true);
-                          if (typeof window !== "undefined") {
-                            localStorage.setItem("rf_onboarding_dismissed", "true");
-                          }
-                        }}
-                        data-testid="dismiss-onboarding-btn"
-                        aria-label="Dismiss quick start guide"
-                        className="rounded-[6px] p-1.5 text-muted-foreground hover:bg-elevated hover:text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-5">
-                    {/* Step 1: Master Resume */}
-                    <div
-                      data-testid="onboarding-step-1"
-                      className={`rounded-[8px] border p-4 flex flex-col justify-between gap-3 transition ${
-                        step1Done
-                          ? "border-status-success/30 bg-status-success/10"
-                          : "border-primary/40 bg-inset"
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                            Step 1
-                          </span>
-                          {step1Done ? (
-                            <CheckCircle2 className="h-4 w-4 text-status-success" />
-                          ) : (
-                            <span className="h-2 w-2 rounded-full bg-primary" />
-                          )}
-                        </div>
-                        <h3 className="text-sm font-bold text-foreground mb-1">
-                          Create or Import Resume
-                        </h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          Upload an existing PDF or use the Guided Visual Builder—no code required.
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => pdfInputRef.current?.click()}
-                          className="text-xs font-mono font-semibold px-2.5 py-1.5 rounded-[6px] bg-elevated border border-outline text-foreground hover:bg-muted transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          Upload PDF
-                        </button>
-                        <Link
-                          href="/editor?mode=visual"
-                          data-testid="onboarding-open-visual-editor"
-                          className="text-xs font-mono font-semibold text-primary hover:underline flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
-                        >
-                          Visual Builder <ArrowRight className="h-3 w-3" />
-                        </Link>
-                      </div>
-                    </div>
-
-                    {/* Step 2: Evidence Bank */}
-                    <div
-                      data-testid="onboarding-step-2"
-                      className={`rounded-[8px] border p-4 flex flex-col justify-between gap-3 transition ${
-                        step2Done
-                          ? "border-status-success/30 bg-status-success/10"
-                          : "border-outline/70 bg-inset"
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                            Step 2
-                          </span>
-                          {step2Done ? (
-                            <CheckCircle2 className="h-4 w-4 text-status-success" />
-                          ) : (
-                            <span className="h-2 w-2 rounded-full bg-text-muted" />
-                          )}
-                        </div>
-                        <h3 className="text-sm font-bold text-foreground mb-1">
-                          Verify Evidence Bank
-                        </h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          Store your real project &amp; work bullets so AI tailoring never hallucinates.
-                        </p>
-                      </div>
-                      <Link
-                        href="/library"
-                        className="text-xs font-mono font-semibold text-primary hover:underline flex items-center gap-1 pt-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
-                      >
-                        {step2Done ? `View ${stats.evidenceCount || "Saved"} Items` : "Add Achievements"}{" "}
-                        <ArrowRight className="h-3 w-3" />
-                      </Link>
-                    </div>
-
-                    {/* Step 3: Connect AI Key */}
-                    <div
-                      data-testid="onboarding-step-3"
-                      className={`rounded-[8px] border p-4 flex flex-col justify-between gap-3 transition ${
-                        step3Done
-                          ? "border-status-success/30 bg-status-success/10"
-                          : "border-outline/70 bg-inset"
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                            Step 3
-                          </span>
-                          {step3Done ? (
-                            <CheckCircle2 className="h-4 w-4 text-status-success" />
-                          ) : (
-                            <span className="h-2 w-2 rounded-full bg-text-muted" />
-                          )}
-                        </div>
-                        <h3 className="text-sm font-bold text-foreground mb-1">
-                          Connect AI Key (BYOK)
-                        </h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          Add a Gemini, OpenAI, Anthropic, or local Ollama key encrypted in this browser.
-                        </p>
-                      </div>
-                      <Link
-                        href="/settings"
-                        className="text-xs font-mono font-semibold text-primary hover:underline flex items-center gap-1 pt-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
-                      >
-                        {aiKeyless ? "Local AI · not verified" : step3Done ? "AI Connected · Manage" : "Connect Key"}{" "}
-                        <ArrowRight className="h-3 w-3" />
-                      </Link>
-                    </div>
-
-                    {/* Step 4: Tailor to a Job */}
-                    <div
-                      data-testid="onboarding-step-4"
-                      className={`rounded-[8px] border p-4 flex flex-col justify-between gap-3 transition ${
-                        step4Done
-                          ? "border-status-success/30 bg-status-success/10"
-                          : "border-outline/70 bg-inset"
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                            Step 4
-                          </span>
-                          {step4Done ? (
-                            <CheckCircle2 className="h-4 w-4 text-status-success" />
-                          ) : (
-                            <span className="h-2 w-2 rounded-full bg-text-muted" />
-                          )}
-                        </div>
-                        <h3 className="text-sm font-bold text-foreground mb-1">
-                          Tailor to Target Job
-                        </h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          Paste a job posting to score ATS fit, apply verified patches, and export PDF.
-                        </p>
-                      </div>
-                      <Link
-                        href="/tailor"
-                        className="text-xs font-mono font-semibold text-primary hover:underline flex items-center gap-1 pt-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
-                      >
-                        {step4Done ? "Open Tailor Workspace" : "Tailor First Job"}{" "}
-                        <ArrowRight className="h-3 w-3" />
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
+            <SetupChecklist
+              stats={stats}
+              hasLocalResume={hasLocalResume}
+              guestEvidence={guestEvidence}
+              guestJobs={guestJobs}
+              hasAiKey={hasAiKey}
+              aiKeyless={aiKeyless}
+              onUploadPdf={() => pdfInputRef.current?.click()}
+              onDismiss={() => {
+                setOnboardingDismissed(true);
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("rf_onboarding_dismissed", "true");
+                }
+              }}
+            />
           </section>
         )}
 
