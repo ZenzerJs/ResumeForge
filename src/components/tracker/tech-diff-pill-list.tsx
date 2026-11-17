@@ -107,11 +107,11 @@ export function TechDiffPillList({
         return (
           <span
             key={`${item.skill}-${index}`}
-            className="inline-flex items-center gap-1 rounded border border-dashed border-amber-500/50 bg-amber-500/10 px-2 py-0.5 font-mono text-xs font-medium text-amber-300 transition-colors hover:bg-amber-500/20"
+            className="inline-flex items-center gap-1 rounded border border-dashed border-status-warning/40 bg-status-warning/15 px-2 py-0.5 font-mono text-xs font-medium text-status-warning transition-colors hover:bg-status-warning/25"
             title="Requirement missing from candidate Evidence Bank"
             data-testid={`tech-pill-missing-${item.skill}`}
           >
-            <AlertTriangle className="h-3 w-3 shrink-0 text-amber-400" />
+            <AlertTriangle className="h-3 w-3 shrink-0 text-status-warning" />
             {showBrand && <BrandIcon name={item.skill} className="h-3.5 w-3.5 shrink-0" />}
             <span>{item.skill}</span>
           </span>

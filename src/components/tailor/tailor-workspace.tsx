@@ -2543,7 +2543,7 @@ export function TailorWorkspace() {
                               <div
                                 key={skill}
                                 className={`flex items-center gap-1.5 px-2.5 py-1 bg-inset rounded text-xs font-mono border ${
-                                  covered ? "border-status-success/40 text-text-secondary" : "border-red-500/40 text-text-secondary"
+                                  covered ? "border-status-success/40 text-text-secondary" : "border-status-danger/30 text-text-secondary"
                                 }`}
                               >
                                 <button
@@ -2556,7 +2556,7 @@ export function TailorWorkspace() {
                                   {covered ? (
                                     <CheckCircle2 className="h-3.5 w-3.5 text-status-success shrink-0" aria-hidden />
                                   ) : (
-                                    <XCircle className="h-3.5 w-3.5 text-red-400 shrink-0" aria-hidden />
+                                    <XCircle className="h-3.5 w-3.5 text-status-danger shrink-0" aria-hidden />
                                   )}
                                   {hasBrandIcon(skill) && (
                                     <BrandIcon name={skill} className="h-3.5 w-3.5 shrink-0" />

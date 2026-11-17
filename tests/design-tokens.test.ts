@@ -217,17 +217,41 @@ describe("Design tokens & Ember Ink taste invariants", () => {
     expect(brandIconSrc).toContain('aria-hidden="true"');
   });
 
-  it("forbids hardcoded -950 status banners in editor-workspace and tailor-workspace", () => {
-    const hardcoded950Re =
-      /\b(?:bg|border|text)-(?:red|amber|sky|blue|orange|yellow|rose|pink|purple|indigo|violet|cyan|lime|teal|emerald|green)-950\b/g;
+  it("forbids hardcoded -900 and -950 status classes across src/app and src/components", () => {
+    const hardcoded900sRe =
+      /\b(?:bg|border|text)-(?:red|amber|sky|blue|orange|yellow|rose|pink|purple|indigo|violet|cyan|lime|teal|emerald|green)-(?:900|950)\b/g;
 
-    for (const relPath of [
-      "components/editor/editor-workspace.tsx",
-      "components/tailor/tailor-workspace.tsx",
-    ]) {
-      const src = fs.readFileSync(path.join(SRC_DIR, relPath), "utf8");
-      expect(src.match(hardcoded950Re) ?? []).toEqual([]);
+    const appAndComponents = sourceFiles.filter((file) => {
+      const rel = path.relative(SRC_DIR, file).replace(/\\/g, "/");
+      return rel.startsWith("app/") || rel.startsWith("components/");
+    });
+
+    const violations: string[] = [];
+    for (const file of appAndComponents) {
+      const src = fs.readFileSync(file, "utf8");
+      const matches = src.match(hardcoded900sRe);
+      if (matches && matches.length > 0) {
+        violations.push(`${path.relative(ROOT, file).replace(/\\/g, "/")}: ${matches.join(", ")}`);
+      }
     }
+
+    expect(violations).toEqual([]);
+  });
+
+  it("forbids numbered palette classes across src/**/*.{ts,tsx,css}", () => {
+    const numberedPaletteRe =
+      /\b(?:bg|text|border|ring|from|to|via)-(?:red|rose|amber|orange|yellow|purple|violet|blue|pink|indigo)-\d{2,3}\b/g;
+
+    const violations: string[] = [];
+    for (const file of sourceFiles) {
+      const src = fs.readFileSync(file, "utf8");
+      const matches = src.match(numberedPaletteRe);
+      if (matches && matches.length > 0) {
+        violations.push(`${path.relative(ROOT, file).replace(/\\/g, "/")}: ${matches.join(", ")}`);
+      }
+    }
+
+    expect(violations).toEqual([]);
   });
 
   it("defaults confirmed to false in ConfirmMasterDialog", () => {
@@ -269,7 +293,7 @@ describe("Design tokens & Ember Ink taste invariants", () => {
       return results;
     };
 
-    const sub12Re = /\btext-\[(?:9|10(?:\.5)?|11)px\]/g;
+    const sub12Re = /\btext-\[(?:\d|1[01])(?:\.\d+)?px\]/g;
     const files = [
       ...collectTsx(path.join(SRC_DIR, "app")),
       ...collectTsx(path.join(SRC_DIR, "components")),

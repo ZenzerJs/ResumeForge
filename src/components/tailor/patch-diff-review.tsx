@@ -235,15 +235,15 @@ interface PatchDiffReviewProps {
 }
 
 const SEVERITY_STYLES: Record<string, { bg: string; border: string; text: string }> = {
-  CRITICAL: { bg: "bg-red-950/60", border: "border-red-800/60", text: "text-red-300" },
-  MODERATE: { bg: "bg-amber-950/60", border: "border-amber-800/60", text: "text-amber-300" },
+  CRITICAL: { bg: "bg-status-danger/10", border: "border-status-danger/30", text: "text-status-danger" },
+  MODERATE: { bg: "bg-status-warning/15", border: "border-status-warning/40", text: "text-status-warning" },
   MINOR: { bg: "bg-elevated/80", border: "border-hairline", text: "text-text-secondary" },
 };
 
 const OPERATION_STYLES: Record<string, { bg: string; text: string }> = {
-  MODIFY_BULLET: { bg: "bg-amber-950/60", text: "text-amber-300" },
+  MODIFY_BULLET: { bg: "bg-status-warning/15", text: "text-status-warning" },
   ADD_SKILL: { bg: "bg-status-success/15", text: "text-status-success-soft" },
-  REORDER_BULLETS: { bg: "bg-purple-950", text: "text-purple-300" },
+  REORDER_BULLETS: { bg: "bg-status-info/10", text: "text-status-info" },
   TWEAK_SUMMARY: { bg: "bg-signal/15", text: "text-status-success-soft" },
 };
 
@@ -758,7 +758,7 @@ export function PatchDiffReview({
             data-testid="review-tab-gaps"
             className={`min-h-9 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors motion-reduce:transition-none ${
               activeSubTab === "gaps"
-                ? "bg-elevated text-amber-300 border border-hairline shadow-[var(--shadow-1)]"
+                ? "bg-elevated text-status-warning border border-hairline shadow-[var(--shadow-1)]"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -772,7 +772,7 @@ export function PatchDiffReview({
             data-testid="review-tab-blocked"
             className={`min-h-9 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors motion-reduce:transition-none ${
               activeSubTab === "blocked"
-                ? "bg-elevated text-red-300 border border-hairline shadow-[var(--shadow-1)]"
+                ? "bg-elevated text-status-danger border border-hairline shadow-[var(--shadow-1)]"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -793,7 +793,7 @@ export function PatchDiffReview({
             <button
               type="button"
               onClick={handleRejectAll}
-              className="min-h-9 px-3 py-1.5 bg-red-900/50 hover:bg-red-800/60 border border-red-700/60 text-red-300 text-xs font-medium rounded-md transition-colors motion-reduce:transition-none"
+              className="min-h-9 px-3 py-1.5 bg-status-danger/10 hover:bg-status-danger/20 border border-status-danger/30 text-status-danger text-xs font-medium rounded-md transition-colors motion-reduce:transition-none"
               data-testid="reject-all-btn"
             >
               Reject All
@@ -838,13 +838,13 @@ export function PatchDiffReview({
                         aria-current={selectedPatch === patch.id ? "true" : undefined}
                         className={`inline-flex h-7 min-w-7 items-center justify-center rounded-md border px-2 text-xs font-mono font-semibold transition-colors motion-reduce:transition-none ${
                           hasCardError
-                            ? "border-red-500/60 bg-red-950/60 text-red-200"
+                            ? "border-status-danger/30 bg-status-danger/10 text-status-danger"
                             : isApplied || dec === "accepted"
                               ? "border-status-success/50 bg-status-success/20 text-status-success-soft"
                               : dec === "rejected"
-                                ? "border-red-800/50 bg-red-950/40 text-red-300"
+                                ? "border-status-danger/30 bg-status-danger/10 text-status-danger"
                                 : selectedPatch === patch.id
-                                  ? "border-amber-500/60 bg-amber-500/20 text-amber-200"
+                                  ? "border-status-warning/40 bg-status-warning/15 text-status-warning"
                                   : "border-hairline bg-panel text-text-secondary hover:text-foreground"
                         }`}
                       >
@@ -893,13 +893,13 @@ export function PatchDiffReview({
                     data-testid={`patch-card-${patch.id}`}
                     className={`border rounded-xl p-4 sm:p-5 space-y-4 transition-colors duration-150 motion-reduce:transition-none ${
                       isAffectedByError
-                        ? "bg-red-950/15 border-red-700/60"
+                        ? "bg-status-danger/10 border-status-danger/30"
                         : isApplied || decision === "accepted"
                           ? "bg-status-success/10 border-status-success/40"
                           : decision === "rejected"
-                            ? "bg-red-950/10 border-red-900/30 opacity-75"
+                            ? "bg-status-danger/10 border-status-danger/30 opacity-75"
                             : selectedPatch === patch.id
-                              ? "bg-panel border-amber-500/60"
+                              ? "bg-panel border-status-warning/40"
                               : "bg-panel border-hairline"
                     }`}
                   >
@@ -932,7 +932,7 @@ export function PatchDiffReview({
                             Accepted
                           </span>
                         ) : decision === "rejected" ? (
-                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full border border-red-800/60 bg-red-950/40 text-red-300">
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full border border-status-danger/30 bg-status-danger/10 text-status-danger">
                             Rejected
                           </span>
                         ) : null}
@@ -969,8 +969,8 @@ export function PatchDiffReview({
                           data-testid={`reject-patch-${patch.id}`}
                           className={`min-h-9 px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors motion-reduce:transition-none ${
                             decision === "rejected"
-                              ? "bg-red-600 text-white"
-                              : "bg-elevated hover:bg-red-900/60 text-muted-foreground hover:text-red-300 border border-hairline"
+                              ? "bg-status-danger/10 border border-status-danger/30 text-status-danger"
+                              : "bg-elevated hover:bg-status-danger/10 text-muted-foreground hover:text-status-danger border border-hairline"
                           }`}
                           title="Reject suggestion"
                           aria-label={`Reject suggestion ${patchIndex + 1}`}
@@ -999,12 +999,12 @@ export function PatchDiffReview({
                     {isAffectedByError && applyError && (
                       <div
                         role="alert"
-                        className="rounded-lg border border-red-800/70 bg-red-950/40 p-3 text-xs text-red-200 space-y-1.5 transition-opacity duration-150 motion-reduce:transition-none"
+                        className="rounded-lg border border-status-danger/30 bg-status-danger/10 p-3 text-xs text-status-danger space-y-1.5 transition-opacity duration-150 motion-reduce:transition-none"
                       >
                         <div className="flex items-start gap-2">
-                          <AlertTriangle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" aria-hidden />
+                          <AlertTriangle className="h-4 w-4 shrink-0 text-status-danger mt-0.5" aria-hidden />
                           <div className="min-w-0 flex-1 space-y-1">
-                            <p className="font-semibold text-red-200">
+                            <p className="font-semibold text-status-danger">
                               {ERROR_CATEGORY_LABELS[applyError.category]}: {applyError.message}
                             </p>
                             <p className="text-text-secondary">{applyError.recoveryAction}</p>
@@ -1036,7 +1036,7 @@ export function PatchDiffReview({
                         <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
                           Before
                         </span>
-                        <div className="mt-1.5 rounded-lg border border-red-900/35 bg-red-950/20 p-3 text-sm sm:text-[15px] leading-relaxed font-sans text-text-secondary whitespace-pre-wrap break-words">
+                        <div className="mt-1.5 rounded-lg border border-status-danger/30 bg-status-danger/10 p-3 text-sm sm:text-[15px] leading-relaxed font-sans text-text-secondary whitespace-pre-wrap break-words">
                           {patch.before || "(empty)"}
                         </div>
                       </div>
@@ -1087,7 +1087,7 @@ export function PatchDiffReview({
                                       className={`text-xs font-semibold uppercase px-1.5 py-0.5 rounded border ${
                                         resolved.entry.status === "verified"
                                           ? "status-success-surface"
-                                          : "border-amber-800/60 bg-amber-950/40 text-amber-300"
+                                          : "border-status-warning/40 bg-status-warning/15 text-status-warning"
                                       }`}
                                     >
                                       {resolved.entry.status}
@@ -1143,7 +1143,7 @@ export function PatchDiffReview({
         <div className="space-y-3" data-testid="gaps-panel">
           {gaps.length > 0 ? (
             <>
-              <h3 className="text-sm font-semibold text-amber-300 flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-status-warning flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" aria-hidden />
                 Unmet Job Requirements ({gaps.length})
               </h3>
@@ -1188,7 +1188,7 @@ export function PatchDiffReview({
             <>
               {preflightBlockedPatches.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-amber-300 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-status-warning flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4" aria-hidden />
                     Needs Review — Preflight Blocked ({preflightBlockedPatches.length})
                   </h3>
@@ -1197,17 +1197,17 @@ export function PatchDiffReview({
                     return (
                       <div
                         key={`pf-blocked-${patch.id}`}
-                        className="rounded-xl border border-amber-800/60 bg-amber-950/20 p-4 space-y-2.5 text-sm"
+                        className="rounded-xl border border-status-warning/40 bg-status-warning/15 p-4 space-y-2.5 text-sm"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="font-semibold text-foreground break-words">
                             {patch.targetSection} ({patch.operation.replace(/_/g, " ")})
                           </span>
-                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full border border-amber-700/60 bg-amber-950/60 text-amber-300">
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full border border-status-warning/40 bg-status-warning/15 text-status-warning">
                             Needs review
                           </span>
                         </div>
-                        <p className="text-xs text-amber-200 leading-relaxed break-words">
+                        <p className="text-xs text-status-warning leading-relaxed break-words">
                           {pf.reason}
                         </p>
                         {pf.recoveryAction && (
@@ -1235,7 +1235,7 @@ export function PatchDiffReview({
 
               {rejected.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-red-400 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-status-danger flex items-center gap-2">
                     <ShieldAlert className="h-4 w-4" aria-hidden />
                     Rejected Patches — Invalid Citations ({rejected.length})
                   </h3>
@@ -1248,18 +1248,18 @@ export function PatchDiffReview({
                     <div
                       key={`rejected-${idx}`}
                       data-testid="rejected-patch-item"
-                      className="bg-red-950/30 border border-red-900/50 rounded-xl p-4 space-y-2.5"
+                      className="bg-status-danger/10 border border-status-danger/30 rounded-xl p-4 space-y-2.5"
                     >
                       <div className="flex flex-wrap items-center gap-2">
-                        <XCircle className="h-4 w-4 text-red-400 shrink-0" aria-hidden />
-                        <span className="text-xs font-mono text-red-300 bg-red-950 px-2 py-0.5 rounded">
+                        <XCircle className="h-4 w-4 text-status-danger shrink-0" aria-hidden />
+                        <span className="text-xs font-mono text-status-danger bg-status-danger/10 px-2 py-0.5 rounded">
                           {item.patch.operation}
                         </span>
-                        <span className="text-xs text-red-200 break-words">
+                        <span className="text-xs text-status-danger break-words">
                           {item.patch.targetSection}
                         </span>
                       </div>
-                      <div className="text-xs text-red-200 bg-red-950/50 rounded p-2.5 leading-relaxed break-words">
+                      <div className="text-xs text-status-danger bg-status-danger/10 rounded p-2.5 leading-relaxed break-words">
                         {item.reason}
                       </div>
                       <div className={diffGridClass}>
@@ -1273,7 +1273,7 @@ export function PatchDiffReview({
                           <span className="text-muted-foreground text-xs uppercase">
                             After (Blocked)
                           </span>
-                          <div className="text-red-300/70 bg-inset rounded p-2.5 mt-1 text-sm font-sans line-through break-words whitespace-pre-wrap">
+                          <div className="text-status-danger/70 bg-inset rounded p-2.5 mt-1 text-sm font-sans line-through break-words whitespace-pre-wrap">
                             {item.patch.after || "(empty)"}
                           </div>
                         </div>
@@ -1300,10 +1300,10 @@ export function PatchDiffReview({
           {unverifiedSkillsForAccepted.length > 0 && (
             <div
               data-testid="unverified-skills-ack-box"
-              className="p-3.5 bg-amber-950/40 border border-amber-800/60 rounded-xl space-y-2 text-xs text-amber-200"
+              className="p-3.5 bg-status-warning/15 border border-status-warning/40 rounded-xl space-y-2 text-xs text-status-warning"
             >
-              <div className="flex items-center gap-2 font-semibold text-amber-300">
-                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" aria-hidden />
+              <div className="flex items-center gap-2 font-semibold text-status-warning">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-status-warning" aria-hidden />
                 <span>Acknowledge unverified skills before applying</span>
               </div>
               <p className="text-xs text-text-secondary leading-relaxed">
@@ -1314,14 +1314,14 @@ export function PatchDiffReview({
                 {unverifiedSkillsForAccepted.map((skill) => (
                   <label
                     key={skill}
-                    className="flex items-center gap-2 text-xs text-amber-200 cursor-pointer"
+                    className="flex items-center gap-2 text-xs text-status-warning cursor-pointer"
                   >
                     <input
                       type="checkbox"
                       checked={acknowledgedSkills.has(skill)}
                       onChange={() => toggleSkillAck(skill)}
                       data-testid={`ack-skill-checkbox-${skill}`}
-                      className="rounded border-amber-600 bg-inset text-amber-500 focus:ring-amber-500"
+                      className="rounded border-status-warning/40 bg-inset text-status-warning focus:ring-ring"
                     />
                     <span>
                       I have real experience with <strong>{skill}</strong>
@@ -1335,12 +1335,12 @@ export function PatchDiffReview({
           {applyError && (
             <div
               role="alert"
-              className="p-4 bg-red-950/50 border border-red-800/60 rounded-xl flex items-start gap-3 text-xs text-red-200 transition-opacity duration-150 motion-reduce:transition-none"
+              className="p-4 bg-status-danger/10 border border-status-danger/30 rounded-xl flex items-start gap-3 text-xs text-status-danger transition-opacity duration-150 motion-reduce:transition-none"
               data-testid="apply-error"
             >
-              <XCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" aria-hidden />
+              <XCircle className="h-4 w-4 shrink-0 text-status-danger mt-0.5" aria-hidden />
               <div className="min-w-0 flex-1 space-y-1">
-                <p className="font-semibold text-red-200">
+                <p className="font-semibold text-status-danger">
                   {ERROR_CATEGORY_LABELS[applyError.category]}: {applyError.message}
                 </p>
                 <p className="text-text-secondary leading-relaxed">{applyError.recoveryAction}</p>

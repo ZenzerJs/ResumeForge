@@ -334,7 +334,7 @@ export function SettingsWorkspace() {
                   </div>
                 </div>
                 {usernameStatus ? (
-                  <p className={`text-xs ${usernameStatus.type === "success" ? "text-status-success-soft" : "text-rose-400"}`} role="status">
+                  <p className={`text-xs ${usernameStatus.type === "success" ? "text-status-success-soft" : "text-status-danger"}`} role="status">
                     {usernameStatus.message}
                   </p>
                 ) : null}
@@ -404,7 +404,7 @@ export function SettingsWorkspace() {
                       id="clear-key-btn"
                       data-testid="clear-key-btn"
                       onClick={handleClearKey}
-                      className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 text-xs text-rose-400 hover:text-rose-300 transition-colors"
+                      className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 text-xs text-status-danger hover:text-status-danger/80 transition-colors"
                     >
                       <Trash2 className="h-3 w-3" />
                       Clear Key
@@ -435,7 +435,7 @@ export function SettingsWorkspace() {
                 </div>
                 {apiKey && (
                   <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-                    <Key className="h-3.5 w-3.5 text-amber-400" />
+                    <Key className="h-3.5 w-3.5 text-status-warning" />
                     <span>Configured key: <code className="text-text-secondary font-mono">{maskKey(apiKey)}</code></span>
                   </div>
                 )}
@@ -530,14 +530,14 @@ export function SettingsWorkspace() {
                 className={`rounded-lg p-4 border text-sm ${
                   testResult.success
                     ? "status-success-surface"
-                    : "border-rose-800/50 bg-rose-950/40 text-rose-200"
+                    : "border-status-danger/30 bg-status-danger/10 text-status-danger"
                 }`}
               >
                 <div className="flex items-start gap-3">
                   {testResult.success ? (
                     <CheckCircle2 className="h-5 w-5 shrink-0 text-status-success mt-0.5" />
                   ) : (
-                    <XCircle className="h-5 w-5 shrink-0 text-rose-400 mt-0.5" />
+                    <XCircle className="h-5 w-5 shrink-0 text-status-danger mt-0.5" />
                   )}
                   <div className="space-y-1">
                     <div className="font-semibold">

@@ -38,7 +38,7 @@ function CodeBlock({
   return (
     <div className="relative my-3 rounded-xl border border-hairline bg-inset overflow-hidden text-xs shadow-sm">
       <div className="flex items-center justify-between px-3 py-1.5 bg-panel border-b border-hairline text-xs text-muted-foreground font-mono">
-        <span className="text-amber-400/90 font-medium">{language || "code"}</span>
+        <span className="text-status-warning/90 font-medium">{language || "code"}</span>
         <button
           type="button"
           onClick={handleCopy}
@@ -58,7 +58,7 @@ function CodeBlock({
           )}
         </button>
       </div>
-      <pre className="p-3.5 overflow-x-auto font-mono text-[11.5px] leading-relaxed text-foreground">
+      <pre className="p-3.5 overflow-x-auto font-mono text-xs leading-relaxed text-foreground">
         <code>{value}</code>
       </pre>
     </div>
@@ -89,7 +89,7 @@ export const AiMarkdownRenderer = React.memo(function AiMarkdownRenderer({
             if (isInline) {
               return (
                 <code
-                  className="rounded bg-elevated px-1.5 py-0.5 text-[11.5px] font-mono text-amber-300 border border-hairline"
+                  className="rounded bg-elevated px-1.5 py-0.5 text-xs font-mono text-status-warning border border-hairline"
                   {...props}
                 >
                   {children}
@@ -103,8 +103,8 @@ export const AiMarkdownRenderer = React.memo(function AiMarkdownRenderer({
           // Callout cards instead of plain blockquotes
           blockquote({ children }) {
             return (
-              <div className="my-3 flex items-start gap-2.5 rounded-xl border border-amber-500/25 bg-amber-950/15 p-3 text-foreground">
-                <Sparkles className="mt-0.5 size-3.5 shrink-0 text-amber-400" />
+              <div className="my-3 flex items-start gap-2.5 rounded-xl border border-status-warning/40 bg-status-warning/15 p-3 text-foreground">
+                <Sparkles className="mt-0.5 size-3.5 shrink-0 text-status-warning" />
                 <div className="text-xs leading-normal [&>p]:m-0 text-foreground italic font-sans">
                   {children}
                 </div>
@@ -129,7 +129,7 @@ export const AiMarkdownRenderer = React.memo(function AiMarkdownRenderer({
           },
           th({ children }) {
             return (
-              <th className="px-3 py-2 text-xs font-semibold tracking-wider uppercase text-amber-300/90 border-r border-hairline last:border-r-0">
+              <th className="px-3 py-2 text-xs font-semibold tracking-wider uppercase text-status-warning/90 border-r border-hairline last:border-r-0">
                 {children}
               </th>
             );
@@ -139,7 +139,7 @@ export const AiMarkdownRenderer = React.memo(function AiMarkdownRenderer({
           },
           td({ children }) {
             return (
-              <td className="px-3 py-2 text-text-secondary border-r border-hairline last:border-r-0 text-[11.5px]">
+              <td className="px-3 py-2 text-text-secondary border-r border-hairline last:border-r-0 text-xs">
                 {children}
               </td>
             );
@@ -159,7 +159,7 @@ export const AiMarkdownRenderer = React.memo(function AiMarkdownRenderer({
             return <h1 className="text-sm font-bold text-foreground mt-2.5 mb-1">{children}</h1>;
           },
           h2({ children }) {
-            return <h2 className="text-xs font-bold text-amber-300 mt-2 mb-1 uppercase tracking-wide">{children}</h2>;
+            return <h2 className="text-xs font-bold text-status-warning mt-2 mb-1 uppercase tracking-wide">{children}</h2>;
           },
           h3({ children }) {
             return <h3 className="text-xs font-semibold text-foreground mt-1.5 mb-0.5">{children}</h3>;

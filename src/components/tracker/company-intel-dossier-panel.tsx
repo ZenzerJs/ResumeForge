@@ -150,12 +150,12 @@ export function CompanyIntelDossierPanel({
       case "Practical / Systems":
         return "border-status-success/45 bg-status-success/15 text-status-success-soft";
       case "Take-home Project":
-        return "border-sky-500/60 bg-sky-950/40 text-sky-300";
+        return "border-status-info/30 bg-status-info/10 text-status-info";
       case "Behavioral / Values Driven":
-        return "border-purple-500/60 bg-purple-950/40 text-purple-300";
+        return "border-status-info/30 bg-status-info/10 text-status-info";
       case "LeetCode Heavy":
       default:
-        return "border-amber-500/60 bg-amber-950/40 text-amber-300";
+        return "border-status-warning/40 bg-status-warning/15 text-status-warning";
     }
   };
 
@@ -201,7 +201,7 @@ export function CompanyIntelDossierPanel({
           className
         )}
       >
-        <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-400">
+        <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-status-warning/15 text-status-warning">
           <Building2 className="size-6" />
         </div>
 
@@ -215,7 +215,7 @@ export function CompanyIntelDossierPanel({
         </div>
 
         {errorMessage && (
-          <div className="p-3 rounded-lg bg-rose-950/40 border border-rose-800 text-rose-300 text-xs flex items-center justify-center gap-2">
+          <div className="p-3 rounded-lg bg-status-danger/10 border border-status-danger/30 text-status-danger text-xs flex items-center justify-center gap-2">
             <AlertCircle className="size-4 shrink-0" />
             <span>{errorMessage}</span>
           </div>
@@ -388,14 +388,14 @@ export function CompanyIntelDossierPanel({
               )}
 
               {culture.cons && culture.cons.length > 0 && (
-                <div className="p-3 rounded-lg border border-rose-900/30 bg-rose-950/20 space-y-1.5">
-                  <span className="font-semibold text-rose-400 text-xs flex items-center gap-1">
+                <div className="p-3 rounded-lg border border-status-danger/30 bg-status-danger/10 space-y-1.5">
+                  <span className="font-semibold text-status-danger text-xs flex items-center gap-1">
                     <ThumbsDown className="size-3" /> Considerations &amp; Trade-offs
                   </span>
                   <div className="space-y-1">
                     {culture.cons.map((con, idx) => (
                       <div key={idx} className="flex items-start gap-1.5 text-text-secondary text-xs">
-                        <span className="text-rose-400 font-bold">−</span>
+                        <span className="text-status-danger font-bold">−</span>
                         <span>{con}</span>
                       </div>
                     ))}
@@ -418,7 +418,7 @@ export function CompanyIntelDossierPanel({
             {interview.proTips.map((tip, idx) => (
               <div
                 key={idx}
-                className="p-2.5 rounded-lg border border-amber-900/40 bg-amber-950/20 text-text-secondary text-xs italic"
+                className="p-2.5 rounded-lg border border-status-warning/40 bg-status-warning/15 text-text-secondary text-xs italic"
               >
                 &ldquo;{tip}&rdquo;
               </div>
@@ -444,7 +444,7 @@ export function CompanyIntelDossierPanel({
           <span>·</span>
           <span>Source: {dossier?.source || "seed+llm"}</span>
           {isStale && (
-            <Badge variant="outline" className="border-amber-500/60 text-amber-300 text-xs">
+            <Badge variant="outline" className="border-status-warning/40 text-status-warning text-xs">
               Dossier &gt;90d Old
             </Badge>
           )}

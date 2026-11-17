@@ -159,7 +159,7 @@ export function JobCardSignalBadge({
             type="button"
             onClick={handleClick}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-xs font-bold transition-colors cursor-pointer shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40",
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-xs font-bold transition-colors cursor-pointer shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-warning/40",
               badgeColorClass
             )}
             title="Hover or click to view explainable point derivation"
@@ -292,9 +292,9 @@ export function JobCardSignalBadge({
 
               {/* Missing critical stack notice / deductions */}
               {effectiveScoreResult.missingRequiredSkills.length > 0 && (
-                <div className="rounded border border-dashed border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-300">
+                <div className="rounded border border-dashed border-status-warning/40 bg-status-warning/15 p-2 text-xs text-status-warning">
                   <div className="flex items-center gap-1.5 font-bold mb-1">
-                    <AlertTriangle className="h-3 w-3 text-amber-400" />
+                    <AlertTriangle className="h-3 w-3 text-status-warning" />
                     <span>Points Deducted for Missing Stack:</span>
                   </div>
                   <span>{effectiveScoreResult.missingRequiredSkills.join(", ")}</span>
@@ -315,7 +315,7 @@ export function JobCardSignalBadge({
                         line.startsWith("+")
                           ? "bg-inset border-hairline border-l-2 border-l-signal text-text-primary"
                           : line.startsWith("Deductions") || line.startsWith("Penalty")
-                          ? "bg-amber-950/30 border-amber-900/40 text-amber-300"
+                          ? "bg-status-warning/15 border-status-warning/40 text-status-warning"
                           : "bg-inset border-hairline text-muted-foreground"
                       )}
                     >

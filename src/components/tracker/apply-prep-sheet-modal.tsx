@@ -316,9 +316,9 @@ export function ApplyPrepSheetModal({
           <Badge
             variant="outline"
             data-testid="grounding-badge-transferable"
-            className="border-amber-500/60 text-amber-300 bg-amber-950/40 text-xs font-semibold gap-1"
+            className="border-status-warning/40 text-status-warning bg-status-warning/15 text-xs font-semibold gap-1"
           >
-            <Sparkles className="size-3 text-amber-400" />
+            <Sparkles className="size-3 text-status-warning" />
             <span>~ Transferable Evidence</span>
           </Badge>
         );
@@ -327,9 +327,9 @@ export function ApplyPrepSheetModal({
           <Badge
             variant="outline"
             data-testid="grounding-badge-gap"
-            className="border-red-500/60 text-red-300 bg-red-950/40 text-xs font-semibold gap-1"
+            className="border-status-danger/30 text-status-danger bg-status-danger/10 text-xs font-semibold gap-1"
           >
-            <AlertCircle className="size-3 text-red-400" />
+            <AlertCircle className="size-3 text-status-danger" />
             <span>✗ Unverified Gap — Mitigation Plan</span>
           </Badge>
         );
@@ -466,10 +466,10 @@ export function ApplyPrepSheetModal({
           {fallbackText && (
             <div
               data-testid="clipboard-fallback-container"
-              className="p-3 rounded-lg bg-amber-950/70 border border-amber-800 text-xs text-amber-200 space-y-2"
+              className="p-3 rounded-lg bg-status-warning/15 border border-status-warning/40 text-xs text-status-warning space-y-2"
             >
               <div className="flex items-center justify-between">
-                <div data-testid="clipboard-fallback-notice" className="font-semibold text-amber-300">
+                <div data-testid="clipboard-fallback-notice" className="font-semibold text-status-warning">
                   Copy unavailable — select and copy the text below.
                 </div>
                 <button
@@ -521,7 +521,7 @@ export function ApplyPrepSheetModal({
                 <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-auto">
                   <Link
                     href={`/practice?company=${encodeURIComponent(job.company || "")}`}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-status-warning/15 hover:bg-status-warning/25 text-status-warning border border-status-warning/40 text-xs font-semibold transition"
                     title="Open in dedicated Practice Workspace"
                   >
                     <span>Full Practice Workspace</span>
@@ -570,7 +570,7 @@ export function ApplyPrepSheetModal({
                       className={cn(
                         "px-2.5 py-1 rounded text-xs font-mono transition-colors",
                         categoryFilter === cat
-                          ? "bg-amber-500/20 border border-amber-500/60 text-amber-300 font-bold"
+                          ? "bg-status-warning/15 border border-status-warning/40 text-status-warning font-bold"
                           : "bg-inset border border-hairline text-muted-foreground hover:text-foreground"
                       )}
                     >
@@ -639,8 +639,8 @@ export function ApplyPrepSheetModal({
                                     prob.difficulty.toLowerCase().includes("easy")
                                       ? "bg-status-success/15 text-status-success-soft border border-status-success/35"
                                       : prob.difficulty.toLowerCase().includes("hard")
-                                      ? "bg-red-950/80 text-red-400 border border-red-800/60"
-                                      : "bg-amber-950/80 text-amber-400 border border-amber-800/60"
+                                      ? "bg-status-danger/10 text-status-danger border border-status-danger/30"
+                                      : "bg-status-warning/15 text-status-warning border border-status-warning/40"
                                   )}
                                 >
                                   {prob.difficulty}
@@ -669,7 +669,7 @@ export function ApplyPrepSheetModal({
                               href={practiceUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold transition"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-status-warning/15 hover:bg-status-warning/25 text-status-warning border border-status-warning/40 text-xs font-semibold transition"
                               title="Open problem in new tab to practice"
                             >
                               <span>Practice Problem</span>
@@ -797,8 +797,8 @@ export function ApplyPrepSheetModal({
 
                         {/* If GAP: Render Honest Mitigation Plan Card */}
                         {story.grounding === "GAP" ? (
-                          <div className="p-3 rounded-lg border border-red-900/40 bg-red-950/20 space-y-1.5">
-                            <span className="font-bold text-red-300 uppercase tracking-wide text-xs block">
+                          <div className="p-3 rounded-lg border border-status-danger/30 bg-status-danger/10 space-y-1.5">
+                            <span className="font-bold text-status-danger uppercase tracking-wide text-xs block">
                               Honest Gap Mitigation Strategy
                             </span>
                             <p className="text-text-secondary leading-relaxed text-xs">
@@ -837,11 +837,11 @@ export function ApplyPrepSheetModal({
                             </div>
 
                             {story.mitigationPlan && (
-                              <div className="p-2.5 rounded bg-amber-950/30 border border-amber-900/50">
-                                <span className="font-bold text-amber-300 uppercase tracking-wide text-xs block mb-0.5">
+                              <div className="p-2.5 rounded bg-status-warning/15 border border-status-warning/40">
+                                <span className="font-bold text-status-warning uppercase tracking-wide text-xs block mb-0.5">
                                   Transferable Bridge Strategy
                                 </span>
-                                <p className="text-amber-200/90 leading-relaxed">{story.mitigationPlan}</p>
+                                <p className="text-status-warning/90 leading-relaxed">{story.mitigationPlan}</p>
                               </div>
                             )}
                           </div>
@@ -881,10 +881,10 @@ export function ApplyPrepSheetModal({
                       <div
                         key={idx}
                         data-testid="gap-mitigation-card"
-                        className="rounded-lg border border-amber-900/40 bg-amber-950/20 p-3 space-y-1.5"
+                        className="rounded-lg border border-status-warning/40 bg-status-warning/15 p-3 space-y-1.5"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-semibold text-amber-300">Missing: {gap.requirement}</span>
+                          <span className="font-semibold text-status-warning">Missing: {gap.requirement}</span>
                           {gap.transferableSkills.length > 0 && (
                             <span className="text-xs text-muted-foreground">
                               Transferable: {gap.transferableSkills.join(", ")}

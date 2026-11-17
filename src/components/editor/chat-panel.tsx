@@ -280,8 +280,8 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
         )}
         {messages.length === 0 && !isStreaming && (
           <div className="flex flex-col items-center text-center py-6 gap-3">
-            <div className="rounded-full bg-amber-500/10 border border-amber-500/20 p-3">
-              <MessageSquare className="h-6 w-6 text-amber-400" />
+            <div className="rounded-full bg-status-warning/15 border border-status-warning/40 p-3">
+              <MessageSquare className="h-6 w-6 text-status-warning" />
             </div>
             <div className="space-y-1">
               <p className="text-xs font-medium text-foreground">Career Assistant</p>
@@ -296,7 +296,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
                   type="button"
                   data-testid="chat-quick-action"
                   onClick={() => void sendMessage(action)}
-                  className="rounded-full border border-hairline bg-inset px-2.5 py-1 text-xs text-text-secondary hover:border-amber-700/60 hover:text-amber-200 transition"
+                  className="rounded-full border border-hairline bg-inset px-2.5 py-1 text-xs text-text-secondary hover:border-status-warning/40 hover:text-status-warning transition"
                 >
                   {action}
                 </button>
@@ -314,7 +314,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
             <div
               className={
                 m.role === "user"
-                  ? "max-w-[85%] rounded-xl border border-amber-800/40 bg-amber-950/30 px-3 py-2 text-xs text-amber-100"
+                  ? "max-w-[85%] rounded-xl border border-status-warning/40 bg-status-warning/15 px-3 py-2 text-xs text-foreground"
                   : "max-w-[92%] rounded-xl border border-hairline bg-inset px-3 py-2"
               }
             >
@@ -340,7 +340,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
                 <AiMarkdownRenderer content={streamingContent} />
               ) : (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
+                  <Loader2 className="h-3 w-3 animate-spin text-status-warning" />
                   Thinking…
                 </div>
               )}
@@ -353,8 +353,8 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
         <div
           className={`mx-3 mb-2 p-2.5 rounded-lg flex items-start gap-2 text-xs border ${
             noKeyError
-              ? "bg-amber-950/50 border-amber-800/60 text-amber-300"
-              : "bg-red-950/50 border-red-800/50 text-red-300"
+              ? "bg-status-warning/15 border-status-warning/40 text-status-warning"
+              : "bg-status-danger/10 border-status-danger/30 text-status-danger"
           }`}
         >
           <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
@@ -363,7 +363,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
             {noKeyError && (
               <Link
                 href="/settings"
-                className="block underline underline-offset-2 text-amber-400 hover:text-amber-300 font-medium"
+                className="block underline underline-offset-2 text-status-warning hover:text-status-warning/80 font-medium"
               >
                 → Configure your API key in Settings
               </Link>
@@ -371,7 +371,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
             {!noKeyError && (
               <button
                 type="button"
-                className="block underline text-red-200"
+                className="block underline text-status-danger"
                 onClick={() => {
                   const lastUser = [...messages].reverse().find((m) => m.role === "user");
                   if (lastUser) void sendMessage(lastUser.content);
@@ -398,7 +398,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
           }}
           onKeyDown={onKeyDown}
           placeholder="Ask about your resume, evidence, or a job…"
-          className="w-full bg-inset border border-hairline rounded-lg p-2.5 text-xs text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 resize-none leading-relaxed"
+          className="w-full bg-inset border border-hairline rounded-lg p-2.5 text-xs text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none leading-relaxed"
         />
         <div className="flex justify-end">
           {isStreaming ? (
@@ -417,7 +417,7 @@ export function ChatPanel({ typstSource, resumeTitle }: ChatPanelProps) {
               data-testid="chat-send-btn"
               disabled={!input.trim()}
               onClick={() => void sendMessage()}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 px-3 py-1.5 text-xs font-semibold text-[#121010] shadow shadow-amber-500/20"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary hover:bg-primary/90 disabled:opacity-40 px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow shadow-primary/20"
             >
               <Send className="h-3 w-3" />
               Send

@@ -40,23 +40,23 @@ const VERDICT_STYLES: Record<
   },
   WEAK_EVIDENCE: {
     label: "Weak Evidence",
-    bg: "bg-amber-950/80",
-    text: "text-amber-300",
-    border: "border-amber-800/80",
+    bg: "bg-status-warning/15",
+    text: "text-status-warning",
+    border: "border-status-warning/40",
     icon: "⚠",
   },
   VAGUE_CLAIM: {
     label: "Vague Claim",
-    bg: "bg-purple-950/80",
-    text: "text-purple-300",
-    border: "border-purple-800/80",
+    bg: "bg-status-info/10",
+    text: "text-status-info",
+    border: "border-status-info/30",
     icon: "?",
   },
   KEYWORD_STUFFING: {
     label: "Keyword Stuffing",
-    bg: "bg-red-950/80",
-    text: "text-red-300",
-    border: "border-red-800/80",
+    bg: "bg-status-danger/10",
+    text: "text-status-danger",
+    border: "border-status-danger/30",
     icon: "✗",
   },
 };
@@ -104,7 +104,7 @@ export function QualitativeReviewPanel({
     result.jdContextAdjustment > 0
       ? "status-success-surface"
       : result.jdContextAdjustment < 0
-      ? "text-red-400 bg-red-950/60 border-red-800/80"
+      ? "text-status-danger bg-status-danger/10 border-status-danger/30"
       : "text-text-secondary bg-inset border-hairline";
 
   return (
@@ -217,7 +217,7 @@ export function QualitativeReviewPanel({
                     className={`font-mono text-xs font-bold px-2 py-0.5 rounded ${
                       item.points >= 0
                         ? "status-success-surface border"
-                        : "bg-red-950 text-red-300 border border-red-800"
+                        : "bg-status-danger/10 text-status-danger border border-status-danger/30"
                     }`}
                   >
                     {item.points >= 0 ? `+${item.points}` : item.points} pts ({item.targetCategory})
@@ -275,7 +275,7 @@ export function QualitativeReviewPanel({
 
                 {cf.weaknesses.length > 0 && (
                   <div>
-                    <span className="text-xs text-amber-400 font-semibold uppercase block">
+                    <span className="text-xs text-status-warning font-semibold uppercase block">
                       Areas to Strengthen
                     </span>
                     <ul className="list-disc list-inside text-text-secondary space-y-0.5 mt-0.5">

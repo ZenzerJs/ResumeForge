@@ -1727,7 +1727,7 @@ export function LibraryWorkspace() {
             className={`p-3.5 rounded-lg border flex flex-wrap items-center justify-between gap-2 text-xs font-medium transition-colors duration-150 ease-out motion-reduce:transition-none ${
               notification.type === "success"
                 ? "bg-status-success/15 border-status-success/35 text-status-success-soft"
-                : "bg-red-500/10 border-red-500/30 text-red-400"
+                : "bg-status-danger/10 border-status-danger/30 text-status-danger"
             }`}
           >
             <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -2164,7 +2164,7 @@ export function LibraryWorkspace() {
                               role="menuitem"
                               data-testid={`item-delete-permanently-${item.id}`}
                               onClick={() => void handleRequestPermanentDelete([item])}
-                              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-status-danger hover:bg-red-500/10 transition-colors"
+                              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-status-danger hover:bg-status-danger/10 transition-colors"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                               Delete permanently…
@@ -2537,7 +2537,7 @@ export function LibraryWorkspace() {
                         role="menuitem"
                         data-testid="bulk-delete-permanently-btn"
                         onClick={() => void handleRequestPermanentDelete(selectedItems)}
-                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-status-danger hover:bg-red-500/10 transition-colors"
+                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-status-danger hover:bg-status-danger/10 transition-colors"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         Delete permanently…

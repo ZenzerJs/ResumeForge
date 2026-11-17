@@ -294,11 +294,11 @@ export function CoverLetterPanel({
       {generateError && (
         <div
           data-testid="cover-letter-error"
-          className="p-4 bg-red-950/60 border border-red-800/80 rounded-xl flex items-start gap-3 text-xs text-red-300"
+          className="p-4 bg-status-danger/10 border border-status-danger/30 rounded-xl flex items-start gap-3 text-xs text-status-danger"
         >
-          <AlertTriangle className="h-5 w-5 shrink-0 text-red-400 mt-0.5" />
+          <AlertTriangle className="h-5 w-5 shrink-0 text-status-danger mt-0.5" />
           <div className="space-y-1">
-            <span className="font-semibold block text-red-200">Generation Error</span>
+            <span className="font-semibold block text-status-danger">Generation Error</span>
             <span>{generateError}</span>
           </div>
         </div>

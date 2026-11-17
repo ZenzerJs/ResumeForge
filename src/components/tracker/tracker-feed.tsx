@@ -1001,7 +1001,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           data-testid="import-status-notice"
           role="status"
           aria-live="polite"
-          className="border-b border-amber-800/80 bg-amber-950/80 px-4 py-2 text-center text-xs font-medium text-amber-200"
+          className="border-b border-status-warning/40 bg-status-warning/15 px-4 py-2 text-center text-xs font-medium text-status-warning"
         >
           {importNotice}
         </div>

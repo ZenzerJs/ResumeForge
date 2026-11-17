@@ -609,9 +609,9 @@ export function DiscoverFeed() {
             data-testid="discover-notification"
             className={`flex items-center justify-between rounded-lg border p-3 text-xs font-medium ${
               notification.tone === "error"
-                ? "border-red-500/40 bg-red-950/30 text-red-300"
+                ? "border-status-danger/30 bg-status-danger/10 text-status-danger"
                 : notification.tone === "info"
-                  ? "border-amber-500/40 bg-amber-950/30 text-amber-200"
+                  ? "border-status-warning/40 bg-status-warning/15 text-status-warning"
                   : "border-signal/35 bg-signal/10 text-signal"
             }`}
           >
