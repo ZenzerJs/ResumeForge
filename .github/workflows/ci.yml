@@ -29,6 +29,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /*
+            !/.agents/
+            !/docs/
+            !/public/wasm/
+          sparse-checkout-cone-mode: false
 
       - name: Reject conflict markers
         run: |
@@ -80,6 +87,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /*
+            !/.agents/
+            !/docs/
+          sparse-checkout-cone-mode: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -121,6 +134,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /*
+            !/.agents/
+            !/docs/
+          sparse-checkout-cone-mode: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
