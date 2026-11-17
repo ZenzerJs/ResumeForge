@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { buildResumeDocument, renderResumeDocument, typstContent, typstString, validateAssignments } from "@/lib/typst/resume-document";
+import {
+  buildResumeDocument,
+  parseManagedResume,
+  removeResumeBlock,
+  renderResumeDocument,
+  typstContent,
+  typstString,
+  validateAssignments,
+} from "@/lib/typst/resume-document";
 
 describe("source-backed resume layout", () => {
   it("accepts only non-overlapping source spans and rejects supplied text", () => {
@@ -73,4 +81,37 @@ it("renders wrapped bullet and skill spans as continuous text while retaining so
   expect(doc.source).toBe(source);
   expect(output).toContain("- Built robust cloud services");
   expect(output).toContain("#strong[Languages:] TypeScript, Python");
+});
+
+it("removes optional blocks cleanly, shifts following spans, and rejects required removals", () => {
+  const source = "Jane\nParis\njane@example.com\nExperience\nNorthwind\nEngineer\n- Built tools\n- Improved speed";
+  const doc = buildResumeDocument(source, [
+    { kind: "name", span: { start: 0, end: 4 } },
+    { kind: "contact", span: { start: 5, end: 10 } },
+    { kind: "contact", span: { start: 11, end: 27 } },
+    { kind: "section", span: { start: 28, end: 38 } },
+    { kind: "entry-title", span: { start: 39, end: 48 } },
+    { kind: "entry-role", span: { start: 49, end: 57 } },
+    { kind: "bullet", span: { start: 58, end: 71 } },
+    { kind: "bullet", span: { start: 72, end: 88 } },
+  ]);
+
+  const withoutLocation = removeResumeBlock(doc, { start: 5, end: 10 });
+  expect(withoutLocation.source).toBe(
+    "Jane\njane@example.com\nExperience\nNorthwind\nEngineer\n- Built tools\n- Improved speed"
+  );
+  expect(withoutLocation.header).toHaveLength(2);
+  expect(withoutLocation.header[1].text).toBe("jane@example.com");
+
+  const firstBullet = withoutLocation.sections[0].blocks[2];
+  const withoutBullet = removeResumeBlock(withoutLocation, firstBullet.span);
+  expect(withoutBullet.source).toBe(
+    "Jane\njane@example.com\nExperience\nNorthwind\nEngineer\n- Improved speed"
+  );
+  const rendered = renderResumeDocument(withoutBullet, "balanced");
+  expect(parseManagedResume(rendered)?.document.source).toBe(withoutBullet.source);
+
+  expect(() => removeResumeBlock(withoutBullet, withoutBullet.header[0].span)).toThrow();
+  expect(() => removeResumeBlock(withoutBullet, withoutBullet.sections[0].heading.span)).toThrow();
+  expect(() => removeResumeBlock(withoutBullet, withoutBullet.sections[0].blocks[0].span)).toThrow();
 });
