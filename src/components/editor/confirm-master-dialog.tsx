@@ -47,7 +47,7 @@ export function ConfirmMasterDialog({
   onConfirm,
   isSaving = false,
 }: ConfirmMasterDialogProps) {
-  const [confirmed, setConfirmed] = useState(true);
+  const [confirmed, setConfirmed] = useState(false);
   const [activeTab, setActiveTab] = useState<"facts" | "diff">("facts");
   const confirmingRef = React.useRef(false);
   const [localSaving, setLocalSaving] = useState(false);

@@ -23,7 +23,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Arrays & Hashing pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(n) memory overhead.",
       "action": "Use single-pass hash map tracking complement value (target - num) and index.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -47,7 +47,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Arrays & Hashing pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Use 26-element integer frequency array or character count hash map.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -71,7 +71,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Arrays & Hashing pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(n) memory overhead.",
       "action": "Use hash set to check seen status during array iteration.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -95,7 +95,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Arrays & Hashing pattern under tight complexity bounds.",
       "task": "Achieve target O(n * k) runtime complexity with O(n * k) memory overhead.",
       "action": "Hash character frequency tuple or sorted string key in a map.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -119,7 +119,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Arrays & Hashing pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(n) memory overhead.",
       "action": "Count frequencies then apply bucket sort indexed by frequency count.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -143,7 +143,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Arrays & Hashing pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Prefix and suffix product passes storing running product directly in result array.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -167,7 +167,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Arrays & Hashing pattern under tight complexity bounds.",
       "task": "Achieve target O(1) runtime complexity with O(1) memory overhead.",
       "action": "Validate 9 rows, 9 columns, and 9 3x3 sub-boxes using bitmasks or hash sets.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -191,7 +191,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Arrays & Hashing pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(n) memory overhead.",
       "action": "Length-prefixed encoding format: `[len]#[string]` for unambiguous decoding.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -215,7 +215,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Arrays & Hashing pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(n) memory overhead.",
       "action": "Store numbers in set; start sequence count only when `num - 1` is absent.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -239,7 +239,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Two Pointers pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Two pointers from left and right skipping non-alphanumerics with case insensitivity.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -262,7 +262,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Two Pointers pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Two pointers moving inwards based on sum comparison to target.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -286,7 +286,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Two Pointers pattern under tight complexity bounds.",
       "task": "Achieve target O(n^2) runtime complexity with O(1) memory overhead.",
       "action": "Sort array, fix first element, and run two pointers for remaining two with duplicate skipping.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -310,7 +310,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Two Pointers pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Two pointers at edges, advance pointer with smaller height to maximize area.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -334,7 +334,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Two Pointers pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Two pointers maintaining leftMax and rightMax tracking trapped units.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -358,7 +358,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Sliding Window pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Track minimum price seen so far and update maximum profit.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -382,7 +382,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Sliding Window pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(min(m,n)) memory overhead.",
       "action": "Sliding window with character index map to contract left boundary on duplicates.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -406,7 +406,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Sliding Window pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Window length minus max frequency must be <= k; slide window accordingly.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -429,7 +429,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Sliding Window pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Fixed-size sliding window comparing character count array matching s1 length.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -453,7 +453,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Sliding Window pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(m) memory overhead.",
       "action": "Sliding window tracking matched unique character counts against target frequency.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -477,7 +477,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Sliding Window pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(k) memory overhead.",
       "action": "Monotonic decreasing deque holding indices within current window.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -501,7 +501,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Stack pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(n) memory overhead.",
       "action": "Stack matching open brackets against closing bracket map.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -525,7 +525,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Stack pattern under tight complexity bounds.",
       "task": "Achieve target O(1) runtime complexity with O(n) memory overhead.",
       "action": "Primary stack paired with auxiliary minimum tracking stack.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -549,7 +549,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Stack pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(n) memory overhead.",
       "action": "Stack pushing operands and evaluating binary operators on pop.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -573,7 +573,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Stack pattern under tight complexity bounds.",
       "task": "Achieve target O(4^n / sqrt(n)) runtime complexity with O(n) memory overhead.",
       "action": "Backtracking adding '(' when open < n and ')' when close < open.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -597,7 +597,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Stack pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(n) memory overhead.",
       "action": "Monotonic decreasing stack storing indices waiting for warmer day.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -620,7 +620,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Stack pattern under tight complexity bounds.",
       "task": "Achieve target O(n log n) runtime complexity with O(n) memory overhead.",
       "action": "Sort cars by position descending, compute time to target, stack merge fleets.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -644,7 +644,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Stack pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(n) memory overhead.",
       "action": "Monotonic increasing stack calculating width when popping taller bars.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -668,7 +668,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Binary Search pattern under tight complexity bounds.",
       "task": "Achieve target O(log n) runtime complexity with O(1) memory overhead.",
       "action": "Standard low/high pointers with midpoint `low + (high - low) / 2`.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -692,7 +692,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Binary Search pattern under tight complexity bounds.",
       "task": "Achieve target O(log(m*n)) runtime complexity with O(1) memory overhead.",
       "action": "Treat m x n matrix as 1D array of length m*n using row = idx / n and col = idx % n.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -716,7 +716,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Binary Search pattern under tight complexity bounds.",
       "task": "Achieve target O(n log m) runtime complexity with O(1) memory overhead.",
       "action": "Binary search on eating speed k between 1 and max(piles).",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -740,7 +740,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Binary Search pattern under tight complexity bounds.",
       "task": "Achieve target O(log n) runtime complexity with O(1) memory overhead.",
       "action": "Compare mid with high pointer to eliminate sorted half.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -764,7 +764,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Binary Search pattern under tight complexity bounds.",
       "task": "Achieve target O(log n) runtime complexity with O(1) memory overhead.",
       "action": "Identify which half is strictly sorted and test if target falls in range.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -788,7 +788,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Binary Search pattern under tight complexity bounds.",
       "task": "Achieve target O(log n) runtime complexity with O(n) memory overhead.",
       "action": "Hash map of keys to arrays of timestamped values; binary search on timestamps.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -812,7 +812,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Binary Search pattern under tight complexity bounds.",
       "task": "Achieve target O(log(min(m,n))) runtime complexity with O(1) memory overhead.",
       "action": "Binary search partition on smaller array ensuring maxLeft <= minRight across both.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -837,7 +837,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Linked List pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Three pointers (prev, curr, next) iterating node by node.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -861,7 +861,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Linked List pattern under tight complexity bounds.",
       "task": "Achieve target O(n + m) runtime complexity with O(1) memory overhead.",
       "action": "Dummy head pointer splicing nodes in non-decreasing order.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -884,7 +884,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Linked List pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Find midpoint with fast/slow pointers, reverse second half, weave two halves together.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -907,7 +907,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Linked List pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Two pointers separated by n nodes advancing to end with dummy head.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -931,7 +931,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Linked List pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Interleave copied nodes next to originals, assign randoms, then unweave.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -955,7 +955,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Linked List pattern under tight complexity bounds.",
       "task": "Achieve target O(max(n,m)) runtime complexity with O(1) memory overhead.",
       "action": "Elementary addition with carry variable creating new result nodes.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -978,7 +978,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Linked List pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Floyd's Tortoise and Hare fast/slow pointer cycle detection.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1001,7 +1001,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Linked List pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Cycle detection treating array values as next pointers in a linked list.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1026,7 +1026,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Linked List pattern under tight complexity bounds.",
       "task": "Achieve target O(1) runtime complexity with O(c) memory overhead.",
       "action": "Doubly linked list paired with hash map for O(1) get and put eviction.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1050,7 +1050,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Linked List pattern under tight complexity bounds.",
       "task": "Achieve target O(n log k) runtime complexity with O(k) memory overhead.",
       "action": "Min-heap storing k node heads, popping min and pushing next.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1074,7 +1074,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Linked List pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Count k nodes ahead, reverse group in-place, and connect boundaries.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1097,7 +1097,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Trees pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(h) memory overhead.",
       "action": "Recursively swap left and right child pointers down to leaves.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1120,7 +1120,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Trees pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(h) memory overhead.",
       "action": "DFS returning 1 + max(depth(left), depth(right)).",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1143,7 +1143,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Trees pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(h) memory overhead.",
       "action": "Postorder traversal calculating left_height + right_height at each node.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1166,7 +1166,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Trees pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(h) memory overhead.",
       "action": "Bottom-up DFS returning -1 if height difference between subtrees > 1.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1189,7 +1189,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Trees pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(h) memory overhead.",
       "action": "Simultaneous DFS asserting value equality and structural parity.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1212,7 +1212,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Trees pattern under tight complexity bounds.",
       "task": "Achieve target O(n * m) runtime complexity with O(h) memory overhead.",
       "action": "DFS on main tree calling isSameTree helper on every matching root.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1236,7 +1236,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Trees pattern under tight complexity bounds.",
       "task": "Achieve target O(h) runtime complexity with O(1) memory overhead.",
       "action": "Traverse left if both values < root, right if both > root; return split node.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1260,7 +1260,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Trees pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(n) memory overhead.",
       "action": "BFS with queue processing current level length in batches.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1283,7 +1283,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Trees pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(h) memory overhead.",
       "action": "Level-order traversal capturing the last node of each level queue.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1306,7 +1306,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Trees pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(h) memory overhead.",
       "action": "DFS passing running maximum down tree, incrementing count when node.val >= max.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1330,7 +1330,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Trees pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(h) memory overhead.",
       "action": "DFS validating values stay strictly within (minLimit, maxLimit) boundaries.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1353,7 +1353,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Trees pattern under tight complexity bounds.",
       "task": "Achieve target O(h + k) runtime complexity with O(h) memory overhead.",
       "action": "Inorder traversal yielding sorted elements; stop when kth visited.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1376,7 +1376,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Trees pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(n) memory overhead.",
       "action": "Root is first in preorder; lookup root in inorder map to partition left and right subtrees.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1400,7 +1400,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Trees pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(h) memory overhead.",
       "action": "Postorder DFS returning max single-branch gain while updating global max path sum.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1424,7 +1424,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Trees pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(n) memory overhead.",
       "action": "Preorder traversal with '#' null markers for deterministic string decoding.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1448,7 +1448,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Tries pattern under tight complexity bounds.",
       "task": "Achieve target O(m) runtime complexity with O(m * 26) memory overhead.",
       "action": "Node with 26-element child array/map and isEndOfWord boolean flag.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1471,7 +1471,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Tries pattern under tight complexity bounds.",
       "task": "Achieve target O(m) runtime complexity with O(m * 26) memory overhead.",
       "action": "Trie with DFS branch traversal when encountering '.' wildcard character.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1495,7 +1495,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Tries pattern under tight complexity bounds.",
       "task": "Achieve target O(m * n * 4^l) runtime complexity with O(words) memory overhead.",
       "action": "Trie built from word list + backtracking DFS on 2D grid with in-place character masking.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1518,7 +1518,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Heap / Priority Queue pattern under tight complexity bounds.",
       "task": "Achieve target O(log k) runtime complexity with O(k) memory overhead.",
       "action": "Maintain min-heap of size k; top element is always kth largest.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1541,7 +1541,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Heap / Priority Queue pattern under tight complexity bounds.",
       "task": "Achieve target O(n log n) runtime complexity with O(n) memory overhead.",
       "action": "Max-heap popping two largest stones, pushing difference until <= 1 remain.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1565,7 +1565,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Heap / Priority Queue pattern under tight complexity bounds.",
       "task": "Achieve target O(n log k) runtime complexity with O(k) memory overhead.",
       "action": "Max-heap of size k tracking Euclidean distance or QuickSelect partition.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1589,7 +1589,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Heap / Priority Queue pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "QuickSelect partition algorithm with random pivot or Min-Heap of size k.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1612,7 +1612,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Heap / Priority Queue pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Greedy max-frequency math: (maxFreq - 1) * (n + 1) + maxCount.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1636,7 +1636,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Heap / Priority Queue pattern under tight complexity bounds.",
       "task": "Achieve target O(k log f) runtime complexity with O(u + t) memory overhead.",
       "action": "Min/Max-heap k-way merge of recent tweets from followed users.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1660,7 +1660,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Heap / Priority Queue pattern under tight complexity bounds.",
       "task": "Achieve target O(log n) runtime complexity with O(n) memory overhead.",
       "action": "Two heaps: max-heap for lower half, min-heap for upper half, balanced within size 1.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1684,7 +1684,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Backtracking pattern under tight complexity bounds.",
       "task": "Achieve target O(2^n) runtime complexity with O(n) memory overhead.",
       "action": "Backtracking deciding to include or exclude current element at each index.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1708,7 +1708,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Backtracking pattern under tight complexity bounds.",
       "task": "Achieve target O(2^t) runtime complexity with O(t) memory overhead.",
       "action": "Include current number repeatedly until target exceeded, or skip to next index.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1732,7 +1732,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Backtracking pattern under tight complexity bounds.",
       "task": "Achieve target O(n!) runtime complexity with O(n) memory overhead.",
       "action": "Backtracking with boolean visited array or in-place element swapping.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1755,7 +1755,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Backtracking pattern under tight complexity bounds.",
       "task": "Achieve target O(2^n) runtime complexity with O(n) memory overhead.",
       "action": "Sort input array; skip duplicate elements when branching on exclusion.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1778,7 +1778,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Backtracking pattern under tight complexity bounds.",
       "task": "Achieve target O(2^n) runtime complexity with O(n) memory overhead.",
       "action": "Sort input array; skip `candidates[i] === candidates[i-1]` in recursive loop.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1802,7 +1802,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Backtracking pattern under tight complexity bounds.",
       "task": "Achieve target O(n * m * 4^l) runtime complexity with O(l) memory overhead.",
       "action": "Grid DFS matching characters, marking visited cells temporarily with '#'.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1825,7 +1825,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Backtracking pattern under tight complexity bounds.",
       "task": "Achieve target O(n * 2^n) runtime complexity with O(n) memory overhead.",
       "action": "Partition string if prefix is palindrome; recurse on remaining suffix.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1848,7 +1848,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Backtracking pattern under tight complexity bounds.",
       "task": "Achieve target O(4^n) runtime complexity with O(n) memory overhead.",
       "action": "DFS mapping digits to character strings via keypad lookup table.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1872,7 +1872,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Backtracking pattern under tight complexity bounds.",
       "task": "Achieve target O(n!) runtime complexity with O(n) memory overhead.",
       "action": "Column and diagonal tracking sets (r + c, r - c) placing queens row by row.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1897,7 +1897,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(m * n) runtime complexity with O(m * n) memory overhead.",
       "action": "DFS or BFS flood-fill sinking visited land ('1' -> '0').",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1920,7 +1920,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(m * n) runtime complexity with O(m * n) memory overhead.",
       "action": "DFS returning 1 + sum of connected 4-directional land cells.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1944,7 +1944,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(v + e) runtime complexity with O(v) memory overhead.",
       "action": "DFS or BFS using map of original node pointers to cloned node pointers.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1967,7 +1967,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(m * n) runtime complexity with O(m * n) memory overhead.",
       "action": "Multi-source BFS starting from all gates (0) simultaneously.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -1990,7 +1990,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(m * n) runtime complexity with O(m * n) memory overhead.",
       "action": "Multi-source BFS from rotten oranges, tracking minutes until all fresh infected.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2013,7 +2013,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(m * n) runtime complexity with O(m * n) memory overhead.",
       "action": "Two BFS/DFS runs starting backwards from Pacific and Atlantic borders.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2036,7 +2036,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(m * n) runtime complexity with O(m * n) memory overhead.",
       "action": "DFS from un-capturable border 'O's marking them safe; flip remaining.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2060,7 +2060,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(v + e) runtime complexity with O(v + e) memory overhead.",
       "action": "Topological sort via Kahn's in-degree algorithm or DFS cycle detection.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2083,7 +2083,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(v + e) runtime complexity with O(v + e) memory overhead.",
       "action": "Kahn's BFS appending 0-in-degree nodes to topological order list.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2106,7 +2106,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(v + e) runtime complexity with O(v) memory overhead.",
       "action": "Tree condition: exactly v - 1 edges and 0 cycles (Union-Find or DFS).",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2129,7 +2129,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(v + e) runtime complexity with O(v) memory overhead.",
       "action": "Union-Find with path compression counting remaining disjoint sets.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2152,7 +2152,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(n) memory overhead.",
       "action": "Union-Find identifying the first edge whose nodes share the same root.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2176,7 +2176,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(m^2 * n) runtime complexity with O(m^2 * n) memory overhead.",
       "action": "BFS shortest path with intermediate wildcard patterns `h*t`.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2199,7 +2199,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Advanced Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(e log e) runtime complexity with O(v + e) memory overhead.",
       "action": "Hierholzer's Eulerian path algorithm using min-heaps for lexical airport order.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2222,7 +2222,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Advanced Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(n^2 log n) runtime complexity with O(n^2) memory overhead.",
       "action": "Prim's Minimum Spanning Tree algorithm using min-heap for Manhattan distances.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2245,7 +2245,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Advanced Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(e log v) runtime complexity with O(v + e) memory overhead.",
       "action": "Dijkstra's shortest path algorithm using priority queue.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2268,7 +2268,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Advanced Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(n^2 log n) runtime complexity with O(n^2) memory overhead.",
       "action": "Modified Dijkstra on grid prioritizing lowest elevation water levels.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2292,7 +2292,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Advanced Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(c) runtime complexity with O(1) memory overhead.",
       "action": "Build directed graph from adjacent words; topological sort for valid alphabet order.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2315,7 +2315,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Advanced Graphs pattern under tight complexity bounds.",
       "task": "Achieve target O(k * e) runtime complexity with O(v) memory overhead.",
       "action": "Bellman-Ford algorithm executed for k + 1 rounds.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2339,7 +2339,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 1-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Fibonacci state transition: dp[i] = dp[i-1] + dp[i-2].",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2362,7 +2362,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 1-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "dp[i] = cost[i] + min(dp[i-1], dp[i-2]) with constant space.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2386,7 +2386,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 1-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "dp[i] = max(dp[i-1], nums[i] + dp[i-2]) tracking two prior values.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2409,7 +2409,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 1-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Circular array: run House Robber on nums[0..n-2] and nums[1..n-1].",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2433,7 +2433,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 1-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(n^2) runtime complexity with O(1) memory overhead.",
       "action": "Expand around centers for both odd and even palindrome lengths.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2456,7 +2456,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 1-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(n^2) runtime complexity with O(1) memory overhead.",
       "action": "Expand around all 2n-1 centers counting valid palindrome matches.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2480,7 +2480,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 1-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "dp[i] sums single digit if 1-9 and two-digit combinations if 10-26.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2504,7 +2504,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 1-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(amount * n) runtime complexity with O(amount) memory overhead.",
       "action": "Unbounded knapsack: dp[a] = min(dp[a], 1 + dp[a - c]).",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2528,7 +2528,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 1-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Maintain running minProduct and maxProduct multiplying each num.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2552,7 +2552,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 1-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(n^2 * k) runtime complexity with O(n) memory overhead.",
       "action": "dp[i] true if dp[j] true and s[j..i] exists in dictionary.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2576,7 +2576,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 1-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(n log n) runtime complexity with O(n) memory overhead.",
       "action": "Patience sorting / binary search replacement in tails array.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2599,7 +2599,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 1-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(n * target) runtime complexity with O(target) memory overhead.",
       "action": "0/1 Knapsack testing if subset sums to totalSum / 2.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2623,7 +2623,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 2-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(m * n) runtime complexity with O(n) memory overhead.",
       "action": "Grid DP: dp[r][c] = dp[r-1][c] + dp[r][c-1] with 1D array optimization.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2646,7 +2646,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 2-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(m * n) runtime complexity with O(min(m,n)) memory overhead.",
       "action": "Match: 1 + dp[i-1][j-1]; mismatch: max(dp[i-1][j], dp[i][j-1]).",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2669,7 +2669,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 2-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Three states: Buying, Selling, and Cooldown.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2692,7 +2692,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 2-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(n * amount) runtime complexity with O(amount) memory overhead.",
       "action": "Outer loop over coins, inner loop over amounts to compute unique combinations.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2715,7 +2715,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 2-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(n * sum) runtime complexity with O(sum) memory overhead.",
       "action": "Convert to subset sum problem: target + totalSum must be even.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2738,7 +2738,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 2-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(m * n) runtime complexity with O(n) memory overhead.",
       "action": "dp[i][j] true if prefix matched from s1[i-1] or s2[j-1].",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2761,7 +2761,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 2-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(m * n) runtime complexity with O(m * n) memory overhead.",
       "action": "DFS with memoization table on DAG formed by increasing neighbor values.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2784,7 +2784,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 2-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(m * n) runtime complexity with O(n) memory overhead.",
       "action": "Match: dp[i-1][j-1] + dp[i-1][j]; mismatch: dp[i-1][j].",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2808,7 +2808,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 2-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(m * n) runtime complexity with O(min(m,n)) memory overhead.",
       "action": "1 + min(insert, delete, replace) when characters differ.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2831,7 +2831,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 2-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(n^3) runtime complexity with O(n^2) memory overhead.",
       "action": "Interval DP: pick the last balloon to burst in range (left, right).",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2855,7 +2855,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal 2-D DP pattern under tight complexity bounds.",
       "task": "Achieve target O(m * n) runtime complexity with O(m * n) memory overhead.",
       "action": "Handle '*' as zero occurrences or one-or-more occurrences via subproblem lookback.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2879,7 +2879,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Greedy pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Kadane's algorithm resetting running sum when negative.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2903,7 +2903,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Greedy pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Track furthest reachable index or shift target goalpost backwards.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2926,7 +2926,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Greedy pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "BFS style greedy window tracking current jump reach and next max reach.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2949,7 +2949,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Greedy pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Total gas >= total cost guarantees solution; reset start whenever running tank drops below 0.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2972,7 +2972,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Greedy pattern under tight complexity bounds.",
       "task": "Achieve target O(n log n) runtime complexity with O(n) memory overhead.",
       "action": "Count frequencies in TreeMap/sorted map; form consecutive groups from smallest key.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -2995,7 +2995,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Greedy pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Filter out triplets where any element > target; verify remaining elements cover target values.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3018,7 +3018,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Greedy pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Map last occurrence of each char; expand current partition to max of last occurrences.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3041,7 +3041,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Greedy pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Track range of open parenthesis counts [cMin, cMax] handling '*' flexibly.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3065,7 +3065,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Intervals pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(n) memory overhead.",
       "action": "Append intervals before, merge overlapping intervals, then append intervals after.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3089,7 +3089,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Intervals pattern under tight complexity bounds.",
       "task": "Achieve target O(n log n) runtime complexity with O(n) memory overhead.",
       "action": "Sort by start time; merge into previous interval if start <= prev.end.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3112,7 +3112,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Intervals pattern under tight complexity bounds.",
       "task": "Achieve target O(n log n) runtime complexity with O(1) memory overhead.",
       "action": "Sort by end time; greedily keep interval that ends earliest to minimize removals.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3135,7 +3135,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Intervals pattern under tight complexity bounds.",
       "task": "Achieve target O(n log n) runtime complexity with O(1) memory overhead.",
       "action": "Sort by start time; return false if any adjacent intervals overlap.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3159,7 +3159,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Intervals pattern under tight complexity bounds.",
       "task": "Achieve target O(n log n) runtime complexity with O(n) memory overhead.",
       "action": "Chronological two-pointer approach comparing sorted start and end arrays.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3182,7 +3182,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Intervals pattern under tight complexity bounds.",
       "task": "Achieve target O(n log n + q log q) runtime complexity with O(n + q) memory overhead.",
       "action": "Sort queries and intervals; use min-heap indexed by interval size.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3206,7 +3206,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Math & Geometry pattern under tight complexity bounds.",
       "task": "Achieve target O(n^2) runtime complexity with O(1) memory overhead.",
       "action": "Transpose matrix across diagonal then reverse each row.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3230,7 +3230,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Math & Geometry pattern under tight complexity bounds.",
       "task": "Achieve target O(m * n) runtime complexity with O(1) memory overhead.",
       "action": "Four boundary pointers (top, bottom, left, right) traversing perimeter inwards.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3254,7 +3254,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Math & Geometry pattern under tight complexity bounds.",
       "task": "Achieve target O(m * n) runtime complexity with O(1) memory overhead.",
       "action": "Use first row and column as flag markers; track col0 status in separate boolean.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3277,7 +3277,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Math & Geometry pattern under tight complexity bounds.",
       "task": "Achieve target O(log n) runtime complexity with O(1) memory overhead.",
       "action": "Floyd's cycle detection comparing sum of squared digits of slow and fast.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3300,7 +3300,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Math & Geometry pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Add carry from right; early return when digit < 9.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3323,7 +3323,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Math & Geometry pattern under tight complexity bounds.",
       "task": "Achieve target O(log n) runtime complexity with O(1) memory overhead.",
       "action": "Binary exponentiation squaring base and halving exponent.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3346,7 +3346,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Math & Geometry pattern under tight complexity bounds.",
       "task": "Achieve target O(n * m) runtime complexity with O(n + m) memory overhead.",
       "action": "Elementary multiplication placing product of num1[i] and num2[j] at indices i+j and i+j+1.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3369,7 +3369,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Math & Geometry pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(n) memory overhead.",
       "action": "Store points in frequency map; query diagonals and assert matching adjacent points.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3392,7 +3392,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Bit Manipulation pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "XOR all elements together: a ^ a = 0 and a ^ 0 = a.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3415,7 +3415,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Bit Manipulation pattern under tight complexity bounds.",
       "task": "Achieve target O(1) runtime complexity with O(1) memory overhead.",
       "action": "Brian Kernighan's algorithm: `n &= (n - 1)` clears lowest set bit.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3438,7 +3438,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Bit Manipulation pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(n) memory overhead.",
       "action": "dp[i] = dp[i >> 1] + (i & 1).",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3461,7 +3461,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Bit Manipulation pattern under tight complexity bounds.",
       "task": "Achieve target O(1) runtime complexity with O(1) memory overhead.",
       "action": "Iterate 32 bits, shift result left, bitwise OR with `n & 1`, shift n right.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3484,7 +3484,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Bit Manipulation pattern under tight complexity bounds.",
       "task": "Achieve target O(n) runtime complexity with O(1) memory overhead.",
       "action": "Gauss sum `n * (n + 1) / 2` minus array sum, or XOR range 0..n with array.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3507,7 +3507,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Bit Manipulation pattern under tight complexity bounds.",
       "task": "Achieve target O(1) runtime complexity with O(1) memory overhead.",
       "action": "Bitwise XOR for addition without carry; AND shifted left by 1 for carry.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   },
   {
@@ -3530,7 +3530,7 @@ export const NEETCODE_150: InterviewQuestion[] = [
       "situation": "Encountered problem requiring optimal Bit Manipulation pattern under tight complexity bounds.",
       "task": "Achieve target O(log x) runtime complexity with O(1) memory overhead.",
       "action": "Pop last digit and push to result checking for 32-bit signed overflow.",
-      "result": "Cleanly passed all test cases with optimal time and space complexity constraints."
+      "result": "Verify your solution passes edge cases and explain the achieved time and space complexity."
     }
   }
 ];
@@ -3559,8 +3559,8 @@ export const SYSTEM_DESIGN_QUESTIONS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "High-volume link generation requiring predictable sub-20ms global redirect latency.",
       "task": "Architect fault-tolerant URL shortening service handling 10:1 read/write asymmetry.",
-      "action": "Deployed pre-generated Base62 key pool with cluster Redis caching and CDN edge routing.",
-      "result": "Achieved 99.99% availability and 8ms p99 redirect latency across global edge pops."
+      "action": "Explain how you would deploy a pre-generated Base62 key pool with cluster Redis caching and CDN edge routing.",
+      "result": "State your measured outcome (availability, tail redirect latency) using your own numbers."
     }
   },
   {
@@ -3585,8 +3585,8 @@ export const SYSTEM_DESIGN_QUESTIONS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Real-time timeline delivery suffering from fan-out write storms on high-follower accounts.",
       "task": "Eliminate write amplification while maintaining sub-200ms timeline assembly.",
-      "action": "Implemented hybrid push/pull fan-out architecture isolating accounts with >25k followers.",
-      "result": "Reduced message queue lag by 94% and sustained stable 140ms p95 timeline renders."
+      "action": "Describe how you would implement a hybrid push/pull fan-out architecture isolating high-follower accounts.",
+      "result": "State your measured outcome (queue lag reduction, tail timeline render latency) using your own numbers."
     }
   },
   {
@@ -3611,8 +3611,8 @@ export const SYSTEM_DESIGN_QUESTIONS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Public API vulnerable to credential stuffing and DDoS traffic spikes.",
       "task": "Deploy a low-latency rate limiter enforcing per-client and per-IP tiered quotas.",
-      "action": "Implemented Redis cluster sliding window log with Lua atomicity and local process fallback.",
-      "result": "Protected downstream microservices while adding less than 1.2ms to roundtrip API latency."
+      "action": "Explain how you would implement a Redis cluster sliding window log with Lua atomicity and local process fallback.",
+      "result": "State your measured outcome (downstream protection, added roundtrip API latency) using your own numbers."
     }
   },
   {
@@ -3637,8 +3637,8 @@ export const SYSTEM_DESIGN_QUESTIONS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Mission-critical state store requiring write availability during network partitions.",
       "task": "Architect Dynamo-style peer-to-peer storage engine with tunable quorum parameters.",
-      "action": "Configured consistent hashing with 256 virtual nodes and vector clock conflict detection.",
-      "result": "Survived node failures with zero downtime and verified R=2, W=2 quorum consistency."
+      "action": "Describe how you would configure consistent hashing with virtual nodes and vector clock conflict detection.",
+      "result": "State your measured outcome (node-failure availability, quorum consistency verification) using your own numbers."
     }
   },
   {
@@ -3664,8 +3664,8 @@ export const SYSTEM_DESIGN_QUESTIONS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Chat delivery bottlenecks causing disconnect storms and out-of-order message receipts.",
       "task": "Build scalable WebSocket routing layer with distributed presence tracking.",
-      "action": "Deployed Redis Pub/Sub connection registry backed by Cassandra append-only message logs.",
-      "result": "Scaled to 10M concurrent connections with 45ms average message delivery latency."
+      "action": "Explain how you would deploy a Redis Pub/Sub connection registry backed by Cassandra append-only message logs.",
+      "result": "State your measured outcome (concurrent connections scaled, average delivery latency) using your own numbers."
     }
   },
   {
@@ -3689,8 +3689,8 @@ export const SYSTEM_DESIGN_QUESTIONS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Video buffering spikes during peak hours due to origin server bandwidth saturation.",
       "task": "Implement adaptive bitrate streaming with localized CDN distribution tier.",
-      "action": "Split uploads into 4-second HLS chunks with geo-distributed edge caching rules.",
-      "result": "Reduced video rebuffering rate by 82% and offloaded 96% of video traffic to edge CDNs."
+      "action": "Describe how you would split uploads into fixed-duration HLS chunks with geo-distributed edge caching rules.",
+      "result": "State your measured outcome (rebuffering rate change, edge CDN offload share) using your own numbers."
     }
   },
   {
@@ -3715,8 +3715,8 @@ export const SYSTEM_DESIGN_QUESTIONS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Marketing campaigns overwhelming transactional OTP and security notification delivery.",
       "task": "Isolate delivery pipelines and enforce user notification frequency caps.",
-      "action": "Architected dual-priority Kafka queues with Redis idempotency keys and APNs/FCM workers.",
-      "result": "Guaranteed 100% of OTPs delivered within 3 seconds regardless of marketing batch load."
+      "action": "Explain how you would architect dual-priority Kafka queues with Redis idempotency keys and APNs/FCM workers.",
+      "result": "State your measured outcome (OTP delivery reliability, delivery latency under load) using your own numbers."
     }
   },
   {
@@ -3739,8 +3739,8 @@ export const SYSTEM_DESIGN_QUESTIONS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Driver location updates overwhelming database write capacity during peak rush hours.",
       "task": "Build real-time spatial ingestion engine supporting 300k GPS pings per second.",
-      "action": "Partitioned geospatial state into Uber H3 hexagonal cells stored in Redis memory clusters.",
-      "result": "Reduced dispatch calculation time to 400ms and eliminated GPS write backpressure."
+      "action": "Describe how you would partition geospatial state into Uber H3 hexagonal cells stored in Redis memory clusters.",
+      "result": "State your measured outcome (dispatch calculation latency, write backpressure reduction) using your own numbers."
     }
   },
   {
@@ -3764,8 +3764,8 @@ export const SYSTEM_DESIGN_QUESTIONS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Keystroke suggestion latency exceeding 100ms, degrading interactive typing feel.",
       "task": "Design distributed autocomplete cache providing instant top-5 search predictions.",
-      "action": "Built serialized Trie node cache with precomputed top-k results deployed to edge PoPs.",
-      "result": "Cut p99 autocomplete latency to 18ms and absorbed 70% of query keystrokes at edge."
+      "action": "Explain how you would build a serialized Trie node cache with precomputed top-k results deployed to edge PoPs.",
+      "result": "State your measured outcome (tail autocomplete latency, edge keystroke cache hit rate) using your own numbers."
     }
   },
   {
@@ -3788,8 +3788,8 @@ export const SYSTEM_DESIGN_QUESTIONS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Crawler encountering crawler traps, duplicate mirrors, and rate-limit IP bans.",
       "task": "Architect distributed web crawler enforcing politeness and duplicate document elimination.",
-      "action": "Implemented two-tier frontier queue (priority + politeness) with 64-bit SimHash deduplication.",
-      "result": "Scaled crawler throughput to 40k pages/sec while maintaining zero IP block incidents."
+      "action": "Describe how you would implement a two-tier frontier queue (priority and politeness) with 64-bit SimHash deduplication.",
+      "result": "State your measured outcome (crawler throughput, IP block incident rate) using your own numbers."
     }
   },
   {
@@ -3814,8 +3814,8 @@ export const SYSTEM_DESIGN_QUESTIONS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Primary database under severe connection pressure from repetitive reads.",
       "task": "Deploy distributed in-memory cache cluster with automatic partition rebalancing.",
-      "action": "Configured consistent hashing ring with virtual nodes and LRU eviction policy.",
-      "result": "Absorbed 92% of read queries with 0.8ms average latency."
+      "action": "Explain how you would configure a consistent hashing ring with virtual nodes and an LRU eviction policy.",
+      "result": "State your measured outcome (cache hit ratio, average read latency) using your own numbers."
     }
   },
   {
@@ -3839,8 +3839,8 @@ export const SYSTEM_DESIGN_QUESTIONS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Network timeouts between payment gateway and third-party acquirers risking duplicate charges.",
       "task": "Architect zero-loss payment pipeline guaranteeing exactly-once transaction processing.",
-      "action": "Built distributed idempotency layer with double-entry ledger and reconciliation cron.",
-      "result": "Processed $50M+ in volume with zero duplicate charges and 100% audit trail compliance."
+      "action": "Describe how you would build a distributed idempotency layer with a double-entry ledger and reconciliation cron.",
+      "result": "State your measured outcome (processed volume, duplicate-charge rate, audit trail accuracy) using your own numbers."
     }
   },
   {
@@ -3864,8 +3864,8 @@ export const SYSTEM_DESIGN_QUESTIONS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Direct client-to-microservice calls creating security fragmentation and cross-cutting duplication.",
       "task": "Consolidate routing, authentication, and throttling into an enterprise API gateway.",
-      "action": "Implemented Envoy-based gateway with distributed JWT verification and circuit breakers.",
-      "result": "Unified security posture across 40+ services while keeping routing overhead under 2.4ms."
+      "action": "Explain how you would implement an Envoy-based gateway with distributed JWT verification and circuit breakers.",
+      "result": "State your measured outcome (service coverage, added routing overhead) using your own numbers."
     }
   },
   {
@@ -3889,8 +3889,8 @@ export const SYSTEM_DESIGN_QUESTIONS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Leaderboard queries locking SQL database during tournament events.",
       "task": "Build real-time ranking engine supporting instantaneous rank updates and pagination.",
-      "action": "Deployed Redis Sorted Sets with range-partitioned buckets and tier caches.",
-      "result": "Handled 120k score submissions/second with sub-5ms rank lookup times."
+      "action": "Describe how you would deploy Redis Sorted Sets with range-partitioned buckets and tier caches.",
+      "result": "State your measured outcome (score submission throughput, rank lookup latency) using your own numbers."
     }
   },
   {
@@ -3914,8 +3914,8 @@ export const SYSTEM_DESIGN_QUESTIONS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Flash sale events causing race conditions and double-bookings on hotel rooms.",
       "task": "Architect inventory reservation system preventing overbooking under high concurrent load.",
-      "action": "Implemented optimistic concurrency control with 10-minute Redis reservation locks.",
-      "result": "Completely eliminated overbooking incidents across 200k concurrent checkout attempts."
+      "action": "Explain how you would implement optimistic concurrency control with time-bounded Redis reservation locks.",
+      "result": "State your measured outcome (overbooking prevention rate, concurrent checkout throughput) using your own numbers."
     }
   }
 ];
@@ -3942,8 +3942,8 @@ export const OA_PROBLEMS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Standard 70-minute OA question testing bracket evaluation and simulation.",
       "task": "Decode nested commands without stack overflow or intermediate string allocations.",
-      "action": "Implemented stack-based iterative parsing accumulating segment string builders.",
-      "result": "Passed all 25 visible and hidden platform test cases in 18 minutes."
+      "action": "Use stack-based iterative parsing accumulating segment string builders.",
+      "result": "Verify your solution passes visible and hidden edge cases within your target time budget."
     }
   },
   {
@@ -3967,8 +3967,8 @@ export const OA_PROBLEMS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Cloud infrastructure capacity assessment problem in technical screen.",
       "task": "Compute peak server concurrency across overlapping active time ranges.",
-      "action": "Applied sweep-line algorithm sorting event points with tie-break handling.",
-      "result": "Optimized runtime from O(n^2) brute force to O(n log n), passing all scale test cases."
+      "action": "Apply a sweep-line algorithm sorting event points with tie-break handling.",
+      "result": "Compare your brute-force baseline against your optimal sweep-line runtime on large inputs."
     }
   },
   {
@@ -3992,8 +3992,8 @@ export const OA_PROBLEMS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Logistics routing scenario under timed assessment constraints.",
       "task": "Find minimum toll cost path across 2D grid with variable congestion costs.",
-      "action": "Implemented min-heap Dijkstra tracking visited coordinates and running costs.",
-      "result": "Produced optimal path within 220ms, well beneath the 2-second timeout ceiling."
+      "action": "Use min-heap Dijkstra tracking visited coordinates and running costs.",
+      "result": "State your measured execution time and confirm it stays comfortably under the timeout ceiling."
     }
   },
   {
@@ -4017,8 +4017,8 @@ export const OA_PROBLEMS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Complex combinatorial substring question requiring mathematical transformation.",
       "task": "Eliminate O(n^2) sliding window in favor of linear character contribution math.",
-      "action": "Tracked prev[i] and next[i] positions for each character, adding (i - prev) * (next - i).",
-      "result": "Delivered O(n) solution passing 100,000-character test inputs in 14ms."
+      "action": "Track prev[i] and next[i] positions for each character, adding (i - prev) * (next - i).",
+      "result": "Verify linear-time execution on maximum-length test inputs using your own timing."
     }
   },
   {
@@ -4042,8 +4042,8 @@ export const OA_PROBLEMS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Fraud screening assessment problem focusing on parsing and frequency thresholds.",
       "task": "Aggregate activity counts with proper self-transaction deduplication.",
-      "action": "Parsed tokens into hash map, filtered by threshold, and applied custom numeric sort.",
-      "result": "Clean implementation completed in under 12 minutes with 100% test accuracy."
+      "action": "Parse tokens into a hash map, filter by threshold, and apply a custom numeric sort.",
+      "result": "Record your completion time and test pass rate across edge cases."
     }
   },
   {
@@ -4066,8 +4066,8 @@ export const OA_PROBLEMS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Security credential metric calculation under OA assessment time pressure.",
       "task": "Compute vowel presence weight across all substrings in linear time.",
-      "action": "Maintained running total of vowel contribution multipliers across scan.",
-      "result": "Achieved optimal O(n) performance avoiding time-limit-exceeded failures."
+      "action": "Maintain a running total of vowel contribution multipliers across a single scan.",
+      "result": "Confirm your linear-time solution avoids time-limit-exceeded failures on large inputs."
     }
   },
   {
@@ -4091,8 +4091,8 @@ export const OA_PROBLEMS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Media playlist optimization question in technical coding assessment.",
       "task": "Count divisible duration combinations without nested loop quadratic time.",
-      "action": "Used 60-element integer array storing remainder counts for constant-space matching.",
-      "result": "Executed in 8ms with zero auxiliary memory overhead."
+      "action": "Use a 60-element integer array storing remainder counts for constant-space matching.",
+      "result": "State your measured execution time and confirm constant auxiliary memory usage."
     }
   },
   {
@@ -4116,8 +4116,8 @@ export const OA_PROBLEMS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "Infrastructure connectivity prompt testing disjoint set data structures.",
       "task": "Validate whether sufficient redundant cables exist to link all power nodes.",
-      "action": "Built Disjoint Set Union (DSU) class with path compression and rank heuristics.",
-      "result": "Correctly resolved edge cases including disconnected cycles in under 15 minutes."
+      "action": "Build a Disjoint Set Union (DSU) class with path compression and rank heuristics.",
+      "result": "Verify edge cases including disconnected cycles and record your completion time."
     }
   },
   {
@@ -4140,8 +4140,8 @@ export const OA_PROBLEMS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "OS CPU task scheduling simulation in technical assessment.",
       "task": "Simulate shortest-remaining-time-first scheduler under arrival time constraints.",
-      "action": "Sorted by arrival time and maintained priority queue of runnable candidate jobs.",
-      "result": "Passed all memory and time constraint checks on test evaluation platform."
+      "action": "Sort by arrival time and maintain a priority queue of runnable candidate jobs.",
+      "result": "Confirm your implementation passes all memory and time constraint checks on your test suite."
     }
   },
   {
@@ -4164,8 +4164,8 @@ export const OA_PROBLEMS: InterviewQuestion[] = [
     "starRubric": {
       "situation": "E-commerce recommendation system association group problem.",
       "task": "Identify maximum connected item cluster with tie-breaking lexicographical ordering.",
-      "action": "Constructed adjacency list, ran BFS traversal, and sorted cluster elements.",
-      "result": "Met all strict lexical tie-breaker criteria and passed 100% of test suites."
+      "action": "Construct an adjacency list, run BFS traversal, and sort cluster elements.",
+      "result": "Verify all strict lexical tie-breaker criteria and record your test suite pass rate."
     }
   }
 ];

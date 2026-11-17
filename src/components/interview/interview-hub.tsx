@@ -308,7 +308,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
             {/* STAR Behavioral Framework Alignment */}
             {selectedQuestion.starRubric && (
               <div className="p-3.5 bg-primary/5 border border-primary/25 rounded-[10px] space-y-2">
-                <h4 className="text-xs font-bold text-primary uppercase tracking-wider">STAR Behavioral Response Framework</h4>
+                <h4 className="text-xs font-bold text-primary uppercase tracking-wider">Answer outline: fill in your own results</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   <div><span className="font-semibold text-foreground">Situation: </span><span className="text-muted-foreground">{selectedQuestion.starRubric.situation}</span></div>
                   <div><span className="font-semibold text-foreground">Task: </span><span className="text-muted-foreground">{selectedQuestion.starRubric.task}</span></div>

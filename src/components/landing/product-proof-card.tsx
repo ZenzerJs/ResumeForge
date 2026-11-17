@@ -26,7 +26,7 @@ export function ProductProofCard() {
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-signal/40 bg-signal/10 px-2.5 py-0.5 text-xs font-semibold text-signal">
           <span className="h-1.5 w-1.5 rounded-full bg-signal" aria-hidden />
-          Live
+          Synthetic example
         </span>
       </div>
 

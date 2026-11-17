@@ -11,6 +11,9 @@ test.describe("Task 7.9: Save as Master + Revert to Master Safety Protocol E2E T
     // Assert confirmation modal appears
     await expect(page.locator("[data-testid='save-master-confirm-modal']")).toBeVisible();
 
+    // Tick confirmation checkbox before confirming
+    await page.click("[data-testid='confirm-master-checkbox']");
+
     // Click Confirm Overwrite & Save
     const savePromise = page.waitForResponse(
       (resp) => resp.url().includes("/api/resumes/save-master") && resp.request().method() === "POST" && resp.ok()
@@ -82,8 +85,10 @@ test.describe("Task 7.9: Save as Master + Revert to Master Safety Protocol E2E T
       await route.continue();
     });
     await page.click("[data-testid='save-as-master-btn']");
+    await page.click("[data-testid='confirm-master-checkbox']");
     const confirmBtn = page.locator("[data-testid='confirm-save-master-btn']");
     await expect(confirmBtn).toBeVisible();
+    await expect(confirmBtn).toBeEnabled();
     await confirmBtn.evaluate((el) => {
       (el as HTMLButtonElement).click();
       (el as HTMLButtonElement).click();
