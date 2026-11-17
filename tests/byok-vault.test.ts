@@ -281,15 +281,30 @@ describe("BYOK Vault & Router (WS6)", () => {
       expect(defaultConfig.provider).toBe("gemini");
       expect(defaultConfig.model).toBe("gemini-2.5-flash");
       expect(defaultConfig.hasKey).toBe(false);
+      expect(defaultConfig.keyless).toBe(false);
 
       await saveKey("gemini", "AIzaSyTestKey");
       const configured = await getActiveConfig();
       expect(configured.hasKey).toBe(true);
+      expect(configured.keyless).toBe(false);
 
       store["resumeforge_ai_settings"] = JSON.stringify({ provider: "ollama" });
       const ollamaConfig = await getActiveConfig();
       expect(ollamaConfig.provider).toBe("ollama");
       expect(ollamaConfig.hasKey).toBe(true);
+      expect(ollamaConfig.keyless).toBe(true);
+
+      store["resumeforge_ai_settings"] = JSON.stringify({ provider: "custom" });
+      const customKeylessConfig = await getActiveConfig();
+      expect(customKeylessConfig.provider).toBe("custom");
+      expect(customKeylessConfig.hasKey).toBe(false);
+      expect(customKeylessConfig.keyless).toBe(true);
+
+      await saveKey("custom", "custom-bearer-token");
+      const customKeyedConfig = await getActiveConfig();
+      expect(customKeyedConfig.provider).toBe("custom");
+      expect(customKeyedConfig.hasKey).toBe(true);
+      expect(customKeyedConfig.keyless).toBe(false);
     });
   });
 

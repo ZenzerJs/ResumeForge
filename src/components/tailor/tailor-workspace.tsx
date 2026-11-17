@@ -24,7 +24,7 @@ import { RoleProfile, ROLE_PROFILES, AtsEvaluationResult } from "@/lib/ats-evalu
 import { auditResume } from "@/lib/diagnostics/auditResume";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
 import { getDemoContextFromBrowser, initializeDemoSamples } from "@/lib/demo-client";
-import { fetchDemoConfig } from "@/components/auth/session-user";
+import { fetchDemoConfig, fetchSessionUser } from "@/components/auth/session-user";
 import { DEMO_JOB } from "@/lib/demo-samples";
 import { readApiResponse } from "@/lib/api-error";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
@@ -599,8 +599,8 @@ export function TailorWorkspace() {
     const existingId = savedJobIdRef.current;
     const demoConfig = await fetchDemoConfig();
 
-    if (isLocalOrDemoJobId(existingId, demoConfig?.demoMode === true)) {
-      const localId = existingId || `guest-job-${Date.now()}`;
+    const saveLocalGuestJob = (targetId?: string | null): string => {
+      const localId = targetId || `guest-job-${Date.now()}`;
       savedJobIdRef.current = localId;
       setSavedJobId(localId);
       sessionStorage.setItem("resumeforge_active_job_id", localId);
@@ -628,6 +628,10 @@ export function TailorWorkspace() {
       } catch {}
       setSaveStatus("Job saved to local workspace.");
       return localId;
+    };
+
+    if (isLocalOrDemoJobId(existingId, demoConfig?.demoMode === true)) {
+      return saveLocalGuestJob(existingId);
     }
 
     if (existingId) {
@@ -661,6 +665,11 @@ export function TailorWorkspace() {
       return existingId;
     }
 
+    const sessionUser = await fetchSessionUser();
+    if (!sessionUser) {
+      return saveLocalGuestJob(null);
+    }
+
     try {
       const saveRes = await fetch("/api/jobs", {
         method: "POST",
@@ -685,26 +694,7 @@ export function TailorWorkspace() {
         return saveJson.data.id;
       }
       if (saveStatusCode === 401 || saveJson?.code === "GUEST_READ_ONLY") {
-        const guestId = `guest-job-${Date.now()}`;
-        savedJobIdRef.current = guestId;
-        setSavedJobId(guestId);
-        sessionStorage.setItem("resumeforge_active_job_id", guestId);
-        try {
-          const raw = localStorage.getItem("resumeforge_guest_jobs");
-          const list = raw ? JSON.parse(raw) : [];
-          const next = Array.isArray(list) ? list : [];
-          next.unshift({
-            id: guestId,
-            company: payload.company || "Target Company",
-            roleTitle: payload.roleTitle || "Target Role",
-            rawDescription: payload.rawDescription,
-            requirements: payload.extractedRequirements,
-            status: "SAVED",
-          });
-          localStorage.setItem("resumeforge_guest_jobs", JSON.stringify(next));
-        } catch {}
-        setSaveStatus("Job saved to local workspace.");
-        return guestId;
+        return saveLocalGuestJob(null);
       }
       if (saveError) {
         setErrorMessage(saveError);
@@ -892,8 +882,22 @@ export function TailorWorkspace() {
     setIsExtracting(true);
 
     try {
-      const demoConfig = await fetchDemoConfig();
+      const [demoConfig, sessionUser] = await Promise.all([
+        fetchDemoConfig(),
+        fetchSessionUser(),
+      ]);
       if (extractGeneration !== scanGenerationRef.current) return;
+
+      if (!sessionUser || demoConfig?.demoMode) {
+        const parsed = parseJobDescription(rawDescription);
+        setExtractedRequirements(parsed);
+        if (parsed.roleTitle && !roleTitle) {
+          setRoleTitle(parsed.roleTitle);
+        }
+        await ensureJobSaved({ forceUpdate: true, requirements: parsed });
+        await fetchMatches(parsed);
+        return;
+      }
 
       const res = await fetch("/api/jobs/extract", {
         method: "POST",
@@ -1059,10 +1063,13 @@ export function TailorWorkspace() {
       if (generation !== scanGenerationRef.current) return;
       try {
         setIsAutoScanning(true);
-        const demoConfig = await fetchDemoConfig();
+        const [demoConfig, sessionUser] = await Promise.all([
+          fetchDemoConfig(),
+          fetchSessionUser(),
+        ]);
         if (generation !== scanGenerationRef.current || controller.signal.aborted) return;
 
-        if (demoConfig?.demoMode) {
+        if (!sessionUser || demoConfig?.demoMode) {
           const parsed = parseJobDescription(rawDescription);
           pendingRescanRef.current = false;
           setExtractedRequirements(parsed);

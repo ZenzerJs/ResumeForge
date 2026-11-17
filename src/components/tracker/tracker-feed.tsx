@@ -37,7 +37,7 @@ import {
   isPlaceholderDescription,
 } from "@/lib/ingestion/helpers";
 import { matchesPostedWithin, type PostedWithin } from "@/lib/jobs/posted-within";
-import { fetchDemoConfig } from "@/components/auth/session-user";
+import { fetchDemoConfig, fetchSessionUser } from "@/components/auth/session-user";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
 import {
   HydratedJobDetailSchema,
@@ -859,6 +859,12 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const handleRefreshFromSource = async () => {
     if (isDemoMode) {
       setImportNotice("Demo tracker uses browser-local jobs. Add or edit jobs here; live import and connector sync require self-hosting.");
+      scheduleNoticeClear();
+      return;
+    }
+    const sessionUser = await fetchSessionUser();
+    if (!sessionUser) {
+      setImportNotice("Live import needs sign-in.");
       scheduleNoticeClear();
       return;
     }

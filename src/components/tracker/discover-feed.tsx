@@ -25,7 +25,7 @@ import { AppShell } from "@/components/design-system/app-shell";
 import { CommandButton } from "@/components/design-system/command-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrackerSubNav } from "@/components/tracker/tracker-sub-nav";
-import { fetchDemoConfig } from "@/components/auth/session-user";
+import { fetchDemoConfig, fetchSessionUser } from "@/components/auth/session-user";
 import { isSafeHref } from "@/lib/security/safe-url";
 import { type PostedWithin } from "@/lib/jobs/posted-within";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
@@ -388,6 +388,14 @@ export function DiscoverFeed() {
         setNotification({
           message:
             "Demo feed uses preloaded public jobs. Live connector sync requires signing in or self-hosting.",
+          tone: "info",
+        });
+        return;
+      }
+      const sessionUser = await fetchSessionUser();
+      if (!sessionUser) {
+        setNotification({
+          message: "Live import needs sign-in.",
           tone: "info",
         });
         return;

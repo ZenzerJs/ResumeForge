@@ -327,9 +327,12 @@ export const TailorDiagnosticPanel = ({
     >
       <div className="flex items-center justify-between gap-3 border-b border-hairline pb-3">
         <h3 className="text-lg font-semibold text-foreground">Diagnostics</h3>
-        <span className="font-mono text-sm font-semibold tabular-nums text-on-surface-variant">
-          {report.overallScore}%
-        </span>
+        <div className="flex items-baseline gap-2">
+          <span className="text-xs font-medium text-muted-foreground">Diagnostic coverage</span>
+          <span className="font-mono text-sm font-semibold tabular-nums text-on-surface-variant">
+            {report.overallScore}%
+          </span>
+        </div>
       </div>
 
       {patchResult && (

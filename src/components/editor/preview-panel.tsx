@@ -382,6 +382,20 @@ export function PreviewPanel({
     setShowGrade((prev) => !prev);
   };
 
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  const hasHydratedSource = hasMounted && source.trim().length > 0;
+  const hasJobRequirements = Boolean(
+    extractedRequirements &&
+      (extractedRequirements.requiredSkills.length > 0 ||
+        extractedRequirements.preferredSkills.length > 0 ||
+        extractedRequirements.domainTerms.length > 0)
+  );
+
   // Synchronous client-side Ember Ink ATS Grade computation for the docked Editor grade rail
   const liveAtsGrade = useMemo<AtsEvaluationResult>(() => {
     return evaluateAtsScore(
@@ -948,31 +962,41 @@ export function PreviewPanel({
               </button>
             </div>
 
-            <div className="flex items-center gap-3.5">
-              <div
-                className="relative grid h-[72px] w-[72px] shrink-0 place-items-center rounded-full"
-                style={{
-                  background: `conic-gradient(rgb(var(--accent-contrast)) ${liveAtsGrade.overallScore}%, rgb(214 196 176 / 0.14) 0)`,
-                  filter: "drop-shadow(0 0 14px rgb(var(--accent-contrast) / 0.35))",
-                }}
-              >
-                <div className="grid h-[58px] w-[58px] place-items-center rounded-full bg-panel font-sans text-[22px] font-bold tracking-[-0.03em] tabular-nums text-foreground">
-                  {liveAtsGrade.overallScore}
+            {hasHydratedSource ? (
+              <>
+                <div className="flex items-center gap-3.5">
+                  <div
+                    className="relative grid h-[72px] w-[72px] shrink-0 place-items-center rounded-full"
+                    style={{
+                      background: `conic-gradient(rgb(var(--accent-contrast)) ${liveAtsGrade.overallScore}%, rgb(214 196 176 / 0.14) 0)`,
+                      filter: "drop-shadow(0 0 14px rgb(var(--accent-contrast) / 0.35))",
+                    }}
+                  >
+                    <div className="grid h-[58px] w-[58px] place-items-center rounded-full bg-panel font-sans text-[22px] font-bold tracking-[-0.03em] tabular-nums text-foreground">
+                      {liveAtsGrade.overallScore}
+                    </div>
+                  </div>
+                  <div className="min-w-0">
+                    {hasJobRequirements ? (
+                      <>
+                        <strong className="block text-sm font-semibold text-foreground">
+                          {liveAtsGrade.overallScore >= 80
+                            ? "Strong"
+                            : liveAtsGrade.overallScore >= 60
+                            ? "Solid"
+                            : "Developing"}
+                        </strong>
+                        <p className="mt-0.5 text-xs text-muted-foreground truncate">
+                          {roleTitle ? `vs. ${roleTitle}` : "General ATS readiness"}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground leading-snug">
+                        No job loaded: base checks only
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="min-w-0">
-                <strong className="block text-sm font-semibold text-foreground">
-                  {liveAtsGrade.overallScore >= 80
-                    ? "Strong"
-                    : liveAtsGrade.overallScore >= 60
-                    ? "Solid"
-                    : "Developing"}
-                </strong>
-                <p className="mt-0.5 text-xs text-muted-foreground truncate">
-                  {roleTitle ? `vs. ${roleTitle}` : "General ATS readiness"}
-                </p>
-              </div>
-            </div>
 
             <div className="flex flex-col gap-2.5 text-xs">
               <div className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1">
@@ -1029,7 +1053,7 @@ export function PreviewPanel({
                       className="flex items-start gap-2.5 rounded-[8px] border border-hairline bg-inset p-2.5 text-xs text-text-secondary"
                     >
                       <span
-                        className={`shrink-0 rounded-[5px] border px-1.5 py-0.5 text-[10.5px] font-semibold ${
+                        className={`shrink-0 rounded-[5px] border px-1.5 py-0.5 text-xs font-semibold ${
                           isUrgent
                             ? "border-status-danger/40 bg-status-danger/10 text-status-danger"
                             : "border-primary/40 bg-primary/10 text-primary"
@@ -1045,7 +1069,7 @@ export function PreviewPanel({
                 })
               ) : (
                 <div className="flex items-start gap-2.5 rounded-[8px] border border-hairline bg-inset p-2.5 text-xs text-text-secondary">
-                  <span className="shrink-0 rounded-[5px] border border-signal/40 bg-signal/10 px-1.5 py-0.5 text-[10.5px] font-semibold text-signal">
+                  <span className="shrink-0 rounded-[5px] border border-signal/40 bg-signal/10 px-1.5 py-0.5 text-xs font-semibold text-signal">
                     Ready
                   </span>
                   <span className="leading-snug">
@@ -1054,6 +1078,12 @@ export function PreviewPanel({
                 </div>
               )}
             </div>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Waiting for resume source...
+              </p>
+            )}
           </aside>
         )}
       </div>

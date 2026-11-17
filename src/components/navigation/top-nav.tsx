@@ -90,14 +90,22 @@ function GuestAuthLinks({ className, signupEnabled }: { className?: string; sign
 }
 
 function useAiStatus(pathname: string) {
-  const [aiStatus, setAiStatus] = useState<{ provider: string; hasKey: boolean } | null>(null);
+  const [aiStatus, setAiStatus] = useState<{
+    provider: string;
+    hasKey: boolean;
+    keyless: boolean;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void getActiveConfig()
       .then((cfg) => {
         if (!cancelled) {
-          setAiStatus({ provider: cfg.provider, hasKey: cfg.hasKey });
+          setAiStatus({
+            provider: cfg.provider,
+            hasKey: cfg.hasKey,
+            keyless: cfg.keyless,
+          });
         }
       })
       .catch(() => {});
@@ -115,42 +123,56 @@ function AiStatusPill({
   className,
   onClick,
 }: {
-  aiStatus: { provider: string; hasKey: boolean };
+  aiStatus: { provider: string; hasKey: boolean; keyless: boolean };
   testId?: string;
   className?: string;
   onClick?: () => void;
 }) {
+  const isConnected = aiStatus.hasKey && !aiStatus.keyless;
+
   return (
     <Link
       href="/settings"
       data-testid={testId}
       onClick={onClick}
       title={
-        aiStatus.hasKey
-          ? `AI Connected (${aiStatus.provider.toUpperCase()}) — Click to manage in Settings`
-          : "No AI API key configured — Click to connect in Settings"
+        aiStatus.keyless
+          ? `Local AI (${aiStatus.provider.toUpperCase()}) not verified — Click to manage in Settings`
+          : isConnected
+            ? `AI Connected (${aiStatus.provider.toUpperCase()}) — Click to manage in Settings`
+            : "No AI API key configured — Click to connect in Settings"
       }
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        aiStatus.hasKey
-          ? "border-signal/35 bg-signal/10 text-signal hover:bg-signal/20"
-          : "border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20",
+        aiStatus.keyless
+          ? "border-outline bg-elevated/60 text-on-surface-variant hover:bg-elevated hover:text-foreground"
+          : isConnected
+            ? "border-signal/35 bg-signal/10 text-signal hover:bg-signal/20"
+            : "border-primary/35 bg-primary/10 text-primary hover:bg-primary/20",
         className
       )}
     >
-      {aiStatus.hasKey && hasBrandIcon(aiStatus.provider) ? (
+      {isConnected && hasBrandIcon(aiStatus.provider) ? (
         <BrandIcon name={aiStatus.provider} className="h-3.5 w-3.5 shrink-0" />
       ) : (
         <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
       )}
       <span>
-        {aiStatus.hasKey ? `AI · ${aiStatus.provider.toUpperCase()}` : "Connect AI Key"}
+        {aiStatus.keyless
+          ? "Local AI · not verified"
+          : isConnected
+            ? `AI · ${aiStatus.provider.toUpperCase()}`
+            : "Connect AI Key"}
       </span>
     </Link>
   );
 }
 
-function NavUtilities({ aiStatus }: { aiStatus: { provider: string; hasKey: boolean } | null }) {
+function NavUtilities({
+  aiStatus,
+}: {
+  aiStatus: { provider: string; hasKey: boolean; keyless: boolean } | null;
+}) {
   return (
     <div className="hidden xl:flex items-center gap-1.5">
       {aiStatus && <AiStatusPill aiStatus={aiStatus} testId="nav-ai-status-pill" />}

@@ -561,7 +561,12 @@ export async function removeKey(provider: string): Promise<void> {
 /**
  * Returns the currently active provider configuration and key status.
  */
-export async function getActiveConfig(): Promise<{ provider: string; model: string; hasKey: boolean }> {
+export async function getActiveConfig(): Promise<{
+  provider: string;
+  model: string;
+  hasKey: boolean;
+  keyless: boolean;
+}> {
   let provider = "gemini";
   let model = DEFAULT_MODELS.gemini;
 
@@ -584,9 +589,11 @@ export async function getActiveConfig(): Promise<{ provider: string; model: stri
   }
 
   const key = await getKey(provider);
-  const hasKey = provider === "ollama" ? true : Boolean(key && key.trim().length > 0);
+  const hasStoredKey = Boolean(key && key.trim().length > 0);
+  const keyless = (provider === "ollama" || provider === "custom") && !hasStoredKey;
+  const hasKey = provider === "ollama" ? true : hasStoredKey;
 
-  return { provider, model, hasKey };
+  return { provider, model, hasKey, keyless };
 }
 
 export interface ClientProviderConfig {
