@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useRef, useState, useCallback, useEffect } from "react";
+import React, { useRef, useState, useCallback, useEffect, useId } from "react";
 import dynamic from "next/dynamic";
 import CodeMirror, { ReactCodeMirrorRef } from "@uiw/react-codemirror";
-import { RangeSetBuilder } from "@codemirror/state";
+import { RangeSetBuilder, type Transaction } from "@codemirror/state";
 import {
   EditorView,
   Decoration,
@@ -11,7 +11,7 @@ import {
   ViewPlugin,
   ViewUpdate,
 } from "@codemirror/view";
-import { ShieldCheck, LayoutList, Code2, Plus, X } from "lucide-react";
+import { MessageSquarePlus, LayoutList, Code2, Plus, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { isResumeLayoutV2Enabled, parseManagedResume, renderResumeDocument } from "@/lib/typst/resume-document";
 
@@ -169,6 +169,51 @@ const EDITOR_EXTENSIONS = [
   typstHighlightPlugin,
 ];
 
+export const REVIEW_MARKER_HELP_TEXT =
+  "Insert a dated source comment. This does not verify Evidence Bank items or create citations.";
+
+export function formatReviewMarkerComment(date: Date = new Date()): string {
+  return `// Reviewed: ${date.toISOString().slice(0, 10)}`;
+}
+
+export function formatReviewMarkerCount(count: number): string {
+  return `${count} review marker${count === 1 ? "" : "s"}`;
+}
+
+export interface ReviewMarkerTargetView {
+  state: EditorView["state"];
+  dispatch: (tr: Transaction) => void;
+}
+
+export function insertReviewMarkerInView(
+  view: ReviewMarkerTargetView,
+  date: Date = new Date()
+): boolean {
+  const { state, dispatch } = view;
+  const selection = state.selection.main;
+  const selectedText = state.sliceDoc(selection.from, selection.to);
+  const marker = formatReviewMarkerComment(date);
+
+  if (selectedText.trim()) {
+    const insertion = `\n${marker}\n`;
+    dispatch(
+      state.update({
+        changes: { from: selection.to, to: selection.to, insert: insertion },
+        scrollIntoView: true,
+      })
+    );
+  } else {
+    const insertion = `${marker}\n`;
+    dispatch(
+      state.update({
+        changes: { from: selection.from, to: selection.from, insert: insertion },
+        scrollIntoView: true,
+      })
+    );
+  }
+  return true;
+}
+
 interface CodeEditorProps {
   value: string;
   onChange: (val: string) => void;
@@ -176,7 +221,8 @@ interface CodeEditorProps {
 
 export function CodeEditor({ value, onChange }: CodeEditorProps) {
   const editorRef = useRef<ReactCodeMirrorRef>(null);
-  const [markedCount, setMarkedCount] = useState(0);
+  const reviewMarkerHelpId = useId();
+  const [reviewMarkerCount, setReviewMarkerCount] = useState(0);
   const [editorMode, setEditorMode] = useState<"code" | "visual">("code");
   const [reformatAlert, setReformatAlert] = useState<string | null>(null);
   const [pendingReformat, setPendingReformat] = useState<{
@@ -197,34 +243,13 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
     }
   }, []);
 
-  const handleMarkVerified = useCallback(() => {
+  const handleAddReviewMarker = useCallback(() => {
     const view = editorRef.current?.view;
     if (!view) return;
 
-    const { state, dispatch } = view;
-    const selection = state.selection.main;
-    const selectedText = state.sliceDoc(selection.from, selection.to);
-
-    const STAMP = `// ✓ @verified:${new Date().toISOString().slice(0, 10)}`;
-
-    if (selectedText.trim()) {
-      const insertion = `\n${STAMP}\n`;
-      dispatch(
-        state.update({
-          changes: { from: selection.to, to: selection.to, insert: insertion },
-          scrollIntoView: true,
-        })
-      );
-    } else {
-      const insertion = `${STAMP}\n`;
-      dispatch(
-        state.update({
-          changes: { from: selection.from, to: selection.from, insert: insertion },
-          scrollIntoView: true,
-        })
-      );
+    if (insertReviewMarkerInView(view)) {
+      setReviewMarkerCount((n) => n + 1);
     }
-    setMarkedCount((n) => n + 1);
   }, []);
 
   const handleReformat = async () => {
@@ -277,9 +302,9 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-panel text-foreground">
-      <div className="flex min-h-8 flex-wrap items-center justify-between gap-2 border-b border-outline/70 bg-panel px-2.5 py-0.5 text-xs text-text-secondary md:h-8 md:flex-nowrap">
+      <div className="flex min-h-8 flex-wrap items-center justify-between gap-2 border-b border-outline/70 bg-panel px-2.5 py-0.5 text-xs text-text-secondary md:h-8 md:flex-nowrap md:overflow-x-auto">
         <div
-          className="flex items-center gap-0.5 rounded border border-outline/70 bg-inset p-0.5"
+          className="flex shrink-0 items-center gap-0.5 rounded border border-outline/70 bg-inset p-0.5"
           role="tablist"
           aria-label="Editor input mode"
         >
@@ -289,7 +314,7 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
             aria-selected={editorMode === "visual"}
             onClick={() => setEditorMode("visual")}
             data-testid="editor-mode-visual"
-            className={`flex min-h-11 md:min-h-0 items-center gap-1 rounded-[4px] px-2.5 py-0.5 text-xs font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`flex min-h-11 md:min-h-0 whitespace-nowrap items-center gap-1 rounded-[4px] px-2.5 py-0.5 text-xs font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               editorMode === "visual"
                 ? "bg-elevated text-foreground shadow-xs"
                 : "text-text-secondary hover:text-foreground"
@@ -304,7 +329,7 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
             aria-selected={editorMode === "code"}
             onClick={() => setEditorMode("code")}
             data-testid="editor-mode-code"
-            className={`flex min-h-11 md:min-h-0 items-center gap-1 rounded-[4px] px-2.5 py-0.5 text-xs font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`flex min-h-11 md:min-h-0 whitespace-nowrap items-center gap-1 rounded-[4px] px-2.5 py-0.5 text-xs font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               editorMode === "code"
                 ? "bg-elevated text-foreground shadow-xs"
                 : "text-text-secondary hover:text-foreground"
@@ -315,7 +340,7 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
           </button>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 md:flex-nowrap md:shrink-0">
           {editorMode === "code" && (
             <>
               <button
@@ -323,29 +348,37 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
                 onClick={handleInsertEntrySnippet}
                 data-testid="insert-entry-snippet-btn"
                 title="Insert a new Experience/Project entry block"
-                className="flex min-h-11 md:min-h-0 items-center gap-1 px-2 py-0.5 rounded bg-elevated hover:bg-muted border border-outline/70 text-foreground text-xs font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex min-h-11 md:min-h-0 shrink-0 whitespace-nowrap items-center gap-1 px-2 py-0.5 rounded bg-elevated hover:bg-muted border border-outline/70 text-foreground text-xs font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Plus className="h-3 w-3 text-primary" />
                 Entry
               </button>
-              {markedCount > 0 && (
-                <span className="text-xs font-mono tabular-nums text-status-success">
-                  {markedCount} mark{markedCount !== 1 ? "s" : ""}
+              {reviewMarkerCount > 0 && (
+                <span
+                  data-testid="review-marker-count"
+                  className="whitespace-nowrap text-xs font-mono tabular-nums text-text-secondary"
+                >
+                  {formatReviewMarkerCount(reviewMarkerCount)}
                 </span>
               )}
               <button
                 type="button"
-                onClick={handleMarkVerified}
-                title="Mark selected text as verified (Task 7.7)"
-                className="flex min-h-11 md:min-h-0 items-center gap-1 px-2 py-0.5 rounded bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-status-success text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={handleAddReviewMarker}
+                data-testid="add-review-marker-btn"
+                title={REVIEW_MARKER_HELP_TEXT}
+                aria-describedby={reviewMarkerHelpId}
+                className="flex min-h-11 md:min-h-0 shrink-0 whitespace-nowrap items-center gap-1 px-2 py-0.5 rounded bg-elevated hover:bg-muted border border-outline/70 text-foreground text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <ShieldCheck className="h-3 w-3" />
-                Mark
+                <MessageSquarePlus className="h-3 w-3 text-text-secondary" aria-hidden="true" />
+                Add review marker
               </button>
+              <span id={reviewMarkerHelpId} className="sr-only">
+                {REVIEW_MARKER_HELP_TEXT}
+              </span>
             </>
           )}
-          {isResumeLayoutV2Enabled() && <button type="button" onClick={() => void handleReformat()} className="inline-flex min-h-11 md:min-h-0 items-center rounded border border-outline/70 bg-elevated px-2 py-0.5 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Reformat draft</button>}
-          <span className="hidden xl:inline font-mono text-xs text-text-muted">
+          {isResumeLayoutV2Enabled() && <button type="button" onClick={() => void handleReformat()} className="inline-flex min-h-11 md:min-h-0 shrink-0 whitespace-nowrap items-center rounded border border-outline/70 bg-elevated px-2 py-0.5 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Reformat draft</button>}
+          <span className="hidden 2xl:inline shrink-0 whitespace-nowrap font-mono text-xs text-text-muted">
             {editorMode === "visual" ? "Guided" : "resume.typ"}
           </span>
         </div>
