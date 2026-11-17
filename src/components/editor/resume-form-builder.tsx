@@ -569,7 +569,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
           <span>Formatting:</span>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-1.5 text-[11px] text-text-muted font-mono">
+          <label className="flex items-center gap-1.5 text-xs text-text-muted font-mono">
             <span>Font Size</span>
             <select
               value={model.fontSize}
@@ -590,7 +590,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
             </select>
           </label>
 
-          <label className="flex items-center gap-1.5 text-[11px] text-text-muted font-mono">
+          <label className="flex items-center gap-1.5 text-xs text-text-muted font-mono">
             <span>Margins</span>
             <select
               value={model.marginPreset}
@@ -651,7 +651,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-mono text-text-muted mb-1">Full Name</label>
+                  <label className="block text-xs font-mono text-text-muted mb-1">Full Name</label>
                   <input
                     type="text"
                     value={model.fullName}
@@ -661,7 +661,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-mono text-text-muted mb-1">Location</label>
+                  <label className="block text-xs font-mono text-text-muted mb-1">Location</label>
                   <input
                     type="text"
                     value={model.location}
@@ -671,7 +671,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-mono text-text-muted mb-1">Email</label>
+                  <label className="block text-xs font-mono text-text-muted mb-1">Email</label>
                   <input
                     type="email"
                     value={model.email}
@@ -681,7 +681,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-mono text-text-muted mb-1">Phone</label>
+                  <label className="block text-xs font-mono text-text-muted mb-1">Phone</label>
                   <input
                     type="text"
                     value={model.phone}
@@ -691,7 +691,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-mono text-text-muted mb-1">GitHub URL</label>
+                  <label className="block text-xs font-mono text-text-muted mb-1">GitHub URL</label>
                   <input
                     type="text"
                     value={model.github}
@@ -700,7 +700,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-mono text-text-muted mb-1">LinkedIn URL</label>
+                  <label className="block text-xs font-mono text-text-muted mb-1">LinkedIn URL</label>
                   <input
                     type="text"
                     value={model.linkedin}
@@ -716,7 +716,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                 <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-primary">
                   Professional Summary (Optional)
                 </h3>
-                <span className="text-[10px] font-mono text-text-muted">Renders above Experience</span>
+                <span className="text-xs font-mono text-text-muted">Renders above Experience</span>
               </div>
               <textarea
                 rows={3}
@@ -781,7 +781,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-[10px] font-mono text-text-muted mb-1">
+                    <label className="block text-xs font-mono text-text-muted mb-1">
                       {activeSection === "education"
                         ? "University / Institution"
                         : activeSection === "projects"
@@ -798,7 +798,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-mono text-text-muted mb-1">
+                    <label className="block text-xs font-mono text-text-muted mb-1">
                       {activeSection === "education" ? "Degree / Program" : "Role / Title"}
                     </label>
                     <input
@@ -811,7 +811,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-mono text-text-muted mb-1">
+                    <label className="block text-xs font-mono text-text-muted mb-1">
                       Location
                     </label>
                     <input
@@ -824,7 +824,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-mono text-text-muted mb-1">
+                    <label className="block text-xs font-mono text-text-muted mb-1">
                       Date Range
                     </label>
                     <input
@@ -840,13 +840,13 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
 
                 <div className="space-y-2 pt-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
+                    <span className="text-xs font-mono uppercase tracking-wider text-text-muted">
                       Impact Bullets ({entry.bullets.length})
                     </span>
                     <button
                       type="button"
                       onClick={() => addEntryBullet(activeSection, entry.id)}
-                      className="text-[11px] font-mono text-primary hover:underline flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                      className="text-xs font-mono text-primary hover:underline flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                     >
                       <Plus className="h-3 w-3" /> Add Bullet
                     </button>
@@ -960,7 +960,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
       </div>
 
       {/* Footer Sync Indicator */}
-      <div className="flex items-center justify-between border-t border-outline/70 bg-canvas px-4 py-2 text-[11px] text-text-muted font-mono">
+      <div className="flex items-center justify-between border-t border-outline/70 bg-canvas px-4 py-2 text-xs text-text-muted font-mono">
         <span className="flex items-center gap-1.5 text-status-success">
           <Sparkles className="h-3 w-3" />
           Live-synced with Typst WASM Preview

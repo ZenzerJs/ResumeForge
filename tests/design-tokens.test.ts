@@ -216,4 +216,41 @@ describe("Design tokens & Ember Ink taste invariants", () => {
     expect(brandIconSrc).toContain('fill="currentColor"');
     expect(brandIconSrc).toContain('aria-hidden="true"');
   });
+
+  it("forbids hardcoded -950 status banners in editor-workspace and tailor-workspace", () => {
+    const hardcoded950Re =
+      /\b(?:bg|border|text)-(?:red|amber|sky|blue|orange|yellow|rose|pink|purple|indigo|violet|cyan|lime|teal|emerald|green)-950\b/g;
+
+    for (const relPath of [
+      "components/editor/editor-workspace.tsx",
+      "components/tailor/tailor-workspace.tsx",
+    ]) {
+      const src = fs.readFileSync(path.join(SRC_DIR, relPath), "utf8");
+      expect(src.match(hardcoded950Re) ?? []).toEqual([]);
+    }
+  });
+
+  it("defaults confirmed to false in ConfirmMasterDialog", () => {
+    const dialogSrc = fs.readFileSync(
+      path.join(SRC_DIR, "components/editor/confirm-master-dialog.tsx"),
+      "utf8",
+    );
+    expect(dialogSrc).toMatch(/useState\(false\)/);
+    expect(dialogSrc).toContain("const [confirmed, setConfirmed] = useState(false)");
+  });
+
+  it("omits fake Live badge in ProductProofCard and sub-12px Math.max(8 floor in HomeLanding", () => {
+    const proofCardSrc = fs.readFileSync(
+      path.join(SRC_DIR, "components/landing/product-proof-card.tsx"),
+      "utf8",
+    );
+    const homeSrc = fs.readFileSync(
+      path.join(SRC_DIR, "components/landing/home-landing.tsx"),
+      "utf8",
+    );
+
+    expect(proofCardSrc).not.toContain(">Live<");
+    expect(proofCardSrc).not.toContain('"Live"');
+    expect(homeSrc).not.toContain("Math.max(8");
+  });
 });

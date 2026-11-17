@@ -15,7 +15,7 @@ export default function TermsPage() {
         id="main-content"
         className="mx-auto w-full max-w-3xl px-4 pb-16 pt-[calc(6rem+env(safe-area-inset-top))] md:px-8"
       >
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Legal</p>
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-primary">Legal</p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">Terms of Service</h1>
         <p className="mt-2 text-sm text-muted-foreground">Last updated: August 14, 2026</p>
 

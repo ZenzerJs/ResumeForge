@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -628,7 +628,7 @@ export function PatchDiffReview({
         const errorMsg = "error" in compileResult ? compileResult.error.message : "Unknown compilation error";
         setApplyError({
           category: "compile_failed",
-          message: `Typst compilation failed — cannot apply patches: ${errorMsg}`,
+          message: `Typst compilation failed â€” cannot apply patches: ${errorMsg}`,
           recoveryAction: getPatchRecoveryAction("compile_failed"),
           details: { compileError: errorMsg, acceptedPatchIds: acceptedIds },
         });
@@ -664,7 +664,7 @@ export function PatchDiffReview({
           revisionToken: batch.revisionToken,
           acceptedPatchIds: acceptedIds,
           acknowledgedSkills: Array.from(acknowledgedSkills),
-          variantTitle: `AI Tailored Variant — ${new Date().toLocaleDateString()}`,
+          variantTitle: `AI Tailored Variant â€” ${new Date().toLocaleDateString()}`,
           ...(expectedEvidenceRevision ? { expectedEvidenceRevision } : {}),
         }),
       });
@@ -854,7 +854,7 @@ export function PatchDiffReview({
                   })}
                 </div>
                 <span className="text-xs text-muted-foreground font-mono tabular-nums">
-                  {acceptedPatches.length} accepted · {rejectedByUser.length} rejected · {pendingPatches.length} pending
+                  {acceptedPatches.length} accepted Â· {rejectedByUser.length} rejected Â· {pendingPatches.length} pending
                 </span>
               </div>
 
@@ -907,7 +907,7 @@ export function PatchDiffReview({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-2 min-w-0">
                         <span
-                          className={`text-[11px] uppercase font-bold px-2 py-0.5 rounded ${opStyle.bg} ${opStyle.text} border border-current/20`}
+                          className={`text-xs uppercase font-bold px-2 py-0.5 rounded ${opStyle.bg} ${opStyle.text} border border-current/20`}
                         >
                           {patch.operation.replace(/_/g, " ")}
                         </span>
@@ -924,22 +924,22 @@ export function PatchDiffReview({
                         </span>
                         {/* Status Distinction Badges */}
                         {isApplied ? (
-                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border status-success-surface">
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full border status-success-surface">
                             Applied
                           </span>
                         ) : decision === "accepted" ? (
-                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border status-success-surface">
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full border status-success-surface">
                             Accepted
                           </span>
                         ) : decision === "rejected" ? (
-                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border border-red-800/60 bg-red-950/40 text-red-300">
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full border border-red-800/60 bg-red-950/40 text-red-300">
                             Rejected
                           </span>
                         ) : null}
                         {preflight?.citationChecked && (
                           <span
                             data-testid={`citation-checked-${patch.id}`}
-                            className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-signal/35 bg-signal/10 text-status-success-soft"
+                            className="text-xs font-medium px-2 py-0.5 rounded-full border border-signal/35 bg-signal/10 text-status-success-soft"
                           >
                             Citation checked
                           </span>
@@ -1013,10 +1013,10 @@ export function PatchDiffReview({
                               onRetry: handleApplyAccepted,
                             })}
                             <details className="pt-1">
-                              <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground hover:text-foreground">
+                              <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
                                 Technical details
                               </summary>
-                              <div className="mt-1 rounded bg-inset p-2 font-mono text-[11px] text-muted-foreground break-all space-y-0.5">
+                              <div className="mt-1 rounded bg-inset p-2 font-mono text-xs text-muted-foreground break-all space-y-0.5">
                                 <div>category: {applyError.category}</div>
                                 <div>patchId: {patch.id}</div>
                                 {batch?.batchId && <div>batchId: {batch.batchId}</div>}
@@ -1084,7 +1084,7 @@ export function PatchDiffReview({
                                   </span>
                                   {resolved && (
                                     <span
-                                      className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded border ${
+                                      className={`text-xs font-semibold uppercase px-1.5 py-0.5 rounded border ${
                                         resolved.entry.status === "verified"
                                           ? "status-success-surface"
                                           : "border-amber-800/60 bg-amber-950/40 text-amber-300"
@@ -1094,7 +1094,7 @@ export function PatchDiffReview({
                                     </span>
                                   )}
                                 </span>
-                                <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                                   <span>Source &amp; IDs</span>
                                   <ChevronDown className="h-3 w-3" aria-hidden />
                                 </span>
@@ -1112,7 +1112,7 @@ export function PatchDiffReview({
                                     {resolved.entry.verifiedSummary}
                                   </p>
                                 )}
-                                <div className="font-mono text-[11px] text-muted-foreground break-all space-y-0.5">
+                                <div className="font-mono text-xs text-muted-foreground break-all space-y-0.5">
                                   {ref.evidenceId && <div>evidenceId: {ref.evidenceId}</div>}
                                   {ref.bulletId && <div>bulletId: {ref.bulletId}</div>}
                                 </div>
@@ -1130,7 +1130,7 @@ export function PatchDiffReview({
             <div className="surface-raised rounded-xl p-6 text-center text-sm text-muted-foreground space-y-2">
               <p>
                 {blockedCount > 0
-                  ? `No ready suggestions right now — inspect Blocked (${blockedCount}) to review citation or anchor issues.`
+                  ? `No ready suggestions right now â€” inspect Blocked (${blockedCount}) to review citation or anchor issues.`
                   : "No actionable patch proposals in this batch."}
               </p>
             </div>
@@ -1157,7 +1157,7 @@ export function PatchDiffReview({
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       <span
-                        className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${style.bg} ${style.text} border ${style.border}`}
+                        className={`text-xs uppercase font-bold px-2 py-0.5 rounded ${style.bg} ${style.text} border ${style.border}`}
                       >
                         {gap.severity}
                       </span>
@@ -1190,7 +1190,7 @@ export function PatchDiffReview({
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-amber-300 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4" aria-hidden />
-                    Needs Review — Preflight Blocked ({preflightBlockedPatches.length})
+                    Needs Review â€” Preflight Blocked ({preflightBlockedPatches.length})
                   </h3>
                   {preflightBlockedPatches.map((patch) => {
                     const pf = preflightById[patch.id];
@@ -1203,7 +1203,7 @@ export function PatchDiffReview({
                           <span className="font-semibold text-foreground break-words">
                             {patch.targetSection} ({patch.operation.replace(/_/g, " ")})
                           </span>
-                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border border-amber-700/60 bg-amber-950/60 text-amber-300">
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full border border-amber-700/60 bg-amber-950/60 text-amber-300">
                             Needs review
                           </span>
                         </div>
@@ -1223,8 +1223,8 @@ export function PatchDiffReview({
                           <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
                             Technical IDs
                           </summary>
-                          <div className="mt-1 rounded bg-inset p-2 font-mono text-[11px] text-muted-foreground break-all">
-                            patchId: {patch.id} · evidenceIds: {patch.evidenceIds.join(", ")}
+                          <div className="mt-1 rounded bg-inset p-2 font-mono text-xs text-muted-foreground break-all">
+                            patchId: {patch.id} Â· evidenceIds: {patch.evidenceIds.join(", ")}
                           </div>
                         </details>
                       </div>
@@ -1237,7 +1237,7 @@ export function PatchDiffReview({
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-red-400 flex items-center gap-2">
                     <ShieldAlert className="h-4 w-4" aria-hidden />
-                    Rejected Patches — Invalid Citations ({rejected.length})
+                    Rejected Patches â€” Invalid Citations ({rejected.length})
                   </h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     These proposals were blocked because they cited evidence IDs that are missing,
@@ -1264,13 +1264,13 @@ export function PatchDiffReview({
                       </div>
                       <div className={diffGridClass}>
                         <div className="min-w-0">
-                          <span className="text-muted-foreground text-[10px] uppercase">Before</span>
+                          <span className="text-muted-foreground text-xs uppercase">Before</span>
                           <div className="text-text-secondary bg-inset rounded p-2.5 mt-1 text-sm font-sans break-words whitespace-pre-wrap">
                             {item.patch.before || "(empty)"}
                           </div>
                         </div>
                         <div className="min-w-0">
-                          <span className="text-muted-foreground text-[10px] uppercase">
+                          <span className="text-muted-foreground text-xs uppercase">
                             After (Blocked)
                           </span>
                           <div className="text-red-300/70 bg-inset rounded p-2.5 mt-1 text-sm font-sans line-through break-words whitespace-pre-wrap">
@@ -1349,10 +1349,10 @@ export function PatchDiffReview({
                   onRetry: handleApplyAccepted,
                 })}
                 <details className="pt-1">
-                  <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground hover:text-foreground">
+                  <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
                     Technical IDs &amp; details
                   </summary>
-                  <pre className="mt-1 whitespace-pre-wrap break-all rounded bg-inset p-2 font-mono text-[11px] text-muted-foreground">
+                  <pre className="mt-1 whitespace-pre-wrap break-all rounded bg-inset p-2 font-mono text-xs text-muted-foreground">
                     {JSON.stringify(
                       {
                         category: applyError.category,
@@ -1407,10 +1407,10 @@ export function PatchDiffReview({
           >
             <div className="flex flex-wrap items-center gap-2 text-xs font-mono tabular-nums text-text-secondary">
               <span className="font-semibold text-foreground">
-                {acceptedPatches.length} accepted · {pendingPatches.length} pending
+                {acceptedPatches.length} accepted Â· {pendingPatches.length} pending
               </span>
               {rejectedByUser.length > 0 && (
-                <span className="text-muted-foreground">· {rejectedByUser.length} rejected</span>
+                <span className="text-muted-foreground">Â· {rejectedByUser.length} rejected</span>
               )}
             </div>
 

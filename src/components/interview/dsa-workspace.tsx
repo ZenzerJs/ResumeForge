@@ -337,16 +337,16 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
 
           <span
             className={cn(
-              "rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
+              "rounded-full border px-2.5 py-0.5 text-xs font-semibold",
               difficultyBadgeStyle(selectedProblem.difficulty)
             )}
           >
             {selectedProblem.difficulty}
           </span>
-          <span className="rounded-full border border-hairline bg-panel px-2.5 py-0.5 text-[11px] font-medium text-text-secondary">
+          <span className="rounded-full border border-hairline bg-panel px-2.5 py-0.5 text-xs font-medium text-text-secondary">
             {selectedProblem.pattern}
           </span>
-          <span className="hidden font-mono text-[11px] tabular-nums text-muted-foreground xl:inline">
+          <span className="hidden font-mono text-xs tabular-nums text-muted-foreground xl:inline">
             Time {selectedProblem.optimalTimeComplexity} · Space {selectedProblem.optimalSpaceComplexity}
           </span>
         </div>
@@ -373,7 +373,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
           <div className="mx-auto max-w-5xl space-y-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-xs font-semibold text-foreground">Find problems for a target role</h2>
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 Ranks problems by keyword overlap with the job description
               </span>
             </div>
@@ -418,13 +418,13 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                         <span className="truncate text-xs font-semibold text-foreground">
                           {rec.problem.title}
                         </span>
-                        <span className="shrink-0 rounded-full bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-amber-300">
+                        <span className="shrink-0 rounded-full bg-amber-500/10 px-1.5 py-0.5 font-mono text-xs tabular-nums text-amber-300">
                           {rec.relevanceScore}% match
                         </span>
                       </span>
                       <span
                         data-testid="dsa-match-reason"
-                        className="line-clamp-2 text-[11px] leading-relaxed text-text-secondary"
+                        className="line-clamp-2 text-xs leading-relaxed text-text-secondary"
                       >
                         {rec.matchReason}
                       </span>
@@ -442,7 +442,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
         {/* Problem pane */}
         <section className="space-y-6 rounded-xl border border-hairline bg-panel p-5 lg:col-span-5 lg:overflow-y-auto">
           <div>
-            <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
               {selectedProblem.pattern}
             </p>
             <h1 className="mb-3 text-xl font-semibold tracking-tight text-foreground text-balance">
@@ -452,7 +452,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               {selectedProblem.categoryTags.map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-full border border-hairline px-2 py-0.5 text-[10px] font-medium text-text-secondary"
+                  className="rounded-full border border-hairline px-2 py-0.5 text-xs font-medium text-text-secondary"
                 >
                   {tag}
                 </span>
@@ -480,7 +480,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                   <span className="text-status-success-soft">{example.output}</span>
                 </div>
                 {example.explanation && (
-                  <div className="border-t border-hairline pt-1.5 font-sans text-[11px] leading-relaxed text-text-secondary">
+                  <div className="border-t border-hairline pt-1.5 font-sans text-xs leading-relaxed text-text-secondary">
                     {example.explanation}
                   </div>
                 )}
@@ -504,7 +504,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                 Progressive Interview Hints
               </h2>
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Try solving without peeking first. Reveal hints progressively if stuck.
             </p>
 
@@ -534,7 +534,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                         />
                         <span>{label}</span>
                       </span>
-                      <span className="text-[11px] text-muted-foreground">{isRevealed ? "Hide" : "Reveal"}</span>
+                      <span className="text-xs text-muted-foreground">{isRevealed ? "Hide" : "Reveal"}</span>
                     </button>
                     {isRevealed && (
                       <div
@@ -562,12 +562,12 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                   Socratic Interview Coach
                 </h2>
               </div>
-              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-amber-300">
+              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-amber-300">
                 Stage: {coachStage}
               </span>
             </div>
 
-            <p className="text-[11px] text-text-secondary">
+            <p className="text-xs text-text-secondary">
               Discuss constraints, walk through your Big-O approach, or request a Socratic nudge without spoiling the code.
             </p>
 
@@ -583,7 +583,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                         : "mr-2 border border-amber-500/20 bg-amber-500/5 text-foreground"
                     )}
                   >
-                    <span className="mb-0.5 block font-mono text-[10px] uppercase text-muted-foreground">
+                    <span className="mb-0.5 block font-mono text-xs uppercase text-muted-foreground">
                       {msg.role === "user" ? "You" : "Socratic Coach"}
                     </span>
                     {msg.content}
@@ -676,25 +676,25 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                     <span className="font-mono text-sm text-amber-400">{scorecard.grade}</span>{" "}
                     ({scorecard.overallScore}/100)
                   </span>
-                  <span className="font-mono text-[10px] uppercase text-muted-foreground">
+                  <span className="font-mono text-xs uppercase text-muted-foreground">
                     {scorecard.mode === "byok" ? "AI Audited" : "Heuristic Audit"}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-[11px]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-xs">
                   <div className="rounded border border-hairline bg-inset p-2">
-                    <span className="block text-[10px] text-muted-foreground">Time Complexity</span>
+                    <span className="block text-xs text-muted-foreground">Time Complexity</span>
                     <span className={scorecard.complexityAudit.isTimeOptimal ? "text-status-success-soft" : "text-amber-300"}>
                       {scorecard.complexityAudit.detectedTimeComplexity} (target {scorecard.complexityAudit.optimalTimeComplexity})
                     </span>
                   </div>
                   <div className="rounded border border-hairline bg-inset p-2">
-                    <span className="block text-[10px] text-muted-foreground">Space Complexity</span>
+                    <span className="block text-xs text-muted-foreground">Space Complexity</span>
                     <span className={scorecard.complexityAudit.isSpaceOptimal ? "text-status-success-soft" : "text-amber-300"}>
                       {scorecard.complexityAudit.detectedSpaceComplexity} (target {scorecard.complexityAudit.optimalSpaceComplexity})
                     </span>
                   </div>
                 </div>
-                <p className="text-[11px] leading-relaxed text-text-secondary">
+                <p className="text-xs leading-relaxed text-text-secondary">
                   {scorecard.complexityAudit.actionableFeedback}
                 </p>
               </div>
@@ -707,7 +707,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
           <div className="flex min-h-[340px] flex-1 flex-col overflow-hidden rounded-xl border border-hairline bg-panel">
             <div className="flex flex-wrap shrink-0 items-center justify-between gap-2 sm:gap-3 border-b border-hairline px-3 py-2">
               <div className="flex min-w-0 items-center gap-3">
-                <span className="rounded-md border border-hairline bg-inset px-2 py-1 font-mono text-[11px] text-text-secondary">
+                <span className="rounded-md border border-hairline bg-inset px-2 py-1 font-mono text-xs text-text-secondary">
                   solution.{FILE_EXT[selectedLanguage]}
                 </span>
                 <div className="relative">
@@ -820,7 +820,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                     <div className="flex items-center gap-2">
                       <span
                         className={cn(
-                          "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
+                          "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold",
                           statusBadgeStyle(executionSummary.status)
                         )}
                       >
@@ -833,16 +833,16 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                         )}
                         <span>{executionSummary.status}</span>
                       </span>
-                      <span className="font-mono text-[11px] tabular-nums text-text-secondary">
+                      <span className="font-mono text-xs tabular-nums text-text-secondary">
                         {executionSummary.passedCount} / {executionSummary.totalCount} Passed
                       </span>
-                      <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                      <span className="font-mono text-xs tabular-nums text-muted-foreground">
                         ({executionSummary.totalTimeMs}ms)
                       </span>
                     </div>
                   ) : (
-                    <span className="text-[11px] text-muted-foreground">
-                      Press <kbd className="rounded border border-hairline px-1 font-mono text-[10px]">Run Code</kbd>{" "}
+                    <span className="text-xs text-muted-foreground">
+                      Press <kbd className="rounded border border-hairline px-1 font-mono text-xs">Run Code</kbd>{" "}
                       to test your solution
                     </span>
                   )}
@@ -850,7 +850,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               </div>
 
               {executionSummary?.errorMessage && (
-                <div className="flex max-w-sm items-center gap-1 truncate font-mono text-[11px] text-rose-400">
+                <div className="flex max-w-sm items-center gap-1 truncate font-mono text-xs text-rose-400">
                   <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden />
                   <span className="truncate">{executionSummary.errorMessage}</span>
                 </div>
@@ -891,7 +891,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
             <div className="flex-1 space-y-3 overflow-y-auto p-3 font-mono text-xs text-text-secondary">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <span className="block font-sans text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <span className="block font-sans text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Input
                   </span>
                   <div className="whitespace-pre-wrap rounded-md border border-hairline bg-inset p-2 text-text-secondary">
@@ -901,13 +901,13 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
 
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="font-sans text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <span className="font-sans text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Expected Output
                     </span>
                     <span className="text-status-success-soft">{JSON.stringify(activeTestCase.expected)}</span>
                   </div>
 
-                  <span className="block pt-1 font-sans text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <span className="block pt-1 font-sans text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Actual Output
                   </span>
                   <div
@@ -931,13 +931,13 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               </div>
 
               <div className="space-y-1 pt-1">
-                <span className="flex items-center gap-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <span className="flex items-center gap-1.5 font-sans text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   <Terminal className="h-3 w-3 text-text-secondary" aria-hidden />
                   <span>Console output</span>
                 </span>
                 <pre
                   data-testid="dsa-stdout-output"
-                  className="max-h-24 overflow-y-auto whitespace-pre-wrap rounded-md border border-hairline bg-inset p-2 text-[11px] leading-relaxed text-text-secondary"
+                  className="max-h-24 overflow-y-auto whitespace-pre-wrap rounded-md border border-hairline bg-inset p-2 text-xs leading-relaxed text-text-secondary"
                 >
                   {activeResult?.stdout || "(no stdout captured)"}
                 </pre>

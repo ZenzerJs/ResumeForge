@@ -36,14 +36,14 @@ export default function Error({
         </div>
 
         <div className="bg-inset border border-outline/70 rounded-[6px] p-3.5 text-left space-y-1 font-mono text-xs">
-          <span className="text-[11px] text-muted-foreground uppercase font-semibold block">
+          <span className="text-xs text-muted-foreground uppercase font-semibold block">
             Error Details
           </span>
           <p className="text-status-danger break-words text-xs">
             {error.message || "An unexpected application error occurred."}
           </p>
           {error.digest && (
-            <span className="text-[11px] text-muted-foreground block mt-1 tabular-nums">
+            <span className="text-xs text-muted-foreground block mt-1 tabular-nums">
               Digest: {error.digest}
             </span>
           )}

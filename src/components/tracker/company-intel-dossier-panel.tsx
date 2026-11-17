@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -229,11 +229,11 @@ export function CompanyIntelDossierPanel({
             className="inline-flex items-center gap-2 rounded-lg bg-status-success px-4 py-2 text-xs font-semibold text-contrast-ink shadow-md hover:bg-status-success/90 transition"
           >
             <Sparkles className="size-3.5" />
-            <span>⚡ Generate Company Intel with AI</span>
+            <span>âš¡ Generate Company Intel with AI</span>
           </button>
         </div>
 
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Uses your configured LLM API key. Never fires automatically to conserve your tokens.
         </p>
       </div>
@@ -246,7 +246,7 @@ export function CompanyIntelDossierPanel({
         <RefreshCw className="size-7 mx-auto text-status-success animate-spin" />
         <div className="space-y-1">
           <h3 className="text-xs font-bold text-foreground">Synthesizing Company Intel for {company}...</h3>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Analyzing interview loops, evaluation criteria, deployment velocity, and engineering culture.
           </p>
         </div>
@@ -272,21 +272,21 @@ export function CompanyIntelDossierPanel({
                 <Badge
                   variant="outline"
                   data-testid="badge-whiteboard-free"
-                  className="border-status-success/45 bg-status-success/15 text-status-success-soft text-[10px] font-semibold gap-1"
+                  className="border-status-success/45 bg-status-success/15 text-status-success-soft text-xs font-semibold gap-1"
                 >
                   <CheckCircle2 className="size-3 text-status-success" />
-                  <span>✓ No Whiteboard Trivia — per Hiring Without Whiteboards</span>
+                  <span>âœ“ No Whiteboard Trivia â€” per Hiring Without Whiteboards</span>
                 </Badge>
               )}
             </div>
             {dossier?.processNotes && (
-              <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{dossier.processNotes}</p>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{dossier.processNotes}</p>
             )}
           </div>
         </div>
 
         {interview?.format && (
-          <Badge variant="outline" className={cn("text-[10px] font-semibold px-2 py-0.5", getFormatBadgeStyle(interview.format))}>
+          <Badge variant="outline" className={cn("text-xs font-semibold px-2 py-0.5", getFormatBadgeStyle(interview.format))}>
             {interview.format}
           </Badge>
         )}
@@ -302,12 +302,12 @@ export function CompanyIntelDossierPanel({
           {/* Evaluation Criteria */}
           {interview?.primaryEvaluationCriteria && interview.primaryEvaluationCriteria.length > 0 && (
             <div className="p-3.5 rounded-lg border border-hairline bg-inset/70 space-y-2">
-              <span className="font-semibold text-text-secondary text-[11px] block">Primary Evaluation Criteria</span>
+              <span className="font-semibold text-text-secondary text-xs block">Primary Evaluation Criteria</span>
               <div className="flex flex-wrap gap-1.5">
                 {interview.primaryEvaluationCriteria.map((crit, idx) => (
                   <span
                     key={idx}
-                    className="px-2 py-0.5 rounded bg-elevated text-foreground border border-hairline text-[10px]"
+                    className="px-2 py-0.5 rounded bg-elevated text-foreground border border-hairline text-xs"
                   >
                     {crit}
                   </span>
@@ -319,11 +319,11 @@ export function CompanyIntelDossierPanel({
           {/* Round Breakdown Timeline */}
           {interview?.roundBreakdown && interview.roundBreakdown.length > 0 && (
             <div className="p-3.5 rounded-lg border border-hairline bg-inset/70 space-y-2">
-              <span className="font-semibold text-text-secondary text-[11px] block">Interview Round Breakdown</span>
+              <span className="font-semibold text-text-secondary text-xs block">Interview Round Breakdown</span>
               <div className="space-y-1.5">
                 {interview.roundBreakdown.map((round, idx) => (
                   <div key={idx} className="flex items-start gap-2 text-text-secondary">
-                    <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-status-success/15 text-status-success-soft border border-status-success/35 text-[9px] font-bold">
+                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-status-success/15 text-status-success-soft border border-status-success/35 text-xs font-bold">
                       {idx + 1}
                     </span>
                     <span className="leading-snug">{round}</span>
@@ -344,24 +344,24 @@ export function CompanyIntelDossierPanel({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="p-3 rounded-lg border border-hairline bg-inset/70 space-y-1">
-              <span className="text-[10px] text-muted-foreground uppercase font-semibold block">Work-Life Balance</span>
+              <span className="text-xs text-muted-foreground uppercase font-semibold block">Work-Life Balance</span>
               <div className="flex items-center gap-1.5">
                 <span className="text-base font-bold text-primary">
                   {culture.workLifeBalanceRating ? `${culture.workLifeBalanceRating}/5` : "3.8/5 (est.)"}
                 </span>
-                <span className="text-[10px] text-muted-foreground font-mono">rating</span>
+                <span className="text-xs text-muted-foreground font-mono">rating</span>
               </div>
             </div>
 
             <div className="p-3 rounded-lg border border-hairline bg-inset/70 space-y-1">
-              <span className="text-[10px] text-muted-foreground uppercase font-semibold block">Deploy Velocity</span>
+              <span className="text-xs text-muted-foreground uppercase font-semibold block">Deploy Velocity</span>
               <span className="text-xs font-semibold text-foreground block truncate">
                 {culture.deploymentVelocity || "Continuous / Daily (est.)"}
               </span>
             </div>
 
             <div className="p-3 rounded-lg border border-hairline bg-inset/70 space-y-1">
-              <span className="text-[10px] text-muted-foreground uppercase font-semibold block">Remote Policy</span>
+              <span className="text-xs text-muted-foreground uppercase font-semibold block">Remote Policy</span>
               <span className="text-xs font-semibold text-foreground block truncate">
                 {culture.remoteCulture || "Hybrid (est.)"}
               </span>
@@ -373,12 +373,12 @@ export function CompanyIntelDossierPanel({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {culture.pros && culture.pros.length > 0 && (
                 <div className="p-3 rounded-lg border border-status-success/30 bg-status-success/10 space-y-1.5">
-                  <span className="font-semibold text-status-success text-[11px] flex items-center gap-1">
+                  <span className="font-semibold text-status-success text-xs flex items-center gap-1">
                     <ThumbsUp className="size-3" /> Cultural Strengths
                   </span>
                   <div className="space-y-1">
                     {culture.pros.map((pro, idx) => (
-                      <div key={idx} className="flex items-start gap-1.5 text-text-secondary text-[11px]">
+                      <div key={idx} className="flex items-start gap-1.5 text-text-secondary text-xs">
                         <span className="text-status-success font-bold">+</span>
                         <span>{pro}</span>
                       </div>
@@ -389,13 +389,13 @@ export function CompanyIntelDossierPanel({
 
               {culture.cons && culture.cons.length > 0 && (
                 <div className="p-3 rounded-lg border border-rose-900/30 bg-rose-950/20 space-y-1.5">
-                  <span className="font-semibold text-rose-400 text-[11px] flex items-center gap-1">
+                  <span className="font-semibold text-rose-400 text-xs flex items-center gap-1">
                     <ThumbsDown className="size-3" /> Considerations &amp; Trade-offs
                   </span>
                   <div className="space-y-1">
                     {culture.cons.map((con, idx) => (
-                      <div key={idx} className="flex items-start gap-1.5 text-text-secondary text-[11px]">
-                        <span className="text-rose-400 font-bold">−</span>
+                      <div key={idx} className="flex items-start gap-1.5 text-text-secondary text-xs">
+                        <span className="text-rose-400 font-bold">âˆ’</span>
                         <span>{con}</span>
                       </div>
                     ))}
@@ -418,7 +418,7 @@ export function CompanyIntelDossierPanel({
             {interview.proTips.map((tip, idx) => (
               <div
                 key={idx}
-                className="p-2.5 rounded-lg border border-amber-900/40 bg-amber-950/20 text-text-secondary text-[11px] italic"
+                className="p-2.5 rounded-lg border border-amber-900/40 bg-amber-950/20 text-text-secondary text-xs italic"
               >
                 &ldquo;{tip}&rdquo;
               </div>
@@ -428,23 +428,23 @@ export function CompanyIntelDossierPanel({
 
         {dossier?.recentSignals && (
           <div className="p-3.5 rounded-lg border border-hairline bg-inset/70 space-y-1.5">
-            <span className="text-[10px] uppercase font-semibold text-muted-foreground">Recent Signals &amp; Market Intel</span>
+            <span className="text-xs uppercase font-semibold text-muted-foreground">Recent Signals &amp; Market Intel</span>
             <p className="text-text-secondary leading-relaxed text-xs">{dossier.recentSignals}</p>
-            <p className="text-[10px] text-muted-foreground italic">
-              Model-generated intelligence — verify before relying on it.
+            <p className="text-xs text-muted-foreground italic">
+              Model-generated intelligence â€” verify before relying on it.
             </p>
           </div>
         )}
       </div>
 
       {/* Footer & Read More Linkout */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-hairline text-[11px] text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-hairline text-xs text-muted-foreground">
         <div className="flex items-center gap-2">
           <span>Updated {daysAgo === 0 ? "today" : `${daysAgo}d ago`}</span>
-          <span>·</span>
+          <span>Â·</span>
           <span>Source: {dossier?.source || "seed+llm"}</span>
           {isStale && (
-            <Badge variant="outline" className="border-amber-500/60 text-amber-300 text-[9px]">
+            <Badge variant="outline" className="border-amber-500/60 text-amber-300 text-xs">
               Dossier &gt;90d Old
             </Badge>
           )}
