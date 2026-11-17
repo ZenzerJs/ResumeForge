@@ -22,14 +22,11 @@ import {
   LogIn,
   UserRound,
   Lock,
-  Sparkles,
 } from "lucide-react";
 import { AppShell } from "@/components/design-system/app-shell";
 import { PageHeader } from "@/components/design-system/page-header";
 import { Surface } from "@/components/design-system/surface";
 import { PageSkeleton } from "@/components/design-system/page-skeleton";
-import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
-import { OpenAILogo } from "@/components/interview/company-logos";
 import {
   fetchDemoConfig,
   fetchSessionUser,
@@ -48,19 +45,6 @@ const DEFAULT_MODELS: Record<string, string> = {
   ollama: "llama3",
   custom: "llama3",
 };
-
-function renderProviderIcon(providerId: ProviderType) {
-  if (hasBrandIcon(providerId)) {
-    return <BrandIcon name={providerId} className="h-3.5 w-3.5 shrink-0" />;
-  }
-  if (providerId === "openai") {
-    return <OpenAILogo className="h-3.5 w-3.5 shrink-0" />;
-  }
-  if (providerId === "groq") {
-    return <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />;
-  }
-  return <Server className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />;
-}
 
 export function SettingsWorkspace() {
   const [provider, setProvider] = useState<ProviderType>("gemini");
@@ -295,19 +279,6 @@ export function SettingsWorkspace() {
     return `${key.slice(0, 4)}••••••••${key.slice(-4)}`;
   };
 
-  const providerPills: Array<{ id: ProviderType; label: string }> = [
-    { id: "gemini", label: "Google Gemini" },
-    { id: "openai", label: "OpenAI" },
-    { id: "anthropic", label: "Anthropic" },
-    { id: "groq", label: "Groq" },
-    ...(!demoMode
-      ? [
-          { id: "ollama" as ProviderType, label: "Ollama" },
-          { id: "custom" as ProviderType, label: "Custom" },
-        ]
-      : []),
-  ];
-
   if (!isHydrated) {
     return <PageSkeleton variant="settings" />;
   }
@@ -318,7 +289,7 @@ export function SettingsWorkspace() {
         <div className="space-y-6">
           <PageHeader
             eyebrow="Control room"
-            title="AI Provider Gateway Settings — Bring-Your-Own-Key (BYOK) AI Configuration"
+            title="Connect an AI provider key (stored in this browser)"
             description="Configure your preferred LLM provider or local OpenAI-compatible endpoint. API keys are encrypted in your browser's Web Crypto vault and never written to the database or server logs."
           />
 
@@ -331,7 +302,7 @@ export function SettingsWorkspace() {
                 </p>
               </div>
               {sessionUser ? (
-                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-hairline bg-elevated font-bold text-[#ff8b3d]">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-hairline bg-elevated font-bold text-ember">
                   {usernameInitial(sessionUser.username)}
                 </span>
               ) : (
@@ -400,36 +371,10 @@ export function SettingsWorkspace() {
 
           <Surface variant="raised" className="edge-glow p-6 space-y-6">
             {/* Provider Selection */}
-            <div className="rounded-lg border border-hairline bg-inset/60 p-4 card-lift">
+            <div className="rounded-lg border border-hairline bg-inset/60 p-4">
               <label htmlFor="provider-select" className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
                 Select AI Provider
               </label>
-              <div
-                role="group"
-                aria-label="Quick select AI provider"
-                className="mb-3 flex flex-wrap gap-2"
-              >
-                {providerPills.map((p) => {
-                  const active = provider === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      data-testid={`provider-pill-${p.id}`}
-                      aria-pressed={active}
-                      onClick={() => void selectProvider(p.id)}
-                      className={`inline-flex min-h-11 sm:min-h-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
-                        active
-                          ? "border-primary/45 bg-primary/15 font-semibold text-primary"
-                          : "border-hairline bg-panel font-medium text-text-secondary hover:bg-elevated hover:text-foreground"
-                      }`}
-                    >
-                      {renderProviderIcon(p.id)}
-                      <span>{p.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
               <select
                 id="provider-select"
                 value={provider}
@@ -448,7 +393,7 @@ export function SettingsWorkspace() {
 
             {/* API Key Input (Hidden for Ollama) */}
             {provider !== "ollama" ? (
-              <div className="rounded-lg border border-hairline bg-inset/60 p-4 card-lift">
+              <div className="rounded-lg border border-hairline bg-inset/60 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                   <label htmlFor="api-key-input" className="block text-xs font-semibold text-text-secondary uppercase tracking-wider">
                     API Key {provider === "custom" ? "(Optional)" : ""}
@@ -510,7 +455,7 @@ export function SettingsWorkspace() {
                 </div>
               </div>
             ) : (
-              <div className="rounded-lg border border-hairline bg-inset/60 p-4 card-lift">
+              <div className="rounded-lg border border-hairline bg-inset/60 p-4">
                 {/* Ollama Visual Status Indicator */}
                 <div data-testid="vault-status" className="flex items-center gap-2 text-xs text-status-success-soft">
                   <Server className="h-4 w-4 text-status-success" />
@@ -521,7 +466,7 @@ export function SettingsWorkspace() {
 
             {/* Custom/Ollama Endpoint Base URL Input */}
             {(provider === "custom" || provider === "openai" || provider === "ollama") && (
-              <div className="rounded-lg border border-hairline bg-inset/60 p-4 card-lift">
+              <div className="rounded-lg border border-hairline bg-inset/60 p-4">
                 <label htmlFor="base-url-input" className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
                   {provider === "ollama" ? "Ollama Endpoint" : `Endpoint Base URL ${provider === "custom" ? "" : "(Optional Override)"}`}
                 </label>
@@ -538,7 +483,7 @@ export function SettingsWorkspace() {
             )}
 
             {/* Model Name Input */}
-            <div className="rounded-lg border border-hairline bg-inset/60 p-4 card-lift">
+            <div className="rounded-lg border border-hairline bg-inset/60 p-4">
               <label htmlFor="model-input" className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
                 Model Name <span className="text-muted-foreground font-normal normal-case">(optional — leave blank for provider default)</span>
               </label>

@@ -24,6 +24,7 @@ import {
 import { AppShell } from "@/components/design-system/app-shell";
 import { CommandButton } from "@/components/design-system/command-button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { TrackerSubNav } from "@/components/tracker/tracker-sub-nav";
 import { fetchDemoConfig, fetchSessionUser } from "@/components/auth/session-user";
 import { isSafeHref } from "@/lib/security/safe-url";
@@ -207,6 +208,13 @@ export function DiscoverFeed() {
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [notification, setNotification] = useState<FeedNotification | null>(null);
+
+  const activeSecondaryFilterCount =
+    (minSalaryFilter !== "0" ? 1 : 0) +
+    (sourceFilter !== "ALL" ? 1 : 0) +
+    (workplaceFilter !== "ALL" ? 1 : 0) +
+    (canadianOnly ? 1 : 0) +
+    (postedWithin !== "all" ? 1 : 0);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchQuery.trim()), 250);
@@ -656,27 +664,24 @@ export function DiscoverFeed() {
 
         {/* Filter Toolbar */}
         <div className="flex flex-col gap-3 rounded-xl surface-raised p-4">
-          <div className="flex items-center gap-2 text-sm font-semibold text-rf-cloud">
-            <SlidersHorizontal className="h-4 w-4 text-primary" aria-hidden="true" />
-            Search and filters
-          </div>
-          <div className="relative w-full">
-            <label htmlFor="discover-search-input" className="sr-only">
-              Search company, role, or keywords
-            </label>
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              id="discover-search-input"
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search company, title, keywords…"
-              className="h-11 w-full rounded-md border border-hairline bg-inset pl-9 pr-3 text-sm text-rf-cloud placeholder:text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              data-testid="discover-search-input"
-            />
-          </div>
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+            <div className="relative w-full lg:min-w-[220px] lg:flex-1">
+              <label htmlFor="discover-search-input" className="sr-only">
+                Search company, role, or keywords
+              </label>
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                id="discover-search-input"
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search company, title, keywords…"
+                className="h-11 w-full rounded-md border border-hairline bg-inset pl-9 pr-3 text-sm text-rf-cloud placeholder:text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                data-testid="discover-search-input"
+              />
+            </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
               <label htmlFor="discover-city-select" className="sr-only">
                 Filter by City
               </label>
@@ -716,24 +721,6 @@ export function DiscoverFeed() {
                 </>
               )}
 
-              {/* Salary Select */}
-              <label htmlFor="discover-salary-select" className="sr-only">
-                Filter by Minimum Salary
-              </label>
-              <select
-                id="discover-salary-select"
-                value={minSalaryFilter}
-                onChange={(e) => setMinSalaryFilter(e.target.value)}
-                className={`${FILTER_CONTROL} min-w-0 w-full sm:w-auto cursor-pointer text-rf-meta`}
-                data-testid="discover-salary-select"
-              >
-                {MIN_SALARY_OPTIONS.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-
               {/* Match Score Filter */}
               <label htmlFor="discover-match-select" className="sr-only">
                 Filter by Match Tier
@@ -770,79 +757,166 @@ export function DiscoverFeed() {
                 ))}
               </select>
 
-              {/* Source Select */}
-              <label htmlFor="discover-source-select" className="sr-only">
-                Filter by Source
-              </label>
-              <select
-                id="discover-source-select"
-                value={sourceFilter}
-                onChange={(e) => setSourceFilter(e.target.value)}
-                className={`${FILTER_CONTROL} min-w-0 w-full sm:w-auto cursor-pointer text-rf-meta`}
-                data-testid="discover-source-select"
-              >
-                {SOURCES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    data-testid="discover-more-filters-btn"
+                    className={`col-span-2 sm:col-span-1 inline-flex min-h-11 items-center justify-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      activeSecondaryFilterCount > 0
+                        ? "border-primary/50 bg-primary/15 text-primary"
+                        : "border-hairline bg-rf-elevated text-rf-cloud hover:border-control hover:text-foreground"
+                    }`}
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>More filters</span>
+                    {activeSecondaryFilterCount > 0 && (
+                      <span
+                        data-testid="discover-more-filters-count"
+                        className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold tabular-nums text-primary-foreground"
+                      >
+                        {activeSecondaryFilterCount}
+                      </span>
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="end"
+                  sideOffset={8}
+                  className="w-[min(calc(100vw-2rem),22rem)] border-hairline bg-rf-panel p-4 text-rf-cloud shadow-xl"
+                >
+                  <div className="flex flex-col gap-3.5">
+                    <div className="flex items-center justify-between border-b border-hairline pb-2.5">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-rf-cloud">
+                        More filters
+                      </span>
+                      {activeSecondaryFilterCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMinSalaryFilter("0");
+                            setSourceFilter("ALL");
+                            setWorkplaceFilter("ALL");
+                            setCanadianOnly(false);
+                            setPostedWithin("all");
+                          }}
+                          className="text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
 
-              {/* Workplace Select */}
-              <label htmlFor="discover-workplace-select" className="sr-only">
-                Filter by Workplace
-              </label>
-              <select
-                id="discover-workplace-select"
-                value={workplaceFilter}
-                onChange={(e) => setWorkplaceFilter(e.target.value)}
-                className={`${FILTER_CONTROL} min-w-0 w-full sm:w-auto cursor-pointer text-rf-meta`}
-                data-testid="discover-workplace-select"
-              >
-                {WORKPLACE_OPTIONS.map((w) => (
-                  <option key={w.value} value={w.value}>
-                    {w.label}
-                  </option>
-                ))}
-              </select>
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="flex flex-col gap-1">
+                        <label
+                          htmlFor="discover-salary-select"
+                          className="text-[11px] font-mono uppercase tracking-wider text-rf-meta"
+                        >
+                          Minimum Salary
+                        </label>
+                        <select
+                          id="discover-salary-select"
+                          value={minSalaryFilter}
+                          onChange={(e) => setMinSalaryFilter(e.target.value)}
+                          className={`${FILTER_CONTROL} w-full cursor-pointer text-rf-meta`}
+                          data-testid="discover-salary-select"
+                        >
+                          {MIN_SALARY_OPTIONS.map((s) => (
+                            <option key={s.value} value={s.value}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-              {/* Canadian Eligible Toggle */}
-              <button
-                type="button"
-                onClick={() => setCanadianOnly((prev) => !prev)}
-                className={`col-span-2 sm:col-span-1 flex min-h-11 items-center justify-center sm:justify-start gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors ${
-                  canadianOnly
-                    ? "border-primary/50 bg-primary/15 text-primary"
-                    : "border-hairline bg-rf-elevated text-text-secondary hover:text-foreground"
-                }`}
-                aria-pressed={canadianOnly}
-                data-testid="discover-canadian-toggle"
-              >
-                <Globe2 className="h-3.5 w-3.5" />
-                <span>Canada Only</span>
-              </button>
+                      <div className="flex flex-col gap-1">
+                        <label
+                          htmlFor="discover-source-select"
+                          className="text-[11px] font-mono uppercase tracking-wider text-rf-meta"
+                        >
+                          Source
+                        </label>
+                        <select
+                          id="discover-source-select"
+                          value={sourceFilter}
+                          onChange={(e) => setSourceFilter(e.target.value)}
+                          className={`${FILTER_CONTROL} w-full cursor-pointer text-rf-meta`}
+                          data-testid="discover-source-select"
+                        >
+                          {SOURCES.map((s) => (
+                            <option key={s.value} value={s.value}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label
+                          htmlFor="discover-workplace-select"
+                          className="text-[11px] font-mono uppercase tracking-wider text-rf-meta"
+                        >
+                          Workplace
+                        </label>
+                        <select
+                          id="discover-workplace-select"
+                          value={workplaceFilter}
+                          onChange={(e) => setWorkplaceFilter(e.target.value)}
+                          className={`${FILTER_CONTROL} w-full cursor-pointer text-rf-meta`}
+                          data-testid="discover-workplace-select"
+                        >
+                          {WORKPLACE_OPTIONS.map((w) => (
+                            <option key={w.value} value={w.value}>
+                              {w.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-[11px] font-mono uppercase tracking-wider text-rf-meta">
+                          Posted
+                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {POSTED_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => setPostedWithin(opt.value)}
+                              className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                                postedWithin === opt.value
+                                  ? "border border-primary/50 bg-primary/15 text-primary"
+                                  : "border border-hairline bg-rf-elevated text-muted-foreground hover:text-foreground"
+                              }`}
+                              aria-pressed={postedWithin === opt.value}
+                              data-testid={`posted-within-${opt.value}`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setCanadianOnly((prev) => !prev)}
+                        className={`flex min-h-11 w-full items-center justify-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors ${
+                          canadianOnly
+                            ? "border-primary/50 bg-primary/15 text-primary"
+                            : "border-hairline bg-rf-elevated text-text-secondary hover:text-foreground"
+                        }`}
+                        aria-pressed={canadianOnly}
+                        data-testid="discover-canadian-toggle"
+                      >
+                        <Globe2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        <span>Canada Only</span>
+                      </button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
-
-          <div className="flex flex-wrap items-center gap-2 border-t border-hairline pt-3">
-            <span className="text-[11px] font-mono uppercase tracking-wider text-rf-meta">
-              Posted:
-            </span>
-            {POSTED_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setPostedWithin(opt.value)}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                  postedWithin === opt.value
-                    ? "border border-primary/50 bg-primary/15 text-primary"
-                    : "border border-transparent text-muted-foreground hover:bg-elevated hover:text-foreground"
-                }`}
-                aria-pressed={postedWithin === opt.value}
-                data-testid={`posted-within-${opt.value}`}
-              >
-                {opt.label}
-              </button>
-            ))}
           </div>
         </div>
 
