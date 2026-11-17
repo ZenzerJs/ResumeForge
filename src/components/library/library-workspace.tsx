@@ -77,6 +77,7 @@ export interface EvidenceItem {
   bullets: Bullet[];
   needsReview?: boolean;
   duplicateTargetId?: string;
+  exactTitleOrgMatch?: boolean;
   similarityScore?: number;
   candidateBullet?: string;
   existingBullet?: string;
@@ -411,7 +412,7 @@ export function LibraryWorkspace() {
             ...item,
             needsReview: true,
             duplicateTargetId: earlierMatch.id,
-            similarityScore: 0.88,
+            exactTitleOrgMatch: true,
             candidateBullet: item.bullets?.[0]?.text || item.verifiedSummary,
             existingBullet: earlierMatch.bullets?.[0]?.text || earlierMatch.verifiedSummary,
           };
@@ -2214,7 +2215,23 @@ export function LibraryWorkspace() {
                 No duplicate or overlapping evidence items need review.
               </div>
             ) : (
-              reviewItems.map((item) => (
+              reviewItems.map((item) => {
+                const similarityScore = item.similarityScore;
+                const hasNumericScore =
+                  typeof similarityScore === "number" && Number.isFinite(similarityScore);
+                const matchedTarget = item.duplicateTargetId
+                  ? items.find((i) => i.id === item.duplicateTargetId)
+                  : undefined;
+                const isExactTitleOrgMatch =
+                  Boolean(item.exactTitleOrgMatch) ||
+                  Boolean(
+                    matchedTarget &&
+                      matchedTarget.title.trim().toLowerCase() === item.title.trim().toLowerCase() &&
+                      (matchedTarget.organization || "").trim().toLowerCase() ===
+                        (item.organization || "").trim().toLowerCase()
+                  );
+
+                return (
                   <div
                     key={item.id}
                     data-testid={`duplicate-review-card-${item.id}`}
@@ -2239,12 +2256,22 @@ export function LibraryWorkspace() {
                       </div>
                       <div className="flex items-center justify-center px-2">
                         <div className="text-center">
-                          <div className="text-ember font-bold text-lg font-mono tabular-nums">
-                            {Math.round((item.similarityScore || 0.75) * 100)}%
-                          </div>
-                          <div className="text-xs text-muted-foreground uppercase font-mono">
-                            Similarity
-                          </div>
+                          {hasNumericScore ? (
+                            <>
+                              <div className="text-ember font-bold text-lg font-mono tabular-nums">
+                                {Math.round(similarityScore * 100)}%
+                              </div>
+                              <div className="text-xs text-muted-foreground uppercase font-mono">
+                                Similarity
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-xs text-muted-foreground font-mono max-w-44">
+                              {isExactTitleOrgMatch
+                                ? "Exact match: same title and organization"
+                                : "Potential duplicate"}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex-1 p-4 rounded-lg bg-inset border border-hairline">
@@ -2430,7 +2457,8 @@ export function LibraryWorkspace() {
                       </Button>
                     </div>
                   </div>
-                ))
+                );
+              })
             )}
           </div>
         )}

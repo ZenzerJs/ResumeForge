@@ -71,12 +71,12 @@ function parseCandidateInfoFromTypst(typst: string) {
   const githubMatch = typst.match(/https?:\/\/(?:www\.)?github\.com\/[^\s")\]]+/i);
 
   return {
-    name: nameMatch?.[1]?.trim() || "Candidate",
-    email: emailMatch?.[0] || "candidate@resumeforge.dev",
-    phone: phoneMatch?.[0] || "+1 (555) 019-2834",
-    linkedin: linkedinMatch?.[0] || "https://linkedin.com/in/candidate",
-    github: githubMatch?.[0] || "https://github.com/candidate",
-    portfolio: "https://resumeforge.dev",
+    name: nameMatch?.[1]?.trim() || "",
+    email: emailMatch?.[0] || "",
+    phone: phoneMatch?.[0] || "",
+    linkedin: linkedinMatch?.[0] || "",
+    github: githubMatch?.[0] || "",
+    portfolio: "",
   };
 }
 

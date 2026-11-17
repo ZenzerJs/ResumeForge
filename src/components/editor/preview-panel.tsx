@@ -565,9 +565,6 @@ export function PreviewPanel({
               className="hidden xl:inline-flex items-center gap-1.5 font-mono text-xs tabular-nums text-text-secondary hover:text-foreground transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
               title="Toggle docked ATS Grade column alongside paper preview"
             >
-              <span className="hidden 2xl:inline">
-                <b className="font-semibold text-status-success">1 / 1</b> page · fits ·
-              </span>
               <span className={showDockedGrade && !showGrade ? "text-signal font-semibold" : "text-text-secondary"}>
                 Preview · Grade ▸
               </span>

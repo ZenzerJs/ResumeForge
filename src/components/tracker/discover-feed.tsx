@@ -543,14 +543,15 @@ export function DiscoverFeed() {
 
   const formatSalary = (j: IngestedJobItem) => {
     if (!j.salaryMin && !j.salaryMax) return null;
-    const currency = j.salaryCurrency || "CAD";
+    const currency = j.salaryCurrency?.trim();
+    const suffix = currency ? ` ${currency}` : "";
     if (j.salaryMin && j.salaryMax) {
-      return `$${j.salaryMin.toLocaleString()} – $${j.salaryMax.toLocaleString()} ${currency}`;
+      return `$${j.salaryMin.toLocaleString()} – $${j.salaryMax.toLocaleString()}${suffix}`;
     }
     if (j.salaryMin) {
-      return `From $${j.salaryMin.toLocaleString()} ${currency}`;
+      return `From $${j.salaryMin.toLocaleString()}${suffix}`;
     }
-    return `Up to $${j.salaryMax?.toLocaleString()} ${currency}`;
+    return `Up to $${j.salaryMax?.toLocaleString()}${suffix}`;
   };
 
   return (

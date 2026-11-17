@@ -107,12 +107,12 @@ export function ApplyPrepSheetModal({
   coverLetter,
   matchedHighlights = [],
   candidateInfo = {
-    name: "Candidate",
-    email: "candidate@resumeforge.dev",
-    phone: "+1 (555) 019-2834",
-    linkedin: "https://linkedin.com/in/candidate",
-    github: "https://github.com/candidate",
-    portfolio: "https://candidate.dev",
+    name: "",
+    email: "",
+    phone: "",
+    linkedin: "",
+    github: "",
+    portfolio: "",
   },
   evidenceItems,
   prepResult,
@@ -214,6 +214,14 @@ export function ApplyPrepSheetModal({
     });
   }, [oaProblems, categoryFilter, problemSearch]);
 
+  const sanitizedCandidateInfo = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(candidateInfo).filter((entry): entry is [string, string] => Boolean(entry[1]?.trim()))
+      ),
+    [candidateInfo]
+  );
+
   const starPrep: StarInterviewPrepResult = useMemo(() => {
     if (prepResult) return prepResult;
     return synthesizeStarInterviewPrep({
@@ -223,9 +231,9 @@ export function ApplyPrepSheetModal({
         requirements: job.requirements,
       },
       evidenceItems: evidenceItems || [],
-      candidateInfo,
+      candidateInfo: sanitizedCandidateInfo,
     });
-  }, [prepResult, job, evidenceItems, candidateInfo]);
+  }, [prepResult, job, evidenceItems, sanitizedCandidateInfo]);
 
   const mockInterviewerPrompt = useMemo(() => {
     const matchedProblemsStr =
@@ -936,31 +944,36 @@ export function ApplyPrepSheetModal({
                 <span className="font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
                   <User className="h-3.5 w-3.5" /> Candidate Information
                 </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-hairline bg-inset/70 p-3">
-                  {Object.entries(candidateInfo).map(([key, val]) => {
-                    if (!val) return null;
-                    const isCopied = copiedKey === `contact-${key}`;
-                    return (
-                      <div
-                        key={key}
-                        className="flex items-center justify-between gap-2 rounded bg-elevated px-2.5 py-1.5"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <span className="text-xs uppercase text-muted-foreground block">{key}</span>
-                          <span className="truncate text-foreground block">{val}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(`contact-${key}`, val)}
-                          className="shrink-0 p-1 text-muted-foreground hover:text-primary transition-colors"
-                          title={`Copy ${key}`}
+                {Object.keys(sanitizedCandidateInfo).length === 0 ? (
+                  <div className="rounded-lg border border-hairline bg-inset/70 p-3 text-muted-foreground">
+                    Not found in resume
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-hairline bg-inset/70 p-3">
+                    {Object.entries(sanitizedCandidateInfo).map(([key, val]) => {
+                      const isCopied = copiedKey === `contact-${key}`;
+                      return (
+                        <div
+                          key={key}
+                          className="flex items-center justify-between gap-2 rounded bg-elevated px-2.5 py-1.5"
                         >
-                          {isCopied ? <Check className="h-3.5 w-3.5 text-status-success" /> : <Copy className="h-3.5 w-3.5" />}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
+                          <div className="min-w-0 flex-1">
+                            <span className="text-xs uppercase text-muted-foreground block">{key}</span>
+                            <span className="truncate text-foreground block">{val}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(`contact-${key}`, val)}
+                            className="shrink-0 p-1 text-muted-foreground hover:text-primary transition-colors"
+                            title={`Copy ${key}`}
+                          >
+                            {isCopied ? <Check className="h-3.5 w-3.5 text-status-success" /> : <Copy className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Matched Highlights */}
