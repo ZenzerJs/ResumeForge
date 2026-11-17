@@ -242,9 +242,18 @@ export function TailorWorkspace() {
     return "job-info";
   };
   const [activeTab, setActiveTab] = useState<TailorWorkspaceTab>(() => normalizeTabParam(tabParam));
-  const [previousTab, setPreviousTab] = useState<TailorWorkspaceTab>(
-    tabParam === "3-pane" ? "3-pane" : "overview"
-  );
+  const [previousTab, setPreviousTab] = useState<TailorWorkspaceTab | null>(null);
+
+  const selectTab = useCallback((nextTab: TailorWorkspaceTab) => {
+    setActiveTab(nextTab);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("tab") !== nextTab) {
+        url.searchParams.set("tab", nextTab);
+        window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (
@@ -326,6 +335,37 @@ export function TailorWorkspace() {
   const [isTier2Fetching, setIsTier2Fetching] = useState<boolean>(false);
   const [tier2Status, setTier2Status] = useState<{ type: "loading" | "success" | "error"; message: string } | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [providerConfigStatus, setProviderConfigStatus] = useState<{
+    checked: boolean;
+    ready: boolean;
+    provider?: string;
+  }>({ checked: false, ready: false });
+
+  const refreshProviderStatus = useCallback(async () => {
+    try {
+      const cfg = await resolveClientProviderConfig();
+      setProviderConfigStatus({
+        checked: true,
+        ready: Boolean(cfg),
+        provider: cfg?.provider,
+      });
+    } catch {
+      setProviderConfigStatus({ checked: true, ready: false });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleRefresh = () => {
+      void refreshProviderStatus();
+    };
+    window.addEventListener("focus", handleRefresh);
+    window.addEventListener("storage", handleRefresh);
+    return () => {
+      window.removeEventListener("focus", handleRefresh);
+      window.removeEventListener("storage", handleRefresh);
+    };
+  }, [refreshProviderStatus]);
 
   const [atsResult, setAtsResult] = useState<AtsEvaluationResult | null>(null);
 
@@ -482,8 +522,10 @@ export function TailorWorkspace() {
       setActiveVariantContent(defaultSource);
     }
 
-    void loadMasterOrStarterResume().finally(() => setIsBootstrapping(false));
-  }, [loadEvidenceMetadata]);
+    void Promise.all([loadMasterOrStarterResume(), refreshProviderStatus()]).finally(() =>
+      setIsBootstrapping(false)
+    );
+  }, [loadEvidenceMetadata, refreshProviderStatus]);
 
   const triggerTier2Fetch = async (jobIdToFetch: string) => {
     setIsTier2Fetching(true);
@@ -848,6 +890,7 @@ export function TailorWorkspace() {
       if (verifiedList.length > 0) {
         setSecondaryDeskTab("preview");
       }
+      selectTab("3-pane");
       void loadEvidenceMetadata(isDemo);
       setPatchStage("done");
     } catch (err) {
@@ -1207,6 +1250,12 @@ export function TailorWorkspace() {
     patchVerified.length === 0 && secondaryDeskTab === "preview" ? "ats" : secondaryDeskTab;
 
   const isSampleJob = !savedJobId && company === "Nova Labs" && rawDescription === SAMPLE_BACKEND_JD;
+  const hasJobRequirements = Boolean(
+    extractedRequirements &&
+      (extractedRequirements.requiredSkills.length > 0 ||
+        extractedRequirements.preferredSkills.length > 0 ||
+        extractedRequirements.domainTerms.length > 0)
+  );
   const isReadyForPatchReview = Boolean(
     extractedRequirements && extractedRequirements.requiredSkills.length > 0 && masterResumeId
   );
@@ -1218,7 +1267,8 @@ export function TailorWorkspace() {
     setRawDescription("");
     setExtractedRequirements(null);
     setCustomUserReqs([]);
-    setActiveTab("job-info");
+    setPreviousTab(null);
+    selectTab("job-info");
     setJobInfoSubTab("original");
   };
 
@@ -1244,39 +1294,95 @@ export function TailorWorkspace() {
             ) : undefined
           }
           actions={
-            <div className="flex w-full sm:w-auto flex-wrap items-center gap-3">
-              <div className="flex min-h-11 w-full sm:w-auto items-center justify-between sm:justify-start gap-3 rounded-md border border-hairline bg-panel px-3">
-                <label
-                  htmlFor="tailor-role-profile-select"
-                  className="text-sm text-muted-foreground font-medium whitespace-nowrap"
+            <div className="flex w-full sm:w-auto flex-col items-stretch sm:items-end gap-2">
+              <div className="flex w-full sm:w-auto flex-wrap items-center gap-3">
+                <div className="flex min-h-11 w-full sm:w-auto items-center justify-between sm:justify-start gap-3 rounded-md border border-hairline bg-panel px-3">
+                  <label
+                    htmlFor="tailor-role-profile-select"
+                    className="text-sm text-muted-foreground font-medium whitespace-nowrap"
+                  >
+                    Target Profile:
+                  </label>
+                  <select
+                    id="tailor-role-profile-select"
+                    value={selectedRoleProfile}
+                    onChange={(e) => setSelectedRoleProfile(e.target.value as RoleProfile)}
+                    className="min-h-11 min-w-0 bg-transparent text-base sm:text-sm font-medium text-foreground outline-none cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded"
+                    data-testid="tailor-role-profile-select"
+                  >
+                    {ROLE_PROFILES.map((p) => (
+                      <option key={p} value={p} className="bg-panel text-foreground">
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGeneratePatches}
+                  disabled={isGeneratingPatches}
+                  data-testid="generate-patches-btn"
+                  className="min-h-11 w-full sm:w-auto justify-center bg-primary text-primary-foreground font-semibold px-5 rounded-md text-sm hover:opacity-90 transition-opacity flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 disabled:opacity-60"
                 >
-                  Target Profile:
-                </label>
-                <select
-                  id="tailor-role-profile-select"
-                  value={selectedRoleProfile}
-                  onChange={(e) => setSelectedRoleProfile(e.target.value as RoleProfile)}
-                  className="min-h-11 min-w-0 bg-transparent text-base sm:text-sm font-medium text-foreground outline-none cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded"
-                  data-testid="tailor-role-profile-select"
-                >
-                  {ROLE_PROFILES.map((p) => (
-                    <option key={p} value={p} className="bg-panel text-foreground">
-                      {p}
-                    </option>
-                  ))}
-                </select>
+                  {isGeneratingPatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  Generate AI patches
+                </button>
               </div>
 
-              <button
-                type="button"
-                onClick={handleGeneratePatches}
-                disabled={isGeneratingPatches}
-                data-testid="generate-patches-btn"
-                className="min-h-11 w-full sm:w-auto justify-center bg-primary text-primary-foreground font-semibold px-5 rounded-md text-sm hover:opacity-90 transition-opacity flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 disabled:opacity-60"
+              <div
+                data-testid="tailor-readiness"
+                className="flex flex-wrap items-center sm:justify-end gap-2 text-xs text-muted-foreground"
               >
-                {isGeneratingPatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                Generate AI patches
-              </button>
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-medium ${
+                    hasJobRequirements
+                      ? "status-success-surface"
+                      : "border-status-warning/40 bg-status-warning/15 text-status-warning"
+                  }`}
+                >
+                  {hasJobRequirements ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  ) : (
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  )}
+                  {hasJobRequirements ? "Job requirements ready" : "Extract job requirements first"}
+                </span>
+
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-medium ${
+                    providerConfigStatus.ready
+                      ? "status-success-surface"
+                      : "border-status-warning/40 bg-status-warning/15 text-status-warning"
+                  }`}
+                >
+                  {providerConfigStatus.ready ? (
+                    <>
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <span>
+                        {providerConfigStatus.provider
+                          ? `AI provider ready (${providerConfigStatus.provider})`
+                          : "AI provider ready"}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <span>
+                        {providerConfigStatus.checked ? "AI provider not set" : "Checking AI provider"}
+                      </span>
+                      {providerConfigStatus.checked && (
+                        <Link
+                          href="/settings?from=tailor"
+                          className="underline font-semibold text-foreground hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded"
+                        >
+                          Configure in Settings
+                        </Link>
+                      )}
+                    </>
+                  )}
+                </span>
+              </div>
             </div>
           }
         />
@@ -1471,7 +1577,10 @@ export function TailorWorkspace() {
             aria-controls="tailor-view-panel"
             tabIndex={activeTab === "overview" ? 0 : -1}
             aria-selected={activeTab === "overview"}
-            onClick={() => setActiveTab("overview")}
+            onClick={() => {
+              setPreviousTab(null);
+              selectTab("overview");
+            }}
             data-testid="tailor-tab-overview"
             className={tabButtonClass("overview")}
           >
@@ -1486,7 +1595,10 @@ export function TailorWorkspace() {
             aria-controls="tailor-view-panel"
             tabIndex={activeTab === "3-pane" ? 0 : -1}
             aria-selected={activeTab === "3-pane"}
-            onClick={() => setActiveTab("3-pane")}
+            onClick={() => {
+              setPreviousTab(null);
+              selectTab("3-pane");
+            }}
             data-testid="tailor-tab-3-pane"
             className={tabButtonClass("3-pane")}
           >
@@ -1501,7 +1613,10 @@ export function TailorWorkspace() {
             aria-controls="tailor-view-panel"
             tabIndex={activeTab === "job-info" ? 0 : -1}
             aria-selected={activeTab === "job-info"}
-            onClick={() => setActiveTab("job-info")}
+            onClick={() => {
+              setPreviousTab(null);
+              selectTab("job-info");
+            }}
             data-testid="tailor-tab-job-info"
             className={tabButtonClass("job-info")}
           >
@@ -1516,7 +1631,10 @@ export function TailorWorkspace() {
             aria-controls="tailor-view-panel"
             tabIndex={activeTab === "cover-letter" ? 0 : -1}
             aria-selected={activeTab === "cover-letter"}
-            onClick={() => setActiveTab("cover-letter")}
+            onClick={() => {
+              setPreviousTab(null);
+              selectTab("cover-letter");
+            }}
             data-testid="tailor-tab-cover-letter"
             className={tabButtonClass("cover-letter")}
           >
@@ -1531,7 +1649,10 @@ export function TailorWorkspace() {
             aria-controls="tailor-view-panel"
             tabIndex={activeTab === "diagnostic" ? 0 : -1}
             aria-selected={activeTab === "diagnostic"}
-            onClick={() => setActiveTab("diagnostic")}
+            onClick={() => {
+              setPreviousTab(null);
+              selectTab("diagnostic");
+            }}
             data-testid="tailor-tab-diagnostic"
             className={tabButtonClass("diagnostic")}
           >
@@ -1596,7 +1717,7 @@ export function TailorWorkspace() {
                   type="button"
                   onClick={() => {
                     setPreviousTab("3-pane");
-                    setActiveTab("job-info");
+                    selectTab("job-info");
                   }}
                   data-testid="edit-job-info-btn"
                   className="min-h-10 px-2.5 text-xs text-primary hover:underline shrink-0"
@@ -1681,7 +1802,7 @@ export function TailorWorkspace() {
                         {isReadyForPatchReview
                           ? "Generate patches to compare proposed wording against your master resume side by side with live paper preview and citation checks."
                           : !masterResumeId
-                          ? "Load or create a master resume in Resume Studio before generating suggestions."
+                          ? "Load or create a master resume in 3-Pane Workspace before generating suggestions."
                           : "Paste a job description and extract requirements in Job Info before generating suggestions."}
                       </p>
                     </div>
@@ -1709,7 +1830,7 @@ export function TailorWorkspace() {
                           type="button"
                           onClick={() => {
                             setPreviousTab("3-pane");
-                            setActiveTab("job-info");
+                            selectTab("job-info");
                           }}
                           className="min-h-11 inline-flex items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90"
                         >
@@ -1894,7 +2015,7 @@ export function TailorWorkspace() {
                 type="button"
                 onClick={() => {
                   setPreviousTab("overview");
-                  setActiveTab("job-info");
+                  selectTab("job-info");
                 }}
                 data-testid="edit-job-info-btn"
                 className="min-h-11 text-sm text-primary hover:underline"
@@ -1916,7 +2037,7 @@ export function TailorWorkspace() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => setActiveTab("3-pane")}
+                  onClick={() => selectTab("3-pane")}
                   data-testid="overview-open-workspace-btn"
                   className="inline-flex min-h-11 sm:min-h-0 items-center text-xs font-semibold text-primary hover:underline"
                 >
@@ -1936,7 +2057,7 @@ export function TailorWorkspace() {
                   type="button"
                   onClick={() => {
                     setPreviousTab("overview");
-                    setActiveTab("job-info");
+                    selectTab("job-info");
                   }}
                   className="inline-flex min-h-11 sm:min-h-0 items-center text-xs font-semibold text-primary hover:underline"
                 >
@@ -1954,7 +2075,7 @@ export function TailorWorkspace() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => setActiveTab("cover-letter")}
+                  onClick={() => selectTab("cover-letter")}
                   data-testid="overview-open-cover-letter-btn"
                   className="inline-flex min-h-11 sm:min-h-0 items-center text-xs font-semibold text-primary hover:underline"
                 >
@@ -1970,7 +2091,7 @@ export function TailorWorkspace() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => setActiveTab("diagnostic")}
+                  onClick={() => selectTab("diagnostic")}
                   data-testid="overview-open-diagnostics-btn"
                   className="inline-flex min-h-11 sm:min-h-0 items-center text-xs font-semibold text-primary hover:underline"
                 >
@@ -2064,14 +2185,20 @@ export function TailorWorkspace() {
                       <Briefcase className="h-4 w-4 text-primary shrink-0" aria-hidden />
                       <h2 className="text-lg text-foreground font-semibold">Target Job Posting</h2>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab(previousTab)}
-                      data-testid="back-to-overview-btn"
-                      className="min-h-11 text-sm text-primary hover:underline"
-                    >
-                      {previousTab === "3-pane" ? "← Back to 3-Pane Workspace" : "← Back to Overview"}
-                    </button>
+                    {previousTab !== null && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const target = previousTab;
+                          setPreviousTab(null);
+                          selectTab(target);
+                        }}
+                        data-testid="back-to-overview-btn"
+                        className="min-h-11 text-sm text-primary hover:underline"
+                      >
+                        {previousTab === "3-pane" ? "← Back to 3-Pane Workspace" : "← Back to Overview"}
+                      </button>
+                    )}
                   </div>
 
                   {/* Diagnostics / Confidence Banner */}
@@ -2348,7 +2475,7 @@ export function TailorWorkspace() {
                             data-testid="open-3pane-tailor-btn"
                             onClick={() => {
                               setPreviousTab("job-info");
-                              setActiveTab("3-pane");
+                              selectTab("3-pane");
                             }}
                             className="min-h-11 text-sm px-3 rounded-lg border border-hairline text-text-secondary hover:bg-elevated hover:text-foreground transition"
                           >

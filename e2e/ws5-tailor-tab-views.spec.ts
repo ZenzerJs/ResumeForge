@@ -61,4 +61,10 @@ test.describe("WS5 — Tailor Information Architecture: Overview vs Job Info Vie
     await expect(page.getByTestId("tailor-tab-cover-letter")).toHaveAttribute("aria-selected", "true");
     await expect(page.getByTestId("tailor-cover-letter-section")).toBeVisible();
   });
+
+  test("5.3 Fresh /tailor does not show back-to-overview-btn", async ({ page }) => {
+    await page.goto("/tailor");
+    await expect(page.getByTestId("tailor-job-info-panel")).toBeVisible();
+    await expect(page.getByTestId("back-to-overview-btn")).not.toBeVisible();
+  });
 });
