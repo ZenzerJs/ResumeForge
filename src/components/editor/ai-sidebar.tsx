@@ -64,6 +64,7 @@ async function readJsonSafe<T = Record<string, unknown>>(res: Response): Promise
 interface AiSidebarProps {
   /** Current Typst source in the editor buffer */
   source: string;
+  isPublicDemo: boolean;
   /** Setter to apply AI suggestions directly to the buffer */
   onApplyToBuffer: (newSource: string) => void;
   /** Optional callback to toggle collapse state of AI sidebar */
@@ -115,6 +116,7 @@ const SEVERITY_COLORS = {
 
 export function AiSidebar({
   source,
+  isPublicDemo,
   onApplyToBuffer,
   onToggleCollapse,
   isCollapsed,
@@ -780,7 +782,15 @@ export function AiSidebar({
       )}
 
       {mode === "chat" && !repairContext ? (
-        <ChatPanel typstSource={source} />
+        isPublicDemo ? (
+          <div className="min-h-0 flex-1 overflow-y-auto p-3" data-testid="chat-panel">
+            <p className="text-sm leading-relaxed text-text-secondary">
+              Career Assistant chat is unavailable in the public demo. Use the Tailor tab or grade your local draft in Preview.
+            </p>
+          </div>
+        ) : (
+          <ChatPanel typstSource={source} jobId={urlJobId} />
+        )
       ) : (
       <div className="flex flex-1 min-h-0 flex-col overflow-y-auto p-4 gap-4">
         {/* Task 10.5: Typst Repair Assist Mode Card */}

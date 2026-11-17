@@ -6,23 +6,30 @@ test.describe("WS5 — Tailor Information Architecture: Overview vs Job Info Vie
   }) => {
     await page.goto("/tailor");
 
-    const overviewTab = page.getByTestId("tailor-tab-overview");
     const jobInfoTab = page.getByTestId("tailor-tab-job-info");
+    const reviewEditsTab = page.getByTestId("tailor-tab-3-pane");
+    const moreToolsTrigger = page.getByTestId("tailor-more-tools-trigger");
 
-    await expect(overviewTab).toBeVisible();
     await expect(jobInfoTab).toBeVisible();
+    await expect(reviewEditsTab).toBeVisible();
+    await expect(moreToolsTrigger).toBeVisible();
+    await expect(page.getByRole("tablist", { name: "Tailor views" }).locator('[role="tab"]')).toHaveCount(2);
 
-    // Default initial visit is Job Info panel for editing/pasting JD
+    // Default initial visit is Job panel for editing/pasting JD
     const jobInfoPanel = page.getByTestId("tailor-job-info-panel");
     await expect(jobInfoPanel).toBeVisible();
 
-    // Switch to Overview tab
-    await overviewTab.click();
+    // Switch to Overview via More tools menu
+    await moreToolsTrigger.click();
+    await page.getByTestId("tailor-tool-overview").click();
     const overviewPanel = page.getByTestId("tailor-overview-panel");
     await expect(overviewPanel).toBeVisible();
+    await expect(page.locator("#tailor-tool-heading-overview")).toHaveText("Overview");
     await expect(jobInfoPanel).not.toBeVisible();
+    await expect(jobInfoTab).toHaveAttribute("aria-selected", "false");
+    await expect(reviewEditsTab).toHaveAttribute("aria-selected", "false");
 
-    // Click Edit Job & Reqs button in overview card
+    // Click Edit job & requirements button in overview card
     const editBtn = page.getByTestId("edit-job-info-btn");
     await expect(editBtn).toBeVisible();
     await editBtn.click();
@@ -33,6 +40,7 @@ test.describe("WS5 — Tailor Information Architecture: Overview vs Job Info Vie
     // Click Back to Overview button
     const backBtn = page.getByTestId("back-to-overview-btn");
     await expect(backBtn).toBeVisible();
+    await expect(backBtn).toContainText("Back to Overview");
     await backBtn.click();
 
     await expect(overviewPanel).toBeVisible();
@@ -44,8 +52,8 @@ test.describe("WS5 — Tailor Information Architecture: Overview vs Job Info Vie
     await expect(page.getByTestId("ats-score-panel")).toHaveCount(0);
     await expect(page.getByTestId("tailor-cover-letter-section")).toHaveCount(0);
 
-    // Workspace (3-pane) owns the single ATS Score Panel mount
-    await page.getByTestId("tailor-tab-3-pane").click();
+    // Review edits owns the single ATS Score Panel mount
+    await reviewEditsTab.click();
     const atsScorePanel = page.getByTestId("ats-score-panel");
     await expect(atsScorePanel).toHaveCount(1);
     await expect(atsScorePanel).toBeVisible();
@@ -55,10 +63,19 @@ test.describe("WS5 — Tailor Information Architecture: Overview vs Job Info Vie
     await page.goto("/tailor?tab=overview");
     const overviewPanel = page.getByTestId("tailor-overview-panel");
     await expect(overviewPanel).toBeVisible();
+    await expect(page.locator("#tailor-tool-heading-overview")).toHaveText("Overview");
+    await expect(page.getByTestId("tailor-tab-job-info")).toHaveAttribute("aria-selected", "false");
+    await expect(page.getByTestId("tailor-tab-3-pane")).toHaveAttribute("aria-selected", "false");
     await expect(page.getByTestId("tailor-cover-letter-section")).toHaveCount(0);
 
     await page.goto("/tailor?tab=cover-letter");
-    await expect(page.getByTestId("tailor-tab-cover-letter")).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#tailor-tool-heading-cover-letter")).toHaveText("Cover letter");
+    await expect(page.locator('#tailor-view-panel[role="tabpanel"]')).toHaveAttribute(
+      "aria-labelledby",
+      "tailor-tool-heading-cover-letter"
+    );
+    await expect(page.getByTestId("tailor-tab-job-info")).toHaveAttribute("aria-selected", "false");
+    await expect(page.getByTestId("tailor-tab-3-pane")).toHaveAttribute("aria-selected", "false");
     await expect(page.getByTestId("tailor-cover-letter-section")).toBeVisible();
   });
 

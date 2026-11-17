@@ -176,6 +176,9 @@ Workspace layouts balance generous breathing room on analytical surfaces (`/libr
 
 - **Spacing rhythm:** `4px` base unit, `16px` gutters and mobile margins, `20px` panel padding, `32px` desktop margins.
 - **Editor chrome budget (`1440×900`):** Preserve all Batch 4 structural/a11y upgrades—`48px` top nav, `40px` document bar, and `32px` pane toolbar so the white resume paper starts within `128px` of the top of the viewport.
+- **Give document previews the largest share of fresh desktop layouts. Open full analysis on demand.**
+  This keeps the document readable while users work.
+  <!-- 2026-11-17: Approved from the critique, "Make the resume the primary artifact in the Editor." -->
 - **Workspace shell:** Non-editor workspace pages use a `64px` nav with a `1px` `.ombre-divider` underneath and responsive `PageHeader` banners (`flex-col` on mobile, `md:flex-row` on desktop).
   <!-- 2026-11-13: Locked alongside Ember Ink palette rollout so structural ergonomics and accessibility guarantees remain non-negotiable. -->
 
@@ -237,6 +240,18 @@ Every component combines `1px` umber hairlines, warm espresso surfaces, and acce
 - **`PageHeader`:** Banner card (`surface-raised`, `edge-glow`, `12px` radius) with a `2px` left Gold Action bar, optional pill eyebrow, `20px–24px` bold title, status badge, and right-aligned action slot.
 - **`BrandIcon`:** Cherry-picked named `simple-icons` SVG paths (never wildcard `import *`), `fill="currentColor"`, `aria-hidden="true"`, alias normalization, and graceful `null` fallback for unmapped skills/companies/providers.
 - **`AsciiWaves` & `WorkspaceAtmosphere`:** Dynamic Ember Ink ASCII wave canvas for the landing hero and pure-CSS 7-orb `AmbientColorBlobs` stage for workspace pages.
+
+## Interaction
+
+- **Show actual prerequisites beside the primary action and offer a direct way to resolve the first blocker.**
+  Users can tell what's missing and act from the current screen.
+  <!-- 2026-11-17: Approved from the critique, "Identify the next missing step with a contextual action." -->
+
+## Copy
+
+- **Drive setup copy from the same deployment mode that controls available options.**
+  Setup guidance stays consistent with the actions users can take.
+  <!-- 2026-11-17: Approved from the critique, "Make quick-start provider copy match the active deployment mode." -->
 
 ## Do's and Don'ts
 

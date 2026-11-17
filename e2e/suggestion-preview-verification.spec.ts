@@ -21,10 +21,16 @@ const patches = [
 
 async function prepare(page: Page) {
   const writes: string[] = [];
-  await page.addInitScript((source) => {
+  await page.addInitScript(({ source, evidenceIds }) => {
     localStorage.setItem("resumeforge_typst_source", source);
-    localStorage.setItem("resumeforge_guest_evidence", "[]");
-    localStorage.setItem("resumeforge_ai_settings", JSON.stringify({ provider: "ollama" }));
+    localStorage.setItem("resumeforge_guest_evidence", JSON.stringify(evidenceIds.map((id) => ({
+      id,
+      title: id,
+      type: "project",
+      status: "verified",
+      verifiedSummary: "Synthetic verified evidence for suggestion previews.",
+    }))));
+    localStorage.setItem("resumeforge_ai_settings", JSON.stringify({ provider: "gemini", apiKey: "synthetic-test-key" }));
     const OriginalWorker = window.Worker;
     (window as unknown as { __pdfCompileCount: number }).__pdfCompileCount = 0;
     window.Worker = class SpyWorker extends OriginalWorker {
@@ -38,7 +44,7 @@ async function prepare(page: Page) {
         return super.postMessage(message, optionsOrTransfer);
       }
     } as typeof Worker;
-  }, base);
+  }, { source: base, evidenceIds: patches.flatMap((patch) => patch.evidenceIds) });
   await page.route("**/api/**", async route => {
     const request = route.request();
     const pathname = new URL(request.url()).pathname;

@@ -91,10 +91,12 @@ test("desktop workflow, tabs, and profile evaluation", async ({ page }) => {
   const errors = await setup(page);
   await resetScroll(page);
   await page.screenshot({ path: `${output}/desktop-job-info.png`, fullPage: true });
-  for (const id of ["job-subtab-structured", "job-subtab-details", "job-subtab-original"]) {
+  for (const id of ["job-subtab-structured", "job-subtab-original"]) {
     await page.getByTestId(id).click();
     await expect(page.getByTestId(id)).toBeVisible();
   }
+  await page.getByTestId("job-extraction-diagnostics-summary").click();
+  await expect(page.getByTestId("job-extraction-diagnostics-details")).toHaveAttribute("open", "");
   await expect(page.getByTestId("jd-textarea")).toHaveValue(description);
   await page.getByLabel("Role", { exact: true }).focus();
   await expect(page.getByLabel("Role", { exact: true })).toBeFocused();
@@ -105,15 +107,18 @@ test("desktop workflow, tabs, and profile evaluation", async ({ page }) => {
   await expect(page.getByTestId("ats-score-panel")).toHaveCount(1);
   await profileRequest;
   await expect(page.getByText("Role-Relevant Evidence (Frontend)")).toBeVisible();
-  await page.getByTestId("tailor-tab-overview").focus();
+  const primaryTablist = page.getByRole("tablist", { name: "Tailor views" });
+  await expect(primaryTablist.locator('[role="tab"]')).toHaveCount(2);
+  await page.getByTestId("tailor-tab-job-info").focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("tailor-tab-3-pane")).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("tailor-tab-job-info")).toBeFocused();
   await page.keyboard.press("End");
-  await expect(page.getByTestId("tailor-tab-diagnostic")).toBeFocused();
+  await expect(page.getByTestId("tailor-tab-3-pane")).toBeFocused();
   await page.keyboard.press("Home");
-  await expect(page.getByTestId("tailor-tab-overview")).toBeFocused();
-  const primaryTablist = page.getByRole("tablist", { name: "Tailor views" });
-  for (const id of ["tailor-tab-overview", "tailor-tab-3-pane", "tailor-tab-job-info", "tailor-tab-cover-letter", "tailor-tab-diagnostic"]) {
+  await expect(page.getByTestId("tailor-tab-job-info")).toBeFocused();
+  for (const id of ["tailor-tab-job-info", "tailor-tab-3-pane"]) {
     const tab = page.getByTestId(id);
     await tab.focus();
     await page.keyboard.press("Enter");
@@ -128,7 +133,23 @@ test("desktop workflow, tabs, and profile evaluation", async ({ page }) => {
     } else {
       await expect(page.getByTestId("ats-score-panel")).toHaveCount(0);
     }
-    if (id === "tailor-tab-cover-letter") {
+    await expect(page.getByTestId("tailor-cover-letter-section")).toHaveCount(0);
+  }
+  for (const tool of [
+    { itemTestId: "tailor-tool-overview", headingId: "tailor-tool-heading-overview", headingText: "Overview" },
+    { itemTestId: "tailor-tool-cover-letter", headingId: "tailor-tool-heading-cover-letter", headingText: "Cover letter" },
+    { itemTestId: "tailor-tool-diagnostic", headingId: "tailor-tool-heading-diagnostic", headingText: "Diagnostics" },
+  ]) {
+    await page.getByTestId("tailor-more-tools-trigger").click();
+    await page.getByTestId(tool.itemTestId).click();
+    await expect(primaryTablist.locator('[role="tab"][aria-selected="true"]')).toHaveCount(0);
+    await expect(primaryTablist.locator('[role="tab"][tabindex="0"]')).toHaveCount(1);
+    await expect(page.locator(`#${tool.headingId}`)).toHaveText(tool.headingText);
+    await expect(page.locator('#tailor-view-panel[role="tabpanel"]')).toHaveAttribute("aria-labelledby", tool.headingId);
+    await expect(page.getByTestId("tool-back-to-job-btn")).toBeVisible();
+    await expect(page.getByTestId("tool-back-to-review-btn")).toBeVisible();
+    await expect(page.getByTestId("ats-score-panel")).toHaveCount(0);
+    if (tool.itemTestId === "tailor-tool-cover-letter") {
       await expect(page.getByTestId("tailor-cover-letter-section")).toHaveCount(1);
     } else {
       await expect(page.getByTestId("tailor-cover-letter-section")).toHaveCount(0);
@@ -136,9 +157,22 @@ test("desktop workflow, tabs, and profile evaluation", async ({ page }) => {
   }
   await expect(page.getByTestId("tailor-role-profile-select")).toHaveValue("Frontend");
   await page.getByTestId("tailor-tab-job-info").click();
+  const readiness = page.getByTestId("tailor-readiness");
+  await expect(readiness).toContainText("Saved in this browser");
+  await expect(readiness).toContainText("1 verified item");
+  await expect(readiness).toContainText("Extracted");
+  await expect(page.getByRole("button", { name: "Configure in Settings" })).toBeVisible();
   await page.getByTestId("generate-patches-btn").click();
   await expect(page.getByText(/No AI provider configured/i).first()).toBeVisible();
-  await page.evaluate(() => localStorage.setItem("resumeforge_ai_settings", JSON.stringify({ provider: "ollama" })));
+  await page.addInitScript(() => {
+    localStorage.setItem("resumeforge_ai_settings", JSON.stringify({ provider: "gemini", apiKey: "synthetic-test-key" }));
+  });
+  await page.reload();
+  await page.getByTestId("jd-textarea").fill("Join our team.");
+  await expect(readiness).toContainText("Extraction needed");
+  await page.getByRole("button", { name: "Extract requirements", exact: true }).click();
+  await expect(readiness).toContainText("Extracted");
+  await expect(readiness).toContainText("Configured");
   let release: () => void = () => {};
   const pending = new Promise<void>(resolve => { release = resolve; });
   await page.route("**/api/demo/generate-patches", async route => {
@@ -172,7 +206,8 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
     await resetScroll(page);
     await page.screenshot({ path: `${output}/${viewport.name}-viewport.png` });
     await page.screenshot({ path: `${output}/${viewport.name}-job-info.png`, fullPage: true });
-    await page.getByTestId("tailor-tab-overview").click();
+    await page.getByTestId("tailor-more-tools-trigger").click();
+    await page.getByTestId("tailor-tool-overview").click();
     await expect(page.getByTestId("tailor-overview-panel")).toBeVisible();
     await expect(page.getByText("Loading Cover Letter Panel...")).toHaveCount(0);
     await noOverflow(page);

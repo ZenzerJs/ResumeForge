@@ -379,9 +379,12 @@ export function SettingsWorkspace() {
       <div className="mx-auto w-full max-w-3xl flex-1 p-4 sm:p-6 md:p-8">
         <div className="space-y-6">
           <PageHeader
-            eyebrow="Control room"
-            title="Connect an AI provider key (stored in this browser)"
-            description="Your API key stays in this browser and is sent only with your own AI request. It is never stored in our database or server logs."
+            title={demoMode ? "Connect an AI provider for the demo" : "Connect an AI provider key (stored in this browser)"}
+            description={
+              demoMode
+                ? "Add a cloud provider API key to use AI. Resume drafts stay in this browser. Export a copy before clearing site data."
+                : "Choose a provider and test the connection."
+            }
             actions={
               tailorBackHref ? (
                 <Link
@@ -395,87 +398,11 @@ export function SettingsWorkspace() {
             }
           />
 
-          <Surface variant="raised" className="edge-glow p-6 space-y-5" data-testid="account-settings">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">Account</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Sign in to save resumes, evidence, and jobs. The nav shows your username, not your email.
-                </p>
-              </div>
-              {sessionUser ? (
-                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-hairline bg-elevated font-bold text-ember">
-                  {usernameInitial(sessionUser.username)}
-                </span>
-              ) : (
-                <UserRound className="h-5 w-5 text-muted-foreground" aria-hidden />
-              )}
-            </div>
-
-            {sessionUser ? (
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="settings-username" className="block text-xs font-semibold uppercase tracking-wider text-text-secondary mb-2">
-                    Username
-                  </label>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <input
-                      id="settings-username"
-                      value={usernameDraft}
-                      onChange={(event) => setUsernameDraft(event.target.value)}
-                      className="h-11 w-full rounded-md border border-hairline bg-inset px-3.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    />
-                    <button
-                      type="button"
-                      disabled={isSavingUsername || usernameDraft.trim() === sessionUser.username}
-                      onClick={() => void handleSaveUsername()}
-                      className="inline-flex h-11 shrink-0 items-center justify-center rounded-md bg-elevated px-4 text-sm font-semibold text-foreground hover:bg-panel focus-visible:ring-2 focus-visible:ring-primary/60 disabled:opacity-50"
-                    >
-                      {isSavingUsername ? "Saving…" : "Save username"}
-                    </button>
-                  </div>
-                </div>
-                {usernameStatus ? (
-                  <p className={`text-xs ${usernameStatus.type === "success" ? "text-status-success-soft" : "text-status-danger"}`} role="status">
-                    {usernameStatus.message}
-                  </p>
-                ) : null}
-                <button
-                  type="button"
-                  aria-label="Sign Out"
-                  disabled={isSigningOut}
-                  onClick={() => {
-                    setIsSigningOut(true);
-                    void signOutAndRedirect("/");
-                  }}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-md border border-hairline px-4 text-sm font-medium text-foreground hover:bg-elevated focus-visible:ring-2 focus-visible:ring-primary/60 disabled:opacity-50"
-                >
-                  <LogOut className="h-4 w-4" aria-hidden />
-                  Sign Out
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href="/login"
-                  className="inline-flex min-h-11 items-center gap-2 rounded-md border border-hairline px-4 text-sm font-medium text-foreground hover:bg-elevated focus-visible:ring-2 focus-visible:ring-primary/60"
-                >
-                  <LogIn className="h-4 w-4" aria-hidden />
-                  Sign In
-                </Link>
-                {!demoMode && <Link
-                  href="/login?mode=signup"
-                  className="inline-flex min-h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary/60"
-                >Sign Up</Link>}
-              </div>
-            )}
-          </Surface>
-
           <Surface variant="raised" className="edge-glow p-6 space-y-6">
             {/* Provider Selection */}
             <div className="rounded-lg border border-hairline bg-inset/60 p-4">
               <label htmlFor="provider-select" className="block font-mono text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
-                Select AI Provider
+                AI provider
               </label>
               <select
                 id="provider-select"
@@ -490,7 +417,6 @@ export function SettingsWorkspace() {
                 {!demoMode && <option value="ollama">Ollama (Local Inference)</option>}
                 {!demoMode && <option value="custom">Custom OpenAI-compatible endpoint (Local / self-hosted endpoint)</option>}
               </select>
-              {demoMode && <p className="mt-2 text-sm text-muted-foreground">Demo BYOK supports Gemini, OpenAI, Anthropic, and Groq. Custom and local Ollama endpoints are disabled.</p>}
             </div>
 
             {/* Required Endpoint for Custom / Ollama (never hidden under Advanced) */}
@@ -610,7 +536,7 @@ export function SettingsWorkspace() {
                     {hasVaultKey ? (
                       <div className="flex items-center gap-1.5 text-status-success-soft">
                         <Lock className="h-4 w-4 text-status-success" />
-                        <span>Key encrypted in browser IndexedDB (AES-GCM vault)</span>
+                        <span>Key encrypted in browser IndexedDB or in memory if browser storage is unavailable.</span>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1.5 text-muted-foreground">
@@ -705,8 +631,8 @@ export function SettingsWorkspace() {
               </button>
 
               <div className="flex items-start sm:items-center gap-2 text-xs text-muted-foreground min-w-0">
-                <ShieldCheck className="h-4 w-4 shrink-0 text-status-success mt-0.5 sm:mt-0" />
-                <span>Keys are encrypted client-side and never written to database or server logs</span>
+                <ShieldCheck className="h-4 w-4 shrink-0 text-status-success mt-0.5 sm:mt-0" aria-hidden="true" />
+                <span>Your key is sent for connection tests and AI requests. ResumeForge never saves it to its database or server logs.</span>
               </div>
             </div>
 
@@ -743,6 +669,88 @@ export function SettingsWorkspace() {
               </div>
             )}
           </Surface>
+
+          {(!demoMode || sessionUser) && (
+            <Surface variant="raised" className="edge-glow p-6 space-y-5" data-testid="account-settings">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">Account</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {sessionUser
+                      ? "Your username appears in the navigation."
+                      : "Sign in to save resumes, evidence, and jobs."}
+                  </p>
+                </div>
+                {sessionUser ? (
+                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-hairline bg-elevated font-bold text-ember">
+                    {usernameInitial(sessionUser.username)}
+                  </span>
+                ) : (
+                  <UserRound className="h-5 w-5 text-muted-foreground" aria-hidden />
+                )}
+              </div>
+
+              {sessionUser ? (
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="settings-username" className="block text-xs font-semibold uppercase tracking-wider text-text-secondary mb-2">
+                      Username
+                    </label>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <input
+                        id="settings-username"
+                        value={usernameDraft}
+                        onChange={(event) => setUsernameDraft(event.target.value)}
+                        className="h-11 w-full rounded-md border border-hairline bg-inset px-3.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      />
+                      <button
+                        type="button"
+                        disabled={isSavingUsername || usernameDraft.trim() === sessionUser.username}
+                        onClick={() => void handleSaveUsername()}
+                        className="inline-flex h-11 shrink-0 items-center justify-center rounded-md bg-elevated px-4 text-sm font-semibold text-foreground hover:bg-panel focus-visible:ring-2 focus-visible:ring-primary/60 disabled:opacity-50"
+                      >
+                        {isSavingUsername ? "Saving…" : "Save username"}
+                      </button>
+                    </div>
+                  </div>
+                  {usernameStatus ? (
+                    <p className={`text-xs ${usernameStatus.type === "success" ? "text-status-success-soft" : "text-status-danger"}`} role="status">
+                      {usernameStatus.message}
+                    </p>
+                  ) : null}
+                  <button
+                    type="button"
+                    aria-label="Sign Out"
+                    disabled={isSigningOut}
+                    onClick={() => {
+                      setIsSigningOut(true);
+                      void signOutAndRedirect("/");
+                    }}
+                    className="inline-flex min-h-11 items-center gap-2 rounded-md border border-hairline px-4 text-sm font-medium text-foreground hover:bg-elevated focus-visible:ring-2 focus-visible:ring-primary/60 disabled:opacity-50"
+                  >
+                    <LogOut className="h-4 w-4" aria-hidden />
+                    Sign Out
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href="/login"
+                    className="inline-flex min-h-11 items-center gap-2 rounded-md border border-hairline px-4 text-sm font-medium text-foreground hover:bg-elevated focus-visible:ring-2 focus-visible:ring-primary/60"
+                  >
+                    <LogIn className="h-4 w-4" aria-hidden />
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/login?mode=signup"
+                    className="inline-flex min-h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary/60"
+                  >
+                    Sign Up
+                  </Link>
+                </div>
+              )}
+            </Surface>
+          )}
         </div>
       </div>
     </AppShell>

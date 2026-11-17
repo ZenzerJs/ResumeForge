@@ -302,7 +302,14 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-b-[6px] border-x border-b border-outline/70 bg-panel text-foreground">
-      <div className="flex min-h-8 flex-wrap items-center justify-between gap-2 border-b border-outline/70 bg-panel px-2.5 py-0.5 text-xs text-text-secondary md:h-8 md:flex-nowrap md:overflow-x-auto">
+      <div
+        data-testid="code-editor-toolbar"
+        className={`flex min-h-8 flex-wrap items-center justify-between border-b border-outline/70 bg-panel px-2.5 text-xs text-text-secondary ${
+          editorMode === "code"
+            ? "gap-1.5 py-0.5 md:py-1"
+            : "gap-2 py-0.5 md:h-8 md:flex-nowrap"
+        }`}
+      >
         <div
           className="flex shrink-0 items-center gap-0.5 rounded border border-outline/70 bg-inset p-0.5"
           role="tablist"
@@ -340,7 +347,11 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5 md:flex-nowrap md:shrink-0">
+        <div
+          className={`flex flex-wrap items-center gap-1.5 ${
+            editorMode === "visual" ? "md:flex-nowrap md:shrink-0" : ""
+          }`}
+        >
           {editorMode === "code" && (
             <>
               <button

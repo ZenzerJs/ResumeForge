@@ -33,6 +33,12 @@ test.describe("Phase 4.2: AI Patch Generator Workspace", () => {
   });
 
   test("Generate AI Patches button shows error when no AI provider configured", async ({ page }) => {
+    await page.route("**/api/evidence", (route) => route.fulfill({ json: {
+      success: true,
+      data: [{ id: "phase4-verified-evidence", status: "verified" }],
+    } }));
+    await page.reload();
+
     // Clear any existing AI settings
     await page.evaluate(() => {
       localStorage.removeItem("resumeforge_ai_settings");
@@ -48,6 +54,7 @@ test.describe("Phase 4.2: AI Patch Generator Workspace", () => {
     await expect(page.locator('[data-testid="generate-patches-btn"]')).toBeVisible({
       timeout: 10000,
     });
+    await expect(page.getByRole("button", { name: "Configure in Settings" })).toBeVisible();
 
     // Click generate patches — should show config error
     await page.locator('[data-testid="generate-patches-btn"]').click();

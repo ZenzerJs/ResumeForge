@@ -49,14 +49,14 @@ test.describe("Task 9.5 — Editor ATS Grade Button & Evidence Retirement E2E Te
     await page.waitForTimeout(500);
     expect(evaluatePostCount).toBe(countAfterOpen + 1);
 
-    // Return to paper preview via preview-mode-pdf and verify docked ATS Grade column across 1440px, 1280px, and 1024px
+    // Return to paper preview and check that the ATS Grade column is opt-in.
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByTestId("preview-mode-pdf").click();
     await expect(scoreOverlay).not.toBeVisible();
 
     const dockedAside = page.getByTestId("editor-ats-grade-aside");
     const splitToggle = page.getByTestId("preview-split-grade-toggle");
-    await expect(dockedAside).toBeVisible();
+    await expect(dockedAside).not.toBeVisible();
     await expect(splitToggle).toBeVisible();
 
     const paperSheet = page
@@ -65,18 +65,21 @@ test.describe("Task 9.5 — Editor ATS Grade Button & Evidence Retirement E2E Te
     await expect(paperSheet).toBeVisible({ timeout: 15000 });
     const paperBox1440 = await paperSheet.boundingBox();
     expect(paperBox1440).not.toBeNull();
+    expect(paperBox1440!.width).toBeGreaterThanOrEqual(480);
     expect(paperBox1440!.y).toBeLessThanOrEqual(128);
 
     // Toggle docked column closed and back open on 1280x800
     await page.setViewportSize({ width: 1280, height: 800 });
+    const paperBox1280 = await paperSheet.boundingBox();
+    expect(paperBox1280).not.toBeNull();
+    expect(paperBox1280!.width).toBeGreaterThanOrEqual(480);
+    expect(paperBox1280!.y).toBeLessThanOrEqual(128);
+    await splitToggle.click();
     await expect(dockedAside).toBeVisible();
     await splitToggle.click();
     await expect(dockedAside).not.toBeVisible();
     await splitToggle.click();
     await expect(dockedAside).toBeVisible();
-    const paperBox1280 = await paperSheet.boundingBox();
-    expect(paperBox1280).not.toBeNull();
-    expect(paperBox1280!.y).toBeLessThanOrEqual(128);
 
     // Clicking preview-mode-grade inside docked aside opens full rubric overlay
     await page.getByTestId("preview-mode-grade").click();

@@ -375,7 +375,7 @@ export function PreviewPanel({
 
   // Task 9.5: ATS Grade in Editor preview state
   const [showGrade, setShowGrade] = useState(false);
-  const [showDockedGrade, setShowDockedGrade] = useState(true);
+  const [showDockedGrade, setShowDockedGrade] = useState(false);
   const [previewView, setPreviewView] = useState<"fit" | "actual">("fit");
 
   const handleToggleGrade = () => {
@@ -397,13 +397,14 @@ export function PreviewPanel({
   );
 
   // Synchronous client-side Ember Ink ATS Grade computation for the docked Editor grade rail
-  const liveAtsGrade = useMemo<AtsEvaluationResult>(() => {
+  const liveAtsGrade = useMemo<AtsEvaluationResult | null>(() => {
+    if (!showDockedGrade || showGrade || v2 || !hasHydratedSource) return null;
     return evaluateAtsScore(
-      source || "",
+      source,
       extractedRequirements || EMPTY_EXTRACTED_REQUIREMENTS,
       "Backend"
     );
-  }, [source, extractedRequirements]);
+  }, [extractedRequirements, hasHydratedSource, showDockedGrade, showGrade, source, v2]);
 
   const handleExportPdf = async () => {
     try {
@@ -562,11 +563,11 @@ export function PreviewPanel({
               }}
               aria-pressed={showDockedGrade && !showGrade}
               data-testid="preview-split-grade-toggle"
-              className="hidden xl:inline-flex items-center gap-1.5 font-mono text-xs tabular-nums text-text-secondary hover:text-foreground transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+              className="hidden xl:inline-flex shrink-0 items-center gap-1.5 text-xs text-text-secondary hover:text-foreground transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
               title="Toggle docked ATS Grade column alongside paper preview"
             >
               <span className={showDockedGrade && !showGrade ? "text-signal font-semibold" : "text-text-secondary"}>
-                Preview · Grade ▸
+                Grade summary
               </span>
             </button>
           )}
@@ -941,7 +942,7 @@ export function PreviewPanel({
         </div>
 
         {/* Docked Right-Hand ATS Grade Column matching palette-lab.html#ember Section 03 */}
-        {!showGrade && showDockedGrade && (
+        {!v2 && !showGrade && showDockedGrade && (
           <aside
             data-testid="editor-ats-grade-aside"
             aria-label="ATS Grade summary"
@@ -959,7 +960,7 @@ export function PreviewPanel({
               </button>
             </div>
 
-            {hasHydratedSource ? (
+            {liveAtsGrade ? (
               <>
                 <div className="flex items-center gap-3.5">
                   <div

@@ -112,21 +112,14 @@ test.describe("WS0 — UX Bug Fixes & Staged AI Feedback", () => {
     expect(cardBg).toBe("rgb(27, 23, 22)");
   });
 
-  test("0.3 Landing capability strip is mounted calmly without scrolling marquee", async ({
+  test("0.3 Landing workspace tools stay readable without scrolling marquee", async ({
     page,
   }) => {
     await page.goto("/");
-    const marqueeContainer = page.getByTestId("capability-marquee-container");
-    await expect(marqueeContainer).toBeVisible();
-    await expect(marqueeContainer.locator(".animate-marquee")).toHaveCount(0);
-
-    const marqueeTrack = page.getByTestId("capability-marquee-track");
-    await expect(marqueeTrack).toBeVisible();
-
-    // Verify presence of capability items inside static capability strip
-    await expect(marqueeTrack.getByText("Clean PDF export").first()).toBeVisible();
-    await expect(marqueeTrack.getByText("Verified work history").first()).toBeVisible();
-    await expect(marqueeTrack.getByText("Bring your own AI key").first()).toBeVisible();
-    await expect(marqueeTrack.getByText("Instant ATS scoring").first()).toBeVisible();
+    const tools = page.getByTestId("capability-grid-section");
+    await expect(tools).toBeVisible();
+    await expect(tools.locator(".animate-marquee")).toHaveCount(0);
+    await expect(tools.getByRole("link", { name: /edit your resume/i })).toBeVisible();
+    await expect(tools.getByRole("link", { name: /tailor for a role/i })).toBeVisible();
   });
 });
