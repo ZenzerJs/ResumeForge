@@ -154,9 +154,11 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
       {/* Questions Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredQuestions.map(q => (
-          <div 
-            key={q.id} 
-            className="group flex flex-col justify-between rounded-[10px] surface-raised card-lift p-4 text-foreground cursor-pointer [content-visibility:auto] [contain-intrinsic-size:auto_132px]"
+          <button
+            key={q.id}
+            type="button"
+            aria-pressed={selectedQuestion?.id === q.id}
+            className="group flex w-full flex-col justify-between rounded-[10px] surface-raised card-lift p-4 text-left text-foreground cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background [content-visibility:auto] [contain-intrinsic-size:auto_132px]"
             onClick={() => setSelectedQuestion(q)}
           >
             <div>
@@ -200,7 +202,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                 </span>
               )}
             </div>
-          </div>
+          </button>
         ))}
       </div>
 

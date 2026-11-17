@@ -98,15 +98,15 @@ function ShellFrame({
       ) : null}
 
       <div className="relative z-10 flex min-h-dvh flex-col">
-        {/* Nav bar placeholder aligned with 1280px (xl) TopNav boundary */}
+        {/* Nav bar placeholder aligned with 1024px (lg) TopNav boundary */}
         <div className="fixed inset-x-0 top-0 z-40 h-[calc(4rem+env(safe-area-inset-top))] border-b border-border bg-rf-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
           <div aria-hidden="true" className="ombre-bar pointer-events-none absolute inset-x-0 top-0 h-[2px]" />
-          <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-4 px-4 xl:px-8">
+          <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-4 px-4 lg:px-8">
             <div className="flex min-w-0 items-center gap-2.5">
               <Skeleton className="h-8 w-8 shrink-0 rounded-[8px]" />
               <Skeleton className="h-5 w-28" />
             </div>
-            <div className="hidden flex-1 items-center justify-center gap-4 xl:flex">
+            <div className="hidden flex-1 items-center justify-center gap-4 lg:flex">
               <Skeleton className="h-3.5 w-14 rounded-full" />
               <Skeleton className="h-3.5 w-20 rounded-full" />
               <Skeleton className="h-3.5 w-12 rounded-full" />
@@ -114,14 +114,14 @@ function ShellFrame({
               <Skeleton className="h-3.5 w-16 rounded-full" />
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <Skeleton className="h-11 w-11 rounded-[6px] xl:hidden" />
+              <Skeleton className="h-11 w-11 rounded-[6px] lg:hidden" />
               {withCompactActions ? (
-                <div className="hidden items-center gap-2 xl:flex">
+                <div className="hidden items-center gap-2 lg:flex">
                   <Skeleton className="h-8 w-24 rounded-[6px]" />
                   <Skeleton className="h-8 w-32 rounded-[6px]" />
                 </div>
               ) : null}
-              <div className="hidden items-center gap-2 xl:flex">
+              <div className="hidden items-center gap-2 lg:flex">
                 <Skeleton className="h-8 w-20 rounded-[7px]" />
                 <Skeleton className="h-8 w-20 rounded-[7px]" />
               </div>
@@ -136,7 +136,7 @@ function ShellFrame({
           )}
         >
           {withCompactActions ? (
-            <div className="xl:hidden flex flex-wrap items-center justify-start gap-2 border-b border-outline/70 glass-bar px-4 py-2 sm:justify-end">
+            <div className="lg:hidden flex flex-wrap items-center justify-start gap-2 border-b border-outline/70 glass-bar px-4 py-2 sm:justify-end">
               <Skeleton className="h-11 w-28 rounded-[6px]" />
               <Skeleton className="h-11 w-36 rounded-[6px]" />
             </div>

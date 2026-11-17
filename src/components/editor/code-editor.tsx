@@ -289,7 +289,7 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
             aria-selected={editorMode === "visual"}
             onClick={() => setEditorMode("visual")}
             data-testid="editor-mode-visual"
-            className={`flex items-center gap-1 rounded-[4px] px-2.5 py-0.5 text-xs font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`flex min-h-11 md:min-h-0 items-center gap-1 rounded-[4px] px-2.5 py-0.5 text-xs font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               editorMode === "visual"
                 ? "bg-elevated text-foreground shadow-xs"
                 : "text-text-secondary hover:text-foreground"
@@ -304,7 +304,7 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
             aria-selected={editorMode === "code"}
             onClick={() => setEditorMode("code")}
             data-testid="editor-mode-code"
-            className={`flex items-center gap-1 rounded-[4px] px-2.5 py-0.5 text-xs font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`flex min-h-11 md:min-h-0 items-center gap-1 rounded-[4px] px-2.5 py-0.5 text-xs font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               editorMode === "code"
                 ? "bg-elevated text-foreground shadow-xs"
                 : "text-text-secondary hover:text-foreground"
@@ -323,7 +323,7 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
                 onClick={handleInsertEntrySnippet}
                 data-testid="insert-entry-snippet-btn"
                 title="Insert a new Experience/Project entry block"
-                className="flex items-center gap-1 px-2 py-0.5 rounded bg-elevated hover:bg-muted border border-outline/70 text-foreground text-xs font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex min-h-11 md:min-h-0 items-center gap-1 px-2 py-0.5 rounded bg-elevated hover:bg-muted border border-outline/70 text-foreground text-xs font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Plus className="h-3 w-3 text-primary" />
                 Entry
@@ -337,14 +337,14 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
                 type="button"
                 onClick={handleMarkVerified}
                 title="Mark selected text as verified (Task 7.7)"
-                className="flex items-center gap-1 px-2 py-0.5 rounded bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-status-success text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex min-h-11 md:min-h-0 items-center gap-1 px-2 py-0.5 rounded bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-status-success text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <ShieldCheck className="h-3 w-3" />
                 Mark
               </button>
             </>
           )}
-          {isResumeLayoutV2Enabled() && <button type="button" onClick={() => void handleReformat()} className="rounded border border-outline/70 bg-elevated px-2 py-0.5 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Reformat draft</button>}
+          {isResumeLayoutV2Enabled() && <button type="button" onClick={() => void handleReformat()} className="inline-flex min-h-11 md:min-h-0 items-center rounded border border-outline/70 bg-elevated px-2 py-0.5 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Reformat draft</button>}
           <span className="hidden xl:inline font-mono text-xs text-text-muted">
             {editorMode === "visual" ? "Guided" : "resume.typ"}
           </span>

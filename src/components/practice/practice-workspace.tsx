@@ -124,7 +124,7 @@ export function PracticeWorkspace() {
   };
 
   return (
-    <AppShell variant={mainTab === "runner" ? "editor" : "quiet"}>
+    <AppShell variant="quiet" layout={mainTab === "runner" ? "workspace" : "page"}>
       <div className="flex min-h-0 flex-1 flex-col text-rf-cloud">
         {mainTab === "questions" ? (
           <div className="mx-auto w-full max-w-6xl px-4 pt-6 md:px-8 space-y-4">
