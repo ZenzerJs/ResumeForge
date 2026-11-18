@@ -185,6 +185,7 @@ export async function updateJob(
     requirementsSource: reqState.requirementsSource,
     isPlaceholder,
     hasFullDescription: !isPlaceholder,
+    salaryLabel: extractSalaryFromNotes(updated.notes, updated.rawDescription),
   };
 }
 
@@ -392,7 +393,10 @@ export async function getJobsList(query: JobListQuery = {}) {
   const workplace = query.workplace ?? "all";
   const start = (page - 1) * limit;
   let cursor: string | undefined;
-  type RawJobRow = Prisma.JobGetPayload<{ include: typeof jobListInclude }> & {
+  type RawJobRow = Omit<
+    Prisma.JobGetPayload<{ include: typeof jobListInclude }>,
+    "normalized" | "formattedJd"
+  > & {
     patchProposalBatches?: { id: string }[];
   };
   type EligibleJobEntry = ReturnType<typeof withViewerOutcome<RawJobRow>> & {
@@ -409,6 +413,10 @@ export async function getJobsList(query: JobListQuery = {}) {
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       take: 500,
+      omit: {
+        normalized: true,
+        formattedJd: true,
+      },
       include: {
         ...jobIncludeForViewer(query.userId),
         patchProposalBatches: {
@@ -472,7 +480,7 @@ export async function getJobsList(query: JobListQuery = {}) {
     }
   }
 
-  const data: Array<Omit<Prisma.JobGetPayload<{ include: typeof jobListInclude }>, "applications" | "extractedRequirements" | "status" | "rawDescription"> & {
+  const data: Array<Omit<Prisma.JobGetPayload<{ include: typeof jobListInclude }>, "applications" | "extractedRequirements" | "status" | "rawDescription" | "normalized" | "formattedJd"> & {
     status: JobStatus;
     appliedAt: Date | null;
     appliedVariantId: string | null;
@@ -485,16 +493,20 @@ export async function getJobsList(query: JobListQuery = {}) {
   }> = [];
 
   for (const entry of deduped.slice(start, start + limit)) {
-    // The scoped proposal lookup is internal and must not leak into board responses.
+    // The scoped proposal lookup and heavy JD JSON blobs must not leak into board list responses.
     const {
       patchProposalBatches: _internal,
       applications: _applications,
+      normalized: _normalized,
+      formattedJd: _formattedJd,
       rawDescription,
       extractedRequirements,
       ...visible
-    } = entry;
+    } = entry as EligibleJobEntry & { normalized?: unknown; formattedJd?: unknown };
     void _internal;
     void _applications;
+    void _normalized;
+    void _formattedJd;
     const reqState = parseRequirementsState(
       extractedRequirements,
       rawDescription,

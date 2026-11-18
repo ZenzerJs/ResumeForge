@@ -18,11 +18,13 @@ export async function GET(request: Request) {
     if (!userId) {
       return NextResponse.json({ success: true, data: [], guest: true, validationContext: null });
     }
-    const resumes = await getResumes(userId);
+    const [resumes, ownedEvidence] = await Promise.all([
+      getResumes(userId),
+      getEvidenceItems(undefined, userId),
+    ]);
     const master = resumes.find((r) => r.isMaster);
     let validationContext: TailoringValidationContext | null = null;
     if (master?.factSnapshot) {
-      const ownedEvidence = await getEvidenceItems(undefined, userId);
       validationContext = buildTailoringValidationContext(
         master.factSnapshot as unknown as ResumeFacts,
         ownedEvidence,
@@ -43,7 +45,12 @@ export async function POST(request: Request) {
     const userId = await requireUserId(request);
     if (userId instanceof NextResponse) return userId;
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON payload" }, { status: 400 });
+    }
     const validation = CreateResumeSchema.safeParse(body);
 
     if (!validation.success) {

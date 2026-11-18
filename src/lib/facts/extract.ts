@@ -8,13 +8,14 @@ import {
   VerifiedEvidenceRegistry,
 } from "./types";
 import {
-  extractEmployerAliases,
+   extractEmployerAliases,
   extractMetricsFromText,
   normalizeEmployer,
   normalizeSkillToken,
   normalizeTitle,
   parseDateRange,
 } from "./normalize";
+import { parseManagedResume } from "@/lib/typst/resume-document";
 
 export interface VerifiedEvidenceInput {
   id: string;
@@ -394,29 +395,63 @@ function classifySectionTitle(rawTitle: string): SectionKind {
 }
 
 /**
- * Replaces `#let name(...) = { ... }` function definitions with spaces of equal length
+ * Replaces `#let name(...) = ...` function/variable definitions with spaces of equal length
  * so template helper definitions are never mistaken for resume content while preserving offsets.
  */
 function blankOutLetDefinitions(source: string): string {
   const chars = source.split("");
-  const letRegex = /#let\s+[a-zA-Z0-9_-]+(?:\s*\([^)]*\))?\s*=\s*\{/g;
+  const letRegex = /#let\s+[a-zA-Z0-9_-]+(?:\s*\([^)]*\))?\s*=\s*/g;
   let match: RegExpExecArray | null;
 
   while ((match = letRegex.exec(source)) !== null) {
     const startIdx = match.index;
-    const braceStart = startIdx + match[0].length - 1;
-    let depth = 0;
-    let endIdx = braceStart;
-    for (let i = braceStart; i < source.length; i++) {
-      if (source[i] === "{") depth++;
-      else if (source[i] === "}") {
-        depth--;
-        if (depth === 0) {
-          endIdx = i;
-          break;
+    const rhsStart = startIdx + match[0].length;
+    let endIdx = rhsStart;
+
+    if (source[rhsStart] === "{") {
+      let depth = 0;
+      for (let i = rhsStart; i < source.length; i++) {
+        if (source[i] === "{") depth++;
+        else if (source[i] === "}") {
+          depth--;
+          if (depth === 0) {
+            endIdx = i;
+            break;
+          }
         }
       }
+    } else {
+      let parenDepth = 0;
+      let bracketDepth = 0;
+      let braceDepth = 0;
+      let inString: string | null = null;
+      for (let i = rhsStart; i < source.length; i++) {
+        const ch = source[i];
+        const prev = i > 0 ? source[i - 1] : "";
+        if (inString) {
+          if (ch === inString && prev !== "\\") inString = null;
+          endIdx = i;
+          continue;
+        }
+        if (ch === '"' || ch === "'") {
+          inString = ch;
+          endIdx = i;
+          continue;
+        }
+        if (ch === "(") parenDepth++;
+        else if (ch === ")") parenDepth = Math.max(0, parenDepth - 1);
+        else if (ch === "[") bracketDepth++;
+        else if (ch === "]") bracketDepth = Math.max(0, bracketDepth - 1);
+        else if (ch === "{") braceDepth++;
+        else if (ch === "}") braceDepth = Math.max(0, braceDepth - 1);
+        else if (ch === "\n" && parenDepth === 0 && bracketDepth === 0 && braceDepth === 0) {
+          endIdx = i - 1;
+          break;
+        }
+        endIdx = i;
+      }
     }
+
     for (let i = startIdx; i <= endIdx; i++) {
       if (chars[i] !== "\n") chars[i] = " ";
     }
@@ -472,12 +507,65 @@ function findBalancedCalls(source: string, fnName: string): Array<{ start: numbe
   return results;
 }
 
+function cleanTypstInlineValue(raw: string): string {
+  let text = raw.trim();
+  // Unwrap outer/inline Typst formatting helpers repeatedly
+  for (let pass = 0; pass < 4; pass++) {
+    const next = text
+      .replace(/#(?:align|text|block|box)\s*\([^)]*\)\s*\[([\s\S]*?)\]/gi, "$1")
+      .replace(/#(?:strong|emph|box|upper|lower)\s*\[([\s\S]*?)\]/gi, "$1")
+      .replace(/#(?:strong|emph|upper|lower)\s*\(\s*(?:"([^"]*)"|'([^']*)'|\[([\s\S]*?)\])\s*\)/gi, "$1$2$3")
+      .replace(/#link\s*\([^)]*\)\s*\[([\s\S]*?)\]/gi, "$1")
+      .replace(/#(?:v|h|line|set|show)\s*\([^)]*\)/gi, " ");
+    if (next === text) break;
+    text = next;
+  }
+  return text
+    .replace(/#sym\.dot\b/g, "|")
+    .replace(/\\([\\#\[\]*_@$<>`~/=+^&-])/g, "$1")
+    .replace(/[*_]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractBalancedBrackets(input: string, openBracketIdx: number): { content: string; endIdx: number } | null {
+  if (input[openBracketIdx] !== "[") return null;
+  let depth = 0;
+  for (let i = openBracketIdx; i < input.length; i++) {
+    if (input[i] === "\\") {
+      i++;
+      continue;
+    }
+    if (input[i] === "[") depth++;
+    else if (input[i] === "]") {
+      depth--;
+      if (depth === 0) {
+        return { content: input.slice(openBracketIdx + 1, i), endIdx: i };
+      }
+    }
+  }
+  return null;
+}
+
 function extractNamedStringArg(body: string, argName: string): string | undefined {
-  const regex = new RegExp(`\\b${argName}\\s*:\\s*(?:"([^"]*)"|'([^']*)')`, "i");
-  const m = body.match(regex);
-  if (!m) return undefined;
-  const val = (m[1] ?? m[2] ?? "").trim();
-  return val.length > 0 ? val : undefined;
+  const stringRegex = new RegExp(`\\b${argName}\\s*:\\s*(?:"([^"]*)"|'([^']*)')`, "i");
+  const m = body.match(stringRegex);
+  if (m) {
+    const val = cleanTypstInlineValue(m[1] ?? m[2] ?? "");
+    return val.length > 0 ? val : undefined;
+  }
+
+  const bracketPrefix = new RegExp(`\\b${argName}\\s*:\\s*\\[`, "i");
+  const bm = bracketPrefix.exec(body);
+  if (bm) {
+    const openBracket = bm.index + bm[0].length - 1;
+    const extracted = extractBalancedBrackets(body, openBracket);
+    if (extracted) {
+      const val = cleanTypstInlineValue(extracted.content);
+      return val.length > 0 ? val : undefined;
+    }
+  }
+  return undefined;
 }
 
 function extractDetailsBracketBlock(body: string): string | undefined {
@@ -500,13 +588,45 @@ function extractDetailsBracketBlock(body: string): string | undefined {
 const EXPLICIT_SKILL_LINE_PREFIX =
   /^\s*(?:[-•*]\s*)?(?:\*([A-Za-z0-9\s&/+_-]+):\*\s*|\*([A-Za-z0-9\s&/+_-]+)\*\s*:\s*|(Languages|Frameworks(?:\s*&\s*Libraries)?|Developer\s+Tools|Tools(?:\s*&\s*Infrastructure)?|Databases|Libraries|Platforms|Core\s+Competencies|Technical\s+Skills|Skills)\s*:\s*)/i;
 
+function unwrapTypstLineForExtraction(rawLine: string): string {
+  let text = rawLine.trim();
+  for (let pass = 0; pass < 4; pass++) {
+    const next = text
+      .replace(/^#(?:block|align|text|box)\s*(?:\([^)]*\))?\s*\[([\s\S]*)\]$/i, "$1")
+      .replace(/#strong\s*\[([^\]]*)\]/gi, "*$1*")
+      .replace(/#emph\s*\[([^\]]*)\]/gi, "_$1_")
+      .replace(/#(?:strong|emph)\s*\(\s*(?:"([^"]*)"|'([^']*)')\s*\)/gi, "*$1$2*")
+      .replace(/#link\s*\([^)]*\)\s*\[([^\]]*)\]/gi, "$1")
+      .trim();
+    if (next === text) break;
+    text = next;
+  }
+  return text
+    .replace(/#(?:block|grid|v|h|text|line|align|set|let|show)\s*\([^)]*\)/gi, " ")
+    .replace(/\\([\\#\[\]*_@$<>`~/=+^&-])/g, "$1")
+    .trim();
+}
+
 function extractSkillsFromBulletLine(line: string, skillsSet: Set<string>, inSkillsSection: boolean): boolean {
-  const hasExplicitSkillPrefix = EXPLICIT_SKILL_LINE_PREFIX.test(line);
+  const rawTrimmed = line.trim();
+  if (
+    /^=+/.test(rawTrimmed) ||
+    /^#(?:section|entry|resume-entry|project-entry|skill-line|set|let|show|v|h|line|grid|page|par|list)\b/i.test(
+      rawTrimmed
+    )
+  ) {
+    return false;
+  }
+
+  const normalizedLine = unwrapTypstLineForExtraction(rawTrimmed);
+  if (!normalizedLine) return false;
+
+  const hasExplicitSkillPrefix = EXPLICIT_SKILL_LINE_PREFIX.test(normalizedLine);
   if (!inSkillsSection && !hasExplicitSkillPrefix) {
     return false;
   }
 
-  const trimmed = line.trim();
+  const trimmed = normalizedLine.trim();
   if (
     !inSkillsSection &&
     !trimmed.startsWith("-") &&
@@ -516,7 +636,13 @@ function extractSkillsFromBulletLine(line: string, skillsSet: Set<string>, inSki
     return false;
   }
 
-  if (inSkillsSection && (/^=+/.test(trimmed) || /^#(?:section|entry|resume-entry|project-entry|skill-line|set|let|show)\b/i.test(trimmed))) {
+  if (
+    inSkillsSection &&
+    (/^=+/.test(trimmed) ||
+      /^#?(?:section|entry|resume-entry|project-entry|skill-line|set|let|show|block|grid|v|h|text|line|align)\s*(?:\(|:|$)/i.test(
+        trimmed
+      ))
+  ) {
     return false;
   }
 
@@ -536,9 +662,20 @@ function extractSkillsFromBulletLine(line: string, skillsSet: Set<string>, inSki
 
   let added = false;
   for (const tok of skillTokens) {
-    if (tok.length > 1 && tok.length < 35 && !/^#?(?:section|entry|set|let|show)\b/i.test(tok)) {
+    if (
+      tok.length > 1 &&
+      tok.length < 35 &&
+      !/^#?(?:section|entry|set|let|show|block|grid|v|h|text|line|align)\b/i.test(tok) &&
+      !/\b(?:above|below|row-gutter|columns|breakable|sticky)\s+\d/i.test(tok)
+    ) {
       const norm = normalizeSkillToken(tok);
-      if (norm && !norm.startsWith("section ")) {
+      if (
+        norm &&
+        !norm.startsWith("section ") &&
+        !norm.startsWith("block ") &&
+        !norm.startsWith("grid ") &&
+        !/\b(?:above|below)\s+\d/i.test(norm)
+      ) {
         skillsSet.add(norm);
         added = true;
       }
@@ -560,6 +697,28 @@ function stripInlineTypstMarkup(bulletLine: string): string {
 }
 
 /**
+ * Extracts top-level bracket cells `[...]` inside a `#grid(...)` body.
+ */
+function extractGridBracketCells(gridBody: string): string[] {
+  const cells: string[] = [];
+  for (let i = 0; i < gridBody.length; i++) {
+    if (gridBody[i] === "\\") {
+      i++;
+      continue;
+    }
+    if (gridBody[i] === "[") {
+      const extracted = extractBalancedBrackets(gridBody, i);
+      if (extracted) {
+        const cleaned = cleanTypstInlineValue(extracted.content);
+        cells.push(cleaned);
+        i = extracted.endIdx;
+      }
+    }
+  }
+  return cells;
+}
+
+/**
  * Extracts structural facts (roles, companies, dates, metrics, skills) from Typst source.
  */
 function extractFactsFromTypst(
@@ -570,7 +729,116 @@ function extractFactsFromTypst(
   metricsList: FactMetric[],
   skillsSet: Set<string>
 ) {
-  // 1. Strip comment lines and `#let ... = { ... }` definitions
+  const eduKeywords = /\b(university|college|institute|school|academy|bachelor|master|b\.?s\.?|m\.?s\.?|ph\.?d)\b/i;
+  const titleKeywords =
+    /\b(engineer|developer|designer|manager|lead|director|architect|intern|specialist|consultant|analyst|scientist|associate|officer|vp|founder|role|head|chief|administrator|coordinator|researcher|fellow|instructor|professor)\b/i;
+
+  const recordExperienceEntry = (
+    titleArg?: string,
+    roleArg?: string,
+    locationArg?: string,
+    dateArg?: string
+  ) => {
+    let empRaw = titleArg?.trim();
+    let roleRaw = roleArg?.trim();
+
+    if (empRaw && !roleRaw) {
+      const splitParts = empRaw
+        .split(/\s*(?:—|–|--|\||(?:\s+@\s+)|(?:\s+at\s+))\s*/i)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (splitParts.length >= 2) {
+        if (titleKeywords.test(splitParts[0]) && !titleKeywords.test(splitParts[1])) {
+          roleRaw = splitParts[0];
+          empRaw = splitParts[1];
+        } else {
+          empRaw = splitParts[0];
+          roleRaw = splitParts[1];
+        }
+      }
+    } else if (empRaw && roleRaw && titleKeywords.test(empRaw) && !titleKeywords.test(roleRaw)) {
+      const tmp = empRaw;
+      empRaw = roleRaw;
+      roleRaw = tmp;
+    }
+
+    let empNormalized: string | undefined;
+    if (empRaw) {
+      const normEmp = normalizeEmployer(empRaw);
+      const aliases = extractEmployerAliases(empRaw);
+      if (normEmp) {
+        empNormalized = normEmp;
+        if (!employersMap.has(normEmp)) {
+          employersMap.set(normEmp, {
+            raw: empRaw,
+            normalized: normEmp,
+            aliases,
+            location: locationArg,
+          });
+        }
+      }
+    }
+
+    if (roleRaw) {
+      const normTitle = normalizeTitle(roleRaw);
+      if (normTitle && !titlesMap.has(normTitle)) {
+        titlesMap.set(normTitle, {
+          raw: roleRaw,
+          normalized: normTitle,
+          employerNormalized: empNormalized,
+        });
+      }
+    }
+
+    if (dateArg) {
+      const parsed = parseDateRange(dateArg, empNormalized);
+      const dateKey = `${empNormalized || ""}:${parsed.raw}`;
+      if (parsed.raw && !dateRangesMap.has(dateKey)) {
+        dateRangesMap.set(dateKey, parsed);
+      }
+    }
+  };
+
+  // 0. If valid V2 managed resume metadata is present, extract structured blocks first
+  const managed = parseManagedResume(rawSource);
+  if (managed) {
+    for (const sec of managed.document.sections) {
+      const sectionKind = classifySectionTitle(sec.heading.text);
+      const blocks = sec.blocks;
+      for (let i = 0; i < blocks.length; i++) {
+        const block = blocks[i];
+        if (block.kind === "entry-title") {
+          let roleText: string | undefined;
+          let locText: string | undefined;
+          let dateText: string | undefined;
+          while (
+            i + 1 < blocks.length &&
+            ["entry-role", "entry-location", "entry-date"].includes(blocks[i + 1].kind)
+          ) {
+            const next = blocks[++i];
+            if (next.kind === "entry-role" && !roleText) roleText = next.text;
+            else if (next.kind === "entry-location" && !locText) locText = next.text;
+            else if (next.kind === "entry-date" && !dateText) dateText = next.text;
+          }
+          const isLikelyEducation =
+            sectionKind === "education" ||
+            (sectionKind === "unknown" &&
+              (eduKeywords.test(block.text) || Boolean(roleText && eduKeywords.test(roleText))));
+          if (sectionKind === "experience" || (sectionKind === "unknown" && !isLikelyEducation)) {
+            recordExperienceEntry(block.text, roleText, locText, dateText);
+          }
+        } else if (block.kind === "skill") {
+          extractSkillsFromBulletLine(block.text, skillsSet, true);
+        } else if (block.kind === "bullet" && sectionKind !== "education") {
+          if (!extractSkillsFromBulletLine(block.text, skillsSet, sectionKind === "skills")) {
+            metricsList.push(...extractMetricsFromText(stripInlineTypstMarkup(block.text)));
+          }
+        }
+      }
+    }
+  }
+
+  // 1. Strip comment lines and `#let ... = ...` definitions
   const uncommented = rawSource
     .split("\n")
     .map((line) => (line.trim().startsWith("//") ? "" : line))
@@ -620,7 +888,6 @@ function extractFactsFromTypst(
       entryCalls.push(rc);
     }
   }
-  const eduKeywords = /\b(university|college|institute|school|academy|bachelor|master|b\.?s\.?|m\.?s\.?|ph\.?d)\b/i;
 
   for (const call of entryCalls) {
     consumedRanges.push({ start: call.start, end: call.end });
@@ -709,6 +976,54 @@ function extractFactsFromTypst(
     }
   }
 
+  // 3b. Parse standalone V2 `#grid(...)` entry headers (outside `#entry` / `#let` definitions)
+  const datePattern =
+    /\b((?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+)?(?:19|20)\d\d(?:\s*[-–—]\s*(?:(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+)?(?:19|20)\d\d|present|current|now))?)\b/i;
+
+  for (const gridCall of findBalancedCalls(source, "grid")) {
+    if (consumedRanges.some((r) => gridCall.start >= r.start && gridCall.end <= r.end)) {
+      continue;
+    }
+    consumedRanges.push({ start: gridCall.start, end: gridCall.end });
+    const sectionKind = getSectionAt(gridCall.start);
+    if (sectionKind === "education" || sectionKind === "skills" || sectionKind === "projects") {
+      continue;
+    }
+    const cells = extractGridBracketCells(gridCall.body).filter(Boolean);
+    if (cells.length === 0) continue;
+
+    let dateCell: string | undefined;
+    for (let i = cells.length - 1; i >= 0; i--) {
+      const dm = cells[i].match(datePattern);
+      if (dm) {
+        dateCell = dm[1];
+        break;
+      }
+    }
+
+    if (cells.length >= 3) {
+      // Standard 2x2 grid: [title/company, location, role/subtitle, date]
+      const c0 = cells[0];
+      const c1 = cells[1];
+      const c2 = cells[2];
+      const isLikelyEdu = eduKeywords.test(c0) || eduKeywords.test(c2);
+      if (!isLikelyEdu && (sectionKind === "experience" || sectionKind === "unknown")) {
+        recordExperienceEntry(c0, c2, datePattern.test(c1) ? undefined : c1, dateCell);
+      }
+    } else if (cells.length === 2) {
+      const c0 = cells[0];
+      const c1 = cells[1];
+      if (!eduKeywords.test(c0) && (sectionKind === "experience" || sectionKind === "unknown")) {
+        recordExperienceEntry(c0, datePattern.test(c1) ? undefined : c1, undefined, dateCell);
+      }
+    } else if (cells.length === 1) {
+      const c0 = cells[0];
+      if (!eduKeywords.test(c0) && (sectionKind === "experience" || sectionKind === "unknown")) {
+        recordExperienceEntry(c0, undefined, undefined, dateCell);
+      }
+    }
+  }
+
   // 4. Parse `#resume-entry(title:, location:, date:)` and standalone lines outside `#entry(...)`
   const isOffsetConsumed = (offset: number): boolean =>
     consumedRanges.some((r) => offset >= r.start && offset <= r.end);
@@ -716,6 +1031,7 @@ function extractFactsFromTypst(
   const resumeEntryRegex =
     /#resume-entry\s*\(\s*title:\s*["']([^"']+)["'](?:,\s*location:\s*["']([^"']+)["'])?(?:,\s*date:\s*["']([^"']+)["'])?/gi;
   let lastResumeEntryDate: FactDateRange | undefined;
+  let pendingBlockEmployer: string | undefined;
 
   let lineOffset = 0;
   const lines = source.split("\n");
@@ -725,7 +1041,9 @@ function extractFactsFromTypst(
 
     if (isOffsetConsumed(currentLineStart)) continue;
     const sectionKind = getSectionAt(currentLineStart);
-    const trimmed = line.trim();
+    const rawTrimmed = line.trim();
+    if (!rawTrimmed) continue;
+    const trimmed = unwrapTypstLineForExtraction(rawTrimmed);
     if (!trimmed) continue;
 
     // Check #resume-entry
@@ -752,9 +1070,7 @@ function extractFactsFromTypst(
 
     // Check bold pairs: `*Software Engineer* | *Google*` or `*Google* -- *Software Engineer*`
     const isExplicitSkillBullet = EXPLICIT_SKILL_LINE_PREFIX.test(trimmed);
-    const boldPairs = !isExplicitSkillBullet ? line.match(/\*([^*]+)\*/g) : null;
-    const titleKeywords =
-      /\b(engineer|developer|designer|manager|lead|director|architect|intern|specialist|consultant|analyst|scientist|associate|officer|vp|founder|role|head|chief|administrator|coordinator|researcher|fellow|instructor|professor)\b/i;
+    const boldPairs = !isExplicitSkillBullet ? trimmed.match(/\*([^*]+)\*/g) : null;
 
     if (boldPairs && boldPairs.length >= 2 && sectionKind !== "skills" && sectionKind !== "education") {
       const part1 = boldPairs[0].replace(/\*/g, "").trim();
@@ -794,7 +1110,7 @@ function extractFactsFromTypst(
       }
 
       // Check if an inline date range is also present on the bold-pair line
-      const remainder = line.replace(/\*[^*]+\*/g, " ");
+      const remainder = trimmed.replace(/\*[^*]+\*/g, " ");
       const inlineDateMatch = remainder.match(
         /\b((?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+)?(?:19|20)\d\d\s*[-–—]\s*(?:(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+)?(?:19|20)\d\d|present|current|now))\b/i
       );
@@ -808,13 +1124,14 @@ function extractFactsFromTypst(
       continue;
     }
 
-    // Check single-bold `*Role* — Company` or `=== Role — Company` experience lines
+    // Check single-bold `*Role* — Company`, `=== Role — Company`, or V2 `#block(...)[...]` experience lines
     const isSubheadingLine = /^===+\s+/.test(trimmed);
+    const isV2BlockLine = /^#block\s*\(/i.test(rawTrimmed);
     if (
       !isExplicitSkillBullet &&
       !trimmed.startsWith("-") &&
       !trimmed.startsWith("•") &&
-      ((boldPairs && boldPairs.length === 1) || isSubheadingLine) &&
+      ((boldPairs && boldPairs.length === 1) || isSubheadingLine || (sectionKind === "experience" && isV2BlockLine)) &&
       (sectionKind === "experience" ||
         (sectionKind === "unknown" && titleKeywords.test(trimmed) && !eduKeywords.test(trimmed)))
     ) {
@@ -874,6 +1191,46 @@ function extractFactsFromTypst(
           const dateKey = `${normEmp || ""}:${parsed.raw}`;
           if (parsed.raw && !dateRangesMap.has(dateKey)) {
             dateRangesMap.set(dateKey, parsed);
+          }
+        }
+        pendingBlockEmployer = normEmp || undefined;
+        continue;
+      } else if (segments.length === 1 && sectionKind === "experience" && isV2BlockLine) {
+        const single = segments[0];
+        if (titleKeywords.test(single) && !eduKeywords.test(single)) {
+          const normTitle = normalizeTitle(single);
+          if (normTitle && !titlesMap.has(normTitle)) {
+            titlesMap.set(normTitle, {
+              raw: single,
+              normalized: normTitle,
+              employerNormalized: pendingBlockEmployer,
+            });
+          }
+          if (inlineDateMatch) {
+            const parsed = parseDateRange(inlineDateMatch[1], pendingBlockEmployer);
+            const dateKey = `${pendingBlockEmployer || ""}:${parsed.raw}`;
+            if (parsed.raw && !dateRangesMap.has(dateKey)) {
+              dateRangesMap.set(dateKey, parsed);
+            }
+          }
+        } else if (!eduKeywords.test(single)) {
+          const normEmp = normalizeEmployer(single);
+          if (normEmp) {
+            pendingBlockEmployer = normEmp;
+            if (!employersMap.has(normEmp)) {
+              employersMap.set(normEmp, {
+                raw: single,
+                normalized: normEmp,
+                aliases: extractEmployerAliases(single),
+              });
+            }
+          }
+          if (inlineDateMatch) {
+            const parsed = parseDateRange(inlineDateMatch[1], normEmp || undefined);
+            const dateKey = `${normEmp || ""}:${parsed.raw}`;
+            if (parsed.raw && !dateRangesMap.has(dateKey)) {
+              dateRangesMap.set(dateKey, parsed);
+            }
           }
         }
         continue;

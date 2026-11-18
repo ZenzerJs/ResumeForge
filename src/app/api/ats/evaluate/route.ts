@@ -7,6 +7,7 @@ import { AtsEvaluateInputSchema, RoleProfile } from "@/lib/ats-evaluator/types";
 import { JobRequirements } from "@/lib/jd-parser/types";
 import { getMasterResume } from "@/lib/db/resumes";
 import { getEvidenceItems } from "@/lib/db/evidence";
+import { sharedOrSelfJobWhere } from "@/lib/db/jobs";
 import { sanitizeError } from "@/lib/ai/redact";
 import { getRequestUserId } from "@/lib/security/auth-request";
 
@@ -73,7 +74,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (input.jobId && !requirements.requiredSkills.length && !requirements.preferredSkills.length) {
-      const job = await prisma.job.findFirst({ where: { id: input.jobId } });
+      const job = await prisma.job.findFirst({
+        where: { id: input.jobId, ...sharedOrSelfJobWhere(userId) },
+      });
       if (job) {
         if (!roleTitle) roleTitle = job.roleTitle || undefined;
         rawDescription = job.rawDescription || "";

@@ -56,7 +56,24 @@ export async function GET(req: NextRequest) {
     }
 
     // Optional: Fetch additional company problems from database if company filter is active
-    let dbCompanyProblems: any[] = [];
+    const dbProblemSelect = {
+      id: true,
+      problemTitle: true,
+      company: true,
+      category: true,
+      difficulty: true,
+      tags: true,
+      sourceUrl: true,
+    } as const;
+    let dbCompanyProblems: Array<{
+      id: string;
+      problemTitle: string;
+      company: string;
+      category: string | null;
+      difficulty: string | null;
+      tags: string[];
+      sourceUrl: string | null;
+    }> = [];
     if (company && company !== "all") {
       try {
         const companyKey = normalizeCompany(company);
@@ -68,6 +85,7 @@ export async function GET(req: NextRequest) {
             ],
           },
           take: 20,
+          select: dbProblemSelect,
         });
       } catch {
         // Continue with static problems if db query fails
@@ -95,7 +113,7 @@ export async function GET(req: NextRequest) {
         total: problems.length,
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[API practice/problems] Error:", sanitizeError(err));
     return NextResponse.json(
       { success: false, error: "Failed to fetch practice curriculum" },

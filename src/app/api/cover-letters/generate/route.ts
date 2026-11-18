@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateCoverLetter, resolveServerProviderConfig } from "@/lib/ai/gateway";
-import { parseAndVerifyCoverLetterOutput } from "@/lib/ai/cover-letter-verifier";
+import {
+  buildCoverLetterEvidenceContext,
+  parseAndVerifyCoverLetterOutput,
+} from "@/lib/ai/cover-letter-verifier";
 import { getEvidenceItems } from "@/lib/db/evidence";
 import { createCoverLetter } from "@/lib/db/cover-letters";
 import { getMasterResume } from "@/lib/db/resumes";
-import { extractCandidateNameFromTypst } from "@/lib/export/resume-text";
 import { sanitizeError } from "@/lib/ai/redact";
 import { ProviderConfigSchema } from "@/lib/ai/types";
 import { requireUserId } from "@/lib/security/auth-request";
@@ -35,10 +37,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify job exists
-    const job = await prisma.job.findFirst({
-      where: { id: jobId, OR: [{ userId }, { userId: null }] },
-    });
+    // Verify job and optional variant in parallel
+    const hasVariantId = Boolean(variantId && typeof variantId === "string");
+    const [job, variant] = await Promise.all([
+      prisma.job.findFirst({
+        where: { id: jobId, OR: [{ userId }, { userId: null }] },
+      }),
+      hasVariantId
+        ? prisma.resumeVariant.findFirst({
+            where: { id: variantId as string, jobId, masterResume: { userId } },
+          })
+        : Promise.resolve(null),
+    ]);
 
     if (!job) {
       return NextResponse.json(
@@ -47,17 +57,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify variant exists if provided
-    if (variantId && typeof variantId === "string") {
-      const variant = await prisma.resumeVariant.findFirst({
-        where: { id: variantId, jobId, masterResume: { userId } },
-      });
-      if (!variant) {
-        return NextResponse.json(
-          { success: false, error: `ResumeVariant record not found: ${variantId}` },
-          { status: 404 }
-        );
-      }
+    if (hasVariantId && !variant) {
+      return NextResponse.json(
+        { success: false, error: `ResumeVariant record not found: ${variantId}` },
+        { status: 404 }
+      );
     }
 
     const parsedConfig = ProviderConfigSchema.safeParse(rawProviderConfig || body.provider);
@@ -86,19 +90,13 @@ export async function POST(req: NextRequest) {
     }
     const providerConfig = resolvedConfig;
 
-    // Gather active evidence items
-    const evidenceItems = await getEvidenceItems(undefined, userId);
-    const activeEvidenceItems = evidenceItems.filter((e) => e.status !== "archived");
-
-    const activeEvidenceIds: string[] = [];
-    for (const item of activeEvidenceItems) {
-      activeEvidenceIds.push(item.id);
-      if (Array.isArray(item.bullets)) {
-        for (const bullet of item.bullets) {
-          activeEvidenceIds.push(bullet.id);
-        }
-      }
-    }
+    // Gather active evidence items and master resume in parallel
+    const [evidenceItems, master] = await Promise.all([
+      getEvidenceItems(undefined, userId),
+      getMasterResume(userId),
+    ]);
+    const { activeEvidenceItems, activeEvidenceIds, resolvedCandidateName } =
+      buildCoverLetterEvidenceContext(evidenceItems, master?.typstSource, body.candidateName);
 
     // Extract requirements object if available
     let extractedReqs = {};
@@ -107,13 +105,6 @@ export async function POST(req: NextRequest) {
     } catch {
       // Non-fatal
     }
-
-    const master = await getMasterResume(userId);
-    const providedName = typeof body.candidateName === "string" ? body.candidateName.trim() : "";
-    const resolvedCandidateName =
-      providedName && providedName.toLowerCase() !== "candidate"
-        ? providedName
-        : extractCandidateNameFromTypst(master?.typstSource) || "Candidate";
 
     const inputPayload = {
       jobId: job.id,
@@ -174,7 +165,7 @@ export async function POST(req: NextRequest) {
       success: true,
       data: persisted,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return NextResponse.json(
       {
         success: false,

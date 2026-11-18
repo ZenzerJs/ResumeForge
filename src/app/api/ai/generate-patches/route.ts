@@ -80,7 +80,18 @@ export async function POST(request: Request) {
 
     const { providerConfig, jobRequirements, tailorFeedback, jobId } = parseResult.data;
 
-    const masterResume = await getMasterResume(userId);
+    const contextPromise = jobId
+      ? captureProposalContext(userId, jobId).then(
+          (value) => ({ ok: true as const, value }),
+          (error: unknown) => ({ ok: false as const, error })
+        )
+      : Promise.resolve(null);
+
+    const [masterResume, contextOutcome, fallbackEvidence] = await Promise.all([
+      getMasterResume(userId),
+      contextPromise,
+      jobId ? Promise.resolve(null) : getEvidenceItems(undefined, userId),
+    ]);
     if (!masterResume) {
       return NextResponse.json(
         { success: false, error: "Master resume not found. Save a master resume before generating patches." },
@@ -88,7 +99,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const context = jobId ? await captureProposalContext(userId, jobId, masterResume.id) : null;
+    if (contextOutcome && !contextOutcome.ok) {
+      throw contextOutcome.error;
+    }
+    const context = contextOutcome ? contextOutcome.value : null;
 
     const activeEvidence: Array<
       EvidenceItemForPrompt & {
@@ -119,7 +133,7 @@ export async function POST(request: Request) {
                 verified: bullet.verified,
               })),
           }))
-      : (await getEvidenceItems(undefined, userId))
+      : (fallbackEvidence ?? [])
           .filter((e) => e.status === "verified")
           .map((e) => ({
             ...e,

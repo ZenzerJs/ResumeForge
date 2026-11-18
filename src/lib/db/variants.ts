@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sharedOrSelfJobWhere } from "@/lib/db/jobs";
 
@@ -58,7 +59,7 @@ export async function createVariant(input: CreateVariantInput) {
       jobId: input.jobId,
       variantTitle: input.variantTitle,
       typstContent: input.typstContent,
-      factSnapshot: masterResume.factSnapshot as any,
+      factSnapshot: (masterResume.factSnapshot ?? undefined) as Prisma.InputJsonValue | undefined,
       status: "DRAFT",
     },
   });
@@ -66,7 +67,7 @@ export async function createVariant(input: CreateVariantInput) {
 
 /**
  * Updates an existing ResumeVariant.
- * Amendment 3: Hard guard — refuses if the target ID resolves to a protected Resume record.
+ * Amendment 3: Hard guard — refuses if the target ID does not resolve to an owned ResumeVariant record.
  */
 export async function updateVariant(
   variantId: string,
@@ -85,18 +86,6 @@ export async function updateVariant(
 
   if (!variant) {
     throw new Error(`ResumeVariant not found: ${variantId}`);
-  }
-
-  // Double-check: ensure we are not somehow writing to a protected master resume
-  // This guards against ID confusion attacks or bugs
-  const protectedResume = await prisma.resume.findFirst({
-    where: { id: variantId, isProtected: true },
-  });
-
-  if (protectedResume) {
-    throw new Error(
-      "SECURITY: Attempted to write AI-generated content to a protected Master Resume. This operation is forbidden."
-    );
   }
 
   return await prisma.resumeVariant.update({

@@ -373,10 +373,12 @@ export async function applyProposalBatch(input: ApplyBatchInput) {
     if (batch.revisionToken !== input.revisionToken) {
       throw new PatchBatchError("stale_resume_or_job", "Proposal revision is stale.", { httpStatus: 409 });
     }
-    await tx.$queryRaw`SELECT "id" FROM "Resume" WHERE "id" = ${batch.masterResumeId} FOR SHARE`;
-    await tx.$queryRaw`SELECT "id" FROM "Job" WHERE "id" = ${batch.jobId} FOR SHARE`;
-    await tx.$queryRaw`SELECT "id" FROM "EvidenceItem" WHERE "userId" = ${input.userId} FOR SHARE`;
-    await tx.$queryRaw`SELECT b."id" FROM "Bullet" b JOIN "EvidenceItem" e ON e."id" = b."evidenceId" WHERE e."userId" = ${input.userId} FOR SHARE OF b`;
+    await Promise.all([
+      tx.$queryRaw`SELECT "id" FROM "Resume" WHERE "id" = ${batch.masterResumeId} FOR SHARE`,
+      tx.$queryRaw`SELECT "id" FROM "Job" WHERE "id" = ${batch.jobId} FOR SHARE`,
+      tx.$queryRaw`SELECT "id" FROM "EvidenceItem" WHERE "userId" = ${input.userId} FOR SHARE`,
+      tx.$queryRaw`SELECT b."id" FROM "Bullet" b JOIN "EvidenceItem" e ON e."id" = b."evidenceId" WHERE e."userId" = ${input.userId} FOR SHARE OF b`,
+    ]);
     const [master, job, evidence] = await Promise.all([
       tx.resume.findFirst({ where: { id: batch.masterResumeId, userId: input.userId, isMaster: true, isProtected: true } }),
       tx.job.findFirst({ where: { id: batch.jobId, OR: [{ userId: input.userId }, { userId: null }] } }),
