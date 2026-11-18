@@ -1,8 +1,11 @@
 import { z } from "zod";
 import { extractJsonObject } from "./ai/json-response";
 import { ProviderConfig } from "./ai/types";
-import { sendChatCompletion, resolveServerProviderConfig } from "@/lib/ai/gateway";
-import { isDemoMode } from "@/lib/demo-mode";
+import {
+  sendChatCompletion,
+  resolveServerProviderConfig,
+  detectServerFallbackProviderConfig,
+} from "@/lib/ai/gateway";
 
 export const dossierSchema = z.object({
   companyName: z.string(),
@@ -174,30 +177,13 @@ async function callDossierLlm(providerConfig: ProviderConfig, promptText: string
   return res.content;
 }
 
-function detectServerProviderConfig(): ProviderConfig | undefined {
-  if (isDemoMode()) return undefined;
-  if (process.env.OPENAI_API_KEY?.trim()) {
-    return { provider: "openai", apiKey: process.env.OPENAI_API_KEY.trim() };
-  }
-  if (process.env.ANTHROPIC_API_KEY?.trim()) {
-    return { provider: "anthropic", apiKey: process.env.ANTHROPIC_API_KEY.trim() };
-  }
-  if (process.env.GEMINI_API_KEY?.trim()) {
-    return { provider: "gemini", apiKey: process.env.GEMINI_API_KEY.trim() };
-  }
-  if (process.env.GROQ_API_KEY?.trim()) {
-    return { provider: "groq", apiKey: process.env.GROQ_API_KEY.trim() };
-  }
-  return undefined;
-}
-
 /**
  * Synthesize company intelligence dossier with source tagging.
  */
 export async function generateDossierWithSource(
   input: GenerateDossierInput
 ): Promise<{ dossier: CompanyIntelligenceDossier; source: "llm" | "seed" }> {
-  const rawConfig = input.providerConfig || detectServerProviderConfig();
+  const rawConfig = input.providerConfig || detectServerFallbackProviderConfig();
   const resolvedConfig = rawConfig ? resolveServerProviderConfig(rawConfig) : undefined;
 
   if (

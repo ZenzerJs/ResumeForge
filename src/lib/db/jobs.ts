@@ -248,6 +248,8 @@ function jobIncludeForViewer(viewerUserId?: string | null): Prisma.JobInclude {
 
 export type { WorkplaceFilter };
 
+export type JobListScope = "all" | "tracked";
+
 export interface JobListQuery {
   page?: number;
   limit?: number;
@@ -256,6 +258,7 @@ export interface JobListQuery {
   workplace?: WorkplaceFilter;
   status?: JobStatus | JobStatus[] | "ALL";
   postedWithin?: PostedWithin;
+  scope?: JobListScope;
   /** Viewer id — scopes nested variants/cover letters, not the job catalog. */
   userId?: string | null;
 }
@@ -263,8 +266,46 @@ export interface JobListQuery {
 export async function getJobsList(query: JobListQuery = {}) {
   const page = Math.max(1, query.page ?? 1);
   const limit = Math.min(100, Math.max(1, query.limit ?? 40));
+
+  if (query.scope === "tracked" && !query.userId) {
+    return {
+      data: [],
+      meta: {
+        page,
+        limit,
+        total: 0,
+        totalPages: 1,
+        counts: { applied: 0, interviewing: 0 },
+      },
+    };
+  }
+
   const where: Prisma.JobWhereInput = {
-    AND: [sharedOrSelfJobWhere(query.userId)],
+    AND: [
+      sharedOrSelfJobWhere(query.userId),
+      ...(query.scope === "tracked" && query.userId
+        ? [
+            {
+              OR: [
+                { userId: query.userId },
+                { applications: { some: { userId: query.userId } } },
+                { variants: { some: { masterResume: { userId: query.userId } } } },
+                {
+                  coverLetters: {
+                    some: {
+                      OR: [
+                        { userId: query.userId },
+                        { variant: { masterResume: { userId: query.userId } } },
+                      ],
+                    },
+                  },
+                },
+                { patchProposalBatches: { some: { userId: query.userId } } },
+              ],
+            } satisfies Prisma.JobWhereInput,
+          ]
+        : []),
+    ],
   };
 
   if (query.q?.trim()) {
@@ -391,6 +432,7 @@ export async function getJobsList(query: JobListQuery = {}) {
       );
       const posted = extractPostingDateFromNotes(job.notes)?.trim() || null;
       const cleanedPosted = posted && !/^apply$/i.test(posted) ? posted : null;
+      if (query.scope === "tracked" && !hasPersonalHistory) continue;
       if (!hasPersonalHistory && !isBoardEligible(cleanedPosted, job.createdAt, now)) continue;
 
       const item = withViewerOutcome(job, query.userId);

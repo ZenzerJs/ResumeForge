@@ -56,7 +56,12 @@ export async function POST(request: Request) {
     const userId = await requireUserId(request);
     if (userId instanceof NextResponse) return userId;
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON payload" }, { status: 400 });
+    }
     const parseResult = CreateCoverLetterSchema.safeParse(body);
 
     if (!parseResult.success) {
@@ -73,6 +78,15 @@ export async function POST(request: Request) {
     const coverLetter = await createCoverLetter({ ...parseResult.data, userId });
     return NextResponse.json({ success: true, data: coverLetter }, { status: 201 });
   } catch (err) {
+    if (err instanceof Error && /not found/i.test(err.message)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: err.message,
+        },
+        { status: 404 }
+      );
+    }
     return NextResponse.json(
       {
         success: false,

@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { TypstRepairInputSchema, MAX_REPAIR_SOURCE_LENGTH, MAX_REPAIR_ERROR_LENGTH } from "@/lib/ai/repair-schema";
 import { ProviderConfigSchema } from "@/lib/ai/types";
-import { repairTypstSource } from "@/lib/ai/gateway";
+import {
+  repairTypstSource,
+  detectServerFallbackProviderConfig,
+  resolveServerProviderConfig,
+} from "@/lib/ai/gateway";
 import { sanitizeError } from "@/lib/ai/redact";
 import { requireUserId } from "@/lib/security/auth-request";
 import { isDemoMode } from "@/lib/demo-mode";
@@ -75,21 +79,9 @@ export async function POST(request: Request) {
         ? (providerConfig as Record<string, unknown>)
         : undefined;
     if ((!providerConfigToUse || !providerConfigToUse.provider) && !demoMode) {
-      if (process.env.OPENAI_API_KEY) {
-        providerConfigToUse = { provider: "openai", apiKey: process.env.OPENAI_API_KEY, model: "gpt-4o" };
-      } else if (process.env.ANTHROPIC_API_KEY) {
-        providerConfigToUse = { provider: "anthropic", apiKey: process.env.ANTHROPIC_API_KEY, model: "claude-3-5-sonnet-20241022" };
-      } else if (process.env.GEMINI_API_KEY) {
-        providerConfigToUse = { provider: "gemini", apiKey: process.env.GEMINI_API_KEY, model: "gemini-1.5-pro" };
-      } else if (process.env.CUSTOM_OPENAI_API_KEY) {
-        providerConfigToUse = { provider: "custom", apiKey: process.env.CUSTOM_OPENAI_API_KEY, baseUrl: process.env.CUSTOM_OPENAI_BASE_URL };
-      } else {
-        providerConfigToUse = {
-          provider: process.env.NEXT_PUBLIC_DEFAULT_AI_PROVIDER || "openai",
-          model: process.env.NEXT_PUBLIC_DEFAULT_AI_MODEL || "gpt-4o",
-          apiKey: process.env.OPENAI_API_KEY || "",
-        };
-      }
+      providerConfigToUse = detectServerFallbackProviderConfig({
+        includeDefaultFallback: true,
+      }) as Record<string, unknown> | undefined;
     }
     if (
       demoMode &&
@@ -105,13 +97,13 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: `Invalid provider configuration: ${configParse.error.message}`,
+          error: sanitizeError(`Invalid provider configuration: ${configParse.error.message}`),
         },
         { status: 400 }
       );
     }
 
-    const result = await repairTypstSource(configParse.data, inputParse.data);
+    const result = await repairTypstSource(resolveServerProviderConfig(configParse.data), inputParse.data);
 
     if (!result.success) {
       return NextResponse.json({ success: false, error: result.error }, { status: 400 });

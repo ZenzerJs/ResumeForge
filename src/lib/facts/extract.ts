@@ -498,7 +498,7 @@ function extractDetailsBracketBlock(body: string): string | undefined {
 }
 
 const EXPLICIT_SKILL_LINE_PREFIX =
-  /^\s*[-•*]\s*(?:\*([A-Za-z0-9\s&/+_-]+):\*\s*|(Languages|Frameworks(?:\s*&\s*Libraries)?|Developer\s+Tools|Tools(?:\s*&\s*Infrastructure)?|Databases|Libraries|Platforms|Core\s+Competencies|Technical\s+Skills|Skills)\s*:\s*)/i;
+  /^\s*(?:[-•*]\s*)?(?:\*([A-Za-z0-9\s&/+_-]+):\*\s*|\*([A-Za-z0-9\s&/+_-]+)\*\s*:\s*|(Languages|Frameworks(?:\s*&\s*Libraries)?|Developer\s+Tools|Tools(?:\s*&\s*Infrastructure)?|Databases|Libraries|Platforms|Core\s+Competencies|Technical\s+Skills|Skills)\s*:\s*)/i;
 
 function extractSkillsFromBulletLine(line: string, skillsSet: Set<string>, inSkillsSection: boolean): boolean {
   const hasExplicitSkillPrefix = EXPLICIT_SKILL_LINE_PREFIX.test(line);
@@ -507,31 +507,44 @@ function extractSkillsFromBulletLine(line: string, skillsSet: Set<string>, inSki
   }
 
   const trimmed = line.trim();
-  if (!trimmed.startsWith("-") && !trimmed.startsWith("•") && !hasExplicitSkillPrefix) {
+  if (
+    !inSkillsSection &&
+    !trimmed.startsWith("-") &&
+    !trimmed.startsWith("•") &&
+    !hasExplicitSkillPrefix
+  ) {
+    return false;
+  }
+
+  if (inSkillsSection && (/^=+/.test(trimmed) || /^#(?:section|entry|resume-entry|project-entry|skill-line|set|let|show)\b/i.test(trimmed))) {
     return false;
   }
 
   const cleanedSkillLine = trimmed
     .replace(/^[-•*#\s]+/, "")
     .replace(/^\*[^*]+:\*\s*/, "")
+    .replace(/^\*[^*]+\*\s*:\s*/, "")
     .replace(
       /^(Languages|Frameworks(?:\s*&\s*Libraries)?|Developer\s+Tools|Tools(?:\s*&\s*Infrastructure)?|Databases|Libraries|Platforms|Core\s+Competencies|Technical\s+Skills|Skills)\s*:\s*/i,
       ""
-    );
+    )
+    .replace(/^[A-Za-z0-9\s&/+_-]{1,30}:\s*/, (match) => (inSkillsSection ? "" : match));
 
   const skillTokens = cleanedSkillLine
     .split(/[,;|•]/)
     .map((s) => s.replace(/[*_]/g, "").trim());
 
+  let added = false;
   for (const tok of skillTokens) {
     if (tok.length > 1 && tok.length < 35 && !/^#?(?:section|entry|set|let|show)\b/i.test(tok)) {
       const norm = normalizeSkillToken(tok);
       if (norm && !norm.startsWith("section ")) {
         skillsSet.add(norm);
+        added = true;
       }
     }
   }
-  return true;
+  return added || hasExplicitSkillPrefix;
 }
 
 /**
@@ -740,12 +753,12 @@ function extractFactsFromTypst(
     // Check bold pairs: `*Software Engineer* | *Google*` or `*Google* -- *Software Engineer*`
     const isExplicitSkillBullet = EXPLICIT_SKILL_LINE_PREFIX.test(trimmed);
     const boldPairs = !isExplicitSkillBullet ? line.match(/\*([^*]+)\*/g) : null;
+    const titleKeywords =
+      /\b(engineer|developer|designer|manager|lead|director|architect|intern|specialist|consultant|analyst|scientist|associate|officer|vp|founder|role|head|chief|administrator|coordinator|researcher|fellow|instructor|professor)\b/i;
+
     if (boldPairs && boldPairs.length >= 2 && sectionKind !== "skills" && sectionKind !== "education") {
       const part1 = boldPairs[0].replace(/\*/g, "").trim();
       const part2 = boldPairs[1].replace(/\*/g, "").trim();
-
-      const titleKeywords =
-        /\b(engineer|developer|designer|manager|lead|director|architect|intern|specialist|consultant|analyst|scientist|associate|officer|vp|founder)\b/i;
 
       let empRaw = part1;
       let titleRaw = part2;
@@ -795,11 +808,83 @@ function extractFactsFromTypst(
       continue;
     }
 
-    // Standalone bullet lines
-    if (trimmed.startsWith("-") || trimmed.startsWith("•")) {
-      if (sectionKind === "skills") {
-        extractSkillsFromBulletLine(trimmed, skillsSet, true);
-      } else if (sectionKind !== "education") {
+    // Check single-bold `*Role* — Company` or `=== Role — Company` experience lines
+    const isSubheadingLine = /^===+\s+/.test(trimmed);
+    if (
+      !isExplicitSkillBullet &&
+      !trimmed.startsWith("-") &&
+      !trimmed.startsWith("•") &&
+      ((boldPairs && boldPairs.length === 1) || isSubheadingLine) &&
+      (sectionKind === "experience" ||
+        (sectionKind === "unknown" && titleKeywords.test(trimmed) && !eduKeywords.test(trimmed)))
+    ) {
+      const inlineDateMatch = trimmed.match(
+        /\b((?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+)?(?:19|20)\d\d\s*[-–—]\s*(?:(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+)?(?:19|20)\d\d|present|current|now))\b/i
+      );
+      const withoutDate = trimmed
+        .replace(/^===+\s*/, "")
+        .replace(
+          /\s*(?:\(\s*)?\b(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+)?(?:19|20)\d\d\s*[-–—]\s*(?:(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+)?(?:19|20)\d\d|present|current|now)\b(?:\s*\))?/gi,
+          ""
+        )
+        .replace(/[\s|—–-]+$/, "")
+        .trim();
+
+      const segments = withoutDate
+        .replace(/[*_]/g, "")
+        .split(/\s*(?:—|–|--|\||(?:\s+-\s+)|(?:\s+@\s+)|(?:\s+at\s+))\s*/i)
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      if (segments.length >= 2) {
+        const part1 = segments[0];
+        const part2 = segments[1];
+        const leadingBold = /^\s*\*[^*]+\*/.test(withoutDate);
+
+        let titleRaw = leadingBold ? part1 : part2;
+        let empRaw = leadingBold ? part2 : part1;
+
+        if (titleKeywords.test(part1) && !titleKeywords.test(part2)) {
+          titleRaw = part1;
+          empRaw = part2;
+        } else if (!titleKeywords.test(part1) && titleKeywords.test(part2)) {
+          empRaw = part1;
+          titleRaw = part2;
+        }
+
+        const normEmp = normalizeEmployer(empRaw);
+        const normTitle = normalizeTitle(titleRaw);
+
+        if (normEmp && !employersMap.has(normEmp)) {
+          employersMap.set(normEmp, {
+            raw: empRaw,
+            normalized: normEmp,
+            aliases: extractEmployerAliases(empRaw),
+          });
+        }
+        if (normTitle && !titlesMap.has(normTitle)) {
+          titlesMap.set(normTitle, {
+            raw: titleRaw,
+            normalized: normTitle,
+            employerNormalized: normEmp || undefined,
+          });
+        }
+        if (inlineDateMatch) {
+          const parsed = parseDateRange(inlineDateMatch[1], normEmp || undefined);
+          const dateKey = `${normEmp || ""}:${parsed.raw}`;
+          if (parsed.raw && !dateRangesMap.has(dateKey)) {
+            dateRangesMap.set(dateKey, parsed);
+          }
+        }
+        continue;
+      }
+    }
+
+    // Standalone bullet lines or plain skill lines under `== Skills`
+    if (sectionKind === "skills" && !/^=+/.test(trimmed)) {
+      extractSkillsFromBulletLine(trimmed, skillsSet, true);
+    } else if (trimmed.startsWith("-") || trimmed.startsWith("•") || isExplicitSkillBullet) {
+      if (sectionKind !== "education") {
         if (!extractSkillsFromBulletLine(trimmed, skillsSet, false)) {
           const cleanBullet = stripInlineTypstMarkup(trimmed);
           metricsList.push(...extractMetricsFromText(cleanBullet));

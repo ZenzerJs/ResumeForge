@@ -5,6 +5,11 @@
  * active (non-archived) EvidenceItem or Bullet records in the candidate's Evidence Bank.
  */
 
+import { CoverLetterResponseSchema, type CoverLetterResponse } from "./cover-letter-schema";
+import { extractJsonObject, normalizeCoverLetterPayload } from "./json-response";
+import { sanitizeError } from "./redact";
+import { replacePlaceholderSignature } from "../export/resume-text";
+
 export interface CoverLetterPayload {
   salutation?: string;
   openingParagraph?: string;
@@ -19,6 +24,73 @@ export interface VerificationResult {
   validCitations: string[];
   invalidCitations: string[];
   reason?: string;
+}
+
+export type ValidatedCoverLetterOutput =
+  | { ok: true; data: CoverLetterResponse }
+  | {
+      ok: false;
+      status: 422;
+      body: Record<string, unknown>;
+    };
+
+export function parseAndVerifyCoverLetterOutput(
+  rawJson: string,
+  resolvedCandidateName: string,
+  activeEvidenceIds: string[]
+): ValidatedCoverLetterOutput {
+  let parsedResponse: unknown;
+  try {
+    parsedResponse = extractJsonObject(rawJson);
+  } catch {
+    return {
+      ok: false,
+      status: 422,
+      body: {
+        success: false,
+        error: "AI provider returned malformed non-JSON output for cover letter.",
+        rawOutput: sanitizeError(rawJson.slice(0, 300)),
+      },
+    };
+  }
+
+  const normalized = normalizeCoverLetterPayload(parsedResponse, resolvedCandidateName);
+  if (normalized && typeof normalized === "object" && "fullMarkdown" in normalized) {
+    const record = normalized as Record<string, unknown>;
+    if (typeof record.fullMarkdown === "string") {
+      record.fullMarkdown = replacePlaceholderSignature(record.fullMarkdown, resolvedCandidateName);
+    }
+  }
+  const schemaValidation = CoverLetterResponseSchema.safeParse(normalized);
+  if (!schemaValidation.success) {
+    return {
+      ok: false,
+      status: 422,
+      body: {
+        success: false,
+        error: "Generated cover letter output failed schema validation.",
+        details: schemaValidation.error.flatten().fieldErrors,
+      },
+    };
+  }
+
+  const coverLetter = schemaValidation.data;
+  const groundingVerification = verifyCoverLetterGrounding(coverLetter, activeEvidenceIds);
+  if (!groundingVerification.verified) {
+    return {
+      ok: false,
+      status: 422,
+      body: {
+        success: false,
+        error:
+          "SECURITY CONTRACT REJECTION: Generated cover letter contained unverified or hallucinated evidence citations.",
+        reason: groundingVerification.reason,
+        invalidCitations: groundingVerification.invalidCitations,
+      },
+    };
+  }
+
+  return { ok: true, data: coverLetter };
 }
 
 export function verifyCoverLetterGrounding(

@@ -65,9 +65,69 @@ async function dispatchTextCompletion(
 }
 
 /**
+ * Detects a server-side fallback ProviderConfig from environment variables when
+ * the caller did not supply a providerConfig (only when not in demo mode).
+ */
+export function detectServerFallbackProviderConfig(options?: {
+  includeDefaultFallback?: boolean;
+}): ProviderConfig | undefined {
+  if (isDemoMode()) return undefined;
+  if (process.env.OPENAI_API_KEY?.trim()) {
+    return { provider: "openai", apiKey: process.env.OPENAI_API_KEY.trim(), model: "gpt-4o" };
+  }
+  if (process.env.ANTHROPIC_API_KEY?.trim()) {
+    return {
+      provider: "anthropic",
+      apiKey: process.env.ANTHROPIC_API_KEY.trim(),
+      model: "claude-3-5-sonnet-20241022",
+    };
+  }
+  if (process.env.GEMINI_API_KEY?.trim()) {
+    return { provider: "gemini", apiKey: process.env.GEMINI_API_KEY.trim(), model: "gemini-1.5-pro" };
+  }
+  if (process.env.GROQ_API_KEY?.trim()) {
+    return resolveServerProviderConfig({ provider: "groq", apiKey: process.env.GROQ_API_KEY.trim() });
+  }
+  if (process.env.CUSTOM_OPENAI_API_KEY?.trim()) {
+    return {
+      provider: "custom",
+      apiKey: process.env.CUSTOM_OPENAI_API_KEY.trim(),
+      baseUrl: process.env.CUSTOM_OPENAI_BASE_URL,
+    };
+  }
+  if (options?.includeDefaultFallback) {
+    const fallbackProvider = (process.env.NEXT_PUBLIC_DEFAULT_AI_PROVIDER || "openai") as ProviderConfig["provider"];
+    return {
+      provider: fallbackProvider,
+      model: process.env.NEXT_PUBLIC_DEFAULT_AI_MODEL || "gpt-4o",
+      apiKey: process.env.OPENAI_API_KEY || "",
+    };
+  }
+  return undefined;
+}
+
+/**
  * Resolves server-side defaults and environment variables for AI providers.
  */
 export function resolveServerProviderConfig(config: ProviderConfig): ProviderConfig {
+  if (!isDemoMode() && !config.apiKey?.trim()) {
+    if (config.provider === "openai" && process.env.OPENAI_API_KEY?.trim()) {
+      return { ...config, apiKey: process.env.OPENAI_API_KEY.trim() };
+    }
+    if (config.provider === "anthropic" && process.env.ANTHROPIC_API_KEY?.trim()) {
+      return { ...config, apiKey: process.env.ANTHROPIC_API_KEY.trim() };
+    }
+    if (config.provider === "gemini" && process.env.GEMINI_API_KEY?.trim()) {
+      return { ...config, apiKey: process.env.GEMINI_API_KEY.trim() };
+    }
+    if (config.provider === "custom" && process.env.CUSTOM_OPENAI_API_KEY?.trim()) {
+      return {
+        ...config,
+        apiKey: process.env.CUSTOM_OPENAI_API_KEY.trim(),
+        baseUrl: config.baseUrl || process.env.CUSTOM_OPENAI_BASE_URL,
+      };
+    }
+  }
   if (config.provider === "groq") {
     const { apiKey, baseUrl } = resolveProviderCredentials({
       configApiKey: config.apiKey,
@@ -329,7 +389,11 @@ export async function convertPdfTextToTypst(input: ConvertPdfInput): Promise<Con
       }
     }
     if (result.success && result.typstSource) {
-      result.typstSource = sanitizeTypstSource(result.typstSource);
+      const v1Validated = z.string().trim().min(1).safeParse(sanitizeTypstSource(result.typstSource));
+      if (!v1Validated.success) {
+        return { success: false, error: "Invalid v1 PDF Typst conversion output" };
+      }
+      result.typstSource = v1Validated.data;
     }
     return result;
   } catch (err) {

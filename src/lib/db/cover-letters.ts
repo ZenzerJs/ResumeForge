@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { sharedOrSelfJobWhere } from "@/lib/db/jobs";
 
 function coverLetterOwnerWhere(userId?: string): Prisma.CoverLetterWhereInput | undefined {
   if (!userId) return undefined;
@@ -45,9 +46,12 @@ export interface UpdateCoverLetterInput {
  * Creates a new CoverLetter record in Postgres.
  */
 export async function createCoverLetter(input: CreateCoverLetterInput) {
-  // Verify job exists
+  // Verify job exists and is visible to the caller
   const job = await prisma.job.findFirst({
-    where: { id: input.jobId },
+    where: {
+      id: input.jobId,
+      ...sharedOrSelfJobWhere(input.userId),
+    },
   });
 
   if (!job) {
