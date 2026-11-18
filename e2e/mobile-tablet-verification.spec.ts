@@ -345,12 +345,12 @@ test.describe("Mobile & Tablet Usability Verification", () => {
     expect(errors).toEqual([]);
   });
 
-  test("2. Editor enforces 1280px 3-pane boundary (1279 vs 1280), exposes WAI-ARIA tabs, preserves edits across tabs & resizes, and holds 1440x900 chrome budget", async ({
+  test("2. Editor enforces lg/xl pane boundaries (1023 vs 1024, 1279 vs 1280), exposes WAI-ARIA tabs, preserves edits across tabs & resizes, and holds 1440x900 chrome budget", async ({
     page,
   }) => {
     const errors = await installMocks(page);
 
-    for (const vp of VIEWPORT_MATRIX.filter((v) => v.width < 1280)) {
+    for (const vp of VIEWPORT_MATRIX.filter((v) => !v.isDesktop)) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await page.goto("/editor", { waitUntil: "domcontentloaded" });
       await assertNoHorizontalOverflow(page, `/editor@${vp.name}`);
@@ -366,12 +366,20 @@ test.describe("Mobile & Tablet Usability Verification", () => {
       await expect(tablist.getByRole("tab", { name: /AI/i })).toBeVisible();
     }
 
-    // Breakpoint boundary check: 1279 stays tabbed, 1280 switches to 3-pane
-    await page.setViewportSize({ width: 1279, height: 900 });
+    // Breakpoint boundary check: 1023 stays tabbed, 1024 switches to 2-pane, 1279 stays 2-pane, 1280 switches to 3-pane
+    await page.setViewportSize({ width: 1023, height: 900 });
     await expect(page.getByTestId("editor-resizable-panel-group")).toHaveCount(0);
     await expect(page.getByRole("tablist", { name: "Workspace panels" })).toBeVisible();
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await expect(page.getByTestId("editor-resizable-panel-group")).toBeVisible();
+    await expect(page.getByTestId("panel-ai")).toHaveCount(0);
+    await page.setViewportSize({ width: 1279, height: 900 });
+    await expect(page.getByTestId("editor-resizable-panel-group")).toBeVisible();
+    await expect(page.getByTestId("panel-ai")).toHaveCount(0);
     await page.setViewportSize({ width: 1280, height: 900 });
     await expect(page.getByTestId("editor-resizable-panel-group")).toBeVisible();
+    await expect(page.getByTestId("panel-ai")).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "AI Assistant" })).toBeVisible();
 
     // Keyboard nav, hit-test, and state preservation across tabs and 390 -> 1024 -> 1440 -> 390 resizes
     await page.setViewportSize({ width: 390, height: 844 });

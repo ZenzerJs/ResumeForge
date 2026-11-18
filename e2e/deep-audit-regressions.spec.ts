@@ -229,9 +229,12 @@ test.describe("Deep Audit Regression Suite", () => {
   test("(e) /404-check Skip to content focuses #main-content and /privacy, /terms, /practice?tab=questions return 200 with 0 errors", async ({
     page,
   }) => {
-    await page.goto("/404-check");
+    await page.goto("/404-check", { waitUntil: "networkidle" });
+    await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
     const skipLink = page.getByRole("link", { name: "Skip to content" });
+    await expect(skipLink).toHaveAttribute("data-hydrated", "true");
     await skipLink.focus();
+    await expect(skipLink).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page.locator("#main-content")).toBeFocused();
 

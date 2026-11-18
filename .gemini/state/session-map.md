@@ -1,25 +1,27 @@
 ### Modified Interfaces
-- `DESIGN.md` — Documented static `AsciiWaves`, frosted glass diffusion layer, landing `ProductProofCard` `palette-lab.html#ember` ATS Match pop-out spec, and `/editor` integrated docked `ATS Grade` + `CodeEditor` syntax tokens.
-- `tailwind.config.ts` — Added `bg-deep` (`#0a0808`) token.
-- `C:/Users/jayde/.gemini/antigravity/brain/99cc49cb-77c3-4e64-8b4c-bd82398cb02b/palette-lab.html` — Removed cursor ripple/pointer listeners and added frosted glass diffusion plane (`ascii-glass-veil`) between the static `AsciiWaves` canvas and foreground text.
-- `src/components/design-system/ascii-waves.tsx` — Defaulted `hasCursorInteraction = false` and `speed = 0`, added synchronous dimension synchronization on `getContext` and `ResizeObserver` for static mode.
-- `src/components/landing/landing-atmosphere.tsx` — Added `data-testid="landing-ascii-glass-layer"` frosted glass diffusion plane (`backdrop-blur-md bg-canvas/55` + warm radial motif sheen + glass hairline highlights) between `AsciiWaves` and hero content; static `speed={0}` & `hasCursorInteraction={false}`.
-- `src/components/landing/home-landing.tsx` — Added subtle frosted glass card framing behind the hero narrative column (`data-testid="landing-hero-copy-glass"`).
-- `src/components/landing/product-proof-card.tsx` — Styled to match `palette-lab.html#ember` `02 · Landing hero` ATS Match pop-out card (`.surface-glass`, `ATS MATCH · STRIPE, BACKEND ENG.`, `Live` Electric Blue pill, `86` Electric Blue conic-gradient ring with glow, `Go`/`PostgreSQL`/`gRPC`/`Kafka` Electric Blue chips, `Terraform`/`PCI-DSS` Warm Gold gap chips, monospace diff with `#ffb3ab` removal & `#4f8fff` addition + `cites ev_0142 · ev_0157` footer, and `Accept` / `Reject` buttons).
-- `src/components/editor/code-editor.tsx` — Styled CodeMirror theme and live Typst line decorations to match `palette-lab.html#ember` `03 · Editor` (`bg-inset` `#151211`, Ember `#ff8b3d` directives, Warm Gold `#f7bd3f` functions, Electric Blue `#4f8fff` strings/metrics, muted stone `#9e9287` comments, and Warm Gold active line bar).
-- `src/components/editor/preview-panel.tsx`, `src/components/tailor/ats-score-panel.tsx`, `src/components/tailor/ats-score-panel.module.css` — Styled `AtsScorePanel` to match `palette-lab.html#ember` (Electric Blue conic score ring with glow, Electric Blue & Warm Gold progress bars, `Urgent` / `Non-urgent` issue cards on `bg-inset`) and integrated a docked right-hand `ATS Grade` column alongside the paper preview in `/editor` (`Preview · Grade` split view + full `ATS Grade` drawer).
-- Swept all remaining navy hexes and `slate-*` classes across `library/`, `evidence/`, `tracker/`, `tailor/`, `editor/`, `interview/`, `practice/`, `settings/`, `navigation/`, `ui/`, and `app/opengraph-image.tsx` onto Ember Ink tokens.
+- **Merged 4 workstream branches (`--no-ff`) into `playwright_browser_testing_plan`**:
+  - `swarm-ws-a-backend-5fd12fc0` (`1215c03`): `cover-letters.ts` & `variants.ts` `sharedOrSelfJobWhere(userId)` + `masterResume: { userId }` scoping; `orchestrator.ts` shared `Job` (`userId: null`) + caller `JobApplication` (`SAVED`); `jobs.ts` & `api/jobs/route.ts` `scope=tracked` query parameter; `resumes.ts` `restoreMasterSnapshot` verified `evidenceIds` snapshot preservation; `byok-proxy/route.ts` `safeFetch` SSRF guard; `middleware.ts` & `rate-limit.ts` throttling on `/api/cover-letters/generate` & `/api/jobs/sync-pittcsc`; `redact.ts` `app_key=`/`app_id=` scrubbing + `sanitizeError` across connectors & `repair-typst`; consolidated `gateway.ts` provider resolution, `cover-letter-verifier.ts`, `patch-citations.ts`, and `extract.ts` plain-Typst `*Role* — Company` & `== Skills` parsing.
+  - `swarm-ws-b-editor-36ca9e47` (`c9f3273`): `code-editor.tsx` & `editor-workspace.tsx` CodeMirror echo/React `#185` prevention (`lastEmittedValueRef`/`pendingEmittedValuesRef`/`isSyncingExternalRef`) & `#9e9287` gutter contrast; `preview-panel.tsx` `formatTypstDiagnosticMessage`, gated stale-preview/spinner states, export error gate, and tokens; `editor-workspace.tsx` & `resume-form-builder.tsx` slim inline `sample-resume-banner`, tab pill scroll chevrons, mobile disclosures, and ARIA labels; `confirm-master-dialog.tsx` starter placeholder warning banner (`starter-master-warning-banner`); `home-landing.tsx` browser-local guest PDF->Typst fallback on `401`; `product-proof-card.tsx`, `ats-sandbox-section.tsx`, `chat-panel.tsx`, `landing-footer.tsx`, `starter-resume.typ` WCAG contrast, accessibility labels, and `#1c1e20` paper ink.
+  - `swarm-ws-c-surfaces-77d5292b` (`621ac97`): `tracker-feed.tsx` & `practice-workspace.tsx` `scope=tracked` fetches, mobile `Filters` collapse, and WAI-ARIA tablist roving focus; `discover-feed.tsx` `Clear filters`, `matchesCuratedCompany` boundary filter, JD preview Radix `Dialog`, and `0`-evidence `Newest` sort fallback; `job-list-row.tsx` & `library-workspace.tsx` Radix `DropdownMenu` menus, `0`-item toolbar hiding, and mobile controls; `not-found.tsx`, `error.tsx`, `login/page.tsx`, `privacy/page.tsx`, `terms/page.tsx`, `app-shell.tsx` `#main-content` + `WorkspaceAtmosphere`; `tailor-workspace.tsx`, `top-nav.tsx`, `settings-workspace.tsx`, `interview-hub.tsx`, `workspace-atmosphere.tsx`, `globals.css`, `button.tsx`, `tailwind.config.ts` token alignment & UX fixes.
+  - `swarm-ws-d-tests-7d27b0cd` (`657a1c5`): `next.config.ts` `NEXT_PUBLIC_RESUME_LAYOUT_V2` build env default; `playwright*.config.ts` `DATABASE_URL` fallback + `DEMO_SPECS` cleanup (deleted duplicate `e2e/workspace-wave-verification.spec.ts`); `package.json` `test:e2e:demo`; repaired RC-3/4/5/6 & phantom assertions across `e2e/*.spec.ts`; added `tests/deep-audit-security.test.ts` and `e2e/deep-audit-regressions.spec.ts`.
+- **Integration & E2E verification fixes**:
+  - `src/components/navigation/skip-link.tsx` & `src/app/layout.tsx` — Added hydrated `SkipLink` preventing fragment-jump focus loss and shifting focus directly to `#main-content`.
+  - `src/components/editor/confirm-master-dialog.tsx` — Constrained dialog height (`max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden`) with scrollable body so `confirm-save-master-btn` stays inside `<=720px` viewports.
+  - `src/app/not-found.tsx` — Added `bg-panel` alongside `surface-raised edge-glow` for computed panel background parity.
+  - `src/components/settings/settings-workspace.tsx` — Extended `isKeyRejectionFailure` regex to match `"Invalid provider API key"` (`aria-invalid="true"`).
+  - `tests/task-8.6-unified-card.test.ts` — Passed `userId` to `createCoverLetter` / `getCoverLettersByJobId` after tenant-isolation hardening.
+  - `e2e/{editor-workspace,ergonomic-enhancements,phase6-job-tracker,smoke-t5,mobile-tablet-verification,deep-audit-regressions,critique-remediation-regression}.spec.ts` — Aligned E2E contracts with Radix portals, `scope=tracked`, curated company chips, `lg:`/`xl:` editor pane boundaries, `/api/jobs/match` isolation, V1 Typst preview recompile assertion, `/404-check` hydration settle, and `60_000ms` timeout on `execFileSync`+WASM+PDF test.
 
 ### Verified Checks
-- `git grep -n -E "bg-slate-|border-slate-|from-slate-|to-slate-|via-slate-|#0b1326|#0f172a|#131b2e|#171f33|#172033|#1e293b|#060e20|#121929|#030712|#0d1727|#0d1526|#162035" -- src/` (0 matches)
-- `npm run check:env` (Passed — 37 env names declared)
-- `npm run lint` (Passed — 0 warnings or errors)
-- `npm run typecheck` (Passed — 0 TypeScript errors)
-- `npm run test` (Passed — 134 test files, 895 unit tests)
-- `npm run test:integration` (Passed — 11 PostgreSQL integration tests)
-- `npm run build` (Passed — Next.js production build)
-- `npx playwright test --config=playwright.demo.config.ts` (Passed — 35/35 E2E tests)
-- `npx playwright test --config=playwright.config.ts e2e/ws0-ux-bugs.spec.ts e2e/phase9-ats-grade.spec.ts e2e/phase10-polish.spec.ts e2e/phase10-repair.spec.ts e2e/landing-tailor-discover-enhancements.spec.ts --project=chromium` (Passed — 29/29 E2E tests)
+- `npm run check:env` — Passed (`37 env names declared`).
+- `npm run lint` — Passed (`No ESLint warnings or errors`).
+- `npm run typecheck` — Passed (`tsc --noEmit` 0 errors).
+- `npm run test` — Passed (`148/148` Vitest test files, `1066/1066` tests, incl. `tests/deep-audit-security.test.ts` and `tests/task-8.6-unified-card.test.ts`).
+- `npm run build` — Passed (`prisma generate && next build`, 60/60 routes built cleanly).
+- `npx playwright test --project=chromium` — Passed (`153/153` passed, `0` failed, `0` skipped).
+- `npx playwright test --config=playwright.demo.config.ts` — Passed (`33/33` passed, `0` failed, `0` skipped; `EDITOR_1440_GEOMETRY={"headerH":48,"toolbarH":40,"paperY":128}`).
+- `impeccable detect --json src/app`, `src/components`, `http://127.0.0.1:3005` — Passed (`0` WCAG contrast warnings; `src/app` & `src/components` exit `0`).
+- Live `browser-verifier` (`gemini-3.8-flash-high`) on `http://127.0.0.1:3005` (`375x812` & `1440x900` across `/`, `/login`, `/tracker`, `/tracker/feed`, `/tailor`, `/editor`, `/library`, `/practice`, `/settings`, `/privacy`, `/terms`, `/404-check`) — Passed (`24/24` expected HTTP status, `#main-content` visible, `0` horizontal overflow, `0` page errors, `paperRect.top=128 <= 128`); port-`3005` daemon stopped and verified free.
 
 ### Open Blockers
 - None.

@@ -290,7 +290,7 @@ test.describe("T5 Browser Smoke Check", () => {
       ]);
     }
 
-    // Create a job posting with SAVED status
+    // Create a personal job posting with SAVED status
     const jobRes = await request.post("/api/jobs", {
       data: {
         company: "Stripe",
@@ -298,6 +298,7 @@ test.describe("T5 Browser Smoke Check", () => {
         rawDescription: "Distributed systems, Kubernetes, Go, PostgreSQL",
         source: "pasted",
         status: "SAVED",
+        personal: true,
       },
     });
     expect(jobRes.ok()).toBeTruthy();
@@ -354,10 +355,10 @@ test.describe("T5 Browser Smoke Check", () => {
     const stripeChip = page.getByTestId("curated-chip-stripe");
     await expect(stripeChip).toBeVisible();
 
-    // Click Stripe chip and confirm search query updates
+    // Click Stripe chip and confirm chip filter activates cleanly without overwriting keyword search
     await stripeChip.click();
-    const searchInput = page.getByTestId("discover-search-input");
-    await expect(searchInput).toHaveValue("Stripe");
+    await expect(stripeChip).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("discover-clear-filters-btn")).toBeVisible();
   });
 
   test("6. /tailor?jobId=X&tab=cover-letter lands on cover letter section", async ({ page }) => {

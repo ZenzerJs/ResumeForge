@@ -12,7 +12,7 @@ export default function NotFound() {
         tabIndex={-1}
         className="relative z-10 flex flex-1 flex-col items-center justify-center p-6 outline-none"
       >
-        <div className="w-full max-w-md surface-raised edge-glow rounded-[10px] p-8 space-y-6 text-center">
+        <div className="w-full max-w-md bg-panel surface-raised edge-glow rounded-[10px] p-8 space-y-6 text-center">
           <div className="inline-flex items-center justify-center h-12 w-12 rounded-[8px] bg-primary/10 border border-primary/30 text-primary mx-auto">
             <ShieldAlert className="h-6 w-6" aria-hidden />
           </div>

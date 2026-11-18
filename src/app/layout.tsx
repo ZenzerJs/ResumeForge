@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { KeyboardShortcutsModal } from "@/components/ui/keyboard-shortcuts-modal";
+import { SkipLink } from "@/components/navigation/skip-link";
 import "./globals.css";
 
 const hankenGrotesk = localFont({
@@ -85,12 +86,7 @@ export default function RootLayout({
         className="bg-background text-on-surface font-body-regular antialiased min-h-screen"
         suppressHydrationWarning
       >
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:font-semibold focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
-        >
-          Skip to content
-        </a>
+        <SkipLink />
         {children}
         <KeyboardShortcutsModal />
       </body>

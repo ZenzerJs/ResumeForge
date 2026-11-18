@@ -168,9 +168,10 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
       closingParagraph: "Existing closing paragraph",
       fullMarkdown: "Existing full markdown content",
       status: "DRAFT",
+      userId,
     });
 
-    const letters = await getCoverLettersByJobId(testJobId);
+    const letters = await getCoverLettersByJobId(testJobId, userId);
     expect(letters.length).toBe(1);
     expect(letters[0].id).toBe(existingDraft.id);
   });
@@ -185,6 +186,7 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
       closingParagraph: "Closing...",
       fullMarkdown: "Full markdown...",
       status: "DRAFT",
+      userId,
     });
 
     const fetchedJob = await getJobById(testJobId, userId);
@@ -236,6 +238,7 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
       bodyParagraphs: ["Body text"],
       closingParagraph: "Closing text",
       fullMarkdown: "Full markdown text",
+      userId,
     });
 
     const req = authedNextRequest(`http://localhost:3000/api/cover-letters/${draft.id}`, {}, cookie);
@@ -259,6 +262,7 @@ describe("Task 8.6: Unified Job-Card Actions & Cross-Page State Integration", ()
       bodyParagraphs: ["Body"],
       closingParagraph: "Closing",
       fullMarkdown: "Full markdown",
+      userId,
     });
 
     const masterAfter = await prisma.resume.findUnique({ where: { id: testMasterResumeId } });

@@ -55,6 +55,7 @@ test.describe("Ergonomic Enhancements E2E", () => {
     await prepSheetBtn.click();
     const modal = page.locator("[data-testid='apply-prep-sheet-modal']");
     await expect(modal).toBeVisible();
+    await modal.getByTestId("tab-form-highlights").click();
     await expect(modal.getByText("Candidate Information")).toBeVisible();
 
     // Close modal
@@ -74,6 +75,17 @@ test.describe("Ergonomic Enhancements E2E", () => {
       }
       await route.continue();
     });
+    await page.route("**/api/jobs/match", async (route) => {
+      if (route.request().method() === "POST") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ success: true, data: [] }),
+        });
+        return;
+      }
+      await route.continue();
+    });
 
     await page.goto("/tailor?tab=job-info");
 
@@ -84,7 +96,11 @@ test.describe("Ergonomic Enhancements E2E", () => {
 
     const extractBtn = page.getByTestId("extract-reqs-btn");
     await expect(extractBtn).toBeVisible();
+    const matchPromise = page.waitForResponse(
+      (res) => res.url().includes("/api/jobs/match") && res.request().method() === "POST"
+    );
     await extractBtn.click();
+    await matchPromise;
 
     // Assert resolve gap button exists on uncovered skills and opens quick-add modal
     const resolveGapBtn = page.locator("[data-testid^='resolve-gap-']").first();

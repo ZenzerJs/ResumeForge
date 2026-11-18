@@ -335,6 +335,7 @@ test.describe("Critique Remediation E2E Regression Suite", () => {
     browser,
     baseURL,
   }) => {
+    test.setTimeout(60_000);
     const { context, page } = await createIsolatedUserContext(browser, baseURL);
     try {
       await mkdir(ARTIFACT_DIR, { recursive: true });

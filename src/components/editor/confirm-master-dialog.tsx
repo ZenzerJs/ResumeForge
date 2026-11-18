@@ -126,13 +126,13 @@ export function ConfirmMasterDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="save-master-confirm-modal"
-        className="max-w-2xl bg-panel border-hairline text-foreground shadow-2xl"
+        className="max-w-2xl max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden bg-panel border-hairline text-foreground shadow-2xl"
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           restoreMasterTriggerFocus();
         }}
       >
-        <DialogHeader>
+        <DialogHeader className="shrink-0">
           <div className="flex items-center gap-2 text-status-warning">
             <ShieldCheck className="size-5 text-status-warning" />
             <DialogTitle className="text-lg font-bold text-foreground">
@@ -144,6 +144,8 @@ export function ConfirmMasterDialog({
             Future AI tailoring and exports will be guarded against these verified claims.
           </DialogDescription>
         </DialogHeader>
+
+        <div className="min-h-0 flex-1 overflow-y-auto space-y-3 pr-1">
 
         {isStarterOrSampleTemplate && (
           <div
@@ -427,7 +429,9 @@ export function ConfirmMasterDialog({
           </div>
         )}
 
-        <DialogFooter className="gap-2 pt-2">
+        </div>
+
+        <DialogFooter className="shrink-0 gap-2 pt-2">
           <Button
             type="button"
             variant="ghost"
