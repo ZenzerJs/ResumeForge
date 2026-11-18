@@ -35,7 +35,7 @@ async function main() {
   }, include: { bullets: true } });
   const job = await prisma.job.create({ data: { userId: user.id, company: "Release Fixture Inc", roleTitle: "Coordinator", rawDescription: "Prepare accurate monthly reports.", source: "manual" } });
   const foreign = await prisma.user.create({ data: { email: `foreign-${crypto.randomUUID().slice(0, 8)}@resumeforge.test`, username: `foreign_${crypto.randomUUID().replaceAll("-", "").slice(0, 10)}`, passwordHash: await hashPassword(password) } });
-  const foreignJob = await prisma.job.create({ data: { userId: foreign.id, company: "Viewer Outcome Catalog Sentinel", roleTitle: "Catalog Fixture Role", rawDescription: "Shared catalog fixture for viewer-scoped application outcomes.", source: "manual" } });
+  const foreignJob = await prisma.job.create({ data: { userId: null, company: "Viewer Outcome Catalog Sentinel", roleTitle: "Catalog Fixture Role", rawDescription: "Shared catalog fixture for viewer-scoped application outcomes.", source: "manual" } });
   await prisma.jobApplication.create({ data: { userId: foreign.id, jobId: foreignJob.id, status: "INTERVIEWING" } });
   const sharedJob = await prisma.job.create({ data: { company: "Shared Catalog Fixture", roleTitle: "Shared Release Role", rawDescription: "Shared catalog fixture for private application outcome isolation.", source: "manual" } });
   await prisma.jobApplication.createMany({ data: [

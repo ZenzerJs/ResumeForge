@@ -26,9 +26,12 @@ test.describe("Task 9.2 — Resizable & Collapsible Editor Panels E2E Tests", ()
 
     // Click to collapse
     await toggleBtn.click();
-    await page.waitForTimeout(300);
+    await expect(page.locator('[data-testid="expand-ai-sidebar-btn"]')).toBeVisible();
 
     // Verify localStorage key resumeforge_editor_layout was set
+    await expect
+      .poll(async () => page.evaluate(() => localStorage.getItem("resumeforge_editor_layout")))
+      .not.toBeNull();
     const savedLayout = await page.evaluate(() => localStorage.getItem("resumeforge_editor_layout"));
     expect(savedLayout).not.toBeNull();
     const parsed = JSON.parse(savedLayout || "{}");
@@ -56,13 +59,12 @@ test.describe("Task 9.2 — Resizable & Collapsible Editor Panels E2E Tests", ()
     const toggleBtn = page.locator('[data-testid="toggle-ai-sidebar-btn"]');
     // Collapse sidebar
     await toggleBtn.click();
-    await page.waitForTimeout(300);
 
     // Expand sidebar again
     const expandBtn = page.locator('[data-testid="expand-ai-sidebar-btn"]');
+    await expect(expandBtn).toBeVisible();
     await expandBtn.scrollIntoViewIfNeeded();
     await expandBtn.click();
-    await page.waitForTimeout(300);
 
     // Assert textarea value remained completely intact without resetting
     await expect(jdTextarea).toBeVisible();

@@ -110,6 +110,7 @@ test.describe("@persistent browser-bound proposal flow", () => {
     expect(reloaded.body.data.patches[0].citations.length).toBeGreaterThanOrEqual(2);
     await page.goto(`/editor?variantId=${saved.variantId}`);
     await expect(page.locator('[data-testid="document-type-badge"]')).toBeVisible();
+    await page.getByTestId("panel-code").getByTestId("editor-mode-code").click();
     const savedEditorSource = page.getByTestId("panel-code").locator(".cm-content");
     await expect(savedEditorSource).toContainText(first.after);
     await expect(savedEditorSource).not.toContainText(second.after);
@@ -245,6 +246,7 @@ test.describe("@persistent release import and exports", () => {
     await page.reload();
     await expect(page.getByTestId("job-status-select-demo-sample-job")).toHaveValue("APPLIED");
     await page.goto("/editor");
+    await page.getByTestId("panel-code").getByTestId("editor-mode-code").click();
     const sourceEditor = page.getByTestId("panel-code").locator(".cm-content");
     await expect(sourceEditor).toBeVisible();
     await sourceEditor.fill("= Personal Resume\n\n== Experience\n- My own draft content.");

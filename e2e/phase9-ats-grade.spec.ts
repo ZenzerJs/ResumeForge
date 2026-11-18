@@ -31,7 +31,7 @@ test.describe("Task 9.5 — Editor ATS Grade Button & Evidence Retirement E2E Te
 
     const scoreBadge = page.locator('[data-testid="overall-score-badge"]');
     await expect(scoreBadge).toBeVisible();
-    await expect(scoreBadge).toContainText("/ 100");
+    await expect(scoreBadge).toContainText("Unscored until job requirements load");
 
     const countAfterOpen = evaluatePostCount;
     expect(countAfterOpen).toBe(1);
@@ -46,7 +46,7 @@ test.describe("Task 9.5 — Editor ATS Grade Button & Evidence Retirement E2E Te
     );
     await page.locator('[data-testid="profile-btn-Frontend"]').click();
     await profileEvalResponse;
-    await page.waitForTimeout(500);
+    await expect(scoreBadge).toContainText("Unscored until job requirements load");
     expect(evaluatePostCount).toBe(countAfterOpen + 1);
 
     // Return to paper preview and check that the ATS Grade column is opt-in.
@@ -133,6 +133,7 @@ test.describe("Task 9.5 — Editor ATS Grade Button & Evidence Retirement E2E Te
 
     const countAfterExtract = evaluatePostCount;
     expect(countAfterExtract).toBe(countAfterInitial + 1);
+    await expect(page.locator("[data-testid='overall-score-badge']")).toContainText("/ 100");
 
     await page.waitForTimeout(1500);
     expect(evaluatePostCount).toBe(countAfterExtract);

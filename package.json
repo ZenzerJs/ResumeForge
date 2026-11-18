@@ -13,6 +13,7 @@
     "check:env": "tsx scripts/check-env-parity.ts",
     "generate:fixtures": "tsx scripts/generate-sample-resume-pdf.ts",
     "test:e2e": "playwright test",
+    "test:e2e:demo": "playwright test --config=playwright.demo.config.ts",
     "test:e2e:ui": "playwright test --ui",
     "sync:oa": "tsx scripts/sync-oa-bank.ts",
     "seed:intel": "tsx scripts/seed-company-intel.ts",

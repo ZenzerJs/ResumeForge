@@ -39,6 +39,7 @@ test.describe("Task 7.9: Save as Master + Revert to Master Safety Protocol E2E T
     await page.waitForSelector("[data-testid='revert-to-master-btn']", { timeout: 10000 });
     await expect(page.locator("[data-testid='revert-to-master-btn']")).toBeVisible();
 
+    await page.locator('[data-testid="panel-code"] [data-testid="editor-mode-code"]').click();
     const editor = page.locator('[data-testid="panel-code"] .cm-content');
     await editor.click();
     await page.keyboard.press("Control+End");
@@ -97,6 +98,7 @@ test.describe("Task 7.9: Save as Master + Revert to Master Safety Protocol E2E T
     expect(saveCalls).toBe(1);
 
     // Trigger non-canonical source + Reformat draft -> inline role=alert (without saving invalid master)
+    await page.locator('[data-testid="panel-code"] [data-testid="editor-mode-code"]').click();
     const editor = page.locator('[data-testid="panel-code"] .cm-content');
     await editor.click();
     await page.keyboard.press("Control+End");

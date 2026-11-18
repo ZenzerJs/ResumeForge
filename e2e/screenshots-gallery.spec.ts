@@ -24,27 +24,21 @@ test.describe("ResumeForge Showcase Screenshots Gallery", () => {
   test("01 & 02 - Landing Page Hero and Features", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1000);
+    await expect(page.locator("h1")).toBeVisible();
 
     // Hero Viewport
     await capture(page, "01-landing-hero.png");
 
     // Scroll to feature highlights
     await page.evaluate(() => window.scrollTo({ top: 750, behavior: "instant" }));
-    await page.waitForTimeout(1000);
+    await expect(page.getByTestId("capability-grid-section")).toBeVisible();
     await capture(page, "02-landing-features.png");
   });
 
   test("03, 04, 05 - Resume Editor Workspace & Typst Live Preview", async ({ page }) => {
     await page.goto("/editor");
-    // Wait for either the typst preview svg or the editor
-    await page.waitForSelector(".cm-editor", { timeout: 25000 });
-    try {
-      await page.waitForSelector(".typst-preview-svg svg", { timeout: 20000 });
-    } catch {
-      console.log("Typst SVG preview selector timed out, proceeding with rendered workspace");
-    }
-    await page.waitForTimeout(2000);
+    await expect(page.locator('[data-testid="panel-code"]')).toBeVisible({ timeout: 25000 });
+    await expect(page.locator(".typst-preview-svg svg").first()).toBeVisible({ timeout: 20000 });
 
     // Main dual-pane workspace
     await capture(page, "03-editor-typst-preview.png");
@@ -53,17 +47,17 @@ test.describe("ResumeForge Showcase Screenshots Gallery", () => {
     const saveMasterBtn = page.locator('[data-testid="save-as-master-btn"]').first();
     if (await saveMasterBtn.isVisible()) {
       await saveMasterBtn.click();
-      await page.waitForTimeout(800);
+      await expect(page.getByTestId("save-master-confirm-modal")).toBeVisible();
       await capture(page, "05-editor-master-dialog.png");
       await page.keyboard.press("Escape");
-      await page.waitForTimeout(500);
+      await expect(page.getByTestId("save-master-confirm-modal")).toBeHidden();
     }
 
     // Open AI Assistant panel if present
     const aiButton = page.locator('button:has-text("AI Assistant")').first();
     if (await aiButton.isVisible()) {
       await aiButton.click();
-      await page.waitForTimeout(1200);
+      await expect(page.getByTestId("panel-ai")).toBeVisible();
       await capture(page, "04-editor-ai-dock.png");
     }
   });
@@ -71,7 +65,7 @@ test.describe("ResumeForge Showcase Screenshots Gallery", () => {
   test("06 - Evidence Bank Library", async ({ page }) => {
     await page.goto("/library");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1500);
+    await expect(page.locator("h1")).toBeVisible();
 
     await capture(page, "06-evidence-bank.png");
   });
@@ -80,20 +74,20 @@ test.describe("ResumeForge Showcase Screenshots Gallery", () => {
     // 07 - Applications Tracker
     await page.goto("/tracker");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1500);
+    await expect(page.getByTestId("tracker-page-title")).toBeVisible();
     await capture(page, "07-job-tracker.png");
 
     // 08 - Discover Feed
     await page.goto("/tracker/feed");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1500);
+    await expect(page.getByTestId("discover-search-input")).toBeVisible();
     await capture(page, "08-job-discover-feed.png");
   });
 
   test("09 & 10 - Resume Tailor Workspace & ATS Diagnostics", async ({ page }) => {
     await page.goto("/tailor");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1500);
+    await expect(page.getByTestId("tailor-tab-3-pane")).toBeVisible();
 
     // 09 - Tailor 3-pane workspace
     await capture(page, "09-tailor-workspace.png");
@@ -102,7 +96,7 @@ test.describe("ResumeForge Showcase Screenshots Gallery", () => {
     const atsTab = page.locator('[data-testid="tailor-tab-ats"], button:has-text("ATS"), button:has-text("Diagnostics")').first();
     if (await atsTab.isVisible()) {
       await atsTab.click();
-      await page.waitForTimeout(1000);
+      await expect(page.getByTestId("ats-score-panel")).toBeVisible();
       await capture(page, "10-tailor-ats-diagnostic.png");
     }
   });
@@ -111,20 +105,20 @@ test.describe("ResumeForge Showcase Screenshots Gallery", () => {
     // 11 - Practice Hub
     await page.goto("/practice");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1500);
+    await expect(page.getByTestId("practice-main-tabs")).toBeVisible();
     await capture(page, "11-practice-interview-hub.png");
 
     // 12 - DSA Code Runner
     await page.goto("/practice?tab=runner");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(2000);
+    await expect(page.getByTestId("dsa-run-btn")).toBeVisible();
     await capture(page, "12-practice-dsa-runner.png");
   });
 
   test("13 - Settings and BYOK Vault", async ({ page }) => {
     await page.goto("/settings");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1500);
+    await expect(page.locator("#provider-select")).toBeVisible();
 
     await capture(page, "13-settings-byok.png");
   });
@@ -137,7 +131,7 @@ test.describe("ResumeForge Showcase Screenshots Gallery", () => {
 
     await page.goto("/login");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1200);
+    await expect(page.locator("h1")).toBeVisible();
 
     await capture(page, "14-auth-login.png");
     await context.close();

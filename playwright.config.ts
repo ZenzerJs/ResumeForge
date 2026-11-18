@@ -1,5 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
+process.env.DATABASE_URL ||=
+  "postgresql://resumeforge:resumeforge@localhost:5432/resumeforge";
+
 // Pin the deterministic E2E secret instead of inheriting the developer's real
 // shell secret: the middleware grants a 100/min auth rate limit only for the
 // canonical "playwright-test-secret" value, so inheriting the real secret made
@@ -13,7 +16,6 @@ const DEMO_SPECS = [
   "resume-layout-v2-verification.spec.ts",
   "suggestion-preview-verification.spec.ts",
   "tailor-polish-verification.spec.ts",
-  "workspace-wave-verification.spec.ts",
 ];
 
 const SCREENSHOT_SPECS = [
@@ -68,6 +70,8 @@ export default defineConfig({
     env: {
       ...process.env,
       DEMO_MODE: "false",
+      NEXT_PUBLIC_RESUME_LAYOUT_V2:
+        process.env.NEXT_PUBLIC_RESUME_LAYOUT_V2 || "true",
       APP_ACCESS_SECRET: testSecret,
       APP_ACCESS_PASSWORD: testSecret,
       JOB_SYNC_SECRET: process.env.JOB_SYNC_SECRET || "playwright-sync-secret",

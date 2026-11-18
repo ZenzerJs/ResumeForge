@@ -63,7 +63,8 @@ test.describe("Typst Live-Preview Workspace E2E Tests", () => {
     await page.keyboard.type("// Test Comment Added\n");
 
     // Wait for compilation update
-    await page.waitForTimeout(2000);
+    await expect(page.locator('[data-testid="layout-page-status"]').first()).toContainText("page measured", { timeout: 15000 });
+    await expect(page.locator(".typst-preview-svg svg").first()).toBeVisible({ timeout: 15000 });
 
     const updatedSvg = await page.locator(".typst-preview-svg").innerHTML();
     expect(updatedSvg.length).toBeGreaterThan(100);
