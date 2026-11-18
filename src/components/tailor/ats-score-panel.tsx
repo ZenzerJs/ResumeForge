@@ -147,6 +147,64 @@ export function classifySkillBacking(
   };
 }
 
+export interface AtsDisplayState {
+  hasJobRequirements: boolean;
+  hasRequiredSkills: boolean;
+  hasPreferredSkills: boolean;
+  overallRingText: string;
+  overallRingPct: number;
+  overallMatchLabel: string;
+  overallScorePrimary: string;
+  overallScoreSubtext: string | null;
+  requiredMatchLabel: string;
+  requiredMatchPct: number;
+  preferredMatchLabel: string;
+  preferredMatchPct: number;
+}
+
+export function getAtsDisplayState(
+  result: AtsEvaluationResult,
+  extractedRequirements: {
+    requiredSkills: string[];
+    preferredSkills: string[];
+    domainTerms?: string[];
+  },
+  roleTitle?: string
+): AtsDisplayState {
+  const hasRequiredSkills = (extractedRequirements.requiredSkills?.length ?? 0) > 0;
+  const hasPreferredSkills = (extractedRequirements.preferredSkills?.length ?? 0) > 0;
+  const hasJobRequirements = hasRequiredSkills || hasPreferredSkills;
+  const overallPct = Math.max(0, Math.min(100, result.overallScore || 0));
+  const gradeLabel = overallPct >= 80 ? "Strong" : overallPct >= 60 ? "Solid" : "Needs work";
+
+  return {
+    hasJobRequirements,
+    hasRequiredSkills,
+    hasPreferredSkills,
+    overallRingText: hasJobRequirements ? String(result.overallScore) : "—",
+    overallRingPct: hasJobRequirements ? overallPct : 0,
+    overallMatchLabel: hasJobRequirements
+      ? `Overall Match · ${gradeLabel}`
+      : "Overall Match · No job loaded",
+    overallScorePrimary: hasJobRequirements ? `${result.overallScore}` : "No job loaded",
+    overallScoreSubtext: hasJobRequirements
+      ? `vs. ${roleTitle || `${result.selectedProfile} profile`}`
+      : `Unscored until job requirements load (Base Health: ${result.baseHealth.score}/${result.baseHealth.maxScore})`,
+    requiredMatchLabel: hasRequiredSkills
+      ? `${result.requiredMatch.score} / ${result.requiredMatch.maxScore} pts (${result.requiredMatch.percentage}% match)`
+      : hasJobRequirements
+      ? "Unscored (none listed)"
+      : "No job loaded",
+    requiredMatchPct: hasRequiredSkills ? result.requiredMatch.percentage : 0,
+    preferredMatchLabel: hasPreferredSkills
+      ? `${result.preferredMatch.score} / ${result.preferredMatch.maxScore} pts (${result.preferredMatch.percentage}% match)`
+      : hasJobRequirements
+      ? "Unscored (none listed)"
+      : "No job loaded",
+    preferredMatchPct: hasPreferredSkills ? result.preferredMatch.percentage : 0,
+  };
+}
+
 interface AtsScorePanelProps {
   typstContent: string;
   extractedRequirements: {
@@ -368,9 +426,7 @@ export function AtsScorePanel({
     return null;
   }
 
-  const overallPct = Math.max(0, Math.min(100, result?.overallScore || 0));
-  const gradeLabel =
-    overallPct >= 80 ? "Strong" : overallPct >= 60 ? "Solid" : "Needs work";
+  const displayState = result ? getAtsDisplayState(result, extractedRequirements, roleTitle) : null;
 
   const skillBackingDetails = (result?.skillEvaluations ?? []).map((se) => ({
     eval: se,
@@ -417,7 +473,7 @@ export function AtsScorePanel({
           )}
         </div>
 
-        {result && (
+        {result && displayState && (
           <div className={`flex flex-col @md:flex-row @md:items-center justify-between gap-4 min-w-0 ${styles.scoreSummary}`}>
             <div
               data-testid="overall-score-badge"
@@ -427,24 +483,35 @@ export function AtsScorePanel({
                 data-testid="ats-overall-score"
                 className="relative grid h-[72px] w-[72px] shrink-0 place-items-center rounded-full"
                 style={{
-                  background: `conic-gradient(rgb(var(--accent-contrast)) ${overallPct}%, rgb(214 196 176 / 0.14) 0)`,
-                  filter: "drop-shadow(0 0 14px rgb(var(--accent-contrast) / 0.35))",
+                  background: `conic-gradient(rgb(var(--accent-contrast)) ${displayState.overallRingPct}%, rgb(214 196 176 / 0.14) 0)`,
+                  filter: displayState.hasJobRequirements
+                    ? "drop-shadow(0 0 14px rgb(var(--accent-contrast) / 0.35))"
+                    : undefined,
                 }}
               >
                 <div className="grid h-[58px] w-[58px] place-items-center rounded-full bg-panel font-sans text-heading-lg font-bold tracking-[-0.03em] tabular-nums text-foreground">
-                  {result.overallScore}
+                  {displayState.overallRingText}
                 </div>
               </div>
               <div className="min-w-0">
                 <span className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground">
-                  Overall Match · {gradeLabel}
+                  {displayState.overallMatchLabel}
                 </span>
                 <div className={`text-2xl font-bold tracking-tight font-mono tabular-nums leading-tight text-foreground ${styles.scoreValue}`}>
-                  {result.overallScore} <span className="text-sm font-normal text-muted-foreground">/ 100</span>
+                  {displayState.hasJobRequirements ? (
+                    <>
+                      {displayState.overallScorePrimary}{" "}
+                      <span className="text-sm font-normal text-muted-foreground">/ 100</span>
+                    </>
+                  ) : (
+                    displayState.overallScorePrimary
+                  )}
                 </div>
-                <p className="mt-0.5 text-xs text-muted-foreground truncate">
-                  vs. {roleTitle || `${result.selectedProfile} profile`}
-                </p>
+                {displayState.overallScoreSubtext && (
+                  <p className="mt-0.5 text-xs text-muted-foreground truncate">
+                    {displayState.overallScoreSubtext}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -554,13 +621,13 @@ export function AtsScorePanel({
                 <span className="break-words">Required Role Match</span>
               </span>
               <span className="text-xs font-mono font-semibold tabular-nums text-foreground shrink-0">
-                {result.requiredMatch.score} / {result.requiredMatch.maxScore} pts ({result.requiredMatch.percentage}% match)
+                {displayState?.requiredMatchLabel}
               </span>
             </div>
             <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
               <div
-                className={`${result.requiredMatch.percentage >= 75 ? "bg-signal" : "bg-primary"} h-full rounded-full transition-all`}
-                style={{ width: `${result.requiredMatch.percentage}%` }}
+                className={`${(displayState?.requiredMatchPct ?? 0) >= 75 ? "bg-signal" : "bg-primary"} h-full rounded-full transition-all`}
+                style={{ width: `${displayState?.requiredMatchPct ?? 0}%` }}
               />
             </div>
             <ul className="text-xs space-y-1.5 text-on-surface-variant leading-relaxed break-words">
@@ -578,13 +645,13 @@ export function AtsScorePanel({
                 <span className="break-words">Preferred Match</span>
               </span>
               <span className="text-xs font-mono font-semibold tabular-nums text-foreground shrink-0">
-                {result.preferredMatch.score} / {result.preferredMatch.maxScore} pts ({result.preferredMatch.percentage}% match)
+                {displayState?.preferredMatchLabel}
               </span>
             </div>
             <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
               <div
-                className={`${result.preferredMatch.percentage >= 75 ? "bg-signal" : "bg-primary"} h-full rounded-full transition-all`}
-                style={{ width: `${result.preferredMatch.percentage}%` }}
+                className={`${(displayState?.preferredMatchPct ?? 0) >= 75 ? "bg-signal" : "bg-primary"} h-full rounded-full transition-all`}
+                style={{ width: `${displayState?.preferredMatchPct ?? 0}%` }}
               />
             </div>
             <ul className="text-xs space-y-1.5 text-on-surface-variant leading-relaxed break-words">

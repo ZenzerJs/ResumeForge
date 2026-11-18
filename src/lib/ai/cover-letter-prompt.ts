@@ -18,28 +18,28 @@ If a job requirement (e.g. Kubernetes, AWS, Go) is NOT supported by any item in 
 ### HARD VALIDATION RULES
 1. evidenceCitations: every Evidence/Bullet ID you used from the prompt. If Evidence Bank has items, include at least one valid ID.
 2. Never claim JD requirements unsupported by evidence — omit them or list in gapsAddressed.
-3. Length floors:
+3. ROLE & CONTEXT TRUTH (STRICT): Never claim "in professional settings", "in past roles", "in previous roles", "on the job", or paid work history unless explicitly supported by a [Type: experience] evidence item. Frame project, education, and coursework evidence items accurately as projects or academic work — never upgrade a project or course assignment into a past professional role.
+4. Length floors:
    - openingParagraph ≥ 20 chars
    - each bodyParagraphs entry ≥ 30 chars
    - closingParagraph ≥ 20 chars
    - fullMarkdown ≥ 100 chars (complete letter)
-4. fullMarkdown must include salutation, blank-line paragraphs, closing, and signature.
-5. NATURAL HUMAN VOICE (NO SYSTEM META-LANGUAGE): Never mention "my Evidence Bank", "verified experience", "master resume", or "evidence citations" inside the cover letter text. Write naturally as the candidate speaking directly to the hiring team.
-6. SYNCHRONIZED MARKDOWN: fullMarkdown must contain the exact same text as salutation + openingParagraph + bodyParagraphs + closingParagraph + signature, separated by \\n\\n. Do not summarize or truncate inside fullMarkdown.
+5. fullMarkdown must include salutation, blank-line paragraphs, closing, and signature using the exact Candidate Name from the user prompt (never literally "Candidate" or a placeholder).
+6. NATURAL HUMAN VOICE (NO SYSTEM META-LANGUAGE): Never mention "my Evidence Bank", "verified experience", "master resume", or "evidence citations" inside the cover letter text. Write naturally as the candidate speaking directly to the hiring team.
+7. SYNCHRONIZED MARKDOWN: fullMarkdown must contain the exact same text as salutation + openingParagraph + bodyParagraphs + closingParagraph + signature, separated by \\n\\n. Do not summarize or truncate inside fullMarkdown.
 
-### CANONICAL VALID JSON SHAPE
+### CANONICAL VALID JSON SHAPE (replace <...> placeholders strictly from user prompt evidence)
 {
-  "title": "Cover Letter — Acme Corp Senior Backend Engineer",
-  "salutation": "Dear Hiring Team at Acme Corp,",
-  "openingParagraph": "I am writing to apply for the Senior Backend Engineer role at Acme Corp. My background building production APIs and high-throughput data systems aligns with your reliability and scale priorities.",
+  "title": "Cover Letter — <Company Name> <Target Role>",
+  "salutation": "Dear Hiring Team at <Company Name>,",
+  "openingParagraph": "<2-3 sentences naming the target role and company and summarizing verified background from the prompt.>",
   "bodyParagraphs": [
-    "At Acme Platform, I architected TypeScript REST APIs and optimized PostgreSQL indexing, cutting p95 query latency by 40% across 1,000+ daily active users.",
-    "I also partnered with infrastructure engineers on containerized microservice deployments, improving release predictability and observability across core services."
+    "<3-4 sentences detailing a verified achievement from the candidate's Evidence Bank, preserving its true context (employment role vs. project vs. academic work) and only real metrics present in the prompt.>"
   ],
-  "closingParagraph": "Thank you for considering my application. I would welcome the chance to discuss how my backend engineering background can support Acme Corp's roadmap.",
-  "fullMarkdown": "# Cover Letter — Acme Corp Senior Backend Engineer\\n\\nDear Hiring Team at Acme Corp,\\n\\nI am writing to apply for the Senior Backend Engineer role at Acme Corp. My background building production APIs and high-throughput data systems aligns with your reliability and scale priorities.\\n\\nAt Acme Platform, I architected TypeScript REST APIs and optimized PostgreSQL indexing, cutting p95 query latency by 40% across 1,000+ daily active users.\\n\\nI also partnered with infrastructure engineers on containerized microservice deployments, improving release predictability and observability across core services.\\n\\nThank you for considering my application. I would welcome the chance to discuss how my backend engineering background can support Acme Corp's roadmap.\\n\\nSincerely,\\nCandidate",
-  "evidenceCitations": ["exp-1", "bullet-101"],
-  "gapsAddressed": ["No verified Kubernetes production ownership in Evidence Bank."]
+  "closingParagraph": "<2 sentences thanking the hiring team and expressing interest in discussing the role.>",
+  "fullMarkdown": "# Cover Letter — <Company Name> <Target Role>\\n\\nDear Hiring Team at <Company Name>,\\n\\n<openingParagraph>\\n\\n<bodyParagraphs joined by blank lines>\\n\\n<closingParagraph>\\n\\nSincerely,\\n<Candidate Name>",
+  "evidenceCitations": ["<evidence-or-bullet-id>"],
+  "gapsAddressed": ["<Unmatched JD requirement omitted from letter claims.>"]
 }`;
 
   return buildComposedSystemPrompt(taskInstructions);
@@ -65,7 +65,7 @@ export function buildCoverLetterUserPrompt(
         const bulletsText = (item.bullets || [])
           .map((b: { id: string; text: string }) => `  - [ID: ${b.id}] ${b.text}`)
           .join("\n");
-        return `Item [ID: ${item.id}] ${item.title} (${item.organization || "N/A"}) [${item.status}]\nSummary: ${item.verifiedSummary}\nBullets:\n${bulletsText}`;
+        return `Item [ID: ${item.id}] [Type: ${item.type}] ${item.title} (${item.organization || "N/A"}) [${item.status}]\nSummary: ${item.verifiedSummary}\nBullets:\n${bulletsText}`;
       })
       .join("\n\n")}\n`;
   };

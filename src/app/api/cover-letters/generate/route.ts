@@ -7,6 +7,7 @@ import { extractJsonObject, normalizeCoverLetterPayload } from "@/lib/ai/json-re
 import { getEvidenceItems } from "@/lib/db/evidence";
 import { createCoverLetter } from "@/lib/db/cover-letters";
 import { getMasterResume } from "@/lib/db/resumes";
+import { extractCandidateNameFromTypst, replacePlaceholderSignature } from "@/lib/export/resume-text";
 import { sanitizeError } from "@/lib/ai/redact";
 import { ProviderConfigSchema } from "@/lib/ai/types";
 import { requireUserId } from "@/lib/security/auth-request";
@@ -109,6 +110,13 @@ export async function POST(req: NextRequest) {
       // Non-fatal
     }
 
+    const master = await getMasterResume(userId);
+    const providedName = typeof body.candidateName === "string" ? body.candidateName.trim() : "";
+    const resolvedCandidateName =
+      providedName && providedName.toLowerCase() !== "candidate"
+        ? providedName
+        : extractCandidateNameFromTypst(master?.typstSource) || "Candidate";
+
     const inputPayload = {
       jobId: job.id,
       variantId: typeof variantId === "string" ? variantId : undefined,
@@ -116,11 +124,9 @@ export async function POST(req: NextRequest) {
       roleTitle: job.roleTitle || "Target Position",
       rawDescription: job.rawDescription,
       extractedRequirements: extractedReqs,
-      candidateName: typeof body.candidateName === "string" && body.candidateName ? body.candidateName : "Candidate",
+      candidateName: resolvedCandidateName,
       activeRoleProfile: typeof body.activeRoleProfile === "string" && body.activeRoleProfile ? body.activeRoleProfile : "Full-stack",
     };
-
-    const master = await getMasterResume(userId);
 
     // Call BYOK AI Gateway
     const gatewayResult = await generateCoverLetter(
@@ -157,8 +163,14 @@ export async function POST(req: NextRequest) {
 
     const normalized = normalizeCoverLetterPayload(
       parsedResponse,
-      inputPayload.candidateName || "Candidate"
+      resolvedCandidateName
     );
+    if (normalized && typeof normalized === "object" && "fullMarkdown" in normalized) {
+      const record = normalized as Record<string, unknown>;
+      if (typeof record.fullMarkdown === "string") {
+        record.fullMarkdown = replacePlaceholderSignature(record.fullMarkdown, resolvedCandidateName);
+      }
+    }
     const schemaValidation = CoverLetterResponseSchema.safeParse(normalized);
     if (!schemaValidation.success) {
       return NextResponse.json(
