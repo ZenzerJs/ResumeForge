@@ -180,7 +180,7 @@ export function EditorWorkspaceSkeleton({
             </div>
           </div>
           <div className="flex flex-1 items-start justify-center overflow-hidden bg-inset px-4 pb-6 pt-2">
-            <div className="h-full w-full max-w-[850px] overflow-hidden rounded-[2px] border border-[#d8dce0] bg-paper p-6 shadow-[0_4px_16px_rgba(0,0,0,0.45)] sm:p-8">
+            <div className="h-full w-full max-w-[850px] overflow-hidden rounded-[2px] border border-hairline bg-paper p-6 shadow-[0_4px_16px_rgba(0,0,0,0.45)] sm:p-8">
               <div className="mx-auto mb-5 space-y-2 text-center">
                 <Skeleton className="mx-auto h-4 w-40 rounded-sm bg-[#d8d0c5]" />
                 <Skeleton className="mx-auto h-2 w-56 rounded-sm bg-[#e6dfd6]" />

@@ -224,10 +224,18 @@ export function AiSidebar({
           scopeResolved: true,
         },
       });
-      const targetJobId = urlJobId ?? resolved.activeJobId ?? null;
+      const targetJobId =
+        urlJobId ??
+        (resolved.activeJobId && !resolved.activeJobId.startsWith("demo-sample-")
+          ? resolved.activeJobId
+          : null);
       setResolvedJobId(targetJobId);
 
-      if (resolved.jobSummary?.rawDescription) {
+      if (
+        resolved.jobSummary?.jobId &&
+        (urlJobId || !resolved.jobSummary.jobId.startsWith("demo-sample-")) &&
+        resolved.jobSummary.rawDescription
+      ) {
         setJdText((prev) => prev || resolved.jobSummary!.rawDescription!);
         return;
       }
@@ -723,32 +731,34 @@ export function AiSidebar({
             <button
               type="button"
               onClick={onDismissRepair}
+              aria-label="Close Repair Assist Mode"
               className="p-0.5 rounded text-text-secondary hover:text-foreground hover:bg-elevated transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               title="Close Repair Assist Mode"
               data-testid="close-repair-mode-btn"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           )}
           <Link
             href="/settings"
             className="flex items-center gap-1 text-xs text-text-muted hover:text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
           >
-            <Settings className="h-3 w-3" />
+            <Settings className="h-3 w-3" aria-hidden="true" />
             Settings
           </Link>
           {onPopOut && (
             <button
               type="button"
               onClick={onPopOut}
+              aria-label={isPoppedOut ? "Dock AI Assistant to sidebar" : "Pop out AI Assistant into floating window"}
               className="p-0.5 rounded text-text-secondary hover:text-primary hover:bg-elevated transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               title={isPoppedOut ? "Dock back to sidebar" : "Pop out into floating window"}
               data-testid="popout-ai-window-btn"
             >
               {isPoppedOut ? (
-                <Dock className="h-3.5 w-3.5 text-status-warning" />
+                <Dock className="h-3.5 w-3.5 text-status-warning" aria-hidden="true" />
               ) : (
-                <ExternalLink className="h-3.5 w-3.5" />
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
               )}
             </button>
           )}
@@ -756,14 +766,15 @@ export function AiSidebar({
             <button
               type="button"
               onClick={onToggleCollapse}
-              className="p-1 rounded text-text-secondary hover:text-foreground hover:bg-elevated transition"
+              aria-label={isCollapsed ? "Expand AI Sidebar" : "Collapse AI Sidebar"}
+              className="p-1 rounded text-text-secondary hover:text-foreground hover:bg-elevated transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               title={isCollapsed ? "Expand AI Sidebar" : "Collapse AI Sidebar"}
               data-testid="toggle-ai-sidebar-btn"
             >
               {isCollapsed ? (
-                <PanelRightOpen className="h-3.5 w-3.5 text-status-warning" />
+                <PanelRightOpen className="h-3.5 w-3.5 text-status-warning" aria-hidden="true" />
               ) : (
-                <PanelRightClose className="h-3.5 w-3.5" />
+                <PanelRightClose className="h-3.5 w-3.5" aria-hidden="true" />
               )}
             </button>
           )}

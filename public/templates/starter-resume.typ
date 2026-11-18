@@ -8,7 +8,7 @@
 #set text(
   font: "Liberation Sans",
   size: 9pt,
-  fill: rgb("#111827"),
+  fill: rgb("#1c1e20"),
 )
 
 #set par(justify: true, leading: 0.48em)
@@ -67,7 +67,7 @@
 
 // HEADER
 #align(center)[
-  #text(size: 18pt, weight: "bold", fill: rgb("#111827"))[Alex Morgan] \
+  #text(size: 18pt, weight: "bold", fill: rgb("#1c1e20"))[Alex Morgan] \
   #v(2pt)
   #text(size: 9pt, fill: rgb("#475569"))[
     San Francisco, CA #sym.dot #link("mailto:alex.morgan@example.com")[alex.morgan\@example.com] #sym.dot (555) 019-2834 #sym.dot #link("https://github.com/alexmorgan")[github.com/alexmorgan] #sym.dot #link("https://linkedin.com/in/alexmorgan")[linkedin.com/in/alexmorgan]

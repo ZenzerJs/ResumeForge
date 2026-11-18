@@ -9,9 +9,16 @@ export function LandingFooter() {
       className="relative z-20 mt-auto w-full min-w-0 shrink-0 border-t border-outline/70 bg-panel py-10 px-4 md:px-8 text-muted-foreground"
     >
       <div className="mx-auto flex w-full max-w-5xl min-w-0 flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-        <div className="flex items-center justify-center sm:justify-start gap-2">
-          <div className="h-6 w-6 rounded-[6px] bg-inset border border-primary/40 text-primary font-semibold font-mono flex items-center justify-center text-xs">
-            RF
+        <div className="flex items-center justify-center sm:justify-start gap-2.5">
+          <div
+            aria-hidden="true"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-sm font-bold text-primary-foreground"
+            style={{
+              background: "linear-gradient(135deg, rgb(var(--accent-action)), rgb(var(--accent-secondary)))",
+              boxShadow: "0 0 0 1px rgb(255 255 255 / 0.12) inset, 0 6px 20px rgb(var(--accent-action) / 0.35)",
+            }}
+          >
+            R
           </div>
           <span className="text-foreground font-bold tracking-tight text-sm">ResumeForge</span>
         </div>
@@ -23,20 +30,26 @@ export function LandingFooter() {
           <Link href="/editor" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
             Editor
           </Link>
+          <Link href="/library" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
+            Evidence Bank
+          </Link>
+          <Link href="/tracker" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
+            Jobs
+          </Link>
           <Link href="/tailor" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
             Tailor
           </Link>
-          <Link href="/tracker" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
-            Tracker
-          </Link>
-          <Link href="/library" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
-            Evidence Bank
+          <Link href="/practice" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
+            Practice
           </Link>
           <Link href="/settings" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
             AI settings
           </Link>
           <Link href="/privacy" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
             Privacy Policy
+          </Link>
+          <Link href="/terms" className="hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]">
+            Terms of Service
           </Link>
         </nav>
 
