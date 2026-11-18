@@ -116,6 +116,11 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     await page.goto("/editor");
     await page.waitForLoadState("networkidle");
 
+    const expandBtn = page.locator('[data-testid="expand-ai-sidebar-btn"]');
+    if (await expandBtn.isVisible().catch(() => false)) {
+      await expandBtn.click();
+    }
+
     const aiPanel = page.locator('[data-testid="panel-ai"]');
     await page.locator('[data-testid="ai-tab-tailor"]').click();
 
