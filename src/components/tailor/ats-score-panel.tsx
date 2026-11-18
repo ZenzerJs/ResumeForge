@@ -221,6 +221,7 @@ interface AtsScorePanelProps {
   includeEvidenceBank?: boolean;
   /** Actual object currently evaluated for display clarity. */
   evaluatedSourceLabel?: EvaluatedResumeSourceKind;
+  measuredPages?: number;
   initialProfile?: RoleProfile;
   onProfileChange?: (profile: RoleProfile) => void;
   onEvaluationComplete?: (result: AtsEvaluationResult | null) => void;
@@ -263,6 +264,7 @@ export function AtsScorePanel({
   useMasterResume = false,
   includeEvidenceBank = true,
   evaluatedSourceLabel,
+  measuredPages,
   initialProfile = "Backend",
   onProfileChange,
   onEvaluationComplete,
@@ -306,6 +308,7 @@ export function AtsScorePanel({
           roleProfile: evaluationProfile,
           useMasterResume,
           includeEvidenceBank,
+          measuredPages,
         });
 
   useEffect(() => {

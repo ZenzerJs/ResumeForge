@@ -116,7 +116,9 @@ export async function POST(req: NextRequest) {
     const selectedProfile: RoleProfile =
       input.roleProfile || inferRoleProfile(roleTitle, rawDescription);
 
-    const evaluationResult = evaluateAtsScore(typstContent, requirements, selectedProfile);
+    const evaluationResult = evaluateAtsScore(typstContent, requirements, selectedProfile, {
+      measuredPages: input.measuredPages,
+    });
 
     return NextResponse.json({
       success: true,

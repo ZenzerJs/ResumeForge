@@ -3,7 +3,7 @@ import { resolveValidationFacts } from "@/lib/facts/extract";
 import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
 import { assertCanExport } from "@/lib/guardrail/policy";
 import { assertLayoutExportReady, type LayoutMeasurement } from "@/lib/typst/resume-document";
-import { managedResumeExport } from "@/lib/export/resume-text";
+import { formatPlaintextLink, managedResumeExport } from "@/lib/export/resume-text";
 
 export const ZIP_MANIFEST_SCHEMA_VERSION = 1;
 
@@ -427,13 +427,17 @@ function formatTypstLinks(source: string): string {
     if (source[cursor] === "[") {
       const closeBracket = findMatchingDelimiter(source, cursor, "[", "]");
       if (closeBracket >= 0) {
-        const label = source.slice(cursor + 1, closeBracket).trim();
-        out += !label || label === url ? url : `${label} (${url})`;
+        const label = source
+          .slice(cursor + 1, closeBracket)
+          .replace(/\\(.)/g, "$1")
+          .replace(/\*+/g, "")
+          .replace(/(?<![a-zA-Z0-9/])_+|_+(?![a-zA-Z0-9])/g, "");
+        out += formatPlaintextLink(url, label);
         i = closeBracket + 1;
         continue;
       }
     }
-    out += url;
+    out += formatPlaintextLink(url);
     i += match[0].length;
   }
   return out;

@@ -9,6 +9,7 @@ import { sanitizeError } from "../redact";
 import type { ChatCompletionResult } from "./custom";
 import { safeFetch } from "@/lib/security/safe-fetch";
 import { resolveProviderCredentialsWithHostPolicy } from "./credentials";
+import { DEFAULT_MODELS } from "@/lib/byok-vault";
 
 function providerFetch(
   url: string,
@@ -101,7 +102,7 @@ export async function completeText(
     defaultBaseUrl: "https://api.anthropic.com",
     officialHosts: ["api.anthropic.com"],
   });
-  const model = config.model?.trim() || options?.defaultModel || "claude-3-5-sonnet-20241022";
+  const model = config.model?.trim() || options?.defaultModel || DEFAULT_MODELS.anthropic;
 
   if (!apiKey) {
     return { success: false, error: options?.missingKeyMessage ?? "Anthropic API key is missing." };

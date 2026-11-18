@@ -2,9 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
 import {
   evaluateGuestMigrationState,
+  executeGuestMigrationBatches,
+  getGuestMigrationCopy,
   GuestMigrationModal,
   hasPendingGuestDraftInStorage,
   isCustomGuestDraftSource,
+  parseGuestEvidenceEntries,
+  parseGuestEvidenceItems,
 } from "@/components/auth/guest-migration-modal";
 
 describe("Guest-to-Account Draft Migration (Release Hardening)", () => {
@@ -207,5 +211,260 @@ describe("Guest-to-Account Draft Migration (Release Hardening)", () => {
     expect(authOwnedEval.shouldPrompt).toBe(false);
     expect(authOwnedEval.hasCustomResumeDraft).toBe(false);
     expect(authOwnedEval.hasGuestEvidence).toBe(false);
+  });
+
+  it("evaluates evidence-only guest state without synthesizing a placeholder resume draft", () => {
+    const store = new Map<string, string>([
+      [
+        "resumeforge_guest_evidence",
+        JSON.stringify([{ title: "Distributed Cache", type: "PROJECT", bullets: ["Cut p99 by 40%"] }]),
+      ],
+    ]);
+    const storage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      },
+    };
+
+    const evalResult = evaluateGuestMigrationState(storage, {
+      isAuthUser: true,
+      isGuest: false,
+      demoMode: false,
+    });
+
+    expect(evalResult.shouldPrompt).toBe(true);
+    expect(evalResult.hasCustomResumeDraft).toBe(false);
+    expect(evalResult.hasGuestEvidence).toBe(true);
+    expect(evalResult.draftSource).toBeNull();
+  });
+
+  it("parses and batches >50 guest evidence items in chunks of 50 and preserves raw entry schema on partial failure", async () => {
+    const rawItems = Array.from({ length: 120 }, (_, i) => ({
+      id: `guest-ev-${i + 1}`,
+      title: `Evidence Item ${i + 1}`,
+      organization: "Stripe",
+      type: "experience",
+      status: "verified",
+      verifiedSummary: `Summary ${i + 1}`,
+      startDate: "2024-01",
+      endDate: "2025-02",
+      tags: ["TypeScript", "Postgres"],
+      bullets: [{ id: `bullet-${i + 1}`, text: `Impact bullet ${i + 1}` }],
+    }));
+
+    const { items: parsed, rawEntries } = parseGuestEvidenceEntries(JSON.stringify(rawItems));
+    expect(parsed).toHaveLength(120);
+    expect(rawEntries).toHaveLength(120);
+    expect(parseGuestEvidenceItems(JSON.stringify(rawItems))).toEqual(parsed);
+
+    const store = new Map<string, string>([
+      ["resumeforge_typst_source", "= Jane Doe\n== EXPERIENCE\n*Stripe* -- Staff Engineer"],
+      ["resumeforge_has_guest_draft", "true"],
+      ["resumeforge_guest_evidence", JSON.stringify(rawEntries)],
+    ]);
+    const storage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      },
+    };
+
+    // Full success across 3 batches (50 + 50 + 20)
+    const calls: Array<Record<string, unknown>> = [];
+    const fetchAllOk = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ success: true, data: {} }), { status: 200 });
+    }) as typeof fetch;
+
+    const okResult = await executeGuestMigrationBatches({
+      storage,
+      fetchFn: fetchAllOk,
+      draftSource: store.get("resumeforge_typst_source"),
+      hasCustomResumeDraft: true,
+      evidenceItems: parsed,
+      rawEvidenceEntries: rawEntries,
+      strategy: "IMPORT_AS_DRAFT",
+      confirmReplaceMaster: false,
+      migrationId: "123e4567-e89b-12d3-a456-426614174000",
+    });
+
+    expect(okResult.ok).toBe(true);
+    expect(calls).toHaveLength(3);
+    expect((calls[0]!.evidenceItems as unknown[]).length).toBe(50);
+    expect(calls[0]!.typstSource).toContain("Jane Doe");
+    expect(calls[0]!.evidenceOnly).toBeUndefined();
+    expect((calls[1]!.evidenceItems as unknown[]).length).toBe(50);
+    expect(calls[1]!.typstSource).toBeUndefined();
+    expect(calls[1]!.evidenceOnly).toBe(true);
+    expect((calls[2]!.evidenceItems as unknown[]).length).toBe(20);
+    expect(calls[2]!.evidenceOnly).toBe(true);
+    expect(store.get("resumeforge_guest_evidence")).toBeUndefined();
+    expect(store.get("resumeforge_typst_source")).toBeUndefined();
+
+    // Partial failure: batch 0 succeeds, batch 1 fails -> remaining 70 raw entries preserved with original fields
+    const storePartial = new Map<string, string>([
+      ["resumeforge_typst_source", "= Jane Doe\n== EXPERIENCE\n*Stripe* -- Staff Engineer"],
+      ["resumeforge_has_guest_draft", "true"],
+      ["resumeforge_guest_evidence", JSON.stringify(rawEntries)],
+    ]);
+    const partialStorage = {
+      getItem: (k: string) => storePartial.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        storePartial.set(k, v);
+      },
+      removeItem: (k: string) => {
+        storePartial.delete(k);
+      },
+    };
+
+    let attempt = 0;
+    const fetchPartialFail = (async () => {
+      attempt++;
+      if (attempt === 1) {
+        return new Response(JSON.stringify({ success: true, data: {} }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ success: false, error: "Server error" }), { status: 500 });
+    }) as typeof fetch;
+
+    const failResult = await executeGuestMigrationBatches({
+      storage: partialStorage,
+      fetchFn: fetchPartialFail,
+      draftSource: storePartial.get("resumeforge_typst_source"),
+      hasCustomResumeDraft: true,
+      evidenceItems: parsed,
+      rawEvidenceEntries: rawEntries,
+      strategy: "IMPORT_AS_DRAFT",
+      confirmReplaceMaster: false,
+      migrationId: "123e4567-e89b-12d3-a456-426614174000",
+    });
+
+    expect(failResult.ok).toBe(false);
+    expect(failResult.remainingEvidence).toHaveLength(70);
+    const persistedRemaining = JSON.parse(storePartial.get("resumeforge_guest_evidence") ?? "[]");
+    expect(persistedRemaining).toHaveLength(70);
+    expect(persistedRemaining[0]).toEqual({
+      id: "guest-ev-51",
+      title: "Evidence Item 51",
+      organization: "Stripe",
+      type: "experience",
+      status: "verified",
+      verifiedSummary: "Summary 51",
+      startDate: "2024-01",
+      endDate: "2025-02",
+      tags: ["TypeScript", "Postgres"],
+      bullets: [{ id: "bullet-51", text: "Impact bullet 51" }],
+    });
+    expect(storePartial.get("resumeforge_has_guest_draft")).toBeUndefined();
+  });
+
+  it("handles non-JSON 502/504 responses gracefully across DISCARD, resume-only, and batched evidence paths", async () => {
+    const html502Fetch = (async () =>
+      new Response("<html><body>502 Bad Gateway</body></html>", {
+        status: 502,
+        headers: { "Content-Type": "text/html" },
+      })) as typeof fetch;
+
+    const evidenceItems = [
+      { title: "Telemetry Pipeline", category: "PROJECT", bullets: ["Reduced latency 20%"] },
+    ];
+
+    const discardRes = await executeGuestMigrationBatches({
+      storage: null,
+      fetchFn: html502Fetch,
+      draftSource: "= Draft\n== EXP\n*Acme*",
+      hasCustomResumeDraft: true,
+      evidenceItems,
+      strategy: "DISCARD",
+      confirmReplaceMaster: false,
+      migrationId: "123e4567-e89b-12d3-a456-426614174000",
+    });
+    expect(discardRes).toEqual({
+      ok: false,
+      error: "Failed to discard guest draft.",
+      remainingEvidence: evidenceItems,
+    });
+
+    const resumeOnlyRes = await executeGuestMigrationBatches({
+      storage: null,
+      fetchFn: html502Fetch,
+      draftSource: "= Draft\n== EXP\n*Acme*",
+      hasCustomResumeDraft: true,
+      evidenceItems: [],
+      strategy: "IMPORT_AS_DRAFT",
+      confirmReplaceMaster: false,
+      migrationId: "123e4567-e89b-12d3-a456-426614174000",
+    });
+    expect(resumeOnlyRes).toEqual({
+      ok: false,
+      error: "Failed to import guest draft to account.",
+      remainingEvidence: [],
+    });
+
+    const batchedRes = await executeGuestMigrationBatches({
+      storage: null,
+      fetchFn: html502Fetch,
+      draftSource: null,
+      hasCustomResumeDraft: false,
+      evidenceItems,
+      strategy: "IMPORT_AS_DRAFT",
+      confirmReplaceMaster: false,
+      migrationId: "123e4567-e89b-12d3-a456-426614174000",
+    });
+    expect(batchedRes).toEqual({
+      ok: false,
+      error: "Failed to import guest draft to account.",
+      remainingEvidence: evidenceItems,
+    });
+  });
+
+  it("adapts GuestMigrationModal copy for evidence-only vs draft+evidence states", () => {
+    const evidenceOnlyCopy = getGuestMigrationCopy(false, true);
+    expect(evidenceOnlyCopy.title).toBe("Unsaved Guest Evidence Detected");
+    expect(evidenceOnlyCopy.description).toBe(
+      "We found guest Evidence Bank items in this browser. Choose whether to import or discard them."
+    );
+    expect(evidenceOnlyCopy.importLabel).toBe("Import Guest Evidence (Recommended)");
+    expect(evidenceOnlyCopy.importDescription).toBe(
+      "Adds your browser Evidence Bank items to your account without touching your Master Resume."
+    );
+    expect(evidenceOnlyCopy.discardLabel).toBe("Discard Local Evidence");
+
+    const draftAndEvidenceCopy = getGuestMigrationCopy(true, true);
+    expect(draftAndEvidenceCopy.title).toBe("Unsaved Guest Draft Detected");
+    expect(draftAndEvidenceCopy.discardLabel).toBe("Discard Local Draft & Evidence");
+
+    const draftOnlyCopy = getGuestMigrationCopy(true, false);
+    expect(draftOnlyCopy.discardLabel).toBe("Discard Local Draft");
+  });
+
+  it("sends evidenceOnly: true without typstSource when migrating evidence-only guest state", async () => {
+    const sentPayloads: Array<Record<string, unknown>> = [];
+    const fetchMock = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      sentPayloads.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ success: true, data: {} }), { status: 200 });
+    }) as typeof fetch;
+
+    const result = await executeGuestMigrationBatches({
+      storage: null,
+      fetchFn: fetchMock,
+      draftSource: null,
+      hasCustomResumeDraft: false,
+      evidenceItems: [{ title: "Evidence Only Project", category: "PROJECT", bullets: ["Shipped"] }],
+      strategy: "IMPORT_AS_DRAFT",
+      confirmReplaceMaster: false,
+      migrationId: "123e4567-e89b-12d3-a456-426614174000",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(sentPayloads).toHaveLength(1);
+    expect(sentPayloads[0]!.evidenceOnly).toBe(true);
+    expect(sentPayloads[0]!.typstSource).toBeUndefined();
   });
 });

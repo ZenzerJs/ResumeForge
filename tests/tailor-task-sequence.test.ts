@@ -273,4 +273,92 @@ describe("Tailor task-sequence navigation & state helpers", () => {
     });
     expect(userPrompt).toContain("prioritize substantive accomplishment bullet improvements");
   });
+
+  it("preserves prior reviewed edits across failed regeneration and swaps state atomically on success", () => {
+    const tailorSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/tailor/tailor-workspace.tsx"),
+      "utf8"
+    );
+
+    const fnStart = tailorSrc.indexOf("const handleGeneratePatches = async () => {");
+    const fetchIdx = tailorSrc.indexOf('fetch(isDemo ? "/api/demo/generate-patches"', fnStart);
+    const successGuardIdx = tailorSrc.indexOf("if (!patchOk || !json?.success || !json.data)", fnStart);
+    const preFetchBlock = tailorSrc.slice(fnStart, fetchIdx);
+
+    expect(fnStart).toBeGreaterThan(-1);
+    expect(fetchIdx).toBeGreaterThan(fnStart);
+    expect(successGuardIdx).toBeGreaterThan(fetchIdx);
+
+    for (const setter of [
+      "setPatchVerified(",
+      "setPatchRejected(",
+      "setPatchGaps(",
+      "setPatchDecisions(",
+      "setPatchBatch(",
+      "setSelectedPatchId(",
+      "setAcknowledgedSkills(",
+      "setDemoPatchBaseSource(",
+    ]) {
+      expect(preFetchBlock).not.toContain(setter);
+    }
+
+    const postSuccessBlock = tailorSrc.slice(successGuardIdx);
+    expect(postSuccessBlock).toContain("setPatchVerified(verifiedList)");
+    expect(postSuccessBlock).toContain("setPatchDecisions(initialDecisions)");
+    expect(postSuccessBlock).toContain("setDemoPatchBaseSource(nextDemoPatchBaseSource)");
+  });
+
+  it("shows full Evidence Matches with required-skill coverage, supported skills, and empty-bank CTA", () => {
+    const tailorSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/tailor/tailor-workspace.tsx"),
+      "utf8"
+    );
+
+    expect(tailorSrc).not.toContain("matches.slice(0, 6)");
+    expect(tailorSrc).toContain('data-testid="evidence-matches-coverage"');
+    expect(tailorSrc).toContain("required skills covered");
+    expect(tailorSrc).toContain("Supports {m.matchedRequirements.length}");
+    expect(tailorSrc).toContain('data-testid="evidence-matches-empty"');
+    expect(tailorSrc).toContain("verifiedEvidenceCount === 0");
+  });
+
+  it("requires verified provider test on non-demoMode and keeps Tailor PageHeader readable at 1280px", () => {
+    const tailorSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/tailor/tailor-workspace.tsx"),
+      "utf8"
+    );
+    const headerSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/design-system/page-header.tsx"),
+      "utf8"
+    );
+
+    expect(tailorSrc).toContain("getActiveConfig()");
+    expect(tailorSrc).toContain("activeConfig.verified");
+    expect(tailorSrc).toContain('"Test needed"');
+    expect(tailorSrc).toContain('"Verify in Settings"');
+    expect(tailorSrc).toContain('data-testid="patch-error-open-settings"');
+
+    const handleGenStart = tailorSrc.indexOf("const handleGeneratePatches = async () => {");
+    const handleGenGuardEnd = tailorSrc.indexOf("const [aiSettings, activeConfig, demoConfig]", handleGenStart);
+    const nextStepGuardBlock = tailorSrc.slice(handleGenStart, handleGenGuardEnd);
+    expect(nextStepGuardBlock).toContain("providerConfigStatus.hasSavedConfig");
+    expect(nextStepGuardBlock).toContain(
+      "AI provider is saved but not verified. Test your connection in Settings before generating edits."
+    );
+    expect(nextStepGuardBlock).toContain(
+      "No AI provider configured. Please configure your API key in Settings."
+    );
+
+    const readinessStart = tailorSrc.indexOf('data-testid="tailor-readiness"');
+    const readinessEnd = tailorSrc.indexOf("</ul>", readinessStart);
+    const readinessBlock = tailorSrc.slice(readinessStart, readinessEnd);
+    expect(readinessBlock).toContain("providerConfigStatus.hasSavedConfig");
+    expect(readinessBlock).toContain('"Verify in Settings"');
+    expect(readinessBlock).toContain('"Configure in Settings"');
+
+    expect(headerSrc).not.toContain("xl:shrink-0");
+    expect(tailorSrc).toContain("md:flex-col md:items-stretch");
+    expect(tailorSrc).toContain("2xl:flex-row 2xl:items-center");
+    expect(tailorSrc).toContain("2xl:[&>div:last-child]:max-w-[75%]");
+  });
 });

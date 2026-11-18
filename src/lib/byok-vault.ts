@@ -42,10 +42,10 @@ const KNOWN_PROVIDERS: readonly ByokProvider[] = [
   "custom",
 ];
 
-const DEFAULT_MODELS: Record<string, string> = {
+export const DEFAULT_MODELS: Record<string, string> = {
   gemini: "gemini-2.5-flash",
-  openai: "gpt-4o",
-  anthropic: "claude-3-5-sonnet-20241022",
+  openai: "gpt-4.1",
+  anthropic: "claude-sonnet-4-20250514",
   groq: "llama-3.3-70b-versatile",
   ollama: "llama3",
   custom: "llama3",

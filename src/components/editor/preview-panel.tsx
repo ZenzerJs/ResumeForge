@@ -498,15 +498,18 @@ export function PreviewPanel({
         extractedRequirements.domainTerms.length > 0)
   );
 
+  const measuredPages = measurement?.source === source ? measurement.pages : undefined;
+
   // Synchronous client-side Ember Ink ATS Grade computation for the docked Editor grade rail
   const liveAtsGrade = useMemo<AtsEvaluationResult | null>(() => {
     if (!showDockedGrade || showGrade || v2 || !hasHydratedSource) return null;
     return evaluateAtsScore(
       source,
       extractedRequirements || EMPTY_EXTRACTED_REQUIREMENTS,
-      "Backend"
+      "Backend",
+      { measuredPages }
     );
-  }, [extractedRequirements, hasHydratedSource, showDockedGrade, showGrade, source, v2]);
+  }, [extractedRequirements, hasHydratedSource, measuredPages, showDockedGrade, showGrade, source, v2]);
 
   const [canDirectExport, setCanDirectExport] = useState(false);
 
@@ -913,6 +916,7 @@ export function PreviewPanel({
                 typstContent={source}
                 extractedRequirements={extractedRequirements || EMPTY_EXTRACTED_REQUIREMENTS}
                 roleTitle={roleTitle}
+                measuredPages={measuredPages}
               />
             )}
           </div>

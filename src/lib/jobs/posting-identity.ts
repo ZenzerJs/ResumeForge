@@ -354,14 +354,19 @@ export function hasJobSavedApplicationHistory(job: TrackerDedupeCandidate): bool
   return false;
 }
 
+function isUserCreatedOrPasted(candidate: TrackerDedupeCandidate): boolean {
+  const src = (candidate.source ?? "").trim().toLowerCase();
+  return src === "pasted" || src === "manual" || Boolean(candidate.userId);
+}
+
 function trackerCandidateRank(job: TrackerDedupeCandidate): number {
   let score = 0;
   if (hasJobSavedApplicationHistory(job)) score += 1000;
+  if (isUserCreatedOrPasted(job)) score += 300;
   if (job.rawDescription !== undefined && !isPlaceholderDescription(job.rawDescription)) {
     score += 100;
   }
   if (job.requirementsStatus === "ready") score += 20;
-  if (job.userId) score += 10;
   return score;
 }
 
@@ -413,11 +418,6 @@ export function collapseDuplicateTrackerJobs<T extends TrackerDedupeCandidate>(r
         break;
       }
     }
-
-    const isUserCreatedOrPasted = (candidate: TrackerDedupeCandidate) => {
-      const src = (candidate.source ?? "").trim().toLowerCase();
-      return src === "pasted" || src === "manual" || Boolean(candidate.userId);
-    };
 
     if (matchedIndex === null && companyTitleKey && !reqUrl && !hasHistory && !isUserCreatedOrPasted(row)) {
       const candidates = byCompanyTitle.get(companyTitleKey) ?? [];
@@ -501,22 +501,17 @@ export function collapseDuplicateIngestedJobs<T extends IngestedDedupeCandidate>
     row: T;
     stableKey: string;
     reqUrl: string | null;
-    companyTitleKey: string | null;
   }
 
   const entries: Entry[] = [];
   const byStableKey = new Map<string, number[]>();
   const byReqUrl = new Map<string, number[]>();
-  const byCompanyTitle = new Map<string, number[]>();
 
   for (const row of rows) {
     const sourceNorm = row.source.trim().toLowerCase();
     const extNorm = row.externalId.trim().toLowerCase();
     const stableKey = sourceNorm && extNorm ? `${sourceNorm}::${extNorm}` : "";
     const reqUrl = extractRequisitionUrl(row.applyUrl);
-    const normCompany = normalizeTextToken(row.companyName);
-    const normTitle = normalizeTextToken(row.title);
-    const companyTitleKey = normCompany && normTitle ? `${normCompany}::${normTitle}` : null;
 
     let matchedIndex: number | null = null;
 
@@ -549,24 +544,6 @@ export function collapseDuplicateIngestedJobs<T extends IngestedDedupeCandidate>
       }
     }
 
-    if (matchedIndex === null && companyTitleKey && !reqUrl) {
-      const candidates = byCompanyTitle.get(companyTitleKey) ?? [];
-      for (const idx of candidates) {
-        const existing = entries[idx]!;
-        if (existing.reqUrl) continue;
-        // Different externalIds from the same source with generic URLs remain distinct postings.
-        if (
-          sourceNorm === existing.row.source.trim().toLowerCase() &&
-          extNorm !== existing.row.externalId.trim().toLowerCase()
-        ) {
-          continue;
-        }
-        if (!arePostingLocationsCompatible(existing.row.location, row.location)) continue;
-        matchedIndex = idx;
-        break;
-      }
-    }
-
     if (matchedIndex !== null) {
       const existing = entries[matchedIndex]!;
       if (compareIngestedCandidate(row, existing.row) > 0) {
@@ -574,14 +551,13 @@ export function collapseDuplicateIngestedJobs<T extends IngestedDedupeCandidate>
           row,
           stableKey: stableKey || existing.stableKey,
           reqUrl: reqUrl ?? existing.reqUrl,
-          companyTitleKey: companyTitleKey ?? existing.companyTitleKey,
         };
       }
       continue;
     }
 
     const newIdx = entries.length;
-    entries.push({ row, stableKey, reqUrl, companyTitleKey });
+    entries.push({ row, stableKey, reqUrl });
     if (stableKey) {
       const list = byStableKey.get(stableKey) ?? [];
       list.push(newIdx);
@@ -591,11 +567,6 @@ export function collapseDuplicateIngestedJobs<T extends IngestedDedupeCandidate>
       const list = byReqUrl.get(reqUrl) ?? [];
       list.push(newIdx);
       byReqUrl.set(reqUrl, list);
-    }
-    if (companyTitleKey) {
-      const list = byCompanyTitle.get(companyTitleKey) ?? [];
-      list.push(newIdx);
-      byCompanyTitle.set(companyTitleKey, list);
     }
   }
 

@@ -60,6 +60,7 @@ export function ConfirmMasterDialog({
   const confirmingRef = React.useRef(false);
   const wasOpenRef = React.useRef(false);
   const [localSaving, setLocalSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const restoreMasterTriggerFocus = React.useCallback(() => {
     const target =
@@ -84,6 +85,7 @@ export function ConfirmMasterDialog({
     if (!open) {
       confirmingRef.current = false;
       setLocalSaving(false);
+      setSaveError(null);
       if (wasOpen) {
         restoreMasterTriggerFocus();
       }
@@ -113,9 +115,16 @@ export function ConfirmMasterDialog({
     if (!confirmed || busy || confirmingRef.current) return;
     confirmingRef.current = true;
     setLocalSaving(true);
+    setSaveError(null);
     try {
       await onConfirm();
       onOpenChange(false);
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : "Failed to save Master Resume. Please try again.";
+      setSaveError(message);
     } finally {
       confirmingRef.current = false;
       setLocalSaving(false);
@@ -429,6 +438,29 @@ export function ConfirmMasterDialog({
           </div>
         )}
 
+        {saveError && (
+          <div
+            role="alert"
+            data-testid="confirm-master-save-error"
+            className="flex items-start justify-between gap-3 rounded-lg border border-status-danger/40 bg-status-danger/10 px-3 py-2.5 text-xs text-status-danger"
+          >
+            <div className="flex items-start gap-2 min-w-0">
+              <AlertTriangle className="size-4 shrink-0 mt-0.5" aria-hidden />
+              <span className="break-words leading-snug">{saveError}</span>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => handleConfirm()}
+              disabled={busy || !confirmed}
+              data-testid="confirm-save-master-retry-btn"
+              className="shrink-0 h-7 px-2.5 text-xs border-status-danger/40 text-status-danger hover:bg-status-danger/15"
+            >
+              Retry
+            </Button>
+          </div>
+        )}
         </div>
 
         <DialogFooter className="shrink-0 gap-2 pt-2">

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { ProviderType } from "@/lib/ai/types";
 import {
+  DEFAULT_MODELS,
   saveKey,
   getKey,
   removeKey,
@@ -51,15 +52,6 @@ import {
 } from "@/lib/tailor/application-context";
 
 const SETTINGS_STORAGE_KEY = "resumeforge_ai_settings";
-
-const DEFAULT_MODELS: Record<string, string> = {
-  gemini: "gemini-2.5-flash",
-  openai: "gpt-4o",
-  groq: "llama-3.3-70b-versatile",
-  anthropic: "claude-3-5-sonnet-20241022",
-  ollama: "llama3",
-  custom: "llama3",
-};
 
 export type CloudProviderId = "gemini" | "openai" | "anthropic" | "groq";
 
@@ -429,7 +421,8 @@ export function SettingsWorkspace() {
     const nextModel = e.target.value;
     setModel(nextModel);
     setTestResult(null);
-    saveSettingsToStorage(provider, baseUrl, nextModel);
+    setVerificationStatus("untested");
+    saveSettingsToStorage(provider, baseUrl, nextModel, { clearVerification: true });
   };
 
   const handleClearKey = async () => {
@@ -559,9 +552,9 @@ export function SettingsWorkspace() {
                 className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <option value="gemini">Google Gemini (Direct API)</option>
-                <option value="openai">OpenAI (BYOK)</option>
-                <option value="anthropic">Anthropic (BYOK)</option>
-                <option value="groq">Groq (BYOK)</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="groq">Groq</option>
                 {!demoMode && <option value="ollama">Ollama (Local Inference)</option>}
                 {!demoMode && <option value="custom">Custom OpenAI-compatible endpoint (Local / self-hosted endpoint)</option>}
               </select>
@@ -729,11 +722,21 @@ export function SettingsWorkspace() {
                   </div>
                   {apiKey && (
                     <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-                      <Key className="h-3.5 w-3.5 text-status-warning" />
+                      <Key
+                        className={`h-3.5 w-3.5 ${
+                          verificationStatus === "verified"
+                            ? "text-status-success"
+                            : verificationStatus === "failed"
+                            ? "text-status-danger"
+                            : "text-status-warning"
+                        }`}
+                      />
                       <span>
-                        {verificationStatus === "failed"
+                        {verificationStatus === "verified"
+                          ? "Verified key: "
+                          : verificationStatus === "failed"
                           ? "Saved key (last test failed): "
-                          : "Configured key: "}
+                          : "Saved key (not tested): "}
                         <code className="text-text-secondary font-mono">{maskKey(apiKey)}</code>
                       </span>
                     </div>

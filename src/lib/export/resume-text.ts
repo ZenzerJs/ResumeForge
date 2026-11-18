@@ -7,6 +7,39 @@ export interface ExportResumeSections {
   sections: { title: string; lines: string[] }[];
 }
 
+/** Format a link for plaintext ATS export, omitting redundant labels that duplicate the destination. */
+export function formatPlaintextLink(url: string, label?: string): string {
+  const trimmedUrl = url.trim();
+  const cleanUrl = trimmedUrl.replace(/^mailto:/i, "");
+  const cleanLabel = label?.trim() ?? "";
+  if (!cleanLabel) return cleanUrl;
+
+  if (/^mailto:/i.test(trimmedUrl)) {
+    const cleanEmailLabel = cleanLabel.replace(/^mailto:/i, "").trim();
+    if (
+      cleanEmailLabel.toLowerCase() === cleanUrl.toLowerCase() ||
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmailLabel)
+    ) {
+      return cleanUrl;
+    }
+    return `${cleanLabel} (${cleanUrl})`;
+  }
+
+  const normalize = (value: string) =>
+    value
+      .trim()
+      .replace(/^https?:\/\//i, "")
+      .replace(/^www\./i, "")
+      .replace(/\/+$/, "")
+      .toLowerCase();
+
+  if (normalize(cleanLabel) === normalize(cleanUrl)) {
+    return cleanUrl;
+  }
+
+  return `${cleanLabel} (${cleanUrl})`;
+}
+
 /** Parse the renderer's visible output, never its stale metadata, after direct edits. */
 function visibleManagedExport(source: string): { text: string; sections: ExportResumeSections } {
   const lines = source.split(/\r?\n/);
@@ -40,7 +73,7 @@ function visibleManagedExport(source: string): { text: string; sections: ExportR
         const label = decodeInline(rest.slice(match[0].length, end));
         const url = JSON.parse(match[1]) as string;
         renderedDestinations.add(url);
-        result += label === url ? label : `${label} (${url})`;
+        result += formatPlaintextLink(url, label);
         i += end + 1; continue;
       }
       const block = /^#block\(above: \d+(?:\.\d+)?(?:pt|em), below: \d+(?:\.\d+)?(?:pt|em)\)\[/.test(input.slice(i));
@@ -304,9 +337,9 @@ export function extractCandidateNameFromTypst(typstSource?: string | null): stri
  */
 export function replacePlaceholderSignature(text: string, candidateName?: string | null): string {
   const cleanName = candidateName?.trim();
-  if (!cleanName || cleanName.toLowerCase() === "candidate") return text;
+  if (!cleanName || PLACEHOLDER_CANDIDATE_NAMES.has(cleanName.toLowerCase())) return text;
   return text.replace(
-    /((?:^|\n)\s*(?:Sincerely|Best regards|Regards|Warm regards|Respectfully),?\s*\n)Candidate\b/gi,
-    `$1${cleanName}`
+    /((?:^|\n)[ \t]*(?:Sincerely|Best regards|Kind regards|Warm regards|Regards|Respectfully|Best|Warmly|Thank you|Yours truly),?[ \t]*\r?\n[ \t]*)(?:\[(?:Candidate(?:\s+Name)?|Your\s+Name)\]|Candidate(?:\s+Name)?|Your\s+Name)(?=[ \t]*(?:\r?\n|$))/gi,
+    (_m, prefix: string) => `${prefix}${cleanName}`
   );
 }

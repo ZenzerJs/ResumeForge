@@ -497,4 +497,33 @@ describe("BYOK Vault & Router (WS6)", () => {
       fetchSpy.mockRestore();
     });
   });
+
+  it("uses updated default models for OpenAI and Anthropic when no custom model is saved", async () => {
+    const store: Record<string, string> = {};
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: (k: string) => (k in store ? store[k] : null),
+        setItem: (k: string, v: string) => { store[k] = v; },
+        removeItem: (k: string) => { delete store[k]; },
+        clear: () => { for (const k of Object.keys(store)) delete store[k]; },
+        key: (i: number) => Object.keys(store)[i] ?? null,
+        get length() { return Object.keys(store).length; },
+      },
+      dispatchEvent: vi.fn(),
+    });
+
+    store["resumeforge_ai_settings"] = JSON.stringify({ provider: "openai" });
+    await saveKey("openai", "sk-openai-default");
+    const openaiActive = await getActiveConfig();
+    expect(openaiActive.model).toBe("gpt-4.1");
+    const openaiResolved = await resolveClientProviderConfig();
+    expect(openaiResolved?.model).toBe("gpt-4.1");
+
+    store["resumeforge_ai_settings"] = JSON.stringify({ provider: "anthropic" });
+    await saveKey("anthropic", "sk-ant-default");
+    const anthropicActive = await getActiveConfig();
+    expect(anthropicActive.model).toBe("claude-sonnet-4-20250514");
+    const anthropicResolved = await resolveClientProviderConfig();
+    expect(anthropicResolved?.model).toBe("claude-sonnet-4-20250514");
+  });
 });

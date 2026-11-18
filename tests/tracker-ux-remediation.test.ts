@@ -516,6 +516,64 @@ describe("Tracker UX Remediation & Deduplication", () => {
         },
       ];
       expect(collapseDuplicateIngestedJobs(genericRows)).toHaveLength(2);
+
+      // Cross-source generic-URL rows with matching company+title+location remain distinct
+      const crossSourceGenericRows = [
+        {
+          id: "cs-1",
+          externalId: "ext-gh-1",
+          source: "GREENHOUSE",
+          companyName: "Example Studio",
+          title: "Backend Engineer",
+          location: "Toronto, ON",
+          applyUrl: "https://example.com/careers",
+        },
+        {
+          id: "cs-2",
+          externalId: "ext-adz-1",
+          source: "ADZUNA_CA",
+          companyName: "Example Studio",
+          title: "Backend Engineer",
+          location: "Toronto, ON",
+          applyUrl: "https://example.com/careers",
+        },
+      ];
+      expect(collapseDuplicateIngestedJobs(crossSourceGenericRows)).toHaveLength(2);
+    });
+
+    it("collapses personal/pasted job and catalog copy sharing an exact requisition URL with personal job winning regardless of order", () => {
+      const personalJob = {
+        id: "job-personal",
+        userId: "user-1",
+        source: "pasted",
+        company: "Stripe",
+        roleTitle: "Staff Software Engineer",
+        notes: "Location: Remote | Apply Link: https://boards.greenhouse.io/stripe/jobs/900",
+        rawDescription: "[Pending Import]",
+        requirementsStatus: "pending",
+        status: "SAVED",
+        createdAt: "2026-11-16T00:00:00.000Z",
+      };
+      const catalogJob = {
+        id: "job-catalog",
+        userId: null,
+        source: "GREENHOUSE",
+        company: "Stripe",
+        roleTitle: "Staff Software Engineer",
+        notes: "Ingested from GREENHOUSE | Location: Remote | Apply Link: https://boards.greenhouse.io/stripe/jobs/900",
+        rawDescription: "Build distributed payment infrastructure at scale.",
+        requirementsStatus: "ready",
+        status: "SAVED",
+        createdAt: "2026-11-15T00:00:00.000Z",
+      };
+
+      const forward = collapseDuplicateTrackerJobs([personalJob, catalogJob]);
+      expect(forward).toHaveLength(1);
+      expect(forward[0]?.id).toBe("job-personal");
+
+      const reversed = collapseDuplicateTrackerJobs([catalogJob, personalJob]);
+      expect(reversed).toHaveLength(1);
+      expect(reversed[0]?.id).toBe("job-personal");
     });
   });
 

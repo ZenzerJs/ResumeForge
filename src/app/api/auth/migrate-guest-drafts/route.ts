@@ -6,28 +6,52 @@ import { requireUserId } from "@/lib/security/auth-request";
 import { extractResumeFacts } from "@/lib/facts/extract";
 import { sanitizeError } from "@/lib/ai/redact";
 
-const MigrateGuestDraftsSchema = z.object({
-  typstSource: z.string().min(1, "typstSource is required").max(500_000),
-  title: z.string().max(100).optional(),
-  conflictStrategy: z
-    .enum(["IMPORT_AS_DRAFT", "REPLACE_MASTER", "DISCARD"])
-    .default("IMPORT_AS_DRAFT"),
-  confirmReplaceMaster: z.boolean().optional(),
-  evidenceItems: z
-    .array(
-      z.object({
-        title: z.string().min(1),
-        organization: z.string().optional(),
-        category: z.string().default("PROJECT"),
-        tags: z.array(z.string()).optional(),
-        bullets: z.array(z.string()).optional(),
-      })
-    )
-    .max(50)
-    .optional(),
-  migrationId: z.string().uuid().optional(),
-  idempotencyKey: z.string().max(100).optional(),
-});
+const MigrateGuestDraftsSchema = z
+  .object({
+    typstSource: z.string().min(1, "typstSource is required").max(500_000).optional(),
+    evidenceOnly: z.boolean().optional(),
+    title: z.string().max(100).optional(),
+    conflictStrategy: z
+      .enum(["IMPORT_AS_DRAFT", "REPLACE_MASTER", "DISCARD"])
+      .default("IMPORT_AS_DRAFT"),
+    confirmReplaceMaster: z.boolean().optional(),
+    evidenceItems: z
+      .array(
+        z.object({
+          title: z.string().min(1),
+          organization: z.string().optional(),
+          category: z.string().default("PROJECT"),
+          tags: z.array(z.string()).optional(),
+          bullets: z.array(z.string()).optional(),
+        })
+      )
+      .max(50)
+      .optional(),
+    migrationId: z.string().uuid().optional(),
+    idempotencyKey: z.string().max(100).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.conflictStrategy === "DISCARD") return;
+    const hasTypstSource = Boolean(data.typstSource && data.typstSource.trim().length > 0);
+    const hasEvidenceItems = Boolean(data.evidenceItems && data.evidenceItems.length > 0);
+    if (data.evidenceOnly) {
+      if (!hasEvidenceItems) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["evidenceItems"],
+          message: "evidenceItems is required when evidenceOnly is true",
+        });
+      }
+      return;
+    }
+    if (!hasTypstSource && !hasEvidenceItems) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["typstSource"],
+        message: "typstSource or non-empty evidenceItems is required",
+      });
+    }
+  });
 
 export async function POST(request: Request) {
   try {
@@ -58,6 +82,7 @@ export async function POST(request: Request) {
 
     const {
       typstSource,
+      evidenceOnly,
       title,
       conflictStrategy,
       confirmReplaceMaster,
@@ -82,13 +107,18 @@ export async function POST(request: Request) {
       });
     }
 
-    // 1. Look up existing master for userId
-    const existingMaster = await prisma.resume.findFirst({
-      where: { userId, isMaster: true },
-    });
+    const trimmedTypstSource = typstSource?.trim() ?? "";
+    const shouldCreateResume = !evidenceOnly && trimmedTypstSource.length > 0;
+
+    // 1. Look up existing master for userId when creating a resume
+    const existingMaster = shouldCreateResume
+      ? await prisma.resume.findFirst({
+          where: { userId, isMaster: true },
+        })
+      : null;
 
     // 2. REPLACE_MASTER SAFETY GATE
-    if (conflictStrategy === "REPLACE_MASTER" && existingMaster && confirmReplaceMaster !== true) {
+    if (shouldCreateResume && conflictStrategy === "REPLACE_MASTER" && existingMaster && confirmReplaceMaster !== true) {
       return NextResponse.json(
         {
           success: false,
@@ -99,62 +129,68 @@ export async function POST(request: Request) {
       );
     }
 
-    const trimmedSource = typstSource.trim();
-
     // 3. IDEMPOTENCY / REPLAY SAFETY
-    if (migrationId) {
-      const existingMatch = await prisma.resume.findFirst({
-        where: { userId, typstSource: trimmedSource },
+    const existingMatch =
+      migrationId && shouldCreateResume
+        ? await prisma.resume.findFirst({
+            where: { userId, typstSource: trimmedTypstSource },
+          })
+        : null;
+
+    if (existingMatch && evidenceItems.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          resumeId: existingMatch.id,
+          isMaster: existingMatch.isMaster,
+          evidenceCount: 0,
+          skippedDuplicateCount: 0,
+          strategyApplied: conflictStrategy,
+          historySnapshotCreated: false,
+          migrationId,
+        },
       });
-      if (existingMatch) {
-        return NextResponse.json({
-          success: true,
-          data: {
-            resumeId: existingMatch.id,
-            isMaster: existingMatch.isMaster,
-            evidenceCount: 0,
-            skippedDuplicateCount: 0,
-            strategyApplied: conflictStrategy,
-            historySnapshotCreated: false,
-            migrationId,
-          },
-        });
-      }
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      let createdResumeId: string | null = null;
       let targetIsMaster = false;
       let resumeTitle = title || "Imported Guest Draft";
       let historySnapshotCreated = false;
 
-      if (!existingMaster) {
-        // No existing master -> new resume becomes master baseline
-        targetIsMaster = true;
-        resumeTitle = title || "Master Resume";
-      } else {
-        if (conflictStrategy === "REPLACE_MASTER") {
-          // Pre-write snapshot of previous master before un-mastering
-          await tx.masterHistory.create({
-            data: {
-              resumeId: existingMaster.id,
-              title: existingMaster.title,
-              typstSource: existingMaster.typstSource,
-              reason: "GUEST_MIGRATION_OVERWRITE",
-            },
-          });
-          historySnapshotCreated = true;
-
-          // Un-master existing master
-          await tx.resume.updateMany({
-            where: { userId, isMaster: true },
-            data: { isMaster: false },
-          });
+      if (existingMatch) {
+        createdResumeId = existingMatch.id;
+        targetIsMaster = existingMatch.isMaster;
+      } else if (shouldCreateResume && trimmedTypstSource) {
+        if (!existingMaster) {
+          // No existing master -> new resume becomes master baseline
           targetIsMaster = true;
           resumeTitle = title || "Master Resume";
         } else {
-          // Default: IMPORT_AS_DRAFT (keep master safe)
-          targetIsMaster = false;
-          resumeTitle = title || "Imported Guest Draft";
+          if (conflictStrategy === "REPLACE_MASTER") {
+            // Pre-write snapshot of previous master before un-mastering
+            await tx.masterHistory.create({
+              data: {
+                resumeId: existingMaster.id,
+                title: existingMaster.title,
+                typstSource: existingMaster.typstSource,
+                reason: "GUEST_MIGRATION_OVERWRITE",
+              },
+            });
+            historySnapshotCreated = true;
+
+            // Un-master existing master
+            await tx.resume.updateMany({
+              where: { userId, isMaster: true },
+              data: { isMaster: false },
+            });
+            targetIsMaster = true;
+            resumeTitle = title || "Master Resume";
+          } else {
+            // Default: IMPORT_AS_DRAFT (keep master safe)
+            targetIsMaster = false;
+            resumeTitle = title || "Imported Guest Draft";
+          }
         }
       }
 
@@ -206,35 +242,38 @@ export async function POST(request: Request) {
         }
       }
 
-      const allVerifiedEvidence = targetIsMaster
-        ? await tx.evidenceItem.findMany({
-            where: { userId, status: "verified" },
-            include: {
-              bullets: {
-                where: { verified: true },
-                orderBy: { orderIndex: "asc" },
+      if (!existingMatch && shouldCreateResume && trimmedTypstSource) {
+        const allVerifiedEvidence = targetIsMaster
+          ? await tx.evidenceItem.findMany({
+              where: { userId, status: "verified" },
+              include: {
+                bullets: {
+                  where: { verified: true },
+                  orderBy: { orderIndex: "asc" },
+                },
               },
-            },
-          })
-        : [];
+            })
+          : [];
 
-      const factSnapshot = targetIsMaster
-        ? (extractResumeFacts(trimmedSource, allVerifiedEvidence) as unknown as Prisma.InputJsonValue)
-        : undefined;
+        const factSnapshot = targetIsMaster
+          ? (extractResumeFacts(trimmedTypstSource, allVerifiedEvidence) as unknown as Prisma.InputJsonValue)
+          : undefined;
 
-      const createdResume = await tx.resume.create({
-        data: {
-          userId,
-          title: resumeTitle,
-          typstSource: trimmedSource,
-          isMaster: targetIsMaster,
-          isProtected: targetIsMaster,
-          factSnapshot,
-        },
-      });
+        const createdResume = await tx.resume.create({
+          data: {
+            userId,
+            title: resumeTitle,
+            typstSource: trimmedTypstSource,
+            isMaster: targetIsMaster,
+            isProtected: targetIsMaster,
+            factSnapshot,
+          },
+        });
+        createdResumeId = createdResume.id;
+      }
 
       return {
-        resumeId: createdResume.id,
+        resumeId: createdResumeId,
         isMaster: targetIsMaster,
         evidenceCount,
         skippedDuplicateCount,

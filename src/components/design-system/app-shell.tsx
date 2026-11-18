@@ -107,6 +107,7 @@ export function AppShell({
 
   const [showMigrationModal, setShowMigrationModal] = useState(false);
   const [guestDraft, setGuestDraft] = useState<string | null>(null);
+  const [hasCustomResumeDraft, setHasCustomResumeDraft] = useState<boolean>(false);
   const [hasExistingMaster, setHasExistingMaster] = useState<boolean>(false);
   const [isDesktopLg, setIsDesktopLg] = useState(true);
 
@@ -141,7 +142,7 @@ export function AppShell({
             isGuest,
             demoMode: Boolean(demoConfig.demoMode),
           });
-          if (!evaluation.shouldPrompt || !evaluation.draftSource) return;
+          if (!evaluation.shouldPrompt) return;
 
           let existingMaster = false;
           try {
@@ -169,6 +170,7 @@ export function AppShell({
 
           if (cancelled) return;
           setHasExistingMaster(existingMaster);
+          setHasCustomResumeDraft(evaluation.hasCustomResumeDraft);
           setGuestDraft(evaluation.draftSource);
           setShowMigrationModal(true);
         })
@@ -243,11 +245,12 @@ export function AppShell({
         {children}
       </main>
 
-      {showMigrationModal && guestDraft && (
+      {showMigrationModal && (
         <GuestMigrationModal
           isOpen={showMigrationModal}
           onClose={() => setShowMigrationModal(false)}
           draftSource={guestDraft}
+          hasCustomResumeDraft={hasCustomResumeDraft}
           hasExistingMaster={hasExistingMaster}
           onSuccess={() => setShowMigrationModal(false)}
         />

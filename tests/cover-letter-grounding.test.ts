@@ -7,8 +7,10 @@ import {
 } from "@/lib/ai/cover-letter-prompt";
 import {
   extractCandidateNameFromTypst,
+  managedResumeExport,
   replacePlaceholderSignature,
 } from "@/lib/export/resume-text";
+import { cleanTypstToText } from "@/lib/export/zip";
 import { buildResumeDocument, renderResumeDocument } from "@/lib/typst/resume-document";
 import { classifyPdfTextFallback } from "@/lib/pdf/parser";
 
@@ -130,5 +132,46 @@ describe("Cover Letter Evidence Grounding Verifier (Fail-First Protocol)", () =>
     );
     expect(signed).toContain("Sincerely,\nAlex Morgan");
     expect(signed).not.toContain("Sincerely,\nCandidate");
+
+    expect(
+      replacePlaceholderSignature("Kind regards,\n  [Your Name]", "Jane $1 Doe")
+    ).toBe("Kind regards,\n  Jane $1 Doe");
+    expect(
+      replacePlaceholderSignature("Best,\n[Candidate]", "Alex Morgan")
+    ).toBe("Best,\nAlex Morgan");
+    expect(
+      replacePlaceholderSignature("Warmly,\nYour Name", "Alex Morgan")
+    ).toBe("Warmly,\nAlex Morgan");
+    expect(
+      replacePlaceholderSignature("Sincerely,\nCandidate Name", "Alex Morgan")
+    ).toBe("Sincerely,\nAlex Morgan");
+    expect(
+      replacePlaceholderSignature("Sincerely,\nCandidate Smith", "Alex Morgan")
+    ).toBe("Sincerely,\nCandidate Smith");
+  });
+
+  it("6. deduplicates bare email/naked URLs and preserves descriptive link labels in plain-text resume exports", () => {
+    const unmanaged = `= Jordan Example\n#link("mailto:jordan@example.invalid")[jordan\\@example.invalid] | #link("https://github.com/jordan")[github.com/jordan] | #link("https://demo.example.invalid")[Live Demo]\n== Experience\n- Built API`;
+    const cleaned = cleanTypstToText(unmanaged);
+    expect(cleaned).toContain("jordan@example.invalid | https://github.com/jordan | Live Demo (https://demo.example.invalid)");
+    expect(cleaned).not.toContain("(mailto:");
+    expect(cleaned).not.toContain("github.com/jordan (https://");
+
+    const raw = "Morgan Sample\nmorgan@example.com | github.com/morgan\nProjects\nAtlas | GitHub | Live Demo\n- Built API";
+    const githubStart = raw.indexOf("GitHub");
+    const demoStart = raw.indexOf("Live Demo");
+    const managed = renderResumeDocument(
+      buildResumeDocument(raw, classifyPdfTextFallback(raw)),
+      "comfortable",
+      [
+        { url: "https://github.com/morgan/atlas", label: "GitHub", span: { start: githubStart, end: githubStart + "GitHub".length } },
+        { url: "https://atlas.example.invalid", label: "Live Demo", span: { start: demoStart, end: demoStart + "Live Demo".length } },
+      ]
+    ).replace("Built API", "Built edited API");
+    const exported = managedResumeExport(managed)?.text ?? "";
+    expect(exported).toContain("morgan@example.com");
+    expect(exported).not.toContain("(mailto:");
+    expect(exported).toContain("GitHub (https://github.com/morgan/atlas)");
+    expect(exported).toContain("Live Demo (https://atlas.example.invalid)");
   });
 });

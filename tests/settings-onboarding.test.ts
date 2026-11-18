@@ -47,10 +47,10 @@ describe("Settings provider onboarding helpers", () => {
     expect(hasNonDefaultAdvancedConfig("gemini", "", "")).toBe(false);
     expect(hasNonDefaultAdvancedConfig("gemini", "gemini-2.5-pro", "")).toBe(true);
 
-    expect(hasNonDefaultAdvancedConfig("openai", "gpt-4o", "")).toBe(false);
-    expect(hasNonDefaultAdvancedConfig("openai", "gpt-4o", "   ")).toBe(false);
-    expect(hasNonDefaultAdvancedConfig("openai", "gpt-4o", "https://proxy.example.com/v1")).toBe(true);
-    expect(hasNonDefaultAdvancedConfig("openai", "gpt-4o-mini", "")).toBe(true);
+    expect(hasNonDefaultAdvancedConfig("openai", "gpt-4.1", "")).toBe(false);
+    expect(hasNonDefaultAdvancedConfig("openai", "gpt-4.1", "   ")).toBe(false);
+    expect(hasNonDefaultAdvancedConfig("openai", "gpt-4.1", "https://proxy.example.com/v1")).toBe(true);
+    expect(hasNonDefaultAdvancedConfig("openai", "gpt-4.1-mini", "")).toBe(true);
 
     // Ollama and Custom keep their endpoints outside Advanced, so endpoint values do not auto-expand Advanced
     expect(hasNonDefaultAdvancedConfig("ollama", "llama3", "http://localhost:11434")).toBe(false);
@@ -141,6 +141,12 @@ describe("Settings provider onboarding helpers", () => {
     expect(src).toContain("parseTailorReturnContext");
     expect(src).toContain("clearActiveApplicationContext");
     expect(src).toContain("AIzaSy... or AQ....");
+    expect(src).toContain("DEFAULT_MODELS");
+    const modelChangeIdx = src.indexOf("const handleModelChange =");
+    const clearKeyIdx = src.indexOf("const handleClearKey =", modelChangeIdx);
+    const modelChangeBlock = src.slice(modelChangeIdx, clearKeyIdx);
+    expect(modelChangeBlock).toContain('setVerificationStatus("untested")');
+    expect(modelChangeBlock).toContain("clearVerification: true");
 
     const topNavSrc = fs.readFileSync(
       path.join(process.cwd(), "src/components/navigation/top-nav.tsx"),

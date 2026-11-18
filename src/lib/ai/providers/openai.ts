@@ -9,6 +9,7 @@ import { sanitizeError } from "../redact";
 import { completeOpenAICompatibleText, type ChatCompletionResult } from "./custom";
 import { safeFetch } from "@/lib/security/safe-fetch";
 import { resolveProviderCredentialsWithHostPolicy } from "./credentials";
+import { DEFAULT_MODELS } from "@/lib/byok-vault";
 
 function providerFetch(
   url: string,
@@ -103,7 +104,7 @@ export async function completeText(
     defaultBaseUrl: "https://api.openai.com",
     officialHosts: ["api.openai.com"],
   });
-  const model = config.model?.trim() || options?.defaultModel || "gpt-4o";
+  const model = config.model?.trim() || options?.defaultModel || DEFAULT_MODELS.openai;
 
   return completeOpenAICompatibleText({
     completionsUrl: `${baseUrl}/v1/chat/completions`,
@@ -137,7 +138,7 @@ export async function chatOpenAI(
     defaultBaseUrl: "https://api.openai.com",
     officialHosts: ["api.openai.com"],
   });
-  const model = config.model?.trim() || "gpt-4o-mini";
+  const model = config.model?.trim() || "gpt-4.1-mini";
 
   if (!apiKey) {
     throw new Error("OpenAI API key is missing.");
