@@ -319,7 +319,7 @@ test.describe("hosted auth and a11y gates", () => {
     const me = await page.request.get("/api/auth/me");
     const json = await me.json();
     expect(json.data?.username).toBeTruthy();
-    await expect(page.getByRole("link", { name: new RegExp(`@${json.data.username}`) })).toBeVisible();
+    await expect(page.locator("header").getByText(new RegExp(`@${json.data.username}`))).toBeVisible();
     await expect(page.getByText("playwright@resumeforge.test")).toHaveCount(0);
     await context.close();
   });

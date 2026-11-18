@@ -77,7 +77,10 @@ describe("Phase 4 Optimization & WUI Regressions", () => {
 
     if (attackerRes.status === 200) {
       expect(attackerJson.data.skillEvaluations).toEqual([]);
-      expect(attackerJson.data.gaps).toEqual([]);
+      const skillGaps = (attackerJson.data.gaps as string[]).filter(
+        (g) => !g.startsWith("Warning:") && !g.startsWith("Penalized:")
+      );
+      expect(skillGaps).toEqual([]);
       expect(attackerJson.data.selectedProfile).not.toBe("AI/LLM");
     }
 

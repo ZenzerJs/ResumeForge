@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useState, useRef, DragEvent, ChangeEvent } from "react";
+import React, { useState, useRef, useEffect, DragEvent, ChangeEvent } from "react";
 import { Upload, FileText, ChevronDown, ChevronRight, CheckCircle2 } from "lucide-react";
 import type { ExtractedPdfEvidence } from "../../lib/evidence/pdfExtractor";
 import { extractTechnologies } from "@/lib/evidence/tech-extractor";
 import { convertExtractedPdfToEvidenceItems, type CreateEvidencePayload } from "@/lib/evidence/evidence-transform";
+
+const loadPdfExtractor = () => import("@/lib/evidence/pdfExtractor");
 
 export function buildSelectedPdfEvidence(
   fileName: string,
@@ -57,6 +59,10 @@ export function BulkPdfDropzone({ onComplete }: Props) {
   const [isDragOver, setIsDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const savingFiles = useRef(new Set<string>());
+
+  useEffect(() => {
+    void loadPdfExtractor().catch(() => {});
+  }, []);
 
   const updateFile = (id: string, changes: Partial<FileState>) => {
     setFiles((current) => current.map((file) => file.id === id ? { ...file, ...changes } : file));
@@ -114,7 +120,7 @@ export function BulkPdfDropzone({ onComplete }: Props) {
 
     setFiles((prev) => [...prev, ...initialStates]);
 
-    const { extractPdfEvidence } = await import("@/lib/evidence/pdfExtractor");
+    const { extractPdfEvidence } = await loadPdfExtractor();
 
     for (let i = 0; i < currentFiles.length; i++) {
       const file = currentFiles[i];

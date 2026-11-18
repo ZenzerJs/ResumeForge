@@ -26,7 +26,7 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
     await expect(twitterCard).toHaveAttribute("content", "summary_large_image");
 
     const themeColor = page.locator('meta[name="theme-color"]');
-    await expect(themeColor).toHaveAttribute("content", "#f7bd3f");
+    await expect(themeColor).toHaveAttribute("content", "#121010");
   });
 
   test("3. Manifest and Icon routes serve valid 200 HTTP responses", async ({ request }) => {
