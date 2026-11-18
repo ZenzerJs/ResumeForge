@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { fetchDemoConfig } from "@/components/auth/session-user";
+import { fetchDemoConfig, fetchSessionUser } from "@/components/auth/session-user";
 import {
   Bot,
   Sparkles,
@@ -47,7 +47,7 @@ export function applyAcceptedSidebarPatches(
 }
 import { GuardrailFeedback } from "@/components/ui/guardrail-feedback";
 import { AiMarkdownRenderer } from "@/components/editor/ai-markdown-renderer";
-import { ChatPanel } from "@/components/editor/chat-panel";
+import { ChatPanel, resolveActiveTailorJobContext } from "@/components/editor/chat-panel";
 import { AiProgress, type AiJobStage } from "@/components/ui/ai-progress";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
 import { getDemoContextFromBrowser } from "@/lib/demo-client";
@@ -129,6 +129,7 @@ export function AiSidebar({
 }: AiSidebarProps) {
   const searchParams = useSearchParams();
   const urlJobId = searchParams ? searchParams.get("jobId") : null;
+  const [resolvedJobId, setResolvedJobId] = useState<string | null>(urlJobId);
   const [mode, setMode] = useState<"chat" | "tailor">("chat");
 
   const handleModeChange = (next: "chat" | "tailor") => {
@@ -206,27 +207,53 @@ export function AiSidebar({
     }
   };
 
-  // Preload JD if available from URL jobId
+  // Preload active Tailor / URL job context and JD
   useEffect(() => {
-    if (!urlJobId) return;
     let cancelled = false;
     (async () => {
-      const demoConfig = await fetchDemoConfig();
+      const [demoConfig, sessionUser] = await Promise.all([
+        fetchDemoConfig(),
+        fetchSessionUser(),
+      ]);
       if (cancelled) return;
-      if (demoConfig?.demoMode) {
+      const resolved = resolveActiveTailorJobContext({
+        propJobId: urlJobId,
+        scope: {
+          userId: sessionUser?.id ?? null,
+          demoMode: demoConfig?.demoMode === true,
+          scopeResolved: true,
+        },
+      });
+      const targetJobId = urlJobId ?? resolved.activeJobId ?? null;
+      setResolvedJobId(targetJobId);
+
+      if (resolved.jobSummary?.rawDescription) {
+        setJdText((prev) => prev || resolved.jobSummary!.rawDescription!);
+        return;
+      }
+
+      if (!targetJobId) return;
+      if (
+        demoConfig?.demoMode ||
+        targetJobId.startsWith("guest-job-") ||
+        targetJobId.startsWith("demo-sample-")
+      ) {
         try {
           const rawJobs = localStorage.getItem("resumeforge_guest_jobs");
           const jobs = rawJobs ? JSON.parse(rawJobs) : [];
-          const localJob = Array.isArray(jobs) ? jobs.find((item) => item?.id === urlJobId) : null;
-          if (localJob?.rawDescription) setJdText(localJob.rawDescription);
+          const localJob = Array.isArray(jobs) ? jobs.find((item) => item?.id === targetJobId) : null;
+          if (localJob?.rawDescription) {
+            setJdText((prev) => prev || localJob.rawDescription);
+          }
         } catch {}
         return;
       }
+
       try {
-        const res = await fetch(`/api/jobs/${urlJobId}`);
+        const res = await fetch(`/api/jobs/${targetJobId}`);
         const json = await readJsonSafe<{ success?: boolean; data?: { rawDescription?: string } }>(res);
         if (!cancelled && res.ok && json?.success && json.data?.rawDescription) {
-          setJdText(json.data.rawDescription);
+          setJdText((prev) => prev || json.data!.rawDescription!);
         }
       } catch {}
     })();
@@ -789,7 +816,7 @@ export function AiSidebar({
             </p>
           </div>
         ) : (
-          <ChatPanel typstSource={source} jobId={urlJobId} />
+          <ChatPanel typstSource={source} jobId={resolvedJobId ?? urlJobId} />
         )
       ) : (
       <div className="flex flex-1 min-h-0 flex-col overflow-y-auto p-4 gap-4">

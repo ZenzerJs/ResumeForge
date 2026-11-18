@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import {
   createSuggestionPreviewCaches,
+  formatExcludedSuggestionsMessage,
+  formatUnlocatedSuggestionsMessage,
   resolveSuggestionPreview,
   type SuggestionPreviewState,
 } from "@/components/tailor/suggestion-preview";
@@ -196,5 +200,34 @@ describe("PERF-02a SuggestionPreview cache & probe separation", () => {
       onUpdate: (state) => updates.push(state),
     });
     expect(calls).toHaveLength(4); // Recompiled in new batch
+  });
+
+  it("formats singular and plural preview status copy and excludes blocked patches from SuggestionPreview", () => {
+    expect(formatUnlocatedSuggestionsMessage(1)).toBe(
+      "1 suggestion has no verified location in this view; use the review list below."
+    );
+    expect(formatUnlocatedSuggestionsMessage(2)).toBe(
+      "2 suggestions have no verified location in this view; use the review list below."
+    );
+    expect(formatExcludedSuggestionsMessage(1)).toBe(
+      "1 conflicting or invalid suggestion is excluded from the candidate. Review the list below."
+    );
+    expect(formatExcludedSuggestionsMessage(3)).toBe(
+      "3 conflicting or invalid suggestions are excluded from the candidate. Review the list below."
+    );
+
+    const previewSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/tailor/suggestion-preview.tsx"),
+      "utf8"
+    );
+    expect(previewSrc).not.toContain("suggestion(s)");
+    expect(previewSrc).toContain("active.isProbing || unlocatedCount > 0");
+
+    const diffReviewSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/tailor/patch-diff-review.tsx"),
+      "utf8"
+    );
+    expect(diffReviewSrc).toContain("renderInlinePreview && actionablePatches.length > 0");
+    expect(diffReviewSrc).toContain("patches={actionablePatches}");
   });
 });

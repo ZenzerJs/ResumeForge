@@ -14,7 +14,10 @@ import {
   transitionTailorNavigation,
   formatRequirementSourceLabel,
   formatJobDiagnosticLabel,
+  computeVerifiedCoveredSkills,
+  isProviderFailureForStatus,
 } from "@/components/tailor/tailor-workspace";
+import { buildPatchSystemPrompt, buildPatchUserPrompt } from "@/lib/ai/prompt-template";
 
 describe("Tailor task-sequence navigation & state helpers", () => {
   it("exposes exactly two primary tabs ('Job' and 'Review edits') and three secondary tools", () => {
@@ -145,5 +148,129 @@ describe("Tailor task-sequence navigation & state helpers", () => {
     expect(formatJobDiagnosticLabel("VERIFIED_ATS")).toBe("Verified ATS source");
     expect(formatJobDiagnosticLabel("STRUCTURED_PAGE")).toBe("Structured posting page");
     expect(formatJobDiagnosticLabel("PARTIAL_EXTRACTION")).toBe("Partial posting extraction");
+  });
+
+  it("computeVerifiedCoveredSkills uses token boundaries and excludes draft/unverified matches", () => {
+    const requirements = {
+      requiredSkills: ["PostgreSQL", "TypeScript", "Go", "Docker"],
+      preferredSkills: ["SQL"],
+      domainTerms: [],
+    };
+
+    const matches = [
+      {
+        id: "ev-verified",
+        title: "Backend Services",
+        type: "work",
+        organization: "Acme",
+        dates: "2024",
+        status: "verified",
+        isDraft: false,
+        verifiedSummary: "Built TypeScript and SQLite data layers",
+        tags: ["TypeScript", "SQL"],
+        score: 5,
+        matchPercentage: 50,
+        matchedRequirements: ["TypeScript", "SQL"],
+        matchedBullets: [
+          {
+            id: "b-1",
+            text: "Optimized SQLite queries and TypeScript services",
+            technologies: ["TypeScript", "SQL", "SQLite"],
+            verified: true,
+            matchedRequirements: ["TypeScript", "SQL"],
+          },
+          {
+            id: "b-unverified",
+            text: "Deployed Go microservices",
+            technologies: ["Go"],
+            verified: false,
+            matchedRequirements: ["Go"],
+          },
+        ],
+      },
+      {
+        id: "ev-draft",
+        title: "Draft PostgreSQL Migration",
+        type: "project",
+        organization: null,
+        dates: null,
+        status: "draft",
+        isDraft: true,
+        verifiedSummary: "Migrated data to PostgreSQL and Docker",
+        tags: ["PostgreSQL", "Docker"],
+        score: 6,
+        matchPercentage: 60,
+        matchedRequirements: ["PostgreSQL", "Docker"],
+        matchedBullets: [
+          {
+            id: "b-draft",
+            text: "Configured PostgreSQL and Docker containers",
+            technologies: ["PostgreSQL", "Docker"],
+            verified: true,
+            matchedRequirements: ["PostgreSQL", "Docker"],
+          },
+        ],
+      },
+    ];
+
+    const covered = computeVerifiedCoveredSkills(requirements, matches);
+    expect(covered.has("TypeScript")).toBe(true);
+    expect(covered.has("SQL")).toBe(true);
+    // SQL/SQLite must NEVER falsely mark PostgreSQL as covered
+    expect(covered.has("PostgreSQL")).toBe(false);
+    // Unverified bullets and draft evidence items must NOT count as verified coverage
+    expect(covered.has("Go")).toBe(false);
+    expect(covered.has("Docker")).toBe(false);
+  });
+
+  it("handles silent pre-generation save, guest match fallback, provider failure status, and substantive patch prompts", () => {
+    const tailorSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/tailor/tailor-workspace.tsx"),
+      "utf8"
+    );
+
+    expect(tailorSrc).toContain("ensureJobSaved({ forceUpdate: false, silent: true })");
+    expect(tailorSrc).toContain("if (ok && json?.success && json.guest)");
+    expect(tailorSrc).toContain("markProviderConnectionStatus(aiSettings.provider, false)");
+    expect(tailorSrc).toContain("patches={actionablePreviewPatches}");
+
+    expect(isProviderFailureForStatus(502, "Gateway error")).toBe(true);
+    expect(isProviderFailureForStatus(401, "Invalid API key provided")).toBe(true);
+    expect(isProviderFailureForStatus(422, "Add evidence first")).toBe(false);
+
+    const sysPrompt = buildPatchSystemPrompt();
+    expect(sysPrompt).toContain("PRIORITIZE SUBSTANTIVE ACCOMPLISHMENT IMPROVEMENTS");
+    expect(sysPrompt).toContain("MODIFY_BULLET");
+
+    const userPrompt = buildPatchUserPrompt({
+      providerConfig: { provider: "gemini", apiKey: "test" },
+      masterTypst: "= Jane\n- Built APIs",
+      jobRequirements: {
+        requiredSkills: ["TypeScript"],
+        preferredSkills: [],
+        domainTerms: [],
+      },
+      evidenceItems: [
+        {
+          id: "ev-1",
+          type: "work",
+          title: "SWE",
+          organization: "Acme",
+          dates: "2024",
+          verifiedSummary: "Built APIs",
+          tags: ["TypeScript"],
+          status: "verified",
+          bullets: [
+            {
+              id: "b-1",
+              text: "Reduced p95 latency by 42% across TypeScript services",
+              technologies: ["TypeScript"],
+              verified: true,
+            },
+          ],
+        },
+      ],
+    });
+    expect(userPrompt).toContain("prioritize substantive accomplishment bullet improvements");
   });
 });

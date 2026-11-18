@@ -13,6 +13,16 @@ import { POST as chatPOST } from "@/app/api/ai/chat/route";
 import { sendChatCompletion } from "@/lib/ai/gateway";
 import { guestSaveResponse, requireUserId } from "@/lib/security/auth-request";
 import { prisma } from "@/lib/prisma";
+import {
+  ACTIVE_TAILOR_JOB_STORAGE_KEY,
+  buildChatMessagesWithJobContext,
+  resolveActiveTailorJobContext,
+} from "@/components/editor/chat-panel";
+import {
+  ACTIVE_APPLICATION_STORAGE_KEY,
+  writeActiveApplicationContext,
+  type StorageLike,
+} from "@/lib/tailor/application-context";
 
 vi.mock("@/lib/security/auth-request", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/security/auth-request")>();
@@ -235,5 +245,111 @@ describe("Career assistant chat", () => {
     expect(text).toContain("one page");
     expect(text).toContain('"type":"done"');
     expect(sendChatCompletion).toHaveBeenCalledTimes(2);
+  });
+
+  it("resolves active guest/unsaved Tailor job context and injects it into outbound chat messages", () => {
+    const createMemoryStorage = (): StorageLike => {
+      const map = new Map<string, string>();
+      return {
+        getItem: (k) => map.get(k) ?? null,
+        setItem: (k, v) => map.set(k, v),
+        removeItem: (k) => map.delete(k),
+      };
+    };
+
+    const sessionStore = createMemoryStorage();
+    const localStore = createMemoryStorage();
+    const guestScope = { userId: null, demoMode: false, scopeResolved: true };
+    const otherUserScope = { userId: "user-other", demoMode: false, scopeResolved: true };
+
+    writeActiveApplicationContext(
+      {
+        jobId: "guest-job-42",
+        roleTitle: "Senior Backend Engineer",
+        company: "Nova Labs",
+        tab: "job-info",
+      },
+      guestScope,
+      sessionStore
+    );
+
+    localStore.setItem(
+      "resumeforge_guest_jobs",
+      JSON.stringify([
+        {
+          id: "guest-job-42",
+          roleTitle: "Senior Backend Engineer",
+          company: "Nova Labs",
+          rawDescription: "Build distributed Go and PostgreSQL services.",
+          requirements: {
+            requiredSkills: ["Go", "PostgreSQL", "Docker"],
+            preferredSkills: ["GraphQL"],
+            domainTerms: ["distributed systems"],
+          },
+        },
+      ])
+    );
+
+    const resolved = resolveActiveTailorJobContext({
+      propJobId: null,
+      scope: guestScope,
+      sessionStorage: sessionStore,
+      localStorage: localStore,
+    });
+
+    expect(resolved.activeJobId).toBe("guest-job-42");
+    expect(resolved.jobSummary).toMatchObject({
+      jobId: "guest-job-42",
+      roleTitle: "Senior Backend Engineer",
+      company: "Nova Labs",
+      extractedRequirements: {
+        requiredSkills: ["Go", "PostgreSQL", "Docker"],
+        preferredSkills: ["GraphQL"],
+        domainTerms: ["distributed systems"],
+      },
+    });
+
+    const originalHistory = [{ role: "user" as const, content: "What skills am I missing for this role?" }];
+    const outbound = buildChatMessagesWithJobContext(originalHistory, resolved.jobSummary);
+    expect(originalHistory[0].content).toBe("What skills am I missing for this role?");
+    expect(outbound[0].content).toContain("[Active Tailor Job Context:");
+    expect(outbound[0].content).toContain("Senior Backend Engineer");
+    expect(outbound[0].content).toContain("Nova Labs");
+    expect(outbound[0].content).toContain("PostgreSQL");
+    expect(outbound[0].content).toContain("What skills am I missing for this role?");
+
+    // Unsaved snapshot with no jobId yet is also resolved within matching scope
+    const unsavedSession = createMemoryStorage();
+    unsavedSession.setItem(
+      ACTIVE_TAILOR_JOB_STORAGE_KEY,
+      JSON.stringify({
+        scopeKey: "guest:default",
+        job: {
+          roleTitle: "Frontend Engineer",
+          company: "WebCraft",
+          rawDescription: "TypeScript and Next.js required.",
+          extractedRequirements: {
+            requiredSkills: ["TypeScript", "Next.js"],
+          },
+        },
+      })
+    );
+    const unsavedResolved = resolveActiveTailorJobContext({
+      propJobId: null,
+      scope: guestScope,
+      sessionStorage: unsavedSession,
+      localStorage: createMemoryStorage(),
+    });
+    expect(unsavedResolved.jobSummary?.roleTitle).toBe("Frontend Engineer");
+
+    // Different user scope must NOT read guest snapshot or application context
+    expect(sessionStore.getItem(ACTIVE_APPLICATION_STORAGE_KEY)).toBeTruthy();
+    const crossAccount = resolveActiveTailorJobContext({
+      propJobId: null,
+      scope: otherUserScope,
+      sessionStorage: sessionStore,
+      localStorage: localStore,
+    });
+    expect(crossAccount.jobSummary).toBeNull();
   });
 });

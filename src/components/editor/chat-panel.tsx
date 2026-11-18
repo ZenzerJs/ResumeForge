@@ -14,8 +14,252 @@ import { AiMarkdownRenderer } from "@/components/editor/ai-markdown-renderer";
 import { ToolBadge } from "@/components/editor/tool-badge";
 import type { ChatMessage, ChatStreamChunk, ToolCallRecord } from "@/lib/ai/chat-types";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
+import { fetchDemoConfig, fetchSessionUser } from "@/components/auth/session-user";
+import { DEMO_JOB } from "@/lib/demo-samples";
+import {
+  LEGACY_ACTIVE_JOB_STORAGE_KEY,
+  readActiveApplicationContext,
+  resolveApplicationScopeKey,
+  type ApplicationAccountScope,
+  type StorageLike,
+} from "@/lib/tailor/application-context";
 
 const STORAGE_KEY = "resumeforge_chat_messages";
+export const ACTIVE_TAILOR_JOB_STORAGE_KEY = "resumeforge_active_tailor_job";
+
+export interface ActiveTailorJobRequirements {
+  requiredSkills?: string[];
+  preferredSkills?: string[];
+  domainTerms?: string[];
+}
+
+export interface ActiveTailorJobSummary {
+  jobId?: string;
+  roleTitle?: string;
+  company?: string;
+  rawDescription?: string;
+  extractedRequirements?: ActiveTailorJobRequirements;
+}
+
+function getSafeSessionStorage(): StorageLike | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+function getSafeLocalStorage(): StorageLike | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeJobRequirements(raw: unknown): ActiveTailorJobRequirements | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const obj = raw as Record<string, unknown>;
+  const toStringList = (val: unknown): string[] =>
+    Array.isArray(val) ? val.filter((v): v is string => typeof v === "string" && v.trim().length > 0) : [];
+  const requiredSkills = toStringList(obj.requiredSkills);
+  const preferredSkills = toStringList(obj.preferredSkills);
+  const domainTerms = toStringList(obj.domainTerms);
+  if (requiredSkills.length === 0 && preferredSkills.length === 0 && domainTerms.length === 0) {
+    return undefined;
+  }
+  return { requiredSkills, preferredSkills, domainTerms };
+}
+
+function hasAnyJobDetails(summary: ActiveTailorJobSummary | null | undefined): summary is ActiveTailorJobSummary {
+  if (!summary) return false;
+  return Boolean(
+    summary.jobId ||
+      summary.roleTitle ||
+      summary.company ||
+      summary.rawDescription?.trim() ||
+      summary.extractedRequirements
+  );
+}
+
+/**
+ * Reads the scoped active Tailor job snapshot from sessionStorage, clearing mismatched scopes.
+ */
+export function readActiveTailorJobSnapshot(
+  scope: ApplicationAccountScope,
+  storage: StorageLike | null = getSafeSessionStorage()
+): ActiveTailorJobSummary | null {
+  const scopeKey = resolveApplicationScopeKey(scope);
+  if (!scopeKey || !storage) return null;
+  try {
+    const raw = storage.getItem(ACTIVE_TAILOR_JOB_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { scopeKey?: unknown; job?: unknown } | null;
+    if (!parsed || typeof parsed !== "object" || parsed.scopeKey !== scopeKey) {
+      storage.removeItem(ACTIVE_TAILOR_JOB_STORAGE_KEY);
+      return null;
+    }
+    const job = parsed.job as Record<string, unknown> | undefined;
+    if (!job || typeof job !== "object") return null;
+    const summary: ActiveTailorJobSummary = {
+      jobId: typeof job.jobId === "string" && job.jobId.trim() ? job.jobId.trim() : undefined,
+      roleTitle: typeof job.roleTitle === "string" && job.roleTitle.trim() ? job.roleTitle.trim() : undefined,
+      company: typeof job.company === "string" && job.company.trim() ? job.company.trim() : undefined,
+      rawDescription:
+        typeof job.rawDescription === "string" && job.rawDescription.trim()
+          ? job.rawDescription.trim()
+          : undefined,
+      extractedRequirements: normalizeJobRequirements(job.extractedRequirements),
+    };
+    return hasAnyJobDetails(summary) ? summary : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolves the active Tailor job from explicit prop, scoped active application context,
+ * active Tailor snapshot, guest jobs in localStorage, and DEMO_JOB fallback.
+ */
+export function resolveActiveTailorJobContext(opts: {
+  propJobId?: string | null;
+  scope: ApplicationAccountScope;
+  sessionStorage?: StorageLike | null;
+  localStorage?: StorageLike | null;
+}): { activeJobId?: string; jobSummary: ActiveTailorJobSummary | null } {
+  const sessionStorageRef = opts.sessionStorage !== undefined ? opts.sessionStorage : getSafeSessionStorage();
+  const localStorageRef = opts.localStorage !== undefined ? opts.localStorage : getSafeLocalStorage();
+  const scopeKey = resolveApplicationScopeKey(opts.scope);
+
+  const appCtx = readActiveApplicationContext(opts.scope, sessionStorageRef);
+  const snapshot = readActiveTailorJobSnapshot(opts.scope, sessionStorageRef);
+  const legacyJobId =
+    scopeKey && sessionStorageRef
+      ? sessionStorageRef.getItem(LEGACY_ACTIVE_JOB_STORAGE_KEY) || undefined
+      : undefined;
+
+  const activeJobId =
+    (opts.propJobId && opts.propJobId.trim()) ||
+    appCtx?.jobId ||
+    snapshot?.jobId ||
+    legacyJobId ||
+    undefined;
+
+  const summary: ActiveTailorJobSummary = {};
+  if (activeJobId) summary.jobId = activeJobId;
+
+  if (snapshot && (!opts.propJobId || !snapshot.jobId || snapshot.jobId === activeJobId)) {
+    if (snapshot.roleTitle) summary.roleTitle = snapshot.roleTitle;
+    if (snapshot.company) summary.company = snapshot.company;
+    if (snapshot.rawDescription) summary.rawDescription = snapshot.rawDescription;
+    if (snapshot.extractedRequirements) summary.extractedRequirements = snapshot.extractedRequirements;
+  }
+
+  if (activeJobId && localStorageRef) {
+    try {
+      const rawJobs = localStorageRef.getItem("resumeforge_guest_jobs");
+      const parsed = rawJobs ? JSON.parse(rawJobs) : [];
+      if (Array.isArray(parsed)) {
+        const match = parsed.find((item) => item && typeof item === "object" && item.id === activeJobId) as
+          | Record<string, unknown>
+          | undefined;
+        if (match) {
+          if (!summary.roleTitle && typeof match.roleTitle === "string" && match.roleTitle.trim()) {
+            summary.roleTitle = match.roleTitle.trim();
+          }
+          if (!summary.company && typeof match.company === "string" && match.company.trim()) {
+            summary.company = match.company.trim();
+          }
+          if (!summary.rawDescription && typeof match.rawDescription === "string" && match.rawDescription.trim()) {
+            summary.rawDescription = match.rawDescription.trim();
+          }
+          if (!summary.extractedRequirements) {
+            summary.extractedRequirements = normalizeJobRequirements(
+              match.extractedRequirements ?? match.requirements
+            );
+          }
+        }
+      }
+    } catch {
+      // Ignore malformed guest jobs storage
+    }
+  }
+
+  if (opts.scope.demoMode && activeJobId === DEMO_JOB.id) {
+    if (!summary.roleTitle) summary.roleTitle = DEMO_JOB.roleTitle;
+    if (!summary.company) summary.company = DEMO_JOB.company;
+    if (!summary.rawDescription) summary.rawDescription = DEMO_JOB.rawDescription;
+    if (!summary.extractedRequirements) {
+      summary.extractedRequirements = normalizeJobRequirements(DEMO_JOB.requirements);
+    }
+  }
+
+  if (appCtx && (!activeJobId || appCtx.jobId === activeJobId)) {
+    if (!summary.roleTitle && appCtx.roleTitle) summary.roleTitle = appCtx.roleTitle;
+    if (!summary.company && appCtx.company) summary.company = appCtx.company;
+  }
+
+  return {
+    activeJobId,
+    jobSummary: hasAnyJobDetails(summary) ? summary : null,
+  };
+}
+
+export function formatActiveJobContextBlock(job: ActiveTailorJobSummary): string {
+  const lines: string[] = ["[Active Tailor Job Context:"];
+  if (job.roleTitle) lines.push(`Role: ${job.roleTitle}`);
+  if (job.company) lines.push(`Company: ${job.company}`);
+  if (job.jobId) lines.push(`Job ID: ${job.jobId}`);
+  const reqs = job.extractedRequirements;
+  if (reqs?.requiredSkills && reqs.requiredSkills.length > 0) {
+    lines.push(`Required Skills: ${reqs.requiredSkills.join(", ")}`);
+  }
+  if (reqs?.preferredSkills && reqs.preferredSkills.length > 0) {
+    lines.push(`Preferred Skills: ${reqs.preferredSkills.join(", ")}`);
+  }
+  if (reqs?.domainTerms && reqs.domainTerms.length > 0) {
+    lines.push(`Domain Terms: ${reqs.domainTerms.join(", ")}`);
+  }
+  if (job.rawDescription) {
+    const excerpt =
+      job.rawDescription.length > 1500
+        ? `${job.rawDescription.slice(0, 1500)}…`
+        : job.rawDescription;
+    lines.push(`Job Description:\n${excerpt}`);
+  }
+  lines.push("]");
+  return lines.join("\n");
+}
+
+export function buildChatMessagesWithJobContext(
+  history: Array<{ role: "user" | "assistant" | "tool"; content: string }>,
+  jobSummary: ActiveTailorJobSummary | null
+): Array<{ role: "user" | "assistant" | "tool"; content: string }> {
+  if (!jobSummary) return history;
+  const hasMeaningfulContext = Boolean(
+    jobSummary.roleTitle ||
+      jobSummary.company ||
+      jobSummary.rawDescription ||
+      jobSummary.extractedRequirements
+  );
+  if (!hasMeaningfulContext) return history;
+
+  let lastUserIdx = -1;
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].role === "user") {
+      lastUserIdx = i;
+      break;
+    }
+  }
+  if (lastUserIdx < 0) return history;
+
+  const block = formatActiveJobContextBlock(jobSummary);
+  return history.map((msg, idx) =>
+    idx === lastUserIdx ? { ...msg, content: `${block}\n\n${msg.content}` } : msg
+  );
+}
 
 function newId(): string {
   return crypto.randomUUID();
@@ -43,10 +287,41 @@ export function ChatPanel({ typstSource, resumeTitle, jobId }: ChatPanelProps) {
   const [streamingTools, setStreamingTools] = useState<ToolCallRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [noKeyError, setNoKeyError] = useState(false);
+  const [activeJobSummary, setActiveJobSummary] = useState<ActiveTailorJobSummary | null>(null);
+  const scopeRef = useRef<ApplicationAccountScope>({ scopeResolved: false });
 
   const listRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [demoConfig, sessionUser] = await Promise.all([
+          fetchDemoConfig(),
+          fetchSessionUser(),
+        ]);
+        if (cancelled) return;
+        const resolvedScope: ApplicationAccountScope = {
+          userId: sessionUser?.id ?? null,
+          demoMode: demoConfig?.demoMode === true,
+          scopeResolved: true,
+        };
+        scopeRef.current = resolvedScope;
+        const resolved = resolveActiveTailorJobContext({
+          propJobId: jobId,
+          scope: resolvedScope,
+        });
+        setActiveJobSummary(resolved.jobSummary);
+      } catch {
+        // Active job context is optional
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId]);
 
   useEffect(() => {
     try {
@@ -88,14 +363,69 @@ export function ChatPanel({ typstSource, resumeTitle, jobId }: ChatPanelProps) {
     async (rawText?: string) => {
       const text = (rawText ?? input).trim();
       if (!text || isStreaming) return;
-      let activeJobId = jobId || undefined;
-      if (!activeJobId) {
+
+      let scope = scopeRef.current;
+      if (scope.scopeResolved === false) {
         try {
-          activeJobId = sessionStorage.getItem("resumeforge_active_job_id") || undefined;
+          const [demoConfig, sessionUser] = await Promise.all([
+            fetchDemoConfig(),
+            fetchSessionUser(),
+          ]);
+          scope = {
+            userId: sessionUser?.id ?? null,
+            demoMode: demoConfig?.demoMode === true,
+            scopeResolved: true,
+          };
+          scopeRef.current = scope;
         } catch {
-          // Chat can run without saved job context.
+          scope = { userId: null, demoMode: false, scopeResolved: true };
         }
       }
+
+      const resolved = resolveActiveTailorJobContext({
+        propJobId: jobId,
+        scope,
+      });
+      const activeJobId = resolved.activeJobId;
+      let jobSummary = resolved.jobSummary;
+
+      if (
+        activeJobId &&
+        !activeJobId.startsWith("guest-job-") &&
+        !activeJobId.startsWith("demo-sample-") &&
+        activeJobId !== DEMO_JOB.id &&
+        (!jobSummary?.rawDescription || !jobSummary?.extractedRequirements)
+      ) {
+        try {
+          const jobRes = await fetch(`/api/jobs/${encodeURIComponent(activeJobId)}`);
+          if (jobRes.ok) {
+            const jobJson = (await jobRes.json()) as {
+              success?: boolean;
+              data?: {
+                roleTitle?: string | null;
+                company?: string | null;
+                rawDescription?: string | null;
+                extractedRequirements?: unknown;
+              };
+            };
+            if (jobJson?.success && jobJson.data) {
+              jobSummary = {
+                ...(jobSummary ?? {}),
+                jobId: activeJobId,
+                roleTitle: jobJson.data.roleTitle || jobSummary?.roleTitle,
+                company: jobJson.data.company || jobSummary?.company,
+                rawDescription: jobJson.data.rawDescription || jobSummary?.rawDescription,
+                extractedRequirements:
+                  normalizeJobRequirements(jobJson.data.extractedRequirements) ||
+                  jobSummary?.extractedRequirements,
+              };
+            }
+          }
+        } catch {
+          // Chat can proceed with locally known job summary
+        }
+      }
+      setActiveJobSummary(jobSummary);
 
       const aiSettings = await resolveClientProviderConfig();
       if (!aiSettings) {
@@ -131,7 +461,10 @@ export function ChatPanel({ typstSource, resumeTitle, jobId }: ChatPanelProps) {
           headers: { "Content-Type": "application/json" },
           signal: controller.signal,
           body: JSON.stringify({
-            messages: nextHistory.map((m) => ({ role: m.role, content: m.content })),
+            messages: buildChatMessagesWithJobContext(
+              nextHistory.map((m) => ({ role: m.role, content: m.content })),
+              jobSummary
+            ),
             providerConfig: {
               provider: aiSettings.provider,
               apiKey: aiSettings.apiKey,
@@ -260,6 +593,15 @@ export function ChatPanel({ typstSource, resumeTitle, jobId }: ChatPanelProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="chat-panel">
+      {(activeJobSummary?.roleTitle || activeJobSummary?.company) && (
+        <div
+          data-testid="chat-active-job-banner"
+          className="border-b border-hairline bg-inset px-3 py-1.5 text-xs font-mono text-muted-foreground truncate"
+          title={[activeJobSummary.roleTitle, activeJobSummary.company].filter(Boolean).join(" · ")}
+        >
+          Active role: {[activeJobSummary.roleTitle, activeJobSummary.company].filter(Boolean).join(" · ")}
+        </div>
+      )}
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-3">
         {messages.length === 0 && !isStreaming && (
           <div className="flex flex-col items-center text-center py-6 gap-3">

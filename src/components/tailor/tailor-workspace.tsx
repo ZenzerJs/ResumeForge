@@ -23,16 +23,25 @@ import {
 import { JobRequirementsSchema, type JobRequirements } from "@/lib/jd-parser/types";
 import { RoleProfile, ROLE_PROFILES, AtsEvaluationResult } from "@/lib/ats-evaluator/types";
 import { auditResume } from "@/lib/diagnostics/auditResume";
-import { resolveClientProviderConfig } from "@/lib/byok-vault";
+import {
+  BYOK_UPDATED_EVENT,
+  markProviderConnectionStatus,
+  resolveClientProviderConfig,
+} from "@/lib/byok-vault";
 import { ProviderConfigSchema } from "@/lib/ai/types";
 import { getDemoContextFromBrowser, initializeDemoSamples } from "@/lib/demo-client";
 import { fetchDemoConfig, fetchSessionUser } from "@/components/auth/session-user";
 import { DEMO_JOB, DEMO_RESUME_SOURCE } from "@/lib/demo-samples";
 import { readApiResponse } from "@/lib/api-error";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
-import { matchEvidenceToRequirements, type EvidenceItemWithBullets } from "@/lib/matching/matcher";
+import {
+  hasUnverifiedMarker,
+  matchEvidenceToRequirements,
+  matchSkillToken,
+  type EvidenceItemWithBullets,
+} from "@/lib/matching/matcher";
 import dynamic from "next/dynamic";
-import { PatchDiffReview } from "./patch-diff-review";
+import { PatchDiffReview, preflightPatchProposal } from "./patch-diff-review";
 import { AtsScorePanel } from "./ats-score-panel";
 
 const CoverLetterPanel = dynamic(
@@ -116,6 +125,7 @@ import {
   normalizeTailorTabParam,
   readActiveApplicationContext,
   readPendingReviewChoices,
+  resolveApplicationScopeKey,
   resolveTailorEntryContext,
   updateActiveApplicationContext,
   writeActiveApplicationContext,
@@ -237,6 +247,70 @@ export function matchGuestEvidenceItems(
         : [],
     }));
   return matchEvidenceToRequirements(evidenceItems, reqs);
+}
+
+/**
+ * Computes which required and preferred skills are covered by verified Evidence Bank matches.
+ * Uses boundary-aware token matching so e.g. "SQL"/"SQLite" never falsely covers "PostgreSQL",
+ * and excludes draft items or unverified bullets.
+ */
+export function computeVerifiedCoveredSkills(
+  requirements: JobRequirements | null,
+  matches: RankedMatch[]
+): Set<string> {
+  const skills = [
+    ...(requirements?.requiredSkills ?? []),
+    ...(requirements?.preferredSkills ?? []),
+  ];
+  const covered = new Set<string>();
+  if (skills.length === 0 || matches.length === 0) return covered;
+
+  const verifiedMatches = matches.filter(
+    (m) =>
+      !m.isDraft &&
+      m.status === "verified" &&
+      !hasUnverifiedMarker(m.title) &&
+      !hasUnverifiedMarker(m.verifiedSummary)
+  );
+  if (verifiedMatches.length === 0) return covered;
+
+  for (const skill of skills) {
+    const needle = skill.trim().toLowerCase();
+    if (!needle) continue;
+    const isMatch = verifiedMatches.some(
+      (m) =>
+        (m.matchedRequirements ?? []).some(
+          (r) => r.trim().toLowerCase() === needle || matchSkillToken(r, skill)
+        ) ||
+        (m.tags ?? []).some(
+          (t) => t.trim().toLowerCase() === needle || matchSkillToken(t, skill)
+        ) ||
+        matchSkillToken(m.title, skill) ||
+        matchSkillToken(m.verifiedSummary, skill) ||
+        (m.matchedBullets ?? []).some(
+          (b) =>
+            b.verified &&
+            !hasUnverifiedMarker(b.text) &&
+            ((b.technologies ?? []).some(
+              (t) => t.trim().toLowerCase() === needle || matchSkillToken(t, skill)
+            ) ||
+              matchSkillToken(b.text, skill))
+        )
+    );
+    if (isMatch) covered.add(skill);
+  }
+  return covered;
+}
+
+/**
+ * Identifies AI generation errors caused by invalid provider credentials or connection failures
+ * so header/settings status can stop reporting the provider as connected.
+ */
+export function isProviderFailureForStatus(status: number, message: string): boolean {
+  if (status === 502 || status === 503 || status === 504) return true;
+  return /api key|unauthorized|invalid.*key|invalid.*credentials|forbidden|\b401\b|\b403\b|econnrefused|enotfound|etimedout|network error|failed to fetch|unsafe url|only https urls|ollama|connection (?:failed|refused|error)/i.test(
+    message
+  );
 }
 
 export { normalizeTailorTabParam, type TailorWorkspaceTab };
@@ -592,9 +666,11 @@ export function TailorWorkspace() {
     };
     window.addEventListener("focus", handleRefresh);
     window.addEventListener("storage", handleRefresh);
+    window.addEventListener(BYOK_UPDATED_EVENT, handleRefresh);
     return () => {
       window.removeEventListener("focus", handleRefresh);
       window.removeEventListener("storage", handleRefresh);
+      window.removeEventListener(BYOK_UPDATED_EVENT, handleRefresh);
     };
   }, [refreshProviderStatus]);
 
@@ -842,6 +918,7 @@ export function TailorWorkspace() {
     forceUpdate?: boolean;
     requirements?: JobRequirements | null;
     requireSuccess?: boolean;
+    silent?: boolean;
   }): Promise<string | null> => {
     if (!rawDescription.trim()) return null;
 
@@ -914,7 +991,9 @@ export function TailorWorkspace() {
         },
         currentScope
       );
-      setSaveStatus("Job saved to local workspace.");
+      if (!opts?.silent) {
+        setSaveStatus("Job saved to local workspace.");
+      }
       return localId;
     };
 
@@ -949,7 +1028,9 @@ export function TailorWorkspace() {
               },
               accountScopeRef.current
             );
-            setSaveStatus("Job posting saved to database.");
+            if (!opts?.silent) {
+              setSaveStatus("Job posting saved to database.");
+            }
             return existingId;
           }
           if (updateStatus === 404) {
@@ -1001,7 +1082,9 @@ export function TailorWorkspace() {
           },
           { userId: sessionUser.id, demoMode: demoConfig?.demoMode === true, scopeResolved: true }
         );
-        setSaveStatus("Job posting saved to database.");
+        if (!opts?.silent) {
+          setSaveStatus("Job posting saved to database.");
+        }
         return saveJson.data.id;
       }
       if (saveStatusCode === 401 || saveJson?.code === "GUEST_READ_ONLY") {
@@ -1018,6 +1101,7 @@ export function TailorWorkspace() {
     forceUpdate?: boolean;
     requirements?: JobRequirements | null;
     requireSuccess?: boolean;
+    silent?: boolean;
   }): Promise<string | null> => {
     const run = saveQueueRef.current.then(() => saveJobNow(opts));
     saveQueueRef.current = run.then(
@@ -1076,7 +1160,7 @@ export function TailorWorkspace() {
         }
         setDemoPatchBaseSource(currentSource);
       } else {
-        jobId = await ensureJobSaved();
+        jobId = await ensureJobSaved({ forceUpdate: false, silent: true });
         if (!jobId) throw new Error("Failed to save job posting before patch generation.");
       }
 
@@ -1135,6 +1219,9 @@ export function TailorWorkspace() {
             recoveryAction: json?.recoveryAction || getPatchRecoveryAction(parsedCategory.data),
             details: json?.details,
           });
+        } else if (isProviderFailureForStatus(res.status, message)) {
+          markProviderConnectionStatus(aiSettings.provider, false);
+          void refreshProviderStatus();
         }
         setPatchError(message);
         setPatchStage("error");
@@ -1169,7 +1256,12 @@ export function TailorWorkspace() {
       void loadEvidenceMetadata(isDemo);
       setPatchStage("done");
     } catch (err) {
-      setPatchError(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      const errMessage = err instanceof Error ? err.message : String(err);
+      if (isProviderFailureForStatus(0, errMessage)) {
+        markProviderConnectionStatus(aiSettings.provider, false);
+        void refreshProviderStatus();
+      }
+      setPatchError(`Error: ${errMessage}`);
       setPatchStage("error");
     } finally {
       setIsGeneratingPatches(false);
@@ -1293,9 +1385,12 @@ export function TailorWorkspace() {
 
       const { ok, status, data: json } = await readApiResponse<{
         success?: boolean;
+        guest?: boolean;
         data?: RankedMatch[];
       }>(res);
-      if (ok && json?.success && Array.isArray(json.data)) {
+      if (ok && json?.success && json.guest) {
+        setMatches(matchGuestEvidenceLocally(reqs));
+      } else if (ok && json?.success && Array.isArray(json.data)) {
         setMatches(json.data);
       } else if (status === 401) {
         setMatches(matchGuestEvidenceLocally(reqs));
@@ -1465,27 +1560,10 @@ export function TailorWorkspace() {
     fetchMatches(updated);
   };
 
-  const coveredSkills = useMemo(() => {
-    const skills = [
-      ...(extractedRequirements?.requiredSkills ?? []),
-      ...(extractedRequirements?.preferredSkills ?? []),
-    ];
-    const covered = new Set<string>();
-    if (skills.length === 0 || matches.length === 0) return covered;
-    for (const skill of skills) {
-      const needle = skill.toLowerCase();
-      const isMatch = matches.some(
-        (m) =>
-          m.matchedRequirements.some(
-            (r) => r.toLowerCase().includes(needle) || needle.includes(r.toLowerCase())
-          ) ||
-          m.verifiedSummary.toLowerCase().includes(needle) ||
-          m.matchedBullets.some((b) => b.text.toLowerCase().includes(needle))
-      );
-      if (isMatch) covered.add(skill);
-    }
-    return covered;
-  }, [extractedRequirements, matches]);
+  const coveredSkills = useMemo(
+    () => computeVerifiedCoveredSkills(extractedRequirements, matches),
+    [extractedRequirements, matches]
+  );
 
   const { verifiedRequiredSkills, missingRequiredSkills } = useMemo(() => {
     const required = extractedRequirements?.requiredSkills ?? [];
@@ -1494,6 +1572,35 @@ export function TailorWorkspace() {
       missingRequiredSkills: required.filter((s) => !coveredSkills.has(s)),
     };
   }, [extractedRequirements, coveredSkills]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (accountScope.scopeResolved === false || isBootstrapping || isLoadingJob) return;
+    const scopeKey = resolveApplicationScopeKey(accountScope);
+    if (!scopeKey) return;
+    try {
+      if (!rawDescription.trim() && !roleTitle.trim() && !company.trim() && !savedJobId) {
+        sessionStorage.removeItem("resumeforge_active_tailor_job");
+        return;
+      }
+      sessionStorage.setItem(
+        "resumeforge_active_tailor_job",
+        JSON.stringify({
+          scopeKey,
+          job: {
+            jobId: savedJobId || undefined,
+            roleTitle: roleTitle.trim() || undefined,
+            company: company.trim() || undefined,
+            rawDescription: rawDescription.trim() ? rawDescription.slice(0, 4000) : undefined,
+            extractedRequirements: extractedRequirements ?? undefined,
+            updatedAt: Date.now(),
+          },
+        })
+      );
+    } catch {
+      // Ignore storage write errors
+    }
+  }, [accountScope, company, extractedRequirements, isBootstrapping, isLoadingJob, rawDescription, roleTitle, savedJobId]);
 
   const highlightedJdView = useMemo(
     () => renderHighlightedJd(rawDescription, extractedRequirements?.requiredSkills ?? []),
@@ -1666,8 +1773,33 @@ export function TailorWorkspace() {
     return map;
   }, [evidenceMetadata]);
 
+  const actionablePreviewPatches = useMemo(() => {
+    const baseTypstSource =
+      masterResumeId === "demo-local" ? demoPatchBaseSource : patchBatch?.baseTypstSource;
+    const currentMaster = masterTypstSource || activeVariantContent;
+    const ackArray = Array.from(acknowledgedSkills);
+    return patchVerified.filter(
+      (patch) =>
+        !preflightPatchProposal(patch, {
+          validationContext,
+          baseTypstSource,
+          masterTypstSource: currentMaster,
+          acknowledgedSkills: ackArray,
+        }).blocked
+    );
+  }, [
+    patchVerified,
+    masterResumeId,
+    demoPatchBaseSource,
+    patchBatch?.baseTypstSource,
+    masterTypstSource,
+    activeVariantContent,
+    validationContext,
+    acknowledgedSkills,
+  ]);
+
   const effectiveSecondaryTab: "preview" | "ats" | "job" =
-    patchVerified.length === 0 && secondaryDeskTab === "preview" ? "ats" : secondaryDeskTab;
+    actionablePreviewPatches.length === 0 && secondaryDeskTab === "preview" ? "ats" : secondaryDeskTab;
 
   const isSampleJob = !savedJobId && company === "Nova Labs" && rawDescription === SAMPLE_BACKEND_JD;
   const hasJobRequirements = extractedRequirements !== null;
@@ -1837,6 +1969,11 @@ export function TailorWorkspace() {
     updateJobDescription("");
     setCustomUserReqs([]);
     setRestoredJobId(null);
+    try {
+      sessionStorage.removeItem("resumeforge_active_tailor_job");
+    } catch {
+      // ignore
+    }
     window.history.replaceState(null, "", buildTailorNewJobHref({ tab: "job-info" }));
     selectTab("job-info");
     setJobInfoSubTab("original");
@@ -2506,7 +2643,7 @@ export function TailorWorkspace() {
                       type="button"
                       role="tab"
                       aria-selected={effectiveSecondaryTab === "preview"}
-                      disabled={patchVerified.length === 0}
+                      disabled={actionablePreviewPatches.length === 0}
                       onClick={() => setSecondaryDeskTab("preview")}
                       data-testid="workspace-secondary-preview-tab"
                       className={`min-h-9 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 disabled:opacity-45 ${
@@ -2516,7 +2653,7 @@ export function TailorWorkspace() {
                       }`}
                     >
                       <Eye className="h-3.5 w-3.5" aria-hidden />
-                      Preview {patchVerified.length > 0 ? `(${patchVerified.length})` : ""}
+                      Preview {actionablePreviewPatches.length > 0 ? `(${actionablePreviewPatches.length})` : ""}
                     </button>
                     <button
                       type="button"
@@ -2551,7 +2688,7 @@ export function TailorWorkspace() {
                   </div>
                 </div>
 
-                {effectiveSecondaryTab === "preview" && patchVerified.length > 0 && (
+                {effectiveSecondaryTab === "preview" && actionablePreviewPatches.length > 0 && (
                   <div className="transition-opacity duration-150 motion-reduce:transition-none">
                     <SuggestionPreview
                       base={masterResumeId === "demo-local" ? demoPatchBaseSource : patchBatch?.baseTypstSource}
@@ -2562,7 +2699,7 @@ export function TailorWorkspace() {
                           : Boolean(patchBatch && patchBatch.baseTypstSource && patchBatch.jobId === (savedJobId || "demo-local-job"))
                       }
                       localStorageSourceKey={masterResumeId === "demo-local" ? "resumeforge_typst_source" : undefined}
-                      patches={patchVerified}
+                      patches={actionablePreviewPatches}
                       decisions={patchDecisions}
                       selected={selectedPatchId}
                       onSelect={setSelectedPatchId}

@@ -269,6 +269,18 @@ export async function resolveSuggestionPreview(params: {
   }
 }
 
+export function formatExcludedSuggestionsMessage(count: number): string {
+  return count === 1
+    ? "1 conflicting or invalid suggestion is excluded from the candidate. Review the list below."
+    : `${count} conflicting or invalid suggestions are excluded from the candidate. Review the list below.`;
+}
+
+export function formatUnlocatedSuggestionsMessage(count: number): string {
+  return count === 1
+    ? "1 suggestion has no verified location in this view; use the review list below."
+    : `${count} suggestions have no verified location in this view; use the review list below.`;
+}
+
 interface Props {
   base: string | null | undefined;
   current: string;
@@ -419,6 +431,12 @@ export function SuggestionPreview({
     );
   const active = key && result?.key === key ? result : null;
   const selectedPatch = patches.find((patch) => patch.id === selected);
+  const excludedIds = new Set(candidate.excluded);
+  const unlocatedCount = active
+    ? patches.filter(
+        (patch) => !excludedIds.has(patch.id) && !active.locations[patch.id]?.length
+      ).length
+    : 0;
   return (
     <section
       className="space-y-3 rounded-xl border border-hairline bg-panel p-3"
@@ -447,8 +465,7 @@ export function SuggestionPreview({
       </div>
       {candidate.excluded.length ? (
         <p role="status" className="text-sm text-status-warning">
-          {candidate.excluded.length} conflicting or invalid suggestion(s) are
-          excluded from the candidate. Review the list below.
+          {formatExcludedSuggestionsMessage(candidate.excluded.length)}
         </p>
       ) : null}
       {!active || active.pages === null ? (
@@ -505,11 +522,11 @@ export function SuggestionPreview({
           ))}
         </div>
       )}
-      {active && active.pages !== null && !active.error && (
+      {active && active.pages !== null && !active.error && (active.isProbing || unlocatedCount > 0) && (
         <p className="text-sm text-muted-foreground">
           {active.isProbing
             ? "Locating suggestions on preview…"
-            : `${patches.filter((patch) => !active.locations[patch.id]).length} suggestion(s) have no verified location in this view; use the review list below.`}
+            : formatUnlocatedSuggestionsMessage(unlocatedCount)}
         </p>
       )}
       {selectedPatch && (

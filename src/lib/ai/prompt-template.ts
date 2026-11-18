@@ -30,6 +30,7 @@ You MUST address the specific points raised in this qualitative feedback while g
 4. **CHARACTER BUDGET (1-PAGE PROTECTION)**: For \`MODIFY_BULLET\` and \`TWEAK_SUMMARY\`, the character length of \`after\` MUST NOT exceed the character length of \`before\` by more than +15% (and ideally stay within ±10 chars) so line wraps do not push the resume onto a second page.
 5. **TYPST SYNTAX IN \`after\`**: Preserve Typst inline emphasis (\`*bold*\`, \`_italic_\`) and escape special characters (\`\\@\`, \`\\$\`, \`\\#\`). Never output Markdown \`**bold**\` (double asterisks) inside Typst fields.
 6. **NO DUPLICATE KEYWORDS**: Before proposing an \`ADD_SKILL\` patch, verify the skill (or its direct alias, e.g., \`Postgres\` vs \`PostgreSQL\`) is not already present in the Master Resume Skills section.
+7. **PRIORITIZE SUBSTANTIVE ACCOMPLISHMENT IMPROVEMENTS**: When verified Evidence Bank items or bullets exist for the role's requirements, prioritize substantive \`MODIFY_BULLET\` (or \`TWEAK_SUMMARY\`) patches that strengthen Experience or Project bullets with concrete, role-relevant metrics, outcomes, and technologies from cited Evidence Bank bullets. Do NOT return only a single skills-line reorder (\`REORDER_BULLETS\` or \`ADD_SKILL\`) when verified Evidence Bank bullets can substantively improve resume impact. Every added or refined claim MUST strictly cite its verified Evidence Bank item/bullet IDs in \`evidenceIds\`.
 
 ## OUTPUT FORMAT — STRICT JSON SCHEMA
 
@@ -103,10 +104,11 @@ ${evidenceSection || "No evidence items available."}
 
 ## INSTRUCTIONS
 
-1. Compare the master resume against the job requirements.
-2. For each requirement that CAN be better addressed using evidence from the bank, propose a specific patch.
-3. For each requirement that CANNOT be addressed by any evidence in the bank, add a gap entry.
-4. Return the JSON response matching the schema specified in your system instructions.`;
+1. Compare the master resume against the job requirements and the Evidence Bank.
+2. When verified Evidence Bank items and bullets exist, prioritize substantive accomplishment bullet improvements (\`MODIFY_BULLET\` — surfacing grounded metrics, outcomes, and role-relevant technologies from cited Evidence Bank bullets) and \`TWEAK_SUMMARY\` / \`ADD_SKILL\` edits where appropriate, rather than returning only a single skills-line reorder.
+3. For each requirement that CAN be better addressed using verified evidence from the bank, propose a specific patch citing the exact item and bullet IDs in \`evidenceIds\`.
+4. For each requirement that CANNOT be addressed by any verified evidence in the bank, add a gap entry.
+5. Return the JSON response matching the schema specified in your system instructions.`;
 }
 
 function formatEvidenceItem(item: EvidenceItemForPrompt): string {
