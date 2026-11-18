@@ -43,8 +43,11 @@ import {
 } from "@/lib/jobs/posting-identity";
 import { fetchDemoConfig, fetchSessionUser } from "@/components/auth/session-user";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
+import { DEMO_JOB } from "@/lib/demo-samples";
+import { buildTailorNewJobHref } from "@/lib/tailor/application-context";
 import {
   HydratedJobDetailSchema,
+  JobRequirementsSchema,
   type HydratedJobDetail,
 } from "@/lib/jd-parser/types";
 
@@ -60,6 +63,7 @@ export {
 };
 
 const PAGE_SIZE = 40;
+const NEW_JOB_HREF = buildTailorNewJobHref({ tab: "job-info" });
 
 const STATUS_LABELS: Record<JobStatus, string> = {
   SAVED: "Saved",
@@ -315,7 +319,8 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           if (Array.isArray(parsed)) {
             localJobs = parsed.map((job) => {
               const isPlaceholder = isPlaceholderDescription(job.rawDescription);
-              const existingReqs = job.extractedRequirements || {
+              const storedReqs = JobRequirementsSchema.safeParse(job.requirements);
+              const existingReqs = storedReqs.data ?? job.extractedRequirements ?? {
                 requiredSkills: [],
                 preferredSkills: [],
                 domainTerms: [],
@@ -330,9 +335,10 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                 !hasAnyReq &&
                 job.requirementsSource !== "manual" &&
                 (!job.requirementsStatus || job.requirementsStatus === "unparsed");
-              const extractedRequirements = shouldParse
-                ? parseJobDescription(job.rawDescription || "")
-                : existingReqs;
+              const extractedRequirements =
+                job.id === DEMO_JOB.id && job.rawDescription === DEMO_JOB.rawDescription && job.requirementsSource !== "manual"
+                  ? DEMO_JOB.requirements
+                  : shouldParse ? parseJobDescription(job.rawDescription || "") : existingReqs;
               return {
                 ...job,
                 source: job.source || "pasted",
@@ -974,6 +980,27 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const disambiguatorById = useMemo(() => buildTrackerDisambiguators(pageJobs), [pageJobs]);
   const selectedJob = activeJobId ? jobs.find((j) => j.id === activeJobId) ?? null : null;
 
+  const hasActiveFilters = Boolean(
+    searchQuery.trim() ||
+      locationQuery.trim() ||
+      workplace !== "all" ||
+      statusFilter !== "ALL" ||
+      postedWithin !== "all" ||
+      minSalary !== "0"
+  );
+
+  const clearAllFilters = () => {
+    setSearchQuery("");
+    setDebouncedSearch("");
+    setLocationQuery("");
+    setDebouncedLocation("");
+    setWorkplace("all");
+    setStatusFilter("ALL");
+    setPostedWithin("all");
+    setMinSalary("0");
+    setPage(1);
+  };
+
   const pipelineApplied = pipelineCounts.applied;
   const pipelineInterviewing = pipelineCounts.interviewing;
 
@@ -1286,7 +1313,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             Interviewing <span className="text-status-success">{pipelineInterviewing}</span>
           </span>
           <Link
-            href="/tailor"
+            href={NEW_JOB_HREF}
             className="inline-flex min-h-11 items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary/90"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -1452,20 +1479,70 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             {!isLoading && pageJobs.length === 0 && (
               <div className="flex flex-col items-center justify-center gap-4 px-4 py-20 text-center">
                 <Briefcase className="h-12 w-12 text-muted-foreground/50" />
-                <div>
-                  <p className="font-medium text-rf-meta">No jobs found</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {searchQuery || locationQuery
-                      ? "Try adjusting search or location filters."
-                      : "Go to the Tailor workspace to paste a job posting."}
-                  </p>
-                </div>
-                <Link
-                  href="/tailor"
-                  className="mt-2 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary/90"
-                >
-                  Add Your First Job
-                </Link>
+                {hasActiveFilters ? (
+                  <>
+                    <div>
+                      <p className="font-medium text-rf-meta">No matching jobs</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        No tracked jobs match your current filters. Clear filters to view all saved jobs, or add a new posting in Tailor.
+                      </p>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        data-testid="tracker-clear-filters-btn"
+                        onClick={clearAllFilters}
+                        className="min-h-11 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        Clear filters
+                      </button>
+                      <Link
+                        href={NEW_JOB_HREF}
+                        className="inline-flex min-h-11 items-center rounded-lg border border-hairline bg-inset px-4 py-2 text-xs font-semibold text-foreground transition-colors duration-150 hover:bg-elevated"
+                      >
+                        Add Job in Tailor
+                      </Link>
+                    </div>
+                  </>
+                ) : filterStatuses?.length ? (
+                  <>
+                    <div>
+                      <p className="font-medium text-rf-meta">No jobs in this stage yet.</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Update a tracked posting’s stage or add a new job in Tailor.
+                      </p>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                      <Link
+                        href="/tracker"
+                        className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary/90"
+                      >
+                        View All Jobs
+                      </Link>
+                      <Link
+                        href={NEW_JOB_HREF}
+                        className="inline-flex min-h-11 items-center rounded-lg border border-hairline bg-inset px-4 py-2 text-xs font-semibold text-foreground transition-colors duration-150 hover:bg-elevated"
+                      >
+                        Add Job in Tailor
+                      </Link>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <p className="font-medium text-rf-meta">No jobs found</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Go to the Tailor workspace to paste a job posting.
+                      </p>
+                    </div>
+                    <Link
+                      href={NEW_JOB_HREF}
+                      className="mt-2 inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary/90"
+                    >
+                      Add Your First Job
+                    </Link>
+                  </>
+                )}
               </div>
             )}
 

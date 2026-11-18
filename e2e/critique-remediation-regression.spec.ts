@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { test, expect, type Browser, type Locator, type Page } from "@playwright/test";
@@ -78,6 +78,81 @@ function buildManagedResumeSource(options?: { twoPages?: boolean }): string {
   });
   const doc = buildResumeDocument(raw, assignments);
   return renderResumeDocument(doc, "balanced");
+}
+
+function buildFittableTwoPageManagedSource(): string {
+  const rows: Array<[ResumeAssignment["kind"], string]> = [
+    ["name", "Morgan Example"],
+    ["contact", "Boston, MA"],
+    ["contact", "morgan@example.test"],
+    ["contact", "(555) 010-2000"],
+    ["section", "Experience"],
+    ["entry-title", "Northwind Labs"],
+    ["entry-role", "Senior Platform Engineer"],
+    ["entry-location", "Boston, MA"],
+    ["entry-date", "2023 - Present"],
+    ["bullet", "- Built distributed TypeScript services backed by PostgreSQL across regional clusters."],
+    ["bullet", "- Reduced tail p99 query latency by 42% through batched connection pooling."],
+    ["bullet", "- Standardized observability tracing across worker pools with deterministic schemas."],
+    ["bullet", "- Hardened automated rollout checks across multi-region deployment pipelines."],
+  ];
+
+  for (let entry = 1; entry <= 4; entry++) {
+    rows.push(["entry-title", `Synthetic Org ${entry}`]);
+    rows.push(["entry-role", `Platform Engineer ${entry}`]);
+    rows.push(["entry-location", "Toronto, ON"]);
+    rows.push(["entry-date", `20${17 + entry} - 20${18 + entry}`]);
+    for (let b = 1; b <= 4; b++) {
+      rows.push([
+        "bullet",
+        `- Engineered resilient microservice component ${entry}.${b} with automated observability, schema verification, and deterministic rollout controls across distributed worker pools.`,
+      ]);
+    }
+  }
+
+  rows.push(["section", "Skills"]);
+  rows.push(["skill", "Languages: TypeScript, SQL, Go"]);
+
+  const raw = rows.map((r) => r[1]).join("\n");
+  let offset = 0;
+  const assignments: ResumeAssignment[] = rows.map(([kind, text]) => {
+    const start = offset;
+    offset += text.length + 1;
+    return { kind, span: { start, end: start + text.length } };
+  });
+  const doc = buildResumeDocument(raw, assignments);
+  const comfortableSource = renderResumeDocument(doc, "comfortable");
+  const hash = createHash("sha256").update(comfortableSource).digest("hex");
+  return `// @layout-two-pages-approved: ${hash}\n${comfortableSource}`;
+}
+
+function buildSyntheticPdfBuffer(lines: string[]): Buffer {
+  const ops = ["BT", "/F1 11 Tf", "72 720 Td", "16 TL"];
+  for (const line of lines) {
+    ops.push(`(${line.replace(/[()\\]/g, "\\$&")}) Tj T*`);
+  }
+  ops.push("ET");
+  const stream = ops.join("\n");
+  const objs = [
+    "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+    "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+    "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n",
+    `4 0 obj\n<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream\nendobj\n`,
+    "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  for (const obj of objs) {
+    offsets.push(Buffer.byteLength(pdf));
+    pdf += obj;
+  }
+  const xrefPos = Buffer.byteLength(pdf);
+  pdf += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
+  for (let i = 1; i < offsets.length; i++) {
+    pdf += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF`;
+  return Buffer.from(pdf, "utf8");
 }
 
 function inspectPdf(pdfPath: string): { numPages: number; text: string } {
@@ -464,7 +539,15 @@ test.describe("Critique Remediation E2E Regression Suite", () => {
       { name: "768x1024", width: 768, height: 1024 },
     ]) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
-      await page.getByTestId("editor-tab-preview").click();
+      await expect(page.getByTestId("document-type-badge")).toBeVisible();
+      if (vp.width === 390) {
+        await page.getByTestId("editor-tab-editor").click();
+        await expect(page.getByTestId("mobile-editor-orientation-bar")).toBeVisible();
+        await expect(page.getByTestId("mobile-orientation-visual-btn")).toBeVisible();
+        await page.getByTestId("mobile-orientation-preview-btn").click();
+      } else {
+        await page.getByTestId("editor-tab-preview").click();
+      }
       await expect(page.getByTestId("layout-page-status")).toContainText("2 pages measured", { timeout: 30000 });
 
       const fitToOneBtn = page.getByRole("button", { name: "Fit to one page" }).first();
@@ -874,6 +957,389 @@ test.describe("Critique Remediation E2E Regression Suite", () => {
       await expect(userBPage.getByTestId("active-job-header-banner")).not.toContainText("User A Confidential Role");
     } finally {
       await userBCtx.close();
+    }
+  });
+
+  test("6. Remediation verification: PDF consent gate, Jobs->Practice exact role handoff, phone Editor 2-to-1 Fit, Tracker/Outcomes recovery, blank Tailor gate & Escape focus restoration", async ({
+    browser,
+    baseURL,
+  }) => {
+    test.setTimeout(90_000);
+    await mkdir(ARTIFACT_DIR, { recursive: true });
+
+    // 6a. Authenticated Evidence Bank PDF consent gate + Add Evidence Escape focus restoration
+    const { context: authCtx, page: authPage } = await createIsolatedUserContext(browser, baseURL);
+    try {
+      let evidencePostCount = 0;
+      authPage.on("request", (req) => {
+        if (new URL(req.url()).pathname === "/api/evidence" && req.method() === "POST") {
+          evidencePostCount += 1;
+        }
+      });
+
+      await authPage.setViewportSize({ width: 1280, height: 800 });
+      await authPage.goto("/library", { waitUntil: "networkidle" });
+
+      const pdfBuffer = buildSyntheticPdfBuffer([
+        "EXPERIENCE",
+        "Northwind Labs | Backend Engineer | 2023 - Present",
+        "- Kept deterministic PostgreSQL telemetry pipelines.",
+        "- Cut tail p99 query latency by 42%.",
+        "- Excluded legacy XML adapter for deprecation.",
+      ]);
+      const fileInput = authPage.locator('[data-testid="bulk-pdf-dropzone"] input[type="file"]');
+      await fileInput.setInputFiles({
+        name: "synthetic-consent.pdf",
+        mimeType: "application/pdf",
+        buffer: pdfBuffer,
+      });
+
+      await expect(authPage.getByTestId("pdf-extracted-preview")).toBeVisible({ timeout: 15000 });
+      await expect(authPage.getByText("Excluded legacy XML adapter for deprecation.")).toBeVisible();
+      // Zero server writes before confirmation
+      expect(evidencePostCount).toBe(0);
+
+      // Uncheck the third bullet (index 3 in experience section, after header line 0)
+      const excludeCheckbox = authPage.getByTestId("pdf-bullet-checkbox-0-3");
+      await expect(excludeCheckbox).toBeChecked();
+      await excludeCheckbox.uncheck();
+      await expect(excludeCheckbox).not.toBeChecked();
+
+      await authPage.getByTestId("pdf-commit-selected-btn-0").click();
+      await expect(authPage.getByTestId("evidence-notification")).toBeVisible({ timeout: 15000 });
+      expect(evidencePostCount).toBeGreaterThan(0);
+
+      await authPage.reload({ waitUntil: "networkidle" });
+      await expect(authPage.getByText("Kept deterministic PostgreSQL telemetry pipelines.").first()).toBeVisible({ timeout: 10000 });
+      await expect(authPage.getByText("Excluded legacy XML adapter for deprecation.")).toHaveCount(0);
+
+      // Escape closes Add Evidence Item and returns focus to the invoking button
+      const addBtn = authPage.getByTestId("add-evidence-item-btn");
+      await addBtn.focus();
+      await addBtn.click();
+      const addDialog = authPage.getByRole("dialog");
+      await expect(addDialog).toBeVisible();
+      await authPage.keyboard.press("Escape");
+      await expect(addDialog).toHaveCount(0);
+      await expect(addBtn).toBeFocused();
+    } finally {
+      await authCtx.close();
+    }
+
+    // 6b. Phone Editor (390x844): visible badge, mobile orientation bar, 2-to-1 Fit conversion, and Master Dialog Escape focus return
+    const editorCtx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const edPage = await editorCtx.newPage();
+    try {
+      const fittableTwoPage = buildFittableTwoPageManagedSource();
+      await edPage.route("**/api/resumes", async (route) => {
+        if (route.request().method() === "GET") await route.fulfill({ json: { success: true, data: [] } });
+        else await route.continue();
+      });
+      await edPage.addInitScript((src) => {
+        localStorage.setItem("resumeforge_typst_source", src);
+        localStorage.setItem("resumeforge_migration_dismissed", "true");
+      }, fittableTwoPage);
+
+      await edPage.setViewportSize({ width: 390, height: 844 });
+      await edPage.goto("/editor");
+      await expect(edPage.getByTestId("document-type-badge")).toBeVisible({ timeout: 15000 });
+      await expect(edPage.getByTestId("mobile-editor-orientation-bar")).toBeVisible();
+      await assertNoHorizontalOverflow(edPage, "/editor-orientation@390x844");
+
+      // Escape closes Confirm & Freeze Master and restores focus to Save as Master Resume
+      const saveMasterBtn = edPage.getByTestId("save-as-master-btn");
+      await saveMasterBtn.focus();
+      await saveMasterBtn.click();
+      const masterDialog = edPage.getByTestId("save-master-confirm-modal");
+      await expect(masterDialog).toBeVisible();
+      await edPage.keyboard.press("Escape");
+      await expect(masterDialog).toHaveCount(0);
+      await expect(saveMasterBtn).toBeFocused();
+
+      // Switch to Preview via mobile orientation bar and convert 2 pages -> 1 page
+      await edPage.getByTestId("mobile-orientation-preview-btn").click();
+      await expect(edPage.getByTestId("layout-page-status")).toContainText("2 pages measured", { timeout: 30000 });
+      await edPage.getByRole("button", { name: "Fit to one page" }).first().click();
+      await expect(edPage.getByTestId("layout-page-status")).toContainText("1 page measured", { timeout: 30000 });
+
+      const fittedDl = edPage.waitForEvent("download", { timeout: 30000 });
+      await edPage.getByTestId("export-dropdown-btn").first().click();
+      await edPage.getByTestId("export-pdf-menu-item").click();
+      const fittedPdfPath = path.join(ARTIFACT_DIR, "fitted-two-to-one.pdf");
+      await (await fittedDl).saveAs(fittedPdfPath);
+      expect(inspectPdf(fittedPdfPath).numPages).toBe(1);
+    } finally {
+      await editorCtx.close();
+    }
+
+    // 6c. Jobs -> Practice exact role handoff, disambiguated picker, scope notice, Tracker filter clear, Demo Outcomes, and blank Tailor banner gate
+    const demoCtx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const demoPage = await demoCtx.newPage();
+    try {
+      const demoJobs = [
+        {
+          id: "frl-frontend",
+          company: "Fictional Review Lab",
+          roleTitle: "Frontend Engineering Intern",
+          source: "pasted",
+          status: "SAVED",
+          createdAt: "2026-11-17T00:00:00.000Z",
+          notes: "Location: Toronto, ON | Apply Link: https://boards.greenhouse.io/frl/jobs/101",
+          rawDescription: "Frontend React and TypeScript role.",
+          extractedRequirements: { requiredSkills: ["React", "TypeScript"], preferredSkills: [], domainTerms: [] },
+        },
+        {
+          id: "frl-backend",
+          company: "Fictional Review Lab",
+          roleTitle: "Backend Engineering Intern",
+          source: "pasted",
+          status: "APPLIED",
+          createdAt: "2026-11-16T00:00:00.000Z",
+          notes: "Location: Waterloo, ON | Apply Link: https://boards.greenhouse.io/frl/jobs/202",
+          rawDescription: "Backend Go and PostgreSQL role.",
+          extractedRequirements: { requiredSkills: ["Go", "PostgreSQL"], preferredSkills: [], domainTerms: [] },
+        },
+        {
+          id: "stripe-intern-1",
+          company: "Stripe",
+          roleTitle: "Software Engineer Intern",
+          source: "greenhouse",
+          status: "SAVED",
+          createdAt: "2026-11-15T00:00:00.000Z",
+          notes: "Location: Toronto, ON | Apply Link: https://boards.greenhouse.io/stripe/jobs/1111",
+          rawDescription: "Distributed payments infrastructure.",
+          extractedRequirements: { requiredSkills: ["Go"], preferredSkills: [], domainTerms: [] },
+        },
+        {
+          id: "stripe-intern-2",
+          company: "Stripe",
+          roleTitle: "Software Engineer Intern",
+          source: "greenhouse",
+          status: "SAVED",
+          createdAt: "2026-11-14T00:00:00.000Z",
+          notes: "Location: Toronto, ON | Apply Link: https://boards.greenhouse.io/stripe/jobs/2222",
+          rawDescription: "Billing engine reliability.",
+          extractedRequirements: { requiredSkills: ["TypeScript"], preferredSkills: [], domainTerms: [] },
+        },
+      ];
+      await demoPage.route("**/api/demo-config", (route) => route.fulfill({ json: { demoMode: true } }));
+      await demoPage.route("**/api/auth/me", (route) => route.fulfill({ json: { data: null, guest: true } }));
+      await demoPage.route("**/api/stats/outcomes", (route) =>
+        route.fulfill({
+          json: {
+            success: true,
+            guest: true,
+            data: { funnel: { SAVED: 0, APPLIED: 0, INTERVIEWING: 0, OFFER: 0, REJECTED: 0 }, interviewRate: 0, medianResponseDays: null, variants: [] },
+          },
+        })
+      );
+      await demoPage.addInitScript((list) => {
+        localStorage.setItem("resumeforge_guest_jobs", JSON.stringify(list));
+      }, demoJobs);
+
+      await demoPage.setViewportSize({ width: 1280, height: 800 });
+      await demoPage.goto("/tracker");
+      await expect(demoPage.getByTestId("tracker-job-card-frl-backend")).toBeVisible({ timeout: 10000 });
+
+      // Empty filter recovery offers Clear filters and restores list
+      await demoPage.getByTestId("tracker-job-search").fill("nonexistent-xyz-999");
+      await expect(demoPage.getByTestId("tracker-clear-filters-btn")).toBeVisible({ timeout: 10000 });
+      await expect(demoPage.getByRole("link", { name: "Add Your First Job" })).toHaveCount(0);
+      await demoPage.getByTestId("tracker-clear-filters-btn").click();
+      await expect(demoPage.getByTestId("tracker-job-card-frl-backend")).toBeVisible({ timeout: 10000 });
+
+      // Click Backend role, then click Practice in Interactive Workspace -> selects exact Backend role
+      await demoPage.getByTestId("tracker-job-card-frl-backend").click();
+      await demoPage.getByTestId("job-detail-practice-link").click();
+      await expect(demoPage).toHaveURL(/\/practice\?jobId=frl-backend/);
+      await expect(demoPage.getByTestId("practice-target-job-banner")).toContainText("Backend Engineering Intern");
+      await expect(demoPage.getByTestId("practice-target-job-banner")).not.toContainText("Frontend Engineering Intern");
+      await expect(demoPage.getByTestId("practice-question-scope-notice")).toContainText("general question bank");
+
+      // Picker distinguishes identical Stripe Software Engineer Intern postings by location + Req #
+      const optionTexts = await demoPage
+        .locator('[data-testid="practice-job-context-select"] option')
+        .allTextContents();
+      expect(optionTexts).toContain("Stripe — Software Engineer Intern (Toronto, ON · Req #1111)");
+      expect(optionTexts).toContain("Stripe — Software Engineer Intern (Toronto, ON · Req #2222)");
+
+      // Demo Outcomes explains local stage counts without sending guests to /login
+      await demoPage.goto("/tracker/outcomes");
+      await expect(demoPage.getByTestId("outcomes-demo-mode-notice")).toBeVisible({ timeout: 10000 });
+      await expect(demoPage.getByTestId("outcomes-demo-mode-notice").locator('a[href="/login"]')).toHaveCount(0);
+      await expect(demoPage.getByTestId("outcome-stage-tiles")).toBeVisible();
+
+      // Blank Tailor (?new=1) hides Partial Extraction banner and shows Awaiting job description until text is entered
+      await demoPage.goto("/tailor?new=1");
+      await expect(demoPage.getByTestId("jd-textarea")).toHaveValue("");
+      await expect(demoPage.getByTestId("confidence-banner-partial-extraction")).toHaveCount(0);
+      await expect(demoPage.getByTestId("job-extraction-diagnostics-summary")).toContainText("Awaiting job description");
+      await demoPage.getByTestId("jd-textarea").fill("Backend Engineer\n- TypeScript and PostgreSQL");
+      await expect(demoPage.getByTestId("job-extraction-diagnostics-summary")).toContainText("Pasted job posting");
+    } finally {
+      await demoCtx.close();
+    }
+  });
+  test("Review follow-up preserves PDF choices, retries only the failed item, and blocks another submit", async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    try {
+      const page = await context.newPage();
+      const submissions: string[] = [];
+      const savedItems = new Map<string, object>();
+      let releaseRequest!: () => void;
+      const blockedRequest = new Promise<void>((resolve) => { releaseRequest = resolve; });
+      await page.route("**/api/demo-config", (route) => route.fulfill({ json: { demoMode: false } }));
+      await page.route("**/api/auth/me", (route) => route.fulfill({
+        json: { data: { id: "synthetic-pdf-user", email: "pdf@example.test", username: "PDF Reviewer" } },
+      }));
+      await page.route("**/api/evidence", async (route) => {
+        if (route.request().method() === "GET") {
+          await route.fulfill({ json: { success: true, data: [...savedItems.values()] } });
+          return;
+        }
+        const item = route.request().postDataJSON();
+        submissions.push(item.importId);
+        if (submissions.length === 1) await blockedRequest;
+        if (submissions.length === 2) {
+          await route.abort("failed");
+          return;
+        }
+        savedItems.set(item.importId, { ...item, id: item.importId, createdAt: new Date().toISOString() });
+        await route.fulfill({ status: 201, json: { success: true, data: item } });
+      });
+
+      await page.goto(new URL("/library", baseURL).href);
+      const dropzone = page.getByTestId("bulk-pdf-dropzone");
+      await dropzone.locator('input[type="file"]').setInputFiles({
+        name: "synthetic-save-retry.pdf",
+        mimeType: "application/pdf",
+        buffer: buildSyntheticPdfBuffer([
+          "EXPERIENCE",
+          "Northwind Labs | Backend Engineer | 2023 - Present",
+          "- Kept deterministic PostgreSQL telemetry pipelines.",
+          "- Cut tail p99 query latency by 42%.",
+          "- Excluded legacy XML adapter for deprecation.",
+        ]),
+      });
+      const excluded = dropzone.getByTestId("pdf-bullet-checkbox-0-3");
+      await excluded.uncheck();
+      expect(submissions).toHaveLength(0);
+
+      const save = dropzone.getByTestId("pdf-commit-selected-btn-0");
+      try {
+        await save.click();
+        await expect.poll(() => submissions.length).toBe(1);
+        await expect(save).toBeDisabled();
+        await expect(save).toHaveText("Saving…");
+        await save.dispatchEvent("click");
+        expect(submissions).toHaveLength(1);
+      } finally {
+        releaseRequest();
+      }
+
+      await expect(dropzone.getByRole("alert")).toContainText("Saved 1. Could not save 1.");
+      await expect(excluded).not.toBeChecked();
+      await expect(save).toHaveText("Retry save");
+      expect(submissions).toHaveLength(2);
+      await save.click();
+      await expect(save).toHaveText("Saved to Evidence Bank");
+      expect(submissions).toEqual([submissions[0], submissions[1], submissions[1]]);
+      expect(savedItems.size).toBe(2);
+      expect(JSON.stringify([...savedItems.values()])).not.toContain("Excluded legacy XML adapter");
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("Review follow-up opens a blank job on mobile and reloads the same saved job", async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: { cookies: [], origins: [] } });
+    try {
+      const page = await context.newPage();
+      await page.route("**/api/demo-config", (route) => route.fulfill({ json: { demoMode: true } }));
+      await page.goto(new URL("/tracker", baseURL).href);
+      await page.getByRole("link", { name: "Add Job", exact: true }).click();
+      await expect(page).toHaveURL(/\/tailor\?new=1&tab=job-info$/);
+      const description = page.getByTestId("jd-textarea");
+      await expect(description).toHaveValue("");
+      await page.getByRole("button", { name: "Paste job description" }).click();
+      await expect(description).toBeFocused();
+      await expect.poll(async () => (await description.boundingBox())?.y).toBeLessThan(350);
+
+      await page.locator("#tailor-company").fill("Fictional Lab");
+      await page.locator("#tailor-role").fill("New synthetic role");
+      const firstDraft = "Required skills: TypeScript. Preferred skills: AWS.";
+      await description.fill(firstDraft);
+      await page.getByTestId("save-job-btn").click();
+      await expect(page).toHaveURL((url) =>
+        url.pathname === "/tailor" &&
+        (url.searchParams.get("jobId") ?? "").startsWith("guest-job-") &&
+        url.searchParams.get("tab") === "job-info" &&
+        !url.searchParams.has("new")
+      );
+      const savedUrl = page.url();
+
+      await page.reload();
+      await expect(description).toHaveValue(firstDraft);
+      await expect(page.getByText("Saved posting", { exact: true })).toBeVisible();
+      const changedDraft = "Required skills: TypeScript and PostgreSQL. Preferred skills: AWS.";
+      await description.fill(changedDraft);
+      await page.getByTestId("save-job-btn").click();
+      await expect(page.getByText("Job posting saved successfully!", { exact: true })).toBeVisible();
+      await expect(page).toHaveURL(savedUrl);
+      await page.reload();
+      await expect(description).toHaveValue(changedDraft);
+
+      await page.goto(new URL("/tracker", baseURL).href);
+      await page.getByRole("link", { name: "Add Job", exact: true }).click();
+      await expect(description).toHaveValue("");
+      await expect(page).toHaveURL(/\/tailor\?new=1&tab=job-info$/);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("Review follow-up excludes preferred skills from Tracker’s required coverage", async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, storageState: { cookies: [], origins: [] } });
+    try {
+      const page = await context.newPage();
+      await page.route("**/api/demo-config", (route) => route.fulfill({ json: { demoMode: true } }));
+      // Exercise existing demo data created before the sample included structured requirements.
+      await page.addInitScript(() => {
+        if (localStorage.getItem("resumeforge_guest_jobs")) return;
+        localStorage.setItem("resumeforge_guest_jobs", JSON.stringify([{
+          id: "demo-sample-job",
+          rawDescription: "Synthetic sample job description for a fictional Sample Software Engineer role at Example Lab. Required skills: TypeScript and PostgreSQL. Preferred skills: AWS. Domain: product analytics. This fictional role is for exploring the tailoring workflow only.",
+          roleTitle: "Sample Software Engineer",
+          company: "Example Lab (fictional)",
+          status: "SAVED",
+        }, {
+          id: "legacy-serialized-requirements",
+          rawDescription: "A fictional role with saved requirements.",
+          roleTitle: "Platform Developer",
+          company: "Legacy Example Lab",
+          status: "SAVED",
+          requirementsStatus: "ready",
+          extractedRequirements: JSON.stringify({
+            requiredSkills: ["Go"],
+            preferredSkills: ["Redis"],
+            domainTerms: [],
+          }),
+        }]));
+      });
+      await page.goto(new URL("/tracker", baseURL).href);
+      await page.getByTestId("job-select-btn-demo-sample-job").click();
+      const groups = page.getByTestId("requirements-groups");
+      const required = groups.getByText("Required", { exact: true }).locator("..");
+      await expect(required).toContainText("PostgreSQL");
+      await expect(required).not.toContainText("AWS");
+      await expect(groups.getByText("Preferred", { exact: true }).locator("..")).toContainText("AWS");
+      await expect(page.getByTestId("tracker-required-evidence-coverage")).toContainText("of 2 required skills");
+
+      await page.getByTestId("job-select-btn-legacy-serialized-requirements").click();
+      await expect(required).toContainText("Go");
+      await expect(groups.getByText("Preferred", { exact: true }).locator("..")).toContainText("Redis");
+    } finally {
+      await context.close();
     }
   });
 });

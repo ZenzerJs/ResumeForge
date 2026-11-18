@@ -217,13 +217,25 @@ export function insertReviewMarkerInView(
 interface CodeEditorProps {
   value: string;
   onChange: (val: string) => void;
+  mode?: "code" | "visual";
+  onModeChange?: (mode: "code" | "visual") => void;
 }
 
-export function CodeEditor({ value, onChange }: CodeEditorProps) {
+export function CodeEditor({ value, onChange, mode, onModeChange }: CodeEditorProps) {
   const editorRef = useRef<ReactCodeMirrorRef>(null);
   const reviewMarkerHelpId = useId();
   const [reviewMarkerCount, setReviewMarkerCount] = useState(0);
-  const [editorMode, setEditorMode] = useState<"code" | "visual">("code");
+  const [internalMode, setInternalMode] = useState<"code" | "visual">(mode ?? "code");
+  const editorMode = mode ?? internalMode;
+  const setEditorMode = useCallback(
+    (nextMode: "code" | "visual") => {
+      if (mode === undefined) {
+        setInternalMode(nextMode);
+      }
+      onModeChange?.(nextMode);
+    },
+    [mode, onModeChange]
+  );
   const [reformatAlert, setReformatAlert] = useState<string | null>(null);
   const [pendingReformat, setPendingReformat] = useState<{
     sourceSnapshot: string;
@@ -236,12 +248,12 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
   }, [value]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (mode !== undefined || typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("mode") === "visual") {
-      setEditorMode("visual");
+      setInternalMode("visual");
     }
-  }, []);
+  }, [mode]);
 
   const handleAddReviewMarker = useCallback(() => {
     const view = editorRef.current?.view;

@@ -520,7 +520,7 @@ export function ApplyPrepSheetModal({
 
                 <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-auto">
                   <Link
-                    href={`/practice?company=${encodeURIComponent(job.company || "")}`}
+                    href={`/practice?${job.id ? `jobId=${encodeURIComponent(job.id)}&` : ""}company=${encodeURIComponent(job.company || "")}&role=${encodeURIComponent(job.title || "")}`}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-status-warning/15 hover:bg-status-warning/25 text-status-warning border border-status-warning/40 text-xs font-semibold transition"
                     title="Open in dedicated Practice Workspace"
                   >

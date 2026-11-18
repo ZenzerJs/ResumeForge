@@ -68,6 +68,14 @@ describe("Deterministic JD Parser Unit Tests", () => {
     expect(result.preferredSkills.length).toBe(0);
   });
 
+  it("keeps inline preferred skills out of the required skill list", () => {
+    const posting = "Platform engineer. Required skills: TypeScript and PostgreSQL. Preferred skills: AWS.";
+    const result = parseJobDescription(posting);
+    expect(result.requiredSkills).toEqual(expect.arrayContaining(["TypeScript", "PostgreSQL"]));
+    expect(result.requiredSkills).not.toContain("AWS");
+    expect(result.preferredSkills).toContain("AWS");
+  });
+
   it("outputs valid JobRequirements matching Zod schema", () => {
     const result = parseJobDescription(backendJD);
     const parsed = JobRequirementsSchema.safeParse(result);

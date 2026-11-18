@@ -25,6 +25,12 @@ import {
   canAutoHydrateTrackerJobs,
   type JobItem,
 } from "@/components/tracker/tracker-feed";
+import { computeLocalOutcomePayload } from "@/components/tracker/outcomes-panel";
+import {
+  describePracticeQuestionScope,
+  formatPracticeJobOptionLabel,
+  resolvePracticeJobSelection,
+} from "@/components/practice/practice-workspace";
 import { JobListRow } from "@/components/tracker/job-list-row";
 import { TrackerSubNav } from "@/components/tracker/tracker-sub-nav";
 
@@ -509,6 +515,139 @@ describe("Tracker UX Remediation & Deduplication", () => {
         },
       ];
       expect(collapseDuplicateIngestedJobs(genericRows)).toHaveLength(2);
+    });
+  });
+
+  describe("4. Practice job handoff, picker disambiguation, question scope & local outcomes", () => {
+    it("selects the exact jobId or strict company+role without falling back to a sibling role at the same company", () => {
+      const jobs = [
+        {
+          id: "job-frontend",
+          company: "Fictional Review Lab",
+          roleTitle: "Frontend Engineering Intern",
+          source: "pasted",
+          notes: "Location: Toronto, ON | Apply Link: https://boards.greenhouse.io/frl/jobs/101",
+        },
+        {
+          id: "job-backend",
+          company: "Fictional Review Lab",
+          roleTitle: "Backend Engineering Intern",
+          source: "pasted",
+          notes: "Location: Waterloo, ON | Apply Link: https://boards.greenhouse.io/frl/jobs/202",
+        },
+      ];
+
+      const exactById = resolvePracticeJobSelection(jobs, {
+        jobId: "job-backend",
+        company: "Fictional Review Lab",
+        role: "Backend Engineering Intern",
+      });
+      expect(exactById.selectedJobId).toBe("job-backend");
+
+      // Missing jobId with company + role synthesizes the exact requested role rather than picking Frontend
+      const missingIdWithRole = resolvePracticeJobSelection(jobs, {
+        jobId: "job-ml",
+        company: "Fictional Review Lab",
+        role: "ML Engineering Intern",
+      });
+      expect(missingIdWithRole.selectedJobId).toBe("job-ml");
+      expect(missingIdWithRole.jobs[0]).toMatchObject({
+        id: "job-ml",
+        company: "Fictional Review Lab",
+        roleTitle: "ML Engineering Intern",
+      });
+
+      // Company + role without jobId never falls back to a different role at the same company
+      const strictRoleNoMatch = resolvePracticeJobSelection(jobs, {
+        company: "Fictional Review Lab",
+        role: "Data Engineering Intern",
+      });
+      expect(strictRoleNoMatch.selectedJobId).toBe("");
+
+      // Company-only param still resolves when role is omitted
+      const companyOnly = resolvePracticeJobSelection(jobs, {
+        company: "Fictional Review Lab",
+      });
+      expect(companyOnly.selectedJobId).toBe("job-frontend");
+
+      // Duplicate req rows retain explicit jobId if requested
+      const dupJobs = [
+        {
+          id: "dup-a",
+          company: "Stripe",
+          roleTitle: "Backend Intern",
+          source: "greenhouse",
+          notes: "Location: Toronto, ON | Apply Link: https://boards.greenhouse.io/stripe/jobs/909",
+        },
+        {
+          id: "dup-b",
+          company: "Stripe",
+          roleTitle: "Backend Intern",
+          source: "greenhouse",
+          notes: "Location: Toronto, ON | Apply Link: https://boards.greenhouse.io/stripe/jobs/909?gh_src=feed",
+        },
+      ];
+      const exactDup = resolvePracticeJobSelection(dupJobs, { jobId: "dup-b" });
+      expect(exactDup.selectedJobId).toBe("dup-b");
+      expect(exactDup.jobs.some((j) => j.id === "dup-b")).toBe(true);
+    });
+
+    it("formats distinct picker labels using location and requisition disambiguators", () => {
+      const jobA = {
+        id: "stripe-1",
+        company: "Stripe",
+        roleTitle: "Software Engineer Intern",
+        notes: "Location: Toronto, ON | Apply Link: https://boards.greenhouse.io/stripe/jobs/111",
+      };
+      const jobB = {
+        id: "stripe-2",
+        company: "Stripe",
+        roleTitle: "Software Engineer Intern",
+        notes: "Location: Toronto, ON | Apply Link: https://boards.greenhouse.io/stripe/jobs/222",
+      };
+      const disambig = buildTrackerDisambiguators([jobA, jobB]);
+      expect(formatPracticeJobOptionLabel(jobA, disambig.get(jobA.id))).toBe(
+        "Stripe — Software Engineer Intern (Toronto, ON · Req #111)"
+      );
+      expect(formatPracticeJobOptionLabel(jobB, disambig.get(jobB.id))).toBe(
+        "Stripe — Software Engineer Intern (Toronto, ON · Req #222)"
+      );
+    });
+
+    it("distinguishes company-tagged banks from general question banks and tallies local outcomes", () => {
+      const unmapped = describePracticeQuestionScope({
+        company: "Fictional Review Lab",
+        roleTitle: "Backend Engineering Intern",
+      });
+      expect(unmapped.kind).toBe("general");
+      expect(unmapped.message).toContain("general question bank");
+      expect(unmapped.message).toContain("Backend Engineering Intern");
+
+      const mapped = describePracticeQuestionScope({
+        company: "Google",
+        roleTitle: "Backend Engineering Intern",
+      });
+      expect(mapped.kind).toBe("company");
+      expect(mapped.count).toBeGreaterThan(0);
+      expect(mapped.message).toContain("company-wide bank");
+      expect(mapped.message).toContain("not tailored to Backend Engineering Intern");
+
+      const outcomes = computeLocalOutcomePayload([
+        { status: "SAVED" },
+        { status: "APPLIED" },
+        { status: "INTERVIEWING" },
+        { status: "OFFER" },
+        { status: "REJECTED" },
+      ]);
+      expect(outcomes.funnel).toEqual({
+        SAVED: 1,
+        APPLIED: 1,
+        INTERVIEWING: 1,
+        OFFER: 1,
+        REJECTED: 1,
+      });
+      // (1 interviewing + 1 offer) / (1 applied + 1 interviewing + 1 offer + 1 rejected) = 0.5
+      expect(outcomes.interviewRate).toBe(0.5);
     });
   });
 });

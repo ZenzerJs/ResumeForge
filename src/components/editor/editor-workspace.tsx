@@ -69,10 +69,8 @@ import { ResumeFacts } from "@/lib/facts/types";
 import { extractResumeFacts } from "@/lib/facts/extract";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
 
-const ConfirmMasterDialog = dynamic(
-  () => import("./confirm-master-dialog").then((m) => m.ConfirmMasterDialog),
-  { ssr: false }
-);
+import { ConfirmMasterDialog } from "./confirm-master-dialog";
+
 const AiAssistantWindow = dynamic(
   () => import("./ai-assistant-window").then((m) => m.AiAssistantWindow),
   { ssr: false }
@@ -137,6 +135,15 @@ export function EditorWorkspace() {
   const [error, setError] = useState<{ message: string; line?: number; column?: number } | null>(null);
   const [isCompiling, setIsCompiling] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<WorkspacePanelTab>("editor");
+  const [editorMode, setEditorMode] = useState<"code" | "visual">(() =>
+    normalizeEditorModeParam(searchParams.get("mode")) === "visual" ? "visual" : "code"
+  );
+  const modeParam = normalizeEditorModeParam(searchParams.get("mode"));
+  useEffect(() => {
+    if (modeParam === "visual") {
+      setEditorMode("visual");
+    }
+  }, [modeParam]);
   const tabRefs = useRef<Record<WorkspacePanelTab, HTMLButtonElement | null>>({
     editor: null,
     preview: null,
@@ -211,6 +218,7 @@ export function EditorWorkspace() {
   const aiPanelRef = usePanelRef();
   const panelGroupRef = useGroupRef();
   const aiToolbarButtonRef = useRef<HTMLButtonElement>(null);
+  const saveMasterBtnRef = useRef<HTMLButtonElement>(null);
   const [layout, setLayout] = useState<Record<string, number>>(DEFAULT_EDITOR_LAYOUT.sizes);
   const [isAiCollapsed, setIsAiCollapsed] = useState<boolean>(DEFAULT_EDITOR_LAYOUT.isAiCollapsed);
   const [isAiPoppedOut, setIsAiPoppedOut] = useState<boolean>(false);
@@ -931,32 +939,34 @@ export function EditorWorkspace() {
       variant="editor"
       isCompiling={isCompiling}
       badge={
-          <div className="hidden sm:flex items-center gap-2" data-testid="document-type-badge">
+          <div className="flex min-w-0 items-center gap-2" data-testid="document-type-badge">
             {docMetadata.type === "MASTER_RESUME" && (
               <span
                 data-testid="doc-badge-master"
-                className="text-xs font-semibold px-2 py-0.5 rounded bg-elevated text-foreground border border-primary/40 flex items-center gap-1.5 whitespace-nowrap"
+                className="text-xs font-semibold px-2 py-0.5 rounded bg-elevated text-foreground border border-primary/40 flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap"
               >
-                <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-                Master Resume
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary" />
+                <span className="truncate max-w-[180px] sm:max-w-none">Master Resume</span>
               </span>
             )}
             {docMetadata.type === "RESUME_VARIANT" && (
               <span
                 data-testid="doc-badge-variant"
-                className="text-xs font-semibold px-2 py-0.5 rounded bg-elevated text-foreground border border-status-info/40 flex items-center gap-1.5 whitespace-nowrap"
+                className="text-xs font-semibold px-2 py-0.5 rounded bg-elevated text-foreground border border-status-info/40 flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap"
               >
-                <Sparkles className="h-3.5 w-3.5 text-status-info" />
-                Tailored Variant ({docMetadata.title})
+                <Sparkles className="h-3.5 w-3.5 shrink-0 text-status-info" />
+                <span className="truncate max-w-[180px] sm:max-w-none">
+                  Tailored Variant ({docMetadata.title})
+                </span>
               </span>
             )}
             {docMetadata.type === "LOCAL_FALLBACK" && (
               <span
                 data-testid="doc-badge-fallback"
-                className="text-xs font-semibold px-2 py-0.5 rounded bg-elevated text-text-secondary border border-outline/70 flex items-center gap-1.5 whitespace-nowrap"
+                className="text-xs font-semibold px-2 py-0.5 rounded bg-elevated text-text-secondary border border-outline/70 flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap"
               >
-                <FileText className="h-3.5 w-3.5 text-text-muted" />
-                {docMetadata.title}
+                <FileText className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+                <span className="truncate max-w-[180px] sm:max-w-none">{docMetadata.title}</span>
               </span>
             )}
           </div>
@@ -1013,6 +1023,7 @@ export function EditorWorkspace() {
             </Button>
 
             <Button
+              ref={saveMasterBtnRef}
               type="button"
               size="sm"
               onClick={handleSaveAsMaster}
@@ -1257,6 +1268,7 @@ export function EditorWorkspace() {
         draftEvidence={draftEvidenceFromMaster}
         onDraftEvidenceChange={setDraftEvidenceFromMaster}
         showDraftEvidence={!isDemoMode}
+        returnFocusRef={saveMasterBtnRef}
       />
 
       {/* Main Workspace Body */}
@@ -1373,6 +1385,35 @@ export function EditorWorkspace() {
               </div>
             </div>
 
+            {activeTab === "editor" && editorMode === "code" && (
+              <div
+                data-testid="mobile-editor-orientation-bar"
+                className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-outline/70 bg-inset px-3 py-2 text-xs"
+              >
+                <span className="min-w-0 truncate text-text-secondary">
+                  Editing <strong className="font-semibold text-foreground">{docMetadata.title}</strong> (Typst source)
+                </span>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <button
+                    type="button"
+                    data-testid="mobile-orientation-preview-btn"
+                    onClick={() => setActiveTab("preview")}
+                    className="inline-flex min-h-8 items-center rounded border border-primary/40 bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    Preview Resume
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="mobile-orientation-visual-btn"
+                    onClick={() => setEditorMode("visual")}
+                    className="inline-flex min-h-8 items-center rounded border border-outline/70 bg-elevated px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    Visual Form
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div
               role="tabpanel"
               id="workspace-tabpanel-editor"
@@ -1461,7 +1502,12 @@ export function EditorWorkspace() {
       {/* Persistent pane portals preserve CodeMirror selection/undo and AI state across tabs and resizes */}
       {hosts &&
         createPortal(
-          <CodeEditor value={source} onChange={handleSourceChange} />,
+          <CodeEditor
+            value={source}
+            onChange={handleSourceChange}
+            mode={editorMode}
+            onModeChange={setEditorMode}
+          />,
           hosts.code
         )}
       {hosts &&

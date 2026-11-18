@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import nextConfig from "../next.config";
 import { config as middlewareConfig, middleware } from "@/middleware";
 import { cookieSecure, isPublicPath } from "@/lib/security/session";
@@ -468,6 +469,36 @@ describe("Backend & Serverless Audit Fixes", () => {
         )
       );
       expect(qualUpstreamFail.status).toBe(502);
+    });
+
+    it("returns a retried PDF import only to the original owner after a duplicate insert", async () => {
+      const owner = await createTestUser();
+      const otherUser = await createTestUser();
+      const importId = "pdf-import-0123456789abcdef0123456789abcdef-0";
+      const request = (cookie: string, title: string) => authedRequest(
+        "http://localhost:3000/api/evidence",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ importId, type: "project", title, verifiedSummary: "Synthetic evidence" }),
+        },
+        cookie
+      );
+      const first = await evidencePOST(request(owner.cookie, "Original"));
+      expect(first.status).toBe(201);
+      const conflict = new Prisma.PrismaClientKnownRequestError("Already created", {
+        code: "P2002", clientVersion: "test",
+      });
+      vi.spyOn(prisma.evidenceItem, "create")
+        .mockRejectedValueOnce(conflict)
+        .mockRejectedValueOnce(conflict);
+
+      const retry = await evidencePOST(request(owner.cookie, "Unexpected replay changes"));
+      expect(retry.status).toBe(200);
+      expect(await retry.json()).toMatchObject({ data: { id: importId, title: "Original" } });
+      const other = await evidencePOST(request(otherUser.cookie, "Foreign retry"));
+      expect(other.status).toBe(409);
+      expect(await other.json()).not.toHaveProperty("data");
     });
 
     it("PUT /api/evidence/[id] promoting draft to verified also verifies draft bullets", async () => {

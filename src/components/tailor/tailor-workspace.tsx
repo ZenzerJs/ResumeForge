@@ -27,7 +27,7 @@ import { resolveClientProviderConfig } from "@/lib/byok-vault";
 import { ProviderConfigSchema } from "@/lib/ai/types";
 import { getDemoContextFromBrowser, initializeDemoSamples } from "@/lib/demo-client";
 import { fetchDemoConfig, fetchSessionUser } from "@/components/auth/session-user";
-import { DEMO_JOB } from "@/lib/demo-samples";
+import { DEMO_JOB, DEMO_RESUME_SOURCE } from "@/lib/demo-samples";
 import { readApiResponse } from "@/lib/api-error";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
 import { matchEvidenceToRequirements, type EvidenceItemWithBullets } from "@/lib/matching/matcher";
@@ -108,6 +108,7 @@ import {
   buildEditorHref,
   buildLibraryHref,
   buildSettingsHref,
+  buildTailorNewJobHref,
   clearActiveApplicationContext,
   clearPendingReviewChoices,
   createSaveBeforeNavigationController,
@@ -177,14 +178,6 @@ Must Have Requirements:
 Nice to Have:
 - Knowledge of WebAssembly (WASM) and Web performance.
 - Experience with state management and Front-End Development best practices.`;
-
-const DEMO_JOB_REQUIREMENTS: JobRequirements = {
-  requiredSkills: ["TypeScript", "PostgreSQL"],
-  preferredSkills: ["AWS"],
-  domainTerms: ["product analytics"],
-  roleTitle: DEMO_JOB.roleTitle,
-  company: DEMO_JOB.company,
-};
 
 function renderHighlightedJd(text: string, skills: string[]) {
   if (!text) return null;
@@ -463,13 +456,21 @@ export function TailorWorkspace() {
   const [jobInfoSubTab, setJobInfoSubTab] = useState<"structured" | "original">("original");
   const jobDescriptionRef = useRef<HTMLTextAreaElement>(null);
   const focusJobDescriptionRef = useRef(false);
+  const focusJobDescription = useCallback((element: HTMLTextAreaElement) => {
+    if (window.matchMedia("(max-width: 639px)").matches) {
+      element.focus({ preventScroll: true });
+      element.scrollIntoView({ block: "start", behavior: "instant" });
+    } else {
+      element.focus();
+    }
+  }, []);
   const registerJobDescription = useCallback((element: HTMLTextAreaElement | null) => {
     jobDescriptionRef.current = element;
     if (element && focusJobDescriptionRef.current) {
       focusJobDescriptionRef.current = false;
-      element.focus();
+      focusJobDescription(element);
     }
-  }, []);
+  }, [focusJobDescription]);
   const [newUserReqText, setNewUserReqText] = useState("");
   const [customUserReqs, setCustomUserReqs] = useState<ProvenanceRequirement[]>([]);
 
@@ -516,6 +517,7 @@ export function TailorWorkspace() {
   const [validationContext, setValidationContext] = useState<TailoringValidationContext | null>(null);
   const [evidenceMetadata, setEvidenceMetadata] = useState<Record<string, EvidenceMetadataEntry>>({});
   const [verifiedEvidenceCount, setVerifiedEvidenceCount] = useState<number | null>();
+  const [sampleEvidenceCount, setSampleEvidenceCount] = useState(0);
   const [activeVariantContent, setActiveVariantContent] = useState<string>("");
   const [patchError, setPatchError] = useState<string | null>(null);
   const [structuredPatchError, setStructuredPatchError] = useState<StructuredPatchError | null>(null);
@@ -634,7 +636,9 @@ export function TailorWorkspace() {
 
     try {
       if (isDemoMode && typeof window !== "undefined") {
-        setVerifiedEvidenceCount(getDemoContextFromBrowser()?.evidenceItems.length ?? 0);
+        const evidence = getDemoContextFromBrowser()?.evidenceItems ?? [];
+        setVerifiedEvidenceCount(evidence.length);
+        setSampleEvidenceCount(evidence.filter((item) => item.id.startsWith("demo-sample-")).length);
         const raw = localStorage.getItem("resumeforge_guest_evidence");
         const parsed = raw ? JSON.parse(raw) : [];
         if (Array.isArray(parsed)) {
@@ -732,7 +736,7 @@ export function TailorWorkspace() {
             setCompany(DEMO_JOB.company);
             setRoleTitle(DEMO_JOB.roleTitle);
             setRawDescription(DEMO_JOB.rawDescription);
-            setExtractedRequirements(DEMO_JOB_REQUIREMENTS);
+            setExtractedRequirements(DEMO_JOB.requirements);
           }
           const frozen = localStorage.getItem("resumeforge_demo_master_facts");
           try {
@@ -849,12 +853,51 @@ export function TailorWorkspace() {
     };
 
     const existingId = savedJobIdRef.current;
+    const entryUrl = new URL(window.location.href);
     const demoConfig = await fetchDemoConfig();
 
-    const saveLocalGuestJob = (targetId?: string | null): string => {
+    const setSavedPosting = (jobId: string) => {
+      const current = new URL(window.location.href);
+      const entryKeys = ["jobId", "new", "action", "sample"];
+      if (current.pathname !== entryUrl.pathname ||
+          entryKeys.some((key) => current.searchParams.get(key) !== entryUrl.searchParams.get(key))) {
+        return false;
+      }
+      savedJobIdRef.current = jobId;
+      setSavedJobId(jobId);
+      if (current.searchParams.get("jobId") !== jobId || isExplicitNewEntry || isExplicitSampleEntry) {
+        for (const key of entryKeys) current.searchParams.delete(key);
+        current.searchParams.set("jobId", jobId);
+        current.searchParams.set("tab", activeTabRef.current);
+        window.history.replaceState(null, "", `${current.pathname}${current.search}${current.hash}`);
+      }
+      return true;
+    };
+
+    const saveLocalGuestJob = (targetId?: string | null): string | null => {
       const localId = targetId || `guest-job-${Date.now()}`;
-      savedJobIdRef.current = localId;
-      setSavedJobId(localId);
+      try {
+        const list = JSON.parse(localStorage.getItem("resumeforge_guest_jobs") ?? "[]");
+        if (!Array.isArray(list)) throw new Error("Invalid local job storage.");
+        const idx = list.findIndex((item) => item?.id === localId);
+        const existingRecord = idx >= 0 ? list[idx] : {};
+        const nextRecord = {
+          ...existingRecord,
+          id: localId,
+          company: payload.company || "Target Company",
+          roleTitle: payload.roleTitle || "Target Role",
+          rawDescription: payload.rawDescription,
+          requirements: payload.extractedRequirements,
+          status: existingRecord?.status || "SAVED",
+        };
+        if (idx >= 0) list[idx] = nextRecord;
+        else list.unshift(nextRecord);
+        localStorage.setItem("resumeforge_guest_jobs", JSON.stringify(list));
+      } catch {
+        setSaveStatus("Could not save the job in this browser. Your edits are still here.");
+        return null;
+      }
+      if (!setSavedPosting(localId)) return localId;
       const currentScope: ApplicationAccountScope =
         accountScopeRef.current.scopeResolved !== false
           ? accountScopeRef.current
@@ -871,30 +914,6 @@ export function TailorWorkspace() {
         },
         currentScope
       );
-      try {
-        const raw = localStorage.getItem("resumeforge_guest_jobs");
-        const parsed = raw ? JSON.parse(raw) : [];
-        const list = Array.isArray(parsed) ? parsed : [];
-        const idx = list.findIndex((item) => item?.id === localId);
-        const existingRecord = idx >= 0 ? list[idx] : {};
-        const nextRecord = {
-          ...existingRecord,
-          id: localId,
-          company: payload.company || "Target Company",
-          roleTitle: payload.roleTitle || "Target Role",
-          rawDescription: payload.rawDescription,
-          requirements: payload.extractedRequirements,
-          status: existingRecord?.status || "SAVED",
-        };
-        if (idx >= 0) {
-          list[idx] = nextRecord;
-        } else {
-          list.unshift(nextRecord);
-        }
-        localStorage.setItem("resumeforge_guest_jobs", JSON.stringify(list));
-      } catch (error) {
-        if (opts?.requireSuccess) throw error;
-      }
       setSaveStatus("Job saved to local workspace.");
       return localId;
     };
@@ -917,6 +936,7 @@ export function TailorWorkspace() {
               "Unable to update saved job posting."
             );
           if (updateOk && updateJson?.success) {
+            if (!setSavedPosting(existingId)) return existingId;
             writeActiveApplicationContext(
               {
                 jobId: existingId,
@@ -968,8 +988,7 @@ export function TailorWorkspace() {
           data?: { id: string };
         }>(saveRes, "Failed to save job posting.");
       if (saveOk && saveJson?.success && saveJson.data?.id) {
-        savedJobIdRef.current = saveJson.data.id;
-        setSavedJobId(saveJson.data.id);
+        if (!setSavedPosting(saveJson.data.id)) return saveJson.data.id;
         writeActiveApplicationContext(
           {
             jobId: saveJson.data.id,
@@ -1246,7 +1265,7 @@ export function TailorWorkspace() {
   };
 
   const handleSaveJob = async () => {
-    const id = await ensureJobSaved({ forceUpdate: true });
+    const id = await ensureJobSaved({ forceUpdate: true, requireSuccess: true });
     if (id) {
       setSaveStatus("Job posting saved successfully!");
     } else {
@@ -1294,7 +1313,7 @@ export function TailorWorkspace() {
   loadedFromStoredRef.current = Boolean(!jobIdParam && restoredJobId);
 
   useEffect(() => {
-    if (!targetJobToLoad) return;
+    if (!targetJobToLoad || targetJobToLoad === savedJobIdRef.current) return;
     const controller = new AbortController();
     const { signal } = controller;
     setIsLoadingJob(true);
@@ -1370,11 +1389,11 @@ export function TailorWorkspace() {
         setCompany(job.company ?? "");
         setRoleTitle(job.roleTitle ?? "");
         setRawDescription(convertHtmlToCleanMarkdown(job.rawDescription ?? ""));
-        savedJobIdRef.current = localOnly ? null : job.id;
+        savedJobIdRef.current = job.id === DEMO_JOB.id ? null : job.id;
         setSavedJobId(savedJobIdRef.current);
 
         const storedRequirements = localOnly
-          ? job.requirements ?? (job.id === DEMO_JOB.id ? DEMO_JOB_REQUIREMENTS : undefined)
+          ? job.requirements ?? job.extractedRequirements ?? (job.id === DEMO_JOB.id ? DEMO_JOB.requirements : undefined)
           : job.requirementsStatus === "ready" ? job.extractedRequirements : undefined;
         const parsed = JobRequirementsSchema.safeParse(storedRequirements);
         if (parsed.success && job.rawDescription?.trim()) {
@@ -1653,12 +1672,14 @@ export function TailorWorkspace() {
   const isSampleJob = !savedJobId && company === "Nova Labs" && rawDescription === SAMPLE_BACKEND_JD;
   const hasJobRequirements = extractedRequirements !== null;
   const hasJobDescription = Boolean(rawDescription.trim());
+  const isBlankJob = activeTab === "job-info" && !hasJobDescription;
+  const isSampleResume = isDemo && masterTypstSource?.trim() === DEMO_RESUME_SOURCE.trim();
   const hasVerifiedEvidence = Boolean(verifiedEvidenceCount);
   const readiness = [
     {
       label: isDemo ? "Resume draft" : "Master resume",
       ready: resumeReady === true,
-      detail: resumeReady ? (isDemo ? "Saved in this browser" : "Frozen in Editor")
+      detail: resumeReady ? (isDemo ? (isSampleResume ? "Sample résumé in this browser" : "Saved in this browser") : "Frozen in Editor")
         : resumeReady === null ? "Status unavailable" : "Save required",
     },
     {
@@ -1666,7 +1687,9 @@ export function TailorWorkspace() {
       ready: hasVerifiedEvidence,
       detail: verifiedEvidenceCount === undefined ? "Checking…"
         : verifiedEvidenceCount === null ? "Status unavailable"
-        : hasVerifiedEvidence ? `${verifiedEvidenceCount} verified ${verifiedEvidenceCount === 1 ? "item" : "items"}`
+        : hasVerifiedEvidence ? (isDemo && sampleEvidenceCount > 0
+            ? sampleEvidenceCount === verifiedEvidenceCount ? "Sample evidence" : "Includes sample evidence"
+            : `${verifiedEvidenceCount} verified ${verifiedEvidenceCount === 1 ? "item" : "items"}`)
         : "Verified evidence needed",
     },
     {
@@ -1690,7 +1713,7 @@ export function TailorWorkspace() {
     if (hasJobDescription) {
       void handleExtract();
     } else if (jobDescriptionRef.current) {
-      jobDescriptionRef.current.focus();
+      focusJobDescription(jobDescriptionRef.current);
     } else {
       focusJobDescriptionRef.current = true;
     }
@@ -1813,6 +1836,8 @@ export function TailorWorkspace() {
     setRoleTitle("");
     updateJobDescription("");
     setCustomUserReqs([]);
+    setRestoredJobId(null);
+    window.history.replaceState(null, "", buildTailorNewJobHref({ tab: "job-info" }));
     selectTab("job-info");
     setJobInfoSubTab("original");
   };
@@ -1844,7 +1869,7 @@ export function TailorWorkspace() {
                 data-testid="tailor-readiness"
                 aria-label="Resume edit prerequisites"
                 tabIndex={-1}
-                className="grid scroll-mt-20 grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4 xl:gap-x-5"
+                className={`grid scroll-mt-20 grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4 xl:gap-x-5 ${isBlankJob ? "max-sm:hidden" : ""}`}
               >
                 {readiness.map(({ label, ready, detail }) => (
                   <li key={label} className="min-w-0 text-xs leading-snug">
@@ -2803,7 +2828,7 @@ export function TailorWorkspace() {
                   </div>
 
                   {/* Critical extraction warning remains prominent outside disclosure */}
-                  {jobDoc.diagnostics.status === "PARTIAL_EXTRACTION" && (
+                  {hasJobDescription && jobDoc.diagnostics.status === "PARTIAL_EXTRACTION" && (
                     <div
                       data-testid="confidence-banner-partial-extraction"
                       className="mb-4 p-3 rounded-lg bg-status-warning/10 border border-status-warning/35 text-sm text-status-warning flex items-start gap-2"
@@ -2951,7 +2976,7 @@ export function TailorWorkspace() {
                           rows={8}
                           data-testid="jd-textarea"
                           placeholder={JD_PASTE_TEMPLATE}
-                          className="w-full bg-inset text-foreground text-base sm:text-sm p-4 rounded-lg border border-hairline resize-y leading-relaxed"
+                          className="w-full scroll-mt-20 bg-inset text-foreground text-base sm:text-sm p-4 rounded-lg border border-hairline resize-y leading-relaxed"
                         />
                         {tier2Status?.type === "error" ? (
                           <pre className="mt-2 whitespace-pre-wrap rounded border border-hairline bg-inset p-3 font-mono text-xs leading-relaxed text-muted-foreground">
@@ -3047,7 +3072,7 @@ export function TailorWorkspace() {
                       data-testid="job-extraction-diagnostics-summary"
                       className="cursor-pointer select-none py-1 font-mono text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded"
                     >
-                      Extraction diagnostics · {formatJobDiagnosticLabel(jobDoc.diagnostics.status)}
+                      Extraction diagnostics · {hasJobDescription ? formatJobDiagnosticLabel(jobDoc.diagnostics.status) : "Awaiting job description"}
                     </summary>
                     <div className="mt-3 space-y-3 border-t border-hairline pt-3 font-mono text-xs">
                       {jobDoc.diagnostics.status === "VERIFIED_ATS" && (
