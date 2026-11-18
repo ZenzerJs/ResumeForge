@@ -8,7 +8,12 @@ import {
   getKey,
   removeKey,
   getActiveConfig,
-  ByokProvider,
+  markProviderConnectionStatus,
+  notifyByokUpdated,
+  providerSupportsBaseUrl,
+  readStoredAiSettings,
+  type ByokProvider,
+  type StoredAiSettings,
 } from "@/lib/byok-vault";
 import {
   ArrowLeft,
@@ -66,7 +71,7 @@ export interface ProviderHelpInfo {
 export const PROVIDER_HELP: Record<CloudProviderId, ProviderHelpInfo> = {
   gemini: {
     label: "Google Gemini",
-    whatIsNeeded: "A Google account and a Gemini API key from Google AI Studio.",
+    whatIsNeeded: "A Google account and a Gemini API key from Google AI Studio (AIzaSy... or AQ....).",
     getKeyUrl: "https://aistudio.google.com/app/apikey",
     prerequisites:
       "Google AI Studio includes a rate-limited Free tier with no credit card required (prompts may be used to improve Google products). Higher limits and private data handling require linking a Google Cloud billing account.",
@@ -117,17 +122,69 @@ export function hasNonDefaultAdvancedConfig(
 
 export type ConnectionTestAvailability = "loading" | "sign-in-required" | "ready";
 
+export function isKeyRejectionFailure(message: string): boolean {
+  const text = message.trim();
+  if (!text) return false;
+  if (
+    /only https urls|invalid url|private or loopback|allowlist|econnrefused|enotfound|etimedout|timed? out|aborted|fetch failed|network error|sign in to|origin|custom endpoint base urls|internal server error|returned status (404|429|5\d\d)|test failed \((404|429|5\d\d)\)/i.test(
+      text
+    )
+  ) {
+    return false;
+  }
+  return /api key is missing|api key is required|api_key_invalid|api key not valid|invalid api key|incorrect api key|invalid x-api-key|invalid_api_key|authentication_error|rejected key|returned status 401|test failed \(401\)|invalid authentication/i.test(
+    text
+  );
+}
+
+function resolveProviderBaseUrl(saved: StoredAiSettings, targetProvider: ProviderType): string {
+  if (!providerSupportsBaseUrl(targetProvider)) {
+    return "";
+  }
+  const perProvider =
+    saved.baseUrls && typeof saved.baseUrls === "object"
+      ? saved.baseUrls[targetProvider]
+      : undefined;
+  if (typeof perProvider === "string") {
+    const trimmed = perProvider.trim();
+    if (trimmed) return trimmed;
+    return targetProvider === "ollama" ? "http://localhost:11434" : "";
+  }
+  if (saved.provider === targetProvider && typeof saved.baseUrl === "string") {
+    const legacy = saved.baseUrl.trim();
+    if (targetProvider === "custom" && legacy === "http://localhost:11434") {
+      return "";
+    }
+    if (legacy) return legacy;
+  }
+  return targetProvider === "ollama" ? "http://localhost:11434" : "";
+}
+
+function readVerificationState(
+  saved: StoredAiSettings,
+  targetProvider: ProviderType
+): "untested" | "verified" | "failed" {
+  const entry = saved.verifiedProviders?.[targetProvider];
+  if (entry === true) return "verified";
+  if (entry === false) return "failed";
+  return "untested";
+}
+
 export function getConnectionTestState(params: {
   isHydrated: boolean;
   isSessionLoaded: boolean;
   isDemoLoaded: boolean;
   sessionUser: SessionUser | null;
   demoMode: boolean;
+  provider?: ProviderType;
 }): ConnectionTestAvailability {
   if (!params.isHydrated || !params.isSessionLoaded || !params.isDemoLoaded) {
     return "loading";
   }
   if (!params.sessionUser && !params.demoMode) {
+    if (!params.provider || isCloudProvider(params.provider)) {
+      return "ready";
+    }
     return "sign-in-required";
   }
   return "ready";
@@ -139,11 +196,13 @@ export function SettingsWorkspace() {
   const [baseUrl, setBaseUrl] = useState<string>("");
   const [model, setModel] = useState<string>(DEFAULT_MODELS.gemini);
   const [hasVaultKey, setHasVaultKey] = useState<boolean>(false);
+  const [verificationStatus, setVerificationStatus] = useState<"untested" | "verified" | "failed">("untested");
   const [isTesting, setIsTesting] = useState<boolean>(false);
   const [testResult, setTestResult] = useState<{
     success: boolean;
     message: string;
     latencyMs?: number;
+    isKeyError?: boolean;
   } | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
@@ -168,28 +227,19 @@ export function SettingsWorkspace() {
         const config = await getActiveConfig();
         let activeProvider = (config.provider as ProviderType) || "gemini";
         let activeModel = config.model || DEFAULT_MODELS[activeProvider] || DEFAULT_MODELS.gemini;
-        let activeBaseUrl = "";
-
-        const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed.provider) activeProvider = parsed.provider;
-          if (parsed.model) activeModel = parsed.model;
-          if (parsed.baseUrl) activeBaseUrl = parsed.baseUrl;
-        }
+        const parsed = readStoredAiSettings();
+        if (parsed.provider) activeProvider = parsed.provider as ProviderType;
+        if (parsed.model) activeModel = parsed.model;
 
         if (isDemo && (activeProvider === "ollama" || activeProvider === "custom")) {
           activeProvider = "gemini";
           activeModel = DEFAULT_MODELS.gemini;
-          activeBaseUrl = "";
         }
+
+        const activeBaseUrl = resolveProviderBaseUrl(parsed, activeProvider);
 
         if (activeProvider === "gemini" && activeModel === "gemini-3.8-flash") {
           activeModel = "gemini-2.5-flash";
-        }
-
-        if (activeProvider === "ollama" && !activeBaseUrl) {
-          activeBaseUrl = "http://localhost:11434";
         }
 
         const key = await getKey(activeProvider);
@@ -200,6 +250,7 @@ export function SettingsWorkspace() {
           setBaseUrl(activeBaseUrl);
           setApiKey(key || "");
           setHasVaultKey(Boolean(key && key.trim().length > 0));
+          setVerificationStatus(readVerificationState(parsed, activeProvider));
           setIsAdvancedOpen(
             hasNonDefaultAdvancedConfig(activeProvider, activeModel, activeBaseUrl)
           );
@@ -269,17 +320,52 @@ export function SettingsWorkspace() {
     }
   };
 
-  // Save non-sensitive active config to localStorage
-  const saveSettingsToStorage = (newProvider: ProviderType, newUrl: string, newModel: string) => {
+  // Save non-sensitive active config to localStorage (isolating baseUrl per provider)
+  const saveSettingsToStorage = (
+    newProvider: ProviderType,
+    newUrl: string,
+    newModel: string,
+    options?: { clearVerification?: boolean }
+  ) => {
     try {
+      const current = readStoredAiSettings();
+      const nextBaseUrls: Record<string, string> = {};
+      if (current.baseUrls && typeof current.baseUrls === "object") {
+        for (const [k, v] of Object.entries(current.baseUrls)) {
+          if (providerSupportsBaseUrl(k) && typeof v === "string" && v.trim()) {
+            nextBaseUrls[k] = v.trim();
+          }
+        }
+      }
+
+      const persistedUrl = providerSupportsBaseUrl(newProvider) ? newUrl.trim() : "";
+      if (providerSupportsBaseUrl(newProvider)) {
+        if (persistedUrl) {
+          nextBaseUrls[newProvider] = persistedUrl;
+        } else {
+          delete nextBaseUrls[newProvider];
+        }
+      }
+
+      const nextVerified: Record<string, boolean> =
+        current.verifiedProviders && typeof current.verifiedProviders === "object"
+          ? { ...current.verifiedProviders }
+          : {};
+      if (options?.clearVerification) {
+        delete nextVerified[newProvider];
+      }
+
       localStorage.setItem(
         SETTINGS_STORAGE_KEY,
         JSON.stringify({
           provider: newProvider,
-          baseUrl: newUrl,
+          baseUrl: persistedUrl,
+          baseUrls: nextBaseUrls,
           model: newModel,
+          verifiedProviders: nextVerified,
         })
       );
+      notifyByokUpdated();
     } catch (err) {
       console.error("Failed to persist settings:", err);
     }
@@ -292,15 +378,14 @@ export function SettingsWorkspace() {
     const nextModel = DEFAULT_MODELS[nextProvider] || "";
     setModel(nextModel);
 
-    let nextUrl = baseUrl;
-    if (nextProvider === "ollama") {
-      nextUrl = baseUrl || "http://localhost:11434";
-      setBaseUrl(nextUrl);
-    }
+    const saved = readStoredAiSettings();
+    const nextUrl = resolveProviderBaseUrl(saved, nextProvider);
+    setBaseUrl(nextUrl);
 
     const storedKey = await getKey(nextProvider);
     setApiKey(storedKey || "");
     setHasVaultKey(Boolean(storedKey && storedKey.trim().length > 0));
+    setVerificationStatus(readVerificationState(saved, nextProvider));
     if (hasNonDefaultAdvancedConfig(nextProvider, nextModel, nextUrl)) {
       setIsAdvancedOpen(true);
     }
@@ -316,11 +401,12 @@ export function SettingsWorkspace() {
     const nextKey = e.target.value;
     setApiKey(nextKey);
     setTestResult(null);
+    setVerificationStatus("untested");
 
     if (nextKey.trim()) {
       await saveKey(provider as ByokProvider, nextKey);
       setHasVaultKey(true);
-      saveSettingsToStorage(provider, baseUrl, model);
+      saveSettingsToStorage(provider, baseUrl, model, { clearVerification: true });
     } else {
       await removeKey(provider);
       setHasVaultKey(false);
@@ -331,7 +417,8 @@ export function SettingsWorkspace() {
     const nextUrl = e.target.value;
     setBaseUrl(nextUrl);
     setTestResult(null);
-    saveSettingsToStorage(provider, nextUrl, model);
+    setVerificationStatus("untested");
+    saveSettingsToStorage(provider, nextUrl, model, { clearVerification: true });
   };
 
   const handleModelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -345,6 +432,7 @@ export function SettingsWorkspace() {
     setApiKey("");
     setHasVaultKey(false);
     setTestResult(null);
+    setVerificationStatus("untested");
     await removeKey(provider);
   };
 
@@ -354,6 +442,7 @@ export function SettingsWorkspace() {
     isDemoLoaded,
     sessionUser,
     demoMode,
+    provider,
   });
 
   const handleTestConnection = async () => {
@@ -368,26 +457,34 @@ export function SettingsWorkspace() {
         body: JSON.stringify({
           provider,
           apiKey: apiKey.trim() || undefined,
-          baseUrl: baseUrl.trim() || undefined,
+          baseUrl: providerSupportsBaseUrl(provider) ? baseUrl.trim() || undefined : undefined,
           model: model.trim() || undefined,
         }),
       });
 
       const data = await res.json();
+      const ok = Boolean(data.success);
+      const message =
+        data.message ||
+        data.error ||
+        (res.status === 401
+          ? "Sign in to test AI provider connections."
+          : "Connection test failed.");
+      markProviderConnectionStatus(provider, ok);
+      setVerificationStatus(ok ? "verified" : "failed");
       setTestResult({
-        success: Boolean(data.success),
-        message:
-          data.message ||
-          data.error ||
-          (res.status === 401
-            ? "Sign in to test AI provider connections."
-            : "Connection test failed."),
+        success: ok,
+        message,
         latencyMs: data.latencyMs,
+        isKeyError: !ok && isKeyRejectionFailure(message),
       });
     } catch (err) {
+      markProviderConnectionStatus(provider, false);
+      setVerificationStatus("failed");
       setTestResult({
         success: false,
         message: err instanceof Error ? err.message : "Network error testing connection.",
+        isKeyError: false,
       });
     } finally {
       setIsTesting(false);
@@ -470,9 +567,33 @@ export function SettingsWorkspace() {
                   className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
                 />
                 {provider === "ollama" ? (
-                  <div data-testid="vault-status" className="flex items-center gap-2 text-xs text-status-success-soft pt-0.5">
-                    <Server className="h-4 w-4 shrink-0 text-status-success" aria-hidden="true" />
-                    <span>Local daemon endpoint (no API key required)</span>
+                  <div
+                    data-testid="vault-status"
+                    className={`flex items-center gap-2 text-xs pt-0.5 ${
+                      verificationStatus === "verified"
+                        ? "text-status-success-soft"
+                        : verificationStatus === "failed"
+                        ? "text-status-danger"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    <Server
+                      className={`h-4 w-4 shrink-0 ${
+                        verificationStatus === "verified"
+                          ? "text-status-success"
+                          : verificationStatus === "failed"
+                          ? "text-status-danger"
+                          : "text-muted-foreground"
+                      }`}
+                      aria-hidden="true"
+                    />
+                    <span>
+                      {verificationStatus === "verified"
+                        ? "Local daemon endpoint verified (no API key required)"
+                        : verificationStatus === "failed"
+                        ? "Local daemon endpoint failed last check (no API key required)"
+                        : "Local daemon endpoint (no API key required — run Test Connection to verify)"}
+                    </span>
                   </div>
                 ) : (
                   <p className="text-xs text-muted-foreground">
@@ -541,7 +662,7 @@ export function SettingsWorkspace() {
                       type="password"
                       value={apiKey}
                       onChange={handleKeyChange}
-                      aria-invalid={testResult && !testResult.success ? true : undefined}
+                      aria-invalid={testResult && !testResult.success && testResult.isKeyError ? true : undefined}
                       aria-describedby={testResult && !testResult.success ? "test-result-banner" : undefined}
                       placeholder={
                         provider === "openai"
@@ -549,7 +670,7 @@ export function SettingsWorkspace() {
                           : provider === "anthropic"
                           ? "sk-ant-..."
                           : provider === "gemini"
-                          ? "AIzaSy..."
+                          ? "AIzaSy... or AQ...."
                           : provider === "groq"
                           ? "gsk_..."
                           : "Optional API Key for custom endpoint"
@@ -560,7 +681,12 @@ export function SettingsWorkspace() {
                   {apiKey && (
                     <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
                       <Key className="h-3.5 w-3.5 text-status-warning" />
-                      <span>Configured key: <code className="text-text-secondary font-mono">{maskKey(apiKey)}</code></span>
+                      <span>
+                        {verificationStatus === "failed"
+                          ? "Saved key (last test failed): "
+                          : "Configured key: "}
+                        <code className="text-text-secondary font-mono">{maskKey(apiKey)}</code>
+                      </span>
                     </div>
                   )}
                   {/* Visual Vault Status Indicator (distinct from connection test status) */}
@@ -647,7 +773,7 @@ export function SettingsWorkspace() {
             {/* Action Buttons & Status */}
             {connectionTestState === "sign-in-required" && (
               <p className="text-sm text-muted-foreground">
-                Sign in to test AI provider connections on this self-hosted instance.
+                Sign in to test local or custom AI endpoints on this self-hosted instance.
               </p>
             )}
             <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-hairline">

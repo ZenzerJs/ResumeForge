@@ -48,6 +48,17 @@ describe("API Key Redaction Utility", () => {
     expect(redacted).toContain("key=[REDACTED_KEY]");
   });
 
+  it("redacts AQ.-prefixed Gemini API keys", () => {
+    const aqKey = "AQ.Ab8RN6J2kLmNoPqRsTuVwXyZ0123456789";
+    const rawError = `Gemini API rejected key ${aqKey} on https://generativelanguage.googleapis.com/v1beta/models?key=${aqKey}`;
+    const redacted = redactKeys(rawError);
+
+    expect(redacted).not.toContain(aqKey);
+    expect(redacted).toContain("[REDACTED_KEY]");
+    expect(redacted).toContain("key=[REDACTED_KEY]");
+    expect(sanitizeError(new Error(`Failed with ${aqKey}`))).toBe("Failed with [REDACTED_KEY]");
+  });
+
   it("redacts Bearer tokens in headers", () => {
     const rawHeader = "Authorization: Bearer sk-1234567890abcdefABCDEF1234567890";
     const redacted = redactKeys(rawHeader);

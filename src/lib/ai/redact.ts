@@ -11,6 +11,7 @@ export const SECRET_PATTERNS = [
   /sk-ant-[A-Za-z0-9_-]+/g,
   /sk-[A-Za-z0-9_-]{20,}/g,
   /AIzaSy[A-Za-z0-9_-]{33}/g,
+  /AQ\.[A-Za-z0-9_.-]{20,}/g,
   /Bearer\s+[A-Za-z0-9._~+/-]+=*/gi,
   /key=[A-Za-z0-9_-]{20,}/gi,
   /gsk_[A-Za-z0-9_-]{20,}/g,

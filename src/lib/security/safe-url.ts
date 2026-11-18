@@ -61,7 +61,7 @@ export function assertSafePublicUrl(
 
   if (parsed.protocol !== "https:") {
     if (!(allowLocalhost && parsed.protocol === "http:" && isLocalDevHost(parsed.hostname))) {
-      throw new UnsafeUrlError("Only HTTPS URLs are allowed");
+      throw new UnsafeUrlError(`Only HTTPS URLs are allowed (rejected ${parsed.protocol}//${parsed.host})`);
     }
   }
 

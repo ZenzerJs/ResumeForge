@@ -30,7 +30,7 @@ import {
   usernameInitial,
   type SessionUser,
 } from "@/components/auth/session-user";
-import { getActiveConfig } from "@/lib/byok-vault";
+import { BYOK_UPDATED_EVENT, getActiveConfig } from "@/lib/byok-vault";
 import {
   clearActiveApplicationContext,
   resolveGlobalTailorHref,
@@ -111,19 +111,35 @@ function useAiStatus(pathname: string) {
 
   useEffect(() => {
     let cancelled = false;
-    void getActiveConfig()
-      .then((cfg) => {
-        if (!cancelled) {
-          setAiStatus({
-            provider: cfg.provider,
-            hasKey: cfg.hasKey,
-            keyless: cfg.keyless,
-          });
-        }
-      })
-      .catch(() => {});
+    const refreshAiStatus = () => {
+      void getActiveConfig()
+        .then((cfg) => {
+          if (!cancelled) {
+            setAiStatus({
+              provider: cfg.provider,
+              hasKey: cfg.hasKey,
+              keyless: cfg.keyless,
+            });
+          }
+        })
+        .catch(() => {});
+    };
+
+    refreshAiStatus();
+    if (typeof window === "undefined") {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    window.addEventListener(BYOK_UPDATED_EVENT, refreshAiStatus);
+    window.addEventListener("storage", refreshAiStatus);
+    window.addEventListener("focus", refreshAiStatus);
     return () => {
       cancelled = true;
+      window.removeEventListener(BYOK_UPDATED_EVENT, refreshAiStatus);
+      window.removeEventListener("storage", refreshAiStatus);
+      window.removeEventListener("focus", refreshAiStatus);
     };
   }, [pathname]);
 
