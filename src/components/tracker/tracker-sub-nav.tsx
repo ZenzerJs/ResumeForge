@@ -92,7 +92,7 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
 
   const linkClass = (active: boolean) =>
     cn(
-      "relative flex shrink-0 items-center whitespace-nowrap rounded-lg px-2 py-1.5 sm:px-3 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+      "relative flex shrink-0 items-center whitespace-nowrap rounded-lg px-2 py-1.5 sm:px-3 min-h-11 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
       active
         ? "bg-primary/15 border border-primary/40 text-primary"
         : "border border-transparent text-muted-foreground hover:bg-elevated/80 hover:text-foreground",
@@ -100,11 +100,11 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
 
   return (
     <div className="sticky top-0 z-20 shrink-0 border-b glass-bar">
-      <div className="flex h-11 items-center justify-between gap-2 px-3 sm:px-4">
+      <div className="flex min-h-11 items-center justify-between gap-1.5 px-2.5 sm:gap-2 sm:px-4">
         <div className="relative min-w-0 flex-1 h-full">
           <div
             ref={navListRef}
-            className="relative flex h-full min-w-0 items-center gap-1 overflow-x-auto pr-5 sm:gap-3 sm:pr-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="relative flex h-full min-w-0 items-center gap-1 overflow-x-auto pr-6 sm:gap-3 sm:pr-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             <span
               aria-hidden="true"
@@ -125,9 +125,9 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
             />
             <h1
               data-testid="tracker-page-title"
-              className="flex shrink-0 items-center gap-1.5 border-r border-hairline pr-2 sm:pr-3 text-xs font-bold text-foreground"
+              className="flex shrink-0 items-center gap-1 border-r border-hairline pr-1.5 sm:gap-1.5 sm:pr-3 text-xs font-bold text-foreground"
             >
-              <Briefcase className="h-3.5 w-3.5 text-primary" />
+              <Briefcase className="hidden sm:inline-block h-3.5 w-3.5 text-primary" aria-hidden="true" />
               Jobs
             </h1>
             <Link
@@ -137,7 +137,7 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
               aria-label="Discover / Feed"
               data-testid="tracker-tab-feed"
             >
-              <Compass className="mr-1 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <Compass className="hidden sm:inline-block mr-1 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span className="sm:hidden">Discover</span>
               <span className="hidden sm:inline">Discover / Feed</span>
             </Link>
@@ -148,7 +148,7 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
               aria-label="All Applications"
               data-testid="tracker-tab-all"
             >
-              <LayoutList className="mr-1 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <LayoutList className="hidden sm:inline-block mr-1 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span className="sm:hidden">All</span>
               <span className="hidden sm:inline">All Applications</span>
             </Link>
@@ -158,7 +158,7 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
               aria-current={isApplied ? "page" : undefined}
               data-testid="tracker-tab-applied"
             >
-              <Send className="mr-1 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <Send className="hidden sm:inline-block mr-1 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               Applied
             </Link>
             <Link
@@ -167,7 +167,7 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
               aria-current={isSaved ? "page" : undefined}
               data-testid="tracker-tab-saved"
             >
-              <Bookmark className="mr-1 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <Bookmark className="hidden sm:inline-block mr-1 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               Saved
             </Link>
             <Link
@@ -176,7 +176,7 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
               aria-current={isOutcomes ? "page" : undefined}
               data-testid="tracker-tab-outcomes"
             >
-              <BarChart3 className="mr-1 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <BarChart3 className="hidden sm:inline-block mr-1 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               Outcomes
             </Link>
           </div>
@@ -184,7 +184,7 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
             <div
               aria-hidden="true"
               data-testid="tracker-sub-nav-scroll-fade"
-              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-panel via-panel/85 to-transparent"
+              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-panel via-panel/85 to-transparent"
             />
           ) : null}
         </div>
@@ -220,9 +220,9 @@ export function TrackerRefreshButton({
       title={syncLabel}
     >
       {isImporting ? (
-        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" aria-hidden="true" />
       ) : (
-        <RefreshCw className="h-3.5 w-3.5 text-primary" />
+        <RefreshCw className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
       )}
       <span className="hidden sm:inline">
         {isImporting ? "Refreshing…" : "Refresh from Source"}

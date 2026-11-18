@@ -312,7 +312,7 @@ export function AtsSandboxSection() {
 
   const scoreBadgeColor =
     scoreResult.compositeScore >= 80
-      ? "text-signal border-signal/40 bg-signal/10"
+      ? "text-status-success-soft border-signal/40 bg-signal/10"
       : scoreResult.compositeScore >= 60
       ? "text-status-warning border-status-warning/40 bg-status-warning/10"
       : "text-status-danger border-status-danger/40 bg-status-danger/10";
@@ -377,6 +377,7 @@ export function AtsSandboxSection() {
               value={customDescription}
               onChange={(e) => setCustomDescription(e.target.value)}
               rows={8}
+              aria-label="Target Job Description"
               data-testid="sandbox-jd-input"
               className="w-full bg-inset border border-outline/70 rounded-[8px] p-3.5 font-mono text-xs md:text-sm text-foreground leading-relaxed resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-ring"
             />
@@ -417,14 +418,14 @@ export function AtsSandboxSection() {
                   <span className="text-on-surface-variant font-normal">
                     Core Stack (50% weight):
                   </span>
-                  <span className="font-semibold text-signal">
+                  <span className="font-semibold tabular-nums text-signal">
                     {scoreResult.breakdown.coreStackScore}%
                   </span>
                 </div>
                 <div className="h-2.5 rounded-full bg-inset border border-outline/70 overflow-hidden">
                   <div
-                    className="h-full bg-signal transition-all duration-500"
-                    style={{ width: `${scoreResult.breakdown.coreStackScore}%` }}
+                    className="h-full w-full origin-left bg-signal transition-transform duration-500"
+                    style={{ transform: `scaleX(${scoreResult.breakdown.coreStackScore / 100})` }}
                   />
                 </div>
               </div>
@@ -435,14 +436,14 @@ export function AtsSandboxSection() {
                   <span className="text-on-surface-variant font-normal">
                     Seniority (20% weight):
                   </span>
-                  <span className="font-semibold text-primary">
+                  <span className="font-semibold tabular-nums text-primary">
                     {scoreResult.breakdown.seniorityScore}%
                   </span>
                 </div>
                 <div className="h-2.5 rounded-full bg-inset border border-outline/70 overflow-hidden">
                   <div
-                    className="h-full bg-primary transition-all duration-500"
-                    style={{ width: `${scoreResult.breakdown.seniorityScore}%` }}
+                    className="h-full w-full origin-left bg-primary transition-transform duration-500"
+                    style={{ transform: `scaleX(${scoreResult.breakdown.seniorityScore / 100})` }}
                   />
                 </div>
               </div>
@@ -453,14 +454,14 @@ export function AtsSandboxSection() {
                   <span className="text-on-surface-variant font-normal">
                     Tools &amp; Infra (15% weight):
                   </span>
-                  <span className="font-semibold text-ember">
+                  <span className="font-semibold tabular-nums text-ember">
                     {scoreResult.breakdown.toolsScore}%
                   </span>
                 </div>
                 <div className="h-2.5 rounded-full bg-inset border border-outline/70 overflow-hidden">
                   <div
-                    className="h-full bg-ember transition-all duration-500"
-                    style={{ width: `${scoreResult.breakdown.toolsScore}%` }}
+                    className="h-full w-full origin-left bg-ember transition-transform duration-500"
+                    style={{ transform: `scaleX(${scoreResult.breakdown.toolsScore / 100})` }}
                   />
                 </div>
               </div>
@@ -471,14 +472,14 @@ export function AtsSandboxSection() {
                   <span className="text-on-surface-variant font-normal">
                     Evidence Bank Coverage (15% weight):
                   </span>
-                  <span className="font-semibold text-foreground">
+                  <span className="font-semibold tabular-nums text-foreground">
                     {scoreResult.breakdown.evidenceCoverageScore}%
                   </span>
                 </div>
                 <div className="h-2.5 rounded-full bg-inset border border-outline/70 overflow-hidden">
                   <div
-                    className="h-full ombre-bar transition-all duration-500"
-                    style={{ width: `${scoreResult.breakdown.evidenceCoverageScore}%` }}
+                    className="h-full w-full origin-left ombre-bar transition-transform duration-500"
+                    style={{ transform: `scaleX(${scoreResult.breakdown.evidenceCoverageScore / 100})` }}
                   />
                 </div>
               </div>
@@ -495,12 +496,12 @@ export function AtsSandboxSection() {
                     key={link.skill}
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-xs font-mono border ${
                       link.verified
-                        ? "bg-signal/10 border-signal/35 text-signal"
+                        ? "bg-signal/10 border-signal/35 text-status-success-soft"
                         : "bg-status-warning/10 border-status-warning/35 text-status-warning"
                     }`}
                   >
                     {link.verified ? (
-                      <CheckCircle2 className="h-3.5 w-3.5 text-signal" />
+                      <CheckCircle2 className="h-3.5 w-3.5 text-status-success-soft" />
                     ) : (
                       <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
                     )}
@@ -530,19 +531,22 @@ export function AtsSandboxSection() {
               <button
                 type="button"
                 onClick={() => setShowDerivationLog((prev) => !prev)}
+                aria-expanded={showDerivationLog}
+                aria-controls="sandbox-derivation-log"
                 data-testid="toggle-derivation-log-btn"
                 className="w-full flex items-center justify-between text-xs md:text-sm font-mono text-muted-foreground hover:text-primary py-1.5 transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
               >
                 <span>Formula Derivation Audit Log</span>
                 {showDerivationLog ? (
-                  <ChevronUp className="h-4 w-4" />
+                  <ChevronUp className="h-4 w-4" aria-hidden="true" />
                 ) : (
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown className="h-4 w-4" aria-hidden="true" />
                 )}
               </button>
 
               {showDerivationLog && (
                 <div
+                  id="sandbox-derivation-log"
                   data-testid="sandbox-derivation-log"
                   className="mt-3 p-4 md:p-5 rounded-[8px] bg-inset border border-outline/70 space-y-2 font-mono text-xs md:text-sm text-foreground leading-relaxed tabular-nums"
                 >
@@ -596,7 +600,7 @@ export function AtsSandboxSection() {
               <div className="flex items-center gap-2">
                 {isCompiling ? (
                   <span className="text-xs font-mono text-primary flex items-center gap-1.5">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Compiling...
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Compiling…
                   </span>
                 ) : (
                   <span className="text-xs font-mono text-signal flex items-center gap-1.5">
@@ -616,7 +620,7 @@ export function AtsSandboxSection() {
                   {isCompiling && !svgOutput ? (
                     <div className="flex flex-col items-center gap-3 text-muted-foreground text-xs md:text-sm font-mono">
                       <Loader2 className="h-7 w-7 animate-spin text-primary" />
-                      <span>Initializing Typst WASM compiler...</span>
+                      <span>Initializing Typst WASM compiler…</span>
                     </div>
                   ) : compileError ? (
                     <div className="text-xs md:text-sm text-status-danger font-mono p-4 border border-status-danger/40 rounded-[8px] bg-status-danger/10">
@@ -633,14 +637,14 @@ export function AtsSandboxSection() {
                       </div>
                     ) : sanitizedSvg?.raw === svgOutput && sanitizedSvg.clean ? (
                       <div
-                        className="typst-preview-svg w-full bg-paper text-paper-ink rounded-[6px] border border-[#d8dce0] shadow-xl overflow-hidden p-2 [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-w-full"
+                        className="typst-preview-svg w-full bg-paper text-paper-ink rounded-[6px] border border-hairline shadow-xl overflow-hidden p-2 [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-w-full"
                         style={{ maxWidth: "580px" }}
                         dangerouslySetInnerHTML={{ __html: sanitizedSvg.clean }}
                       />
                     ) : (
                       <div className="flex flex-col items-center gap-3 text-muted-foreground text-xs md:text-sm font-mono">
                         <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                        <span>Verifying SVG preview...</span>
+                        <span>Verifying SVG preview…</span>
                       </div>
                     )
                   ) : (
@@ -681,6 +685,7 @@ export function AtsSandboxSection() {
                   {isEditingSnippet ? (
                     <textarea
                       data-testid="sandbox-typst-textarea"
+                      aria-label="Resume Typst source"
                       value={customSnippet}
                       onChange={(e) => setCustomSnippet(e.target.value)}
                       rows={14}
@@ -688,13 +693,17 @@ export function AtsSandboxSection() {
                       spellCheck={false}
                     />
                   ) : (
-                    <pre
+                    <button
+                      type="button"
                       onClick={() => setIsEditingSnippet(true)}
                       title="Click to edit snippet"
-                      className="flex-1 p-4 md:p-6 bg-inset border border-outline/70 rounded-[8px] font-mono text-xs md:text-sm text-on-surface-variant leading-relaxed overflow-auto max-h-[620px] whitespace-pre-wrap selection:bg-primary/30 cursor-pointer hover:border-outline transition-colors"
+                      aria-label="Edit resume snippet"
+                      className="flex-1 p-4 md:p-6 bg-inset border border-outline/70 rounded-[8px] font-mono text-xs md:text-sm text-on-surface-variant text-left leading-relaxed overflow-auto max-h-[620px] whitespace-pre-wrap selection:bg-primary/30 cursor-pointer hover:border-outline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     >
-                      {customSnippet}
-                    </pre>
+                      <pre className="font-mono text-inherit whitespace-pre-wrap">
+                        {customSnippet}
+                      </pre>
+                    </button>
                   )}
                 </div>
               )}

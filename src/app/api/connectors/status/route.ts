@@ -8,19 +8,19 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const totalJobs = await prisma.ingestedJob.count();
-    const canadianJobs = await prisma.ingestedJob.count({
-      where: { isCanadianEligible: true },
-    });
-    const remoteJobs = await prisma.ingestedJob.count({
-      where: { workplaceType: "REMOTE" },
-    });
-
-    // Get latest sync log per source
-    const logs = await prisma.connectorSyncLog.findMany({
-      orderBy: { executedAt: "desc" },
-      take: 20,
-    });
+    const [totalJobs, canadianJobs, remoteJobs, logs] = await Promise.all([
+      prisma.ingestedJob.count(),
+      prisma.ingestedJob.count({
+        where: { isCanadianEligible: true },
+      }),
+      prisma.ingestedJob.count({
+        where: { workplaceType: "REMOTE" },
+      }),
+      prisma.connectorSyncLog.findMany({
+        orderBy: { executedAt: "desc" },
+        take: 20,
+      }),
+    ]);
 
     // Check connector health
     const providers = await Promise.all(
@@ -54,7 +54,7 @@ export async function GET() {
         recentLogs: logs.slice(0, 10),
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[API connectors/status] Error:", sanitizeError(err));
     return NextResponse.json(
       { success: false, error: "Failed to fetch status" },

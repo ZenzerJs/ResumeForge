@@ -2,6 +2,7 @@ import { safeFetch } from "../http";
 import { filterInternshipListings } from "../internship-filter";
 import { sanitizeJobPayload } from "../sanitize";
 import { ConnectorClient, RawJobListing } from "../types";
+import { sanitizeError } from "@/lib/ai/redact";
 
 export const ASHBY_CURATED_BOARDS = [
   { slug: "cohere", name: "Cohere" },
@@ -88,7 +89,7 @@ export class AshbyConnector implements ConnectorClient {
           });
         }
       } catch (err) {
-        console.error(`[Ashby] Failed board ${board.slug}:`, err);
+        console.error(`[Ashby] Failed board ${board.slug}:`, sanitizeError(err));
       }
     }
 

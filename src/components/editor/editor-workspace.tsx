@@ -58,8 +58,7 @@ import {
   isCustomGuestDraftSource,
 } from "@/components/auth/guest-migration-modal";
 import { EditorWorkspaceSkeleton } from "@/components/editor/editor-workspace-skeleton";
-import { resolveDefaultEditorMode } from "@/components/editor/code-editor";
-import { createBlankResumeTypst } from "@/components/editor/resume-form-builder";
+import { resolveDefaultEditorMode, createBlankResumeTypst } from "@/lib/editor/mode-utils";
 import {
   buildLibraryHref,
   normalizeEditorModeParam,
@@ -176,6 +175,7 @@ export function EditorWorkspace() {
   const [activeTab, setActiveTab] = useState<WorkspacePanelTab>("editor");
   const modeParam = normalizeEditorModeParam(searchParams.get("mode"));
   const hasExplicitModeRef = useRef<boolean>(modeParam !== null);
+  const hasResolvedDocModeRef = useRef<boolean>(false);
   const [editorMode, setEditorMode] = useState<"code" | "visual">(() =>
     modeParam === "code" ? "code" : "visual"
   );
@@ -423,7 +423,7 @@ export function EditorWorkspace() {
         const text = await res.text();
         if (process.env.NEXT_PUBLIC_RESUME_LAYOUT_V2 === "true") {
           const [{ parseTypstToStructuredModel, legacyFormToResumeDocument }, { renderResumeDocument }] = await Promise.all([
-            import("./resume-form-builder"), import("@/lib/typst/resume-document"),
+            import("@/lib/editor/mode-utils"), import("@/lib/typst/resume-document"),
           ]);
           return renderResumeDocument(legacyFormToResumeDocument(parseTypstToStructuredModel(text)));
         }
@@ -444,7 +444,7 @@ export function EditorWorkspace() {
    */
   const loadGeneration = useRef(0);
 
-  const loadFrozenMasterSnapshot = useCallback(async () => {
+  const loadFrozenMasterSnapshot = useCallback(async (prefetchedResumesJson?: unknown) => {
     try {
       const demoConfig = await fetchDemoConfig();
       setIsDemoMode(Boolean(demoConfig?.demoMode));
@@ -453,15 +453,20 @@ export function EditorWorkspace() {
         setMasterFacts(rawSnapshot ? JSON.parse(rawSnapshot) as ResumeFacts : null);
         return;
       }
-      const [resumesRes, evidRes] = await Promise.all([
-        fetch("/api/resumes").catch(() => null),
-        fetch("/api/evidence").catch(() => null),
-      ]);
-      const resumesJson = resumesRes && resumesRes.ok ? await resumesRes.json().catch(() => null) : null;
+
+      let resumesJson = prefetchedResumesJson ?? null;
+      const evidResPromise = fetch("/api/evidence").catch(() => null);
+
+      if (!resumesJson) {
+        const resumesRes = await fetch("/api/resumes").catch(() => null);
+        resumesJson = resumesRes && resumesRes.ok ? await resumesRes.json().catch(() => null) : null;
+      }
+
+      const evidRes = await evidResPromise;
       const evidJson = evidRes && evidRes.ok ? await evidRes.json().catch(() => null) : null;
 
-      const resumesList = Array.isArray(resumesJson?.data) ? resumesJson.data : [];
-      const frozenMaster = resumesList.find((r: { isMaster?: boolean; typstSource?: string }) => r.isMaster && r.typstSource);
+      const resumesList = Array.isArray((resumesJson as { data?: unknown[] })?.data) ? (resumesJson as { data: Array<{ isMaster?: boolean; typstSource?: string }> }).data : [];
+      const frozenMaster = resumesList.find((r) => r.isMaster && r.typstSource);
       const verifiedEvidence = Array.isArray(evidJson?.data) ? evidJson.data : [];
 
       if (frozenMaster?.typstSource) {
@@ -477,6 +482,7 @@ export function EditorWorkspace() {
   const loadCanonicalDocument = useCallback(async () => {
     const generation = ++loadGeneration.current;
     const current = () => generation === loadGeneration.current;
+    hasResolvedDocModeRef.current = false;
     setIsLoadingDocument(true);
     setDocumentError(null);
     const persistedAiPatched =
@@ -513,9 +519,9 @@ export function EditorWorkspace() {
         }
         return;
       }
-      void loadFrozenMasterSnapshot();
       // Priority 1: variantId param
       if (variantIdParam && variantIdParam.trim().length > 0) {
+        void loadFrozenMasterSnapshot();
         const res = await fetch(`/api/variants/${variantIdParam.trim()}`);
         const json = await res.json();
         if (res.ok && json.success && json.data) {
@@ -538,6 +544,7 @@ export function EditorWorkspace() {
 
       // Priority 2: resumeId param
       if (resumeIdParam && resumeIdParam.trim().length > 0) {
+        void loadFrozenMasterSnapshot();
         const res = await fetch(`/api/resumes/${resumeIdParam.trim()}`);
         const json = await res.json();
         if (res.ok && json.success && json.data) {
@@ -561,6 +568,8 @@ export function EditorWorkspace() {
       // Priority 3: No param -> fetch canonical PostgreSQL master resume
       const res = await fetch("/api/resumes");
       const json = await res.json();
+      // Share the response with loadFrozenMasterSnapshot to avoid a duplicate fetch
+      void loadFrozenMasterSnapshot(json && Array.isArray(json.data) ? json : { data: [] });
       if (res.ok && json.success && Array.isArray(json.data) && json.data.length > 0) {
         if (!current()) return;
         const master = json.data.find((r: { isMaster: boolean }) => r.isMaster) || json.data[0];
@@ -632,8 +641,14 @@ export function EditorWorkspace() {
   }, [loadCanonicalDocument]);
 
   useEffect(() => {
-    if (isLoadingDocument || !source || hasExplicitModeRef.current) return;
-    setEditorMode(resolveDefaultEditorMode(source, null));
+    if (isLoadingDocument) {
+      hasResolvedDocModeRef.current = false;
+      return;
+    }
+    if (!source || hasExplicitModeRef.current || hasResolvedDocModeRef.current) return;
+    hasResolvedDocModeRef.current = true;
+    const nextMode = resolveDefaultEditorMode(source, null);
+    setEditorMode((prev) => (prev === nextMode ? prev : nextMode));
   }, [isLoadingDocument, source]);
 
   useEffect(() => {
@@ -707,6 +722,7 @@ export function EditorWorkspace() {
 
   // Task 9.3: Ctrl+S / Cmd+S save & instant recompile handler
   const isSavingShortcutRef = useRef<boolean>(false);
+  const shortcutToastTimerRef = useRef<number | null>(null);
   const sourceRef = useRef<string>(source);
 
   useEffect(() => {
@@ -717,11 +733,23 @@ export function EditorWorkspace() {
     const currentSource = sourceRef.current;
     if (typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEY, currentSource);
+      if (shortcutToastTimerRef.current !== null) {
+        window.clearTimeout(shortcutToastTimerRef.current);
+        shortcutToastTimerRef.current = null;
+      }
     }
     setShowShortcutSaveToast(true);
-    scheduleUiTimer(() => setShowShortcutSaveToast(false), 2000);
 
     await runCompile(currentSource);
+
+    if (typeof window !== "undefined") {
+      const timerId = window.setTimeout(() => {
+        shortcutToastTimerRef.current = null;
+        setShowShortcutSaveToast(false);
+      }, 2200);
+      shortcutToastTimerRef.current = timerId;
+      uiTimers.current.push(timerId);
+    }
   }, [runCompile]);
 
   useEffect(() => {
@@ -778,23 +806,28 @@ export function EditorWorkspace() {
       type: "LOCAL_FALLBACK",
       title: "Blank Resume",
     });
+    hasResolvedDocModeRef.current = false;
     setSource(blankSource);
     setBaselineSource(blankSource);
     setSvg(null);
     setError(null);
   }, []);
 
+  const handleExpandAiPanel = useCallback(() => {
+    if (isXlDesktopRef.current && isAiCollapsedRef.current && !isAiPoppedOutRef.current) {
+      setDockCollapsed(false, false);
+    } else if (isDesktopRef.current && !isXlDesktopRef.current) {
+      setIsAiSheetOpen(true);
+    }
+    setActiveTab("ai");
+  }, [setDockCollapsed]);
+
   const handleTriggerRepair = useCallback(
     (context: { compileError: string; line?: number; column?: number; sourceExcerpt?: string }) => {
       setRepairContext(context);
-      if (isXlDesktopRef.current && isAiCollapsedRef.current && !isAiPoppedOutRef.current) {
-        setDockCollapsed(false, false);
-      } else if (isDesktopRef.current && !isXlDesktopRef.current) {
-        setIsAiSheetOpen(true);
-      }
-      setActiveTab("ai");
+      handleExpandAiPanel();
     },
-    [setDockCollapsed]
+    [handleExpandAiPanel]
   );
 
   const handleTabListKeyDown = useCallback(
@@ -837,7 +870,14 @@ export function EditorWorkspace() {
     [runCompile, handleSourceChange]
   );
 
-  const handleResetTemplate = async () => {
+  const [pendingResetTemplate, setPendingResetTemplate] = useState<boolean>(false);
+
+  const handleResetTemplate = () => {
+    setPendingResetTemplate(true);
+  };
+
+  const performResetTemplate = async () => {
+    setPendingResetTemplate(false);
     setHasAiPatchedBuffer(false);
     if (typeof window !== "undefined") {
       try {
@@ -850,6 +890,7 @@ export function EditorWorkspace() {
     if (docMetadata.type === "LOCAL_FALLBACK") {
       setDocMetadata({ type: "LOCAL_FALLBACK", title: "Starter Template" });
     }
+    hasResolvedDocModeRef.current = false;
     handleSourceChange(starter);
   };
 
@@ -1131,10 +1172,21 @@ export function EditorWorkspace() {
             {showShortcutSaveToast && (
               <div
                 data-testid="shortcut-save-toast"
-                className="flex items-center gap-1.5 px-2.5 py-0.5 bg-elevated border border-status-success/60 text-foreground text-xs font-semibold rounded transition-all"
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-0.5 bg-elevated border text-foreground text-xs font-semibold rounded transition-colors",
+                  error ? "border-status-warning/60" : "border-status-success/60"
+                )}
               >
-                <Check className="h-3.5 w-3.5 text-status-success" />
-                <span>Draft Saved &amp; Recompiled</span>
+                {error ? (
+                  <AlertTriangle className="h-3.5 w-3.5 text-status-warning" aria-hidden="true" />
+                ) : (
+                  <Check className="h-3.5 w-3.5 text-status-success" aria-hidden="true" />
+                )}
+                <span>
+                  {error
+                    ? "Draft Saved — Fix syntax error to update preview"
+                    : "Draft Saved & Recompiled"}
+                </span>
               </div>
             )}
             <Button
@@ -1146,8 +1198,10 @@ export function EditorWorkspace() {
               className="min-h-10 xl:min-h-0 xl:h-7 px-2.5 text-xs border-outline/70 bg-transparent text-text-secondary hover:bg-elevated hover:text-foreground gap-1.5 focus-visible:ring-2 focus-visible:ring-ring"
               title="Discard unsaved live buffer changes and reload persisted Master Resume"
             >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Revert to Master</span>
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>
+                Revert<span className="hidden sm:inline"> to Master</span>
+              </span>
             </Button>
 
             <Button
@@ -1232,6 +1286,7 @@ export function EditorWorkspace() {
       >
 
       {/* Task B1: Explicit Loading & Recoverable Error States */}
+      <h1 className="sr-only">Resume Editor</h1>
       {isLoadingDocument && (
         <div
           data-testid="editor-loading-state"
@@ -1244,7 +1299,6 @@ export function EditorWorkspace() {
       )}
 
       {(documentError ||
-        showSampleResumeBanner ||
         showConversionFallbackBanner ||
         showConversionAiBanner ||
         lastSnapshotId ||
@@ -1270,28 +1324,6 @@ export function EditorWorkspace() {
             </div>
           )}
 
-          {showSampleResumeBanner && (
-            <div
-              data-testid="sample-resume-banner"
-              className="flex flex-wrap items-center justify-between gap-2 px-4 py-1.5 bg-primary/10 border-b border-primary/30 text-xs text-foreground"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <FileText className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
-                <span>
-                  <strong className="font-semibold text-primary">Sample Resume Loaded</strong> — This placeholder example uses fictional experience so you can explore the editor.
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleStartBlankResume}
-                data-testid="start-blank-resume-btn"
-                className="shrink-0 rounded border border-primary/40 bg-elevated px-2.5 py-0.5 text-xs font-semibold text-foreground hover:bg-muted transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                Start Blank Resume
-              </button>
-            </div>
-          )}
-
           {/* Task 9.1: PDF Conversion Status Banners (suppressed on frozen Master Resume) */}
           {showConversionFallbackBanner && (
             <div
@@ -1305,11 +1337,12 @@ export function EditorWorkspace() {
               <button
                 type="button"
                 onClick={handleDismissConversionBanner}
+                aria-label="Dismiss conversion banner"
                 className="p-1 text-primary/80 hover:text-foreground transition inline-flex items-center justify-center rounded"
                 title="Dismiss banner"
                 data-testid="dismiss-conversion-banner-btn"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </div>
           )}
@@ -1317,20 +1350,21 @@ export function EditorWorkspace() {
           {showConversionAiBanner && (
             <div
               data-testid="pdf-conversion-ai-banner"
-              className="flex items-center justify-between gap-2 px-4 py-1.5 bg-status-success/15 border-b border-status-success/35 text-xs text-status-info"
+              className="flex items-center justify-between gap-2 px-4 py-1.5 bg-status-success/15 border-b border-status-success/35 text-xs text-status-success-soft"
             >
               <div className="flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 shrink-0 text-status-success" />
+                <Sparkles className="h-3.5 w-3.5 shrink-0 text-status-success-soft" />
                 <span>AI-Converted Draft — Converted using BYOK AI provider</span>
               </div>
               <button
                 type="button"
                 onClick={handleDismissConversionBanner}
-                className="p-1 text-status-info hover:text-foreground transition inline-flex items-center justify-center rounded"
+                aria-label="Dismiss conversion banner"
+                className="p-1 text-status-success-soft hover:text-foreground transition inline-flex items-center justify-center rounded"
                 title="Dismiss banner"
                 data-testid="dismiss-conversion-banner-btn"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </div>
           )}
@@ -1361,9 +1395,9 @@ export function EditorWorkspace() {
           {undoSuccess && (
             <div
               data-testid="undo-success-banner"
-              className="flex items-center gap-2 px-4 py-1.5 bg-status-success/15 border-b border-status-success/35 text-xs text-status-info"
+              className="flex items-center gap-2 px-4 py-1.5 bg-status-success/15 border-b border-status-success/35 text-xs text-status-success-soft"
             >
-              <Check className="h-3.5 w-3.5 text-status-success" />
+              <Check className="h-3.5 w-3.5 text-status-success-soft" />
               <span>Restored Master Resume to pre-overwrite snapshot!</span>
             </div>
           )}
@@ -1373,7 +1407,7 @@ export function EditorWorkspace() {
               data-testid="evidence-extract-toast"
               className="flex items-center gap-2 px-4 py-1.5 bg-status-info/10 border-b border-status-info/30 text-xs text-foreground"
             >
-              <BookOpen className="h-3.5 w-3.5 text-status-info shrink-0" />
+              <BookOpen className="h-3.5 w-3.5 text-status-success-soft shrink-0" />
               <span>{evidenceExtractToast}</span>
               {evidenceExtractToast.includes("Library") && (
                 <Link
@@ -1391,7 +1425,7 @@ export function EditorWorkspace() {
                         : null),
                     mode: normalizeEditorModeParam(searchParams.get("mode")),
                   })}
-                  className="ml-auto text-status-info underline underline-offset-2 hover:text-foreground"
+                  className="ml-auto text-status-success-soft underline underline-offset-2 hover:text-foreground"
                 >
                   Open Library
                 </Link>
@@ -1451,7 +1485,11 @@ export function EditorWorkspace() {
                 <PortalSlot host={hosts.code} className="h-full min-h-0" />
               </ResizablePanel>
 
-              <ResizableHandle withHandle onDoubleClick={handleLayoutReset} />
+              <ResizableHandle
+                withHandle
+                aria-label="Resize editor and preview panes"
+                onDoubleClick={handleLayoutReset}
+              />
 
               {/* Panel 2: Live Preview */}
               <ResizablePanel
@@ -1466,7 +1504,12 @@ export function EditorWorkspace() {
 
               {isXlDesktop && (
                 <>
-                  <ResizableHandle withHandle disabled={isAiPoppedOut} onDoubleClick={handleLayoutReset} />
+                  <ResizableHandle
+                    withHandle
+                    disabled={isAiPoppedOut}
+                    aria-label="Resize preview and AI assistant panes"
+                    onDoubleClick={handleLayoutReset}
+                  />
 
                   {/* Panel 3: AI Sidebar (Collapsible, >= xl) */}
                   <ResizablePanel
@@ -1652,12 +1695,41 @@ export function EditorWorkspace() {
       {/* Persistent pane portals preserve CodeMirror selection/undo and AI state across tabs and resizes */}
       {hosts &&
         createPortal(
-          <CodeEditor
-            value={source}
-            onChange={handleSourceChange}
-            mode={editorMode}
-            onModeChange={handleEditorModeChange}
-          />,
+          <div className="flex h-full min-h-0 flex-col">
+            {showSampleResumeBanner && (
+              <div
+                data-testid="sample-resume-banner"
+                className="flex shrink-0 items-center justify-between gap-2 border-x border-t border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-foreground"
+              >
+                <span className="flex min-w-0 items-center gap-1.5 truncate">
+                  <FileText className="h-3 w-3 shrink-0 text-primary" aria-hidden="true" />
+                  <span className="truncate">
+                    <strong className="font-semibold text-primary">Sample Resume Loaded</strong>
+                    <span className="hidden sm:inline text-text-secondary">
+                      {" "}
+                      — Fictional placeholder example.
+                    </span>
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleStartBlankResume}
+                  data-testid="start-blank-resume-btn"
+                  className="shrink-0 rounded border border-primary/40 bg-elevated px-2 py-0.5 text-xs font-semibold text-foreground hover:bg-muted transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  Start Blank Resume
+                </button>
+              </div>
+            )}
+            <div className="min-h-0 flex-1">
+              <CodeEditor
+                value={source}
+                onChange={handleSourceChange}
+                mode={editorMode}
+                onModeChange={handleEditorModeChange}
+              />
+            </div>
+          </div>,
           hosts.code
         )}
       {hosts &&
@@ -1700,6 +1772,7 @@ export function EditorWorkspace() {
             repairContext={repairContext}
             onDismissRepair={() => setRepairContext(null)}
             onModeChange={setAiMode}
+            onRequestExpand={handleExpandAiPanel}
           />,
           hosts.ai
         )}
@@ -1723,6 +1796,21 @@ export function EditorWorkspace() {
         onConfirm={() =>
           performRevertToMaster(pendingRevertDoc?.id ?? null)
         }
+      />
+
+      <ConfirmDialog
+        open={pendingResetTemplate}
+        onOpenChange={(open) => {
+          if (!open) setPendingResetTemplate(false);
+        }}
+        title="Reset Template"
+        description="Reset to the starter template? Your current edits will be replaced."
+        confirmLabel="Reset Template"
+        tone="destructive"
+        dialogTestId="reset-template-confirm-modal"
+        confirmTestId="confirm-reset-template-btn"
+        cancelTestId="cancel-reset-template-btn"
+        onConfirm={() => void performResetTemplate()}
       />
     </AppShell>
   );

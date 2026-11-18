@@ -23,28 +23,28 @@ const BLOB_ORBS: BlobOrbConfig[] = [
     animClass: "ambient-blob-a",
     positionClass: "-left-24 top-8 h-[460px] w-[560px]",
     delay: "-3s",
-    background: (s) => featheredOrbGradient("245 166 35", 0.16, s),
+    background: (s) => featheredOrbGradient("var(--accent-action)", 0.16, s),
   },
   {
     id: 1,
     animClass: "ambient-blob-b",
     positionClass: "-right-20 top-16 h-[500px] w-[600px]",
     delay: "-7.5s",
-    background: (s) => featheredOrbGradient("76 141 255", 0.15, s),
+    background: (s) => featheredOrbGradient("var(--accent-contrast)", 0.15, s),
   },
   {
     id: 2,
     animClass: "ambient-blob-c",
     positionClass: "left-[16%] top-[36%] h-[440px] w-[540px]",
     delay: "-12s",
-    background: (s) => featheredOrbGradient("217 119 6", 0.14, s),
+    background: (s) => featheredOrbGradient("var(--accent-secondary)", 0.14, s),
   },
   {
     id: 3,
     animClass: "ambient-blob-d",
     positionClass: "right-[18%] top-[28%] h-[470px] w-[570px]",
     delay: "-5s",
-    background: (s) => featheredOrbGradient("56 189 248", 0.13, s),
+    background: (s) => featheredOrbGradient("var(--accent-action)", 0.13, s),
   },
   {
     id: 4,
@@ -148,8 +148,7 @@ export function WorkspaceAtmosphere({ variant }: WorkspaceAtmosphereProps) {
       {/* 7 pure CSS roaming Ember Ink & Electric Blue orbs */}
       <AmbientColorBlobs testId="ambient-floating-blobs" variant={variant} />
 
-      {/* 1px ombre motif hairline under the 64px top nav */}
-      <div className="ombre-divider absolute inset-x-0 top-16 h-px" />
+      {/* Ombre divider: TopNav provides the primary ombre-divider at its boundary; unconditional top-16 divider removed */}
     </div>
   );
 }

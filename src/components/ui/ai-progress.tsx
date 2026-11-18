@@ -139,7 +139,7 @@ export function AiProgress({
       aria-live="polite"
       data-testid="ai-progress-container"
       className={cn(
-        "rounded-lg border p-3.5 shadow-sm transition-all",
+        "rounded-lg border p-3.5 shadow-sm transition-colors",
         isDone && "bg-status-success/10 border-status-success/35 text-status-success-soft",
         isError && "bg-status-danger/10 border-status-danger/30 text-status-danger",
         !isDone && !isError && "bg-inset border-hairline text-foreground",
@@ -226,7 +226,7 @@ export function AiProgress({
                 >
                   <div
                     className={cn(
-                      "h-1.5 w-full rounded-full transition-all duration-300",
+                      "h-1.5 w-full rounded-full transition-colors duration-300",
                       isPast && "bg-status-success",
                       isCurrent && "bg-status-warning animate-pulse",
                       !isPast && !isCurrent && "bg-elevated"

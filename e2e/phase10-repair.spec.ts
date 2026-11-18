@@ -5,6 +5,7 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     await page.goto("/editor");
     await page.waitForLoadState("networkidle");
 
+    await page.locator('[data-testid="panel-code"] [data-testid="editor-mode-code"]').click();
     const editor = page.locator('[data-testid="panel-code"] .cm-content');
     await expect(editor).toBeVisible();
 
@@ -33,6 +34,7 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     await page.goto("/editor");
     await page.waitForLoadState("networkidle");
 
+    await page.locator('[data-testid="panel-code"] [data-testid="editor-mode-code"]').click();
     const editor = page.locator('[data-testid="panel-code"] .cm-content');
     await expect(editor).toBeVisible();
 
@@ -88,6 +90,7 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     await page.goto("/editor");
     await page.waitForLoadState("networkidle");
 
+    await page.locator('[data-testid="panel-code"] [data-testid="editor-mode-code"]').click();
     const editor = page.locator('[data-testid="panel-code"] .cm-content');
     await expect(editor).toBeVisible();
 
@@ -112,6 +115,11 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
   test("3b. AI Sidebar renders clean UTF-8 punctuation without mojibake across Tailor states", async ({ page }) => {
     await page.goto("/editor");
     await page.waitForLoadState("networkidle");
+
+    const expandBtn = page.locator('[data-testid="expand-ai-sidebar-btn"]');
+    if (await expandBtn.isVisible().catch(() => false)) {
+      await expandBtn.click();
+    }
 
     const aiPanel = page.locator('[data-testid="panel-ai"]');
     await page.locator('[data-testid="ai-tab-tailor"]').click();
@@ -231,6 +239,7 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     await page.goto("/editor");
     await page.waitForLoadState("networkidle");
 
+    await page.locator('[data-testid="panel-code"] [data-testid="editor-mode-code"]').click();
     const editor = page.locator('[data-testid="panel-code"] .cm-content');
     await expect(editor).toBeVisible();
 
@@ -283,6 +292,7 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     await page.goto("/editor");
     await page.waitForLoadState("networkidle");
 
+    await page.locator('[data-testid="panel-code"] [data-testid="editor-mode-code"]').click();
     const editor = page.locator('[data-testid="panel-code"] .cm-content');
     await expect(editor).toBeVisible({ timeout: 15000 });
 

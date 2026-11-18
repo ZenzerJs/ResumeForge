@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2, Lock, Mail, User } from "lucide-react";
+import { BrandMark } from "@/components/design-system/brand-mark";
 import { fetchDemoConfig } from "@/components/auth/session-user";
 import { readApiResponse } from "@/lib/api-error";
 
@@ -228,11 +229,8 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
       className={`w-full max-w-md rounded-[10px] border border-border bg-card p-8 shadow-2xl ${className}`}
     >
       <div className="mb-6">
-        <div className="flex items-center gap-2.5 mb-2">
-          <div className="w-8 h-8 rounded-[6px] bg-primary flex items-center justify-center font-bold text-primary-foreground text-base">
-            R
-          </div>
-          <span className="text-xl font-bold tracking-tight text-foreground">ResumeForge</span>
+        <div className="mb-2">
+          <BrandMark />
         </div>
         <h1 className="text-2xl font-bold text-foreground tracking-tight">
           {effectiveMode === "signup" ? "Create your account" : "Welcome back"}
@@ -266,7 +264,7 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
                 if (error) setError(null);
               }}
               placeholder="e.g. janesmith"
-              className="h-11 w-full rounded-[6px] border border-outline/70 bg-input px-3 pl-10 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="h-11 w-full rounded-[6px] border border-outline/70 bg-input px-3 pl-10 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             />
             <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
@@ -295,7 +293,7 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
               if (error) setError(null);
             }}
             placeholder={effectiveMode === "signup" ? "name@example.com" : "Email or username"}
-            className="h-11 w-full rounded-[6px] border border-outline/70 bg-input px-3 pl-10 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="h-11 w-full rounded-[6px] border border-outline/70 bg-input px-3 pl-10 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           />
           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         </div>
@@ -322,7 +320,7 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
               if (error) setError(null);
             }}
             placeholder={effectiveMode === "signup" ? "Minimum 8 characters" : "Enter your password"}
-            className="h-11 w-full rounded-[6px] border border-outline/70 bg-input px-3 pl-10 pr-12 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="h-11 w-full rounded-[6px] border border-outline/70 bg-input px-3 pl-10 pr-12 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           />
           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <button
@@ -359,7 +357,7 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
                 if (error) setError(null);
               }}
               placeholder="Re-enter your password"
-              className="h-11 w-full rounded-[6px] border border-outline/70 bg-input px-3 pl-10 pr-12 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="h-11 w-full rounded-[6px] border border-outline/70 bg-input px-3 pl-10 pr-12 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             />
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <button
@@ -376,21 +374,12 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
       ) : (
         <div
           data-testid="login-recovery-notice"
-          className="mb-5 rounded-[6px] border border-hairline bg-inset px-3 py-2.5 text-xs text-on-surface-variant leading-relaxed"
+          className="mb-5 border-t border-hairline pt-3 text-xs text-on-surface-variant leading-relaxed"
         >
           <p className="font-semibold text-foreground">Forgot your password?</p>
           <p className="mt-0.5 text-muted-foreground">
             Self-serve email password reset is not enabled yet. If you are locked out, contact your instance
-            administrator or{" "}
-            <a
-              href="https://github.com/ZenzerJs/ResumeForge/issues"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline rounded-[2px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              open a recovery request on GitHub
-            </a>
-            , or continue as a guest in this browser.
+            administrator or continue as a guest in this browser.
           </p>
         </div>
       )}
@@ -410,7 +399,7 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
         data-testid="login-submit-btn"
         disabled={isSubmitting}
         aria-busy={isSubmitting}
-        className="flex h-11 w-full items-center justify-center rounded-[6px] bg-primary font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition disabled:opacity-50 text-sm cursor-pointer"
+        className="flex h-11 w-full items-center justify-center rounded-[6px] bg-primary font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-colors disabled:opacity-50 text-sm cursor-pointer"
       >
         {isSubmitting ? (
           <>
@@ -428,7 +417,7 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
         {signupEnabled ? <button
           type="button"
           data-testid="login-mode-toggle-btn"
-          className="text-xs md:text-sm text-muted-foreground hover:text-primary transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded py-1 cursor-pointer"
+          className="text-xs md:text-sm text-muted-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded py-1 cursor-pointer"
           onClick={() => {
             setError(null);
             setConfirmPassword("");
@@ -443,7 +432,7 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
         <Link
           href="/"
           data-testid="login-guest-btn"
-          className="flex h-10 w-full items-center justify-center rounded-[6px] border border-outline/70 text-xs md:text-sm text-on-surface-variant hover:bg-elevated hover:text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="flex h-10 w-full items-center justify-center rounded-[6px] border border-outline/70 text-xs md:text-sm text-on-surface-variant hover:bg-elevated hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           Continue as guest
         </Link>

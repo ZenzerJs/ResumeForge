@@ -20,6 +20,7 @@ import { fetchDemoConfig } from "@/components/auth/session-user";
 import { downloadBlob } from "@/lib/utils";
 import { extractCandidateNameFromTypst, replacePlaceholderSignature } from "@/lib/export/resume-text";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useRovingTablist } from "@/lib/hooks/use-roving-tablist";
 
 interface CoverLetterPanelProps {
   jobId: string;
@@ -62,6 +63,10 @@ export function CoverLetterPanel({
   const coverLetter = draftCoverLetter !== undefined ? draftCoverLetter : internalCoverLetter;
   const setCoverLetter = onDraftCoverLetterChange ?? setInternalCoverLetter;
   const [activeFormat, setActiveFormat] = useState<"markdown" | "text">("markdown");
+  const { tablistRef: formatTablistRef, getTabProps: getFormatTabProps } = useRovingTablist(
+    activeFormat === "markdown" ? 0 : 1
+  );
+  const generateAbortRef = React.useRef<AbortController | null>(null);
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -85,6 +90,7 @@ export function CoverLetterPanel({
     return () => {
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      generateAbortRef.current?.abort();
     };
   }, []);
 
@@ -164,6 +170,10 @@ export function CoverLetterPanel({
   }, [jobId]);
 
   const performGenerateCoverLetter = async () => {
+    generateAbortRef.current?.abort();
+    const controller = new AbortController();
+    generateAbortRef.current = controller;
+
     setIsGenerating(true);
     setGenerateError(null);
     setCoverLetter(null);
@@ -171,6 +181,7 @@ export function CoverLetterPanel({
     try {
       const providerConfig = (await resolveClientProviderConfig()) || undefined;
       const demoConfig = await fetchDemoConfig();
+      if (controller.signal.aborted) return;
       const demoContext = demoConfig.demoMode ? getDemoContextFromBrowser() : undefined;
       if (demoConfig.demoMode && !demoContext) {
         setGenerateError("Add a local resume and verified evidence before generating a cover letter.");
@@ -187,6 +198,7 @@ export function CoverLetterPanel({
       const res = await fetch(demoConfig.demoMode ? "/api/demo/generate-cover-letter" : "/api/ai/generate-cover-letter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           jobId,
           variantId,
@@ -202,6 +214,7 @@ export function CoverLetterPanel({
       });
 
       const json = await res.json();
+      if (controller.signal.aborted) return;
 
       if (!res.ok || !json.success) {
         setGenerateError(json.error || json.reason || "Failed to generate cover letter.");
@@ -215,9 +228,12 @@ export function CoverLetterPanel({
       setCoverLetter(generatedDraft);
       if (demoConfig.demoMode) localStorage.setItem(`resumeforge_demo_cover_letter_${jobId}`, JSON.stringify(generatedDraft));
     } catch (err) {
+      if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) return;
       setGenerateError(`Generation error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setIsGenerating(false);
+      if (!controller.signal.aborted) {
+        setIsGenerating(false);
+      }
     }
   };
 
@@ -364,10 +380,18 @@ export function CoverLetterPanel({
           {/* Format selector and action toolbar */}
           <div className="bg-inset border border-hairline rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
             {/* Format toggle */}
-            <div className="flex items-center gap-1.5">
+            <div
+              ref={formatTablistRef}
+              role="tablist"
+              aria-label="Cover letter format"
+              className="flex items-center gap-1.5"
+            >
               <span className="text-xs text-muted-foreground font-medium mr-1">View Format:</span>
               <button
                 type="button"
+                role="tab"
+                aria-selected={activeFormat === "markdown"}
+                {...getFormatTabProps(0)}
                 onClick={() => setActiveFormat("markdown")}
                 data-testid="format-markdown-btn"
                 className={`px-3 py-1 rounded-md text-xs font-mono transition flex items-center gap-1.5 ${
@@ -376,11 +400,14 @@ export function CoverLetterPanel({
                     : "bg-elevated text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <FileCode2 className="h-3.5 w-3.5" />
+                <FileCode2 className="h-3.5 w-3.5" aria-hidden="true" />
                 Markdown
               </button>
               <button
                 type="button"
+                role="tab"
+                aria-selected={activeFormat === "text"}
+                {...getFormatTabProps(1)}
                 onClick={() => setActiveFormat("text")}
                 data-testid="format-text-btn"
                 className={`px-3 py-1 rounded-md text-xs font-mono transition flex items-center gap-1.5 ${
@@ -389,7 +416,7 @@ export function CoverLetterPanel({
                     : "bg-elevated text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <FileText className="h-3.5 w-3.5" />
+                <FileText className="h-3.5 w-3.5" aria-hidden="true" />
                 Plain Text
               </button>
             </div>

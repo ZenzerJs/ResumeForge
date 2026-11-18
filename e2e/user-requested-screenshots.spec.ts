@@ -33,16 +33,7 @@ test.describe("User Requested Focus Screenshots", () => {
     await page.goto("/editor");
     await page.waitForLoadState("networkidle");
 
-    // Wait for the editor and live typst svg preview to finish compilation
-    await page.waitForSelector(".cm-editor", { timeout: 25000 });
-    try {
-      await page.waitForSelector(".typst-preview-svg svg", { timeout: 25000 });
-    } catch {
-      console.log("Typst preview svg wait timeout; proceeding with workspace render");
-    }
-
-    // Give 2.5s for WASM render and font layout to settle
-    await page.waitForTimeout(2500);
+    await expect(page.locator(".typst-preview-svg svg").first()).toBeVisible({ timeout: 25000 });
 
     // Save as primary focus screenshot and update preview gallery
     await capture(page, "editor-with-resume.png");
@@ -53,7 +44,7 @@ test.describe("User Requested Focus Screenshots", () => {
     // 1. Applications Tracker view
     await page.goto("/tracker");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(2000);
+    await expect(page.getByTestId("tracker-page-title")).toBeVisible();
 
     await capture(page, "jobs-page-fetched.png");
     await capture(page, "07-job-tracker.png");
@@ -61,7 +52,7 @@ test.describe("User Requested Focus Screenshots", () => {
     // 2. Discover Feed view (showing ingested jobs catalog)
     await page.goto("/tracker/feed");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(2000);
+    await expect(page.getByTestId("discover-search-input")).toBeVisible();
 
     await capture(page, "jobs-feed-fetched.png");
     await capture(page, "08-job-discover-feed.png");

@@ -33,6 +33,7 @@ export async function GET(request: Request) {
     const location = url.searchParams.get("location") || undefined;
     const postedRaw = url.searchParams.get("postedWithin");
     const workplaceRaw = url.searchParams.get("workplace");
+    const scopeRaw = url.searchParams.get("scope");
     const result = await getJobsList({
       page: Number.isFinite(page) ? page : 1,
       limit: Number.isFinite(limit) ? limit : 40,
@@ -41,6 +42,7 @@ export async function GET(request: Request) {
       workplace: isWorkplaceFilter(workplaceRaw) ? workplaceRaw : "all",
       status: parseStatusParam(url.searchParams.get("status")),
       postedWithin: isPostedWithinParam(postedRaw) ? postedRaw : "all",
+      scope: scopeRaw === "tracked" ? "tracked" : undefined,
       userId: viewerUserId,
     });
     return NextResponse.json({

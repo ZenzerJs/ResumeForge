@@ -14,6 +14,8 @@ export const SECRET_PATTERNS = [
   /AQ\.[A-Za-z0-9_.-]{20,}/g,
   /Bearer\s+[A-Za-z0-9._~+/-]+=*/gi,
   /key=[A-Za-z0-9_-]{20,}/gi,
+  /app_key=[A-Za-z0-9_%-]+/gi,
+  /app_id=[A-Za-z0-9_%-]+/gi,
   /gsk_[A-Za-z0-9_-]{20,}/g,
 ];
 
@@ -36,6 +38,12 @@ export function redactKeys(text: string): string {
       }
       if (match.toLowerCase().startsWith("key=")) {
         return "key=[REDACTED_KEY]";
+      }
+      if (match.toLowerCase().startsWith("app_key=")) {
+        return "app_key=[REDACTED_KEY]";
+      }
+      if (match.toLowerCase().startsWith("app_id=")) {
+        return "app_id=[REDACTED_KEY]";
       }
       return "[REDACTED_KEY]";
     });

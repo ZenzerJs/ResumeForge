@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TopNav } from "@/components/navigation/top-nav";
+import { WorkspaceAtmosphere } from "@/components/design-system/workspace-atmosphere";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -10,11 +11,13 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-dvh bg-background text-on-surface-variant">
+    <div className="relative min-h-dvh bg-background text-on-surface-variant">
+      <WorkspaceAtmosphere variant="quiet" />
       <TopNav />
       <main
         id="main-content"
-        className="mx-auto w-full max-w-3xl px-4 pb-16 pt-[calc(6rem+env(safe-area-inset-top))] md:px-8"
+        tabIndex={-1}
+        className="relative z-10 mx-auto w-full max-w-3xl px-4 pb-16 pt-[calc(6rem+env(safe-area-inset-top))] outline-none scroll-mt-16 md:px-8"
       >
         <p className="font-mono text-sm uppercase tracking-[0.2em] text-primary">Legal</p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">Privacy Policy</h1>

@@ -5,9 +5,9 @@ const VIEWPORT_MATRIX = [
   { name: "390x844", width: 390, height: 844, isDesktop: false },
   { name: "768x1024", width: 768, height: 1024, isDesktop: false },
   { name: "820x1180", width: 820, height: 1180, isDesktop: false },
-  { name: "1024x768", width: 1024, height: 768, isDesktop: false },
+  { name: "1024x768", width: 1024, height: 768, isDesktop: true },
   { name: "844x390", width: 844, height: 390, isDesktop: false },
-  { name: "1180x820", width: 1180, height: 820, isDesktop: false },
+  { name: "1180x820", width: 1180, height: 820, isDesktop: true },
   { name: "1280x800", width: 1280, height: 800, isDesktop: true },
   { name: "1440x900", width: 1440, height: 900, isDesktop: true },
 ] as const;
@@ -16,8 +16,8 @@ const BREAKPOINT_EDGES = [
   { width: 767, height: 900, isDesktop: false },
   { width: 768, height: 900, isDesktop: false },
   { width: 1023, height: 900, isDesktop: false },
-  { width: 1024, height: 900, isDesktop: false },
-  { width: 1279, height: 900, isDesktop: false },
+  { width: 1024, height: 900, isDesktop: true },
+  { width: 1279, height: 900, isDesktop: true },
   { width: 1280, height: 900, isDesktop: true },
 ] as const;
 
@@ -99,6 +99,7 @@ async function installMocks(
   options?: {
     holdEvidence?: () => Promise<void>;
     failTestConnection?: boolean;
+    demoMode?: boolean;
   }
 ) {
   const errors: string[] = [];
@@ -121,7 +122,7 @@ async function installMocks(
     let body: unknown = { success: true, data: [] };
 
     if (pathname === "/api/demo-config") {
-      body = { demoMode: true };
+      body = { demoMode: options?.demoMode ?? true };
     } else if (pathname === "/api/auth/me") {
       body = { data: null, guest: true };
     } else if (pathname === "/api/evidence") {
@@ -335,16 +336,16 @@ test.describe("Mobile & Tablet Usability Verification", () => {
     await expect(mobileNav).toBeHidden();
     await expect(openMenuBtn).toBeFocused();
 
-    // Open again, resize across 1279 -> 1280 -> drawer auto-closes cleanly
+    // Open again, resize across 1023 -> 1024 -> drawer auto-closes cleanly
     await openMenuBtn.click();
     await expect(mobileNav).toBeVisible();
-    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.setViewportSize({ width: 1024, height: 900 });
     await expect(mobileNav).toBeHidden();
 
     expect(errors).toEqual([]);
   });
 
-  test("2. Editor enforces 1280px 3-pane boundary (1279 vs 1280), exposes WAI-ARIA tabs, preserves edits across tabs & resizes, and holds 1440x900 chrome budget", async ({
+  test("2. Editor enforces lg/xl pane boundaries (1023 vs 1024, 1279 vs 1280), exposes WAI-ARIA tabs, preserves edits across tabs & resizes, and holds 1440x900 chrome budget", async ({
     page,
   }) => {
     const errors = await installMocks(page);
@@ -365,12 +366,20 @@ test.describe("Mobile & Tablet Usability Verification", () => {
       await expect(tablist.getByRole("tab", { name: /AI/i })).toBeVisible();
     }
 
-    // Breakpoint boundary check: 1279 stays tabbed, 1280 switches to 3-pane
-    await page.setViewportSize({ width: 1279, height: 900 });
+    // Breakpoint boundary check: 1023 stays tabbed, 1024 switches to 2-pane, 1279 stays 2-pane, 1280 switches to 3-pane
+    await page.setViewportSize({ width: 1023, height: 900 });
     await expect(page.getByTestId("editor-resizable-panel-group")).toHaveCount(0);
     await expect(page.getByRole("tablist", { name: "Workspace panels" })).toBeVisible();
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await expect(page.getByTestId("editor-resizable-panel-group")).toBeVisible();
+    await expect(page.getByTestId("panel-ai")).toHaveCount(0);
+    await page.setViewportSize({ width: 1279, height: 900 });
+    await expect(page.getByTestId("editor-resizable-panel-group")).toBeVisible();
+    await expect(page.getByTestId("panel-ai")).toHaveCount(0);
     await page.setViewportSize({ width: 1280, height: 900 });
     await expect(page.getByTestId("editor-resizable-panel-group")).toBeVisible();
+    await expect(page.getByTestId("panel-ai")).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "AI Assistant" })).toBeVisible();
 
     // Keyboard nav, hit-test, and state preservation across tabs and 390 -> 1024 -> 1440 -> 390 resizes
     await page.setViewportSize({ width: 390, height: 844 });
@@ -387,6 +396,7 @@ test.describe("Mobile & Tablet Usability Verification", () => {
     await expectHitTestable(page.getByTestId("save-as-master-btn"), "Save as Master button on 390px");
 
     const marker = "// MobileResizeStatePreserved";
+    await page.getByTestId("editor-mode-code").first().click();
     const cmContent = page.locator(".cm-content").first();
     await expect(cmContent).toBeVisible({ timeout: 15000 });
     await cmContent.click();
@@ -496,7 +506,7 @@ test.describe("Mobile & Tablet Usability Verification", () => {
   test("4. Settings aria-live/wrap, Jobs sheet & Kanban, and Tailor/Practice mobile ergonomics", async ({
     page,
   }) => {
-    const errors = await installMocks(page, { failTestConnection: true });
+    const errors = await installMocks(page, { failTestConnection: true, demoMode: false });
 
     // Settings aria-live + invalid association + button wrap/hit-test
     await page.setViewportSize({ width: 320, height: 740 });

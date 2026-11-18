@@ -7,7 +7,12 @@ import { getRequestUserId } from "@/lib/security/auth-request";
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON payload" }, { status: 400 });
+    }
     const validation = JobRequirementsSchema.safeParse(body);
 
     if (!validation.success) {

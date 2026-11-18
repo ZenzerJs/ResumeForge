@@ -12,6 +12,7 @@ import {
   MapPin,
   Columns3,
   LayoutList,
+  SlidersHorizontal,
 } from "lucide-react";
 import { JobStatus, type WorkplaceFilter } from "@/lib/db/jobs";
 import { AppShell } from "@/components/design-system/app-shell";
@@ -52,6 +53,7 @@ import { fetchDemoConfig, fetchSessionPayload, fetchSessionUser } from "@/compon
 import { parseJobDescription } from "@/lib/jd-parser/parser";
 import { DEMO_JOB } from "@/lib/demo-samples";
 import { buildTailorNewJobHref } from "@/lib/tailor/application-context";
+import type { EvidenceItemWithBullets } from "@/lib/matching/matcher";
 import {
   HydratedJobDetailSchema,
   JobRequirementsSchema,
@@ -449,7 +451,12 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const [importNotice, setImportNotice] = useState<string | null>(null);
   const [hydrateProgress, setHydrateProgress] = useState<{ done: number; total: number } | null>(null);
   const [viewMode, setViewMode] = useState<"split" | "kanban">("split");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [draggedJobId, setDraggedJobId] = useState<string | null>(null);
+  const [evidenceItems, setEvidenceItems] = useState<EvidenceItemWithBullets[]>([]);
+  const [masterTypstSource, setMasterTypstSource] = useState<string>("");
+  const urlHydratedRef = useRef(false);
+  const skipNextPageResetRef = useRef(false);
   const hydrateAttemptedRef = useRef<Set<string>>(new Set());
   const mountedRef = useRef(true);
   const activeCardRef = useRef<HTMLDivElement | null>(null);
@@ -479,6 +486,126 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   useEffect(() => {
     const saved = sessionStorage.getItem("resumeforge_active_job_id");
     if (saved) setActiveJobId(saved);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q");
+    if (q) {
+      skipNextPageResetRef.current = true;
+      setSearchQuery(q);
+      setDebouncedSearch(q.trim());
+    }
+    const loc = params.get("location");
+    if (loc) {
+      skipNextPageResetRef.current = true;
+      setLocationQuery(loc);
+      setDebouncedLocation(loc.trim());
+    }
+    const wp = params.get("workplace");
+    if (wp && WORKPLACE_OPTIONS.some((o) => o.value === wp)) {
+      skipNextPageResetRef.current = true;
+      setWorkplace(wp as WorkplaceFilter);
+    }
+    const st = params.get("status");
+    if (st && ALL_STATUSES.includes(st as JobStatus)) {
+      skipNextPageResetRef.current = true;
+      setStatusFilter(st as JobStatus);
+    }
+    const pw = params.get("posted");
+    if (pw && POSTED_OPTIONS.some((o) => o.value === pw)) {
+      skipNextPageResetRef.current = true;
+      setPostedWithin(pw as PostedWithin);
+    }
+    const ms = params.get("minSalary");
+    if (ms && MIN_SALARY_OPTIONS.some((o) => o.value === ms)) {
+      skipNextPageResetRef.current = true;
+      setMinSalary(ms);
+    }
+    const v = params.get("view");
+    if (v === "kanban" || v === "split") {
+      setViewMode(v);
+    }
+    const p = Number(params.get("page"));
+    if (Number.isInteger(p) && p > 0) {
+      skipNextPageResetRef.current = true;
+      setPage(p);
+    }
+    urlHydratedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !urlHydratedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const setOrDel = (k: string, v: string, def = "") => {
+      if (v && v !== def) params.set(k, v);
+      else params.delete(k);
+    };
+    setOrDel("q", debouncedSearch);
+    setOrDel("location", debouncedLocation);
+    setOrDel("workplace", workplace, "all");
+    setOrDel("status", statusFilter, "ALL");
+    setOrDel("posted", postedWithin, "all");
+    setOrDel("minSalary", minSalary, "0");
+    setOrDel("view", viewMode, "split");
+    setOrDel("page", String(page), "1");
+    const qs = params.toString();
+    const nextUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState(null, "", nextUrl);
+  }, [debouncedSearch, debouncedLocation, workplace, statusFilter, postedWithin, minSalary, viewMode, page]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const config = await fetchDemoConfig();
+        if (controller.signal.aborted) return;
+        const localDemo = config?.demoMode === true;
+        if (localDemo) {
+          const rawEvi = localStorage.getItem("resumeforge_guest_evidence");
+          const parsedEvi = rawEvi ? JSON.parse(rawEvi) : [];
+          if (Array.isArray(parsedEvi)) setEvidenceItems(parsedEvi as EvidenceItemWithBullets[]);
+          const localTypst = localStorage.getItem("resumeforge_typst_source");
+          if (localTypst) setMasterTypstSource(localTypst);
+          return;
+        }
+        const [eviRes, resRes] = await Promise.all([
+          fetch("/api/evidence", { signal: controller.signal }).catch(() => null),
+          fetch("/api/resumes", { signal: controller.signal }).catch(() => null),
+        ]);
+        if (controller.signal.aborted) return;
+        if (eviRes?.ok) {
+          const json = await eviRes.json().catch(() => null);
+          if (!controller.signal.aborted && json?.success) {
+            if (json.guest) {
+              const rawEvi = localStorage.getItem("resumeforge_guest_evidence");
+              const parsedEvi = rawEvi ? JSON.parse(rawEvi) : [];
+              if (Array.isArray(parsedEvi)) setEvidenceItems(parsedEvi as EvidenceItemWithBullets[]);
+            } else if (Array.isArray(json.data)) {
+              setEvidenceItems(json.data as EvidenceItemWithBullets[]);
+            }
+          }
+        }
+        if (resRes?.ok) {
+          const json = await resRes.json().catch(() => null);
+          if (!controller.signal.aborted && json?.success && Array.isArray(json.data) && json.data.length > 0) {
+            const master = json.data.find((r: { isMaster?: boolean }) => r.isMaster) || json.data[0];
+            if (master?.typstSource) {
+              setMasterTypstSource(master.typstSource);
+              return;
+            }
+          }
+        }
+        if (!controller.signal.aborted && typeof window !== "undefined") {
+          const localTypst = localStorage.getItem("resumeforge_typst_source");
+          if (localTypst) setMasterTypstSource(localTypst);
+        }
+      } catch {
+        // non-blocking
+      }
+    })();
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -613,6 +740,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         page: String(page),
         limit: String(PAGE_SIZE),
         postedWithin,
+        scope: "tracked",
       });
       if (debouncedSearch) params.set("q", debouncedSearch);
       if (debouncedLocation) params.set("location", debouncedLocation);
@@ -859,6 +987,10 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
 
   // Reset page when filters/search change
   useEffect(() => {
+    if (skipNextPageResetRef.current) {
+      skipNextPageResetRef.current = false;
+      return;
+    }
     setPage(1);
   }, [searchQuery, locationQuery, workplace, statusFilter, postedWithin, filterStatuses]);
 
@@ -1186,6 +1318,13 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
     setPage(1);
   };
 
+  const activeMobileFilterCount =
+    (locationQuery.trim() ? 1 : 0) +
+    (workplace !== "all" ? 1 : 0) +
+    (statusFilter !== "ALL" ? 1 : 0) +
+    (postedWithin !== "all" ? 1 : 0) +
+    (minSalary !== "0" ? 1 : 0);
+
   const pipelineApplied = pipelineCounts.applied;
   const pipelineInterviewing = pipelineCounts.interviewing;
 
@@ -1219,6 +1358,13 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
     document.addEventListener("pointerdown", onPointerDownOutside);
     return () => document.removeEventListener("pointerdown", onPointerDownOutside);
   }, [isLocationDropdownOpen]);
+
+  const isPersonalEmptyDefault =
+    !isLoading &&
+    totalJobs === 0 &&
+    !hasActiveFilters &&
+    !filterStatuses?.length &&
+    viewMode !== "kanban";
 
   return (
     <AppShell variant="tracker">
@@ -1258,23 +1404,54 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       )}
 
       {/* Filter subheader — sticky glass bar under TrackerSubNav */}
-      <div className="sticky top-11 z-10 flex shrink-0 flex-wrap items-center gap-2 border-b glass-bar px-3 py-2 sm:px-4 sm:py-2.5">
-        <div className="relative w-full sm:w-auto sm:min-w-[180px] sm:flex-1 sm:max-w-xs">
-          <label htmlFor="tracker-job-search" className="sr-only">
-            Search jobs, companies, or keywords
-          </label>
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <input
-            id="tracker-job-search"
-            data-testid="tracker-job-search"
-            type="search"
-            placeholder="Search jobs, companies…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className={`${FILTER_CONTROL} w-full py-0 pl-8 pr-3`}
-          />
+      {!isPersonalEmptyDefault && (
+      <div className="sticky top-[45px] z-10 relative flex shrink-0 flex-wrap items-center gap-2 border-b glass-bar px-3 py-2 sm:px-4 sm:py-2.5">
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:min-w-[180px] sm:flex-1 sm:max-w-xs">
+          <div className="relative min-w-0 flex-1">
+            <label htmlFor="tracker-job-search" className="sr-only">
+              Search jobs, companies, or keywords
+            </label>
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              id="tracker-job-search"
+              data-testid="tracker-job-search"
+              type="search"
+              placeholder="Search jobs, companies…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={`${FILTER_CONTROL} w-full py-0 pl-8 pr-3`}
+            />
+          </div>
+          <button
+            type="button"
+            data-testid="tracker-mobile-filters-btn"
+            aria-expanded={mobileFiltersOpen}
+            aria-controls="tracker-collapsible-filters"
+            onClick={() => setMobileFiltersOpen((open) => !open)}
+            className={`sm:hidden inline-flex h-11 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold transition-colors ${
+              mobileFiltersOpen || activeMobileFilterCount > 0
+                ? "border-primary/50 bg-primary/15 text-primary"
+                : "border-hairline bg-inset text-rf-cloud hover:bg-elevated"
+            }`}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>Filters</span>
+            {activeMobileFilterCount > 0 && (
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold tabular-nums text-primary-foreground">
+                {activeMobileFilterCount}
+              </span>
+            )}
+          </button>
         </div>
 
+        <div
+          id="tracker-collapsible-filters"
+          className={
+            mobileFiltersOpen
+              ? "flex w-full flex-wrap items-center gap-2 sm:visible sm:pointer-events-auto sm:contents"
+              : "absolute left-0 top-0 w-full h-0 overflow-hidden invisible pointer-events-none flex flex-wrap items-center gap-2 sm:static sm:w-auto sm:h-auto sm:overflow-visible sm:visible sm:pointer-events-auto sm:contents"
+          }
+        >
         <div ref={locationComboboxRef} className="relative min-w-0 flex-1 basis-[calc(50%-0.25rem)] sm:basis-auto sm:min-w-[140px] sm:max-w-[180px]">
           <label htmlFor="tracker-location-filter" className="sr-only">
             Filter by location
@@ -1444,6 +1621,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             </option>
           ))}
         </select>
+        </div>
 
         <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:ml-auto sm:w-auto sm:justify-end sm:gap-3 text-xs text-muted-foreground">
           <div
@@ -1477,13 +1655,13 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
               tabIndex={viewMode === "split" ? 0 : -1}
               onClick={() => setViewMode("split")}
               data-testid="tracker-view-split"
-              className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-mono font-semibold transition ${
+              className={`inline-flex items-center gap-1.5 rounded px-2 py-1 sm:px-2.5 text-xs font-mono font-semibold transition ${
                 viewMode === "split"
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <LayoutList className="h-3.5 w-3.5" />
+              <LayoutList className="h-3.5 w-3.5" aria-hidden="true" />
               <span>Split View</span>
             </button>
             <button
@@ -1494,13 +1672,13 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
               tabIndex={viewMode === "kanban" ? 0 : -1}
               onClick={() => setViewMode("kanban")}
               data-testid="tracker-view-kanban"
-              className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-mono font-semibold transition ${
+              className={`inline-flex items-center gap-1.5 rounded px-2 py-1 sm:px-2.5 text-xs font-mono font-semibold transition ${
                 viewMode === "kanban"
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Columns3 className="h-3.5 w-3.5" />
+              <Columns3 className="h-3.5 w-3.5" aria-hidden="true" />
               <span>Kanban Board</span>
             </button>
           </div>
@@ -1523,13 +1701,43 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             href={NEW_JOB_HREF}
             className="inline-flex min-h-11 items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary/90"
           >
-            <Plus className="h-3.5 w-3.5" />
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
             Add Job
           </Link>
         </div>
       </div>
+      )}
 
-      {viewMode === "kanban" ? (
+      {isPersonalEmptyDefault ? (
+        <div
+          data-testid="tracker-empty-state"
+          className="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-20 text-center"
+        >
+          <Briefcase className="h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
+          <div className="max-w-md space-y-1.5">
+            <h2 className="text-lg font-semibold text-foreground">No tracked jobs yet</h2>
+            <p className="text-sm text-muted-foreground">
+              Explore roles from public job boards or paste a job posting in Tailor to start tracking applications.
+            </p>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-2.5">
+            <Link
+              href="/tracker/feed"
+              data-testid="tracker-empty-explore-feed-link"
+              className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Explore Job Feed
+            </Link>
+            <Link
+              href={NEW_JOB_HREF}
+              data-testid="tracker-empty-add-job-link"
+              className="inline-flex min-h-11 items-center rounded-lg border border-hairline bg-inset px-4 py-2 text-xs font-semibold text-foreground transition-colors duration-150 hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Add Job in Tailor
+            </Link>
+          </div>
+        </div>
+      ) : viewMode === "kanban" ? (
         <div
           data-testid="tracker-kanban-board"
           tabIndex={0}
@@ -1649,10 +1857,10 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           )}
         </div>
       ) : (
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden scroll-pt-28">
         {/* List pane — independent scroll */}
         <div className="flex min-h-0 w-full flex-col border-r border-hairline lg:w-[400px] lg:shrink-0">
-          <div className="min-h-0 flex-1 overflow-y-auto" data-testid="tracker-job-list">
+          <div className="min-h-0 flex-1 overflow-y-auto scroll-pt-28" data-testid="tracker-job-list">
             {isLoading && (
               <div className="space-y-0 p-0">
                 {[...Array(6)].map((_, i) => (
@@ -1817,6 +2025,8 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
               isHydrating={Boolean(hydratingIds[selectedJob.id])}
               tier2Notice={tier2Notice[selectedJob.id]}
               showNotes
+              evidence={evidenceItems}
+              masterTypst={masterTypstSource}
               onStatusChange={handleStatusChange}
               onVariantChange={handleVariantChange}
               onNotesChange={(id, value) =>
@@ -1848,6 +2058,8 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             tier2Notice={tier2Notice[selectedJob.id]}
             showNotes
             isSheet
+            evidence={evidenceItems}
+            masterTypst={masterTypstSource}
             onClose={handleCloseSheet}
             onSheetCloseAutoFocus={(event) => {
               event.preventDefault();

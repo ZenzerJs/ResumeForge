@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -93,7 +93,8 @@ export function classifySkillBacking(
   skillEval: SkillEvaluation,
   evaluatedTypstContent: string,
   includeEvidenceBank: boolean,
-  sourceLabel: EvaluatedResumeSourceKind = "working draft"
+  sourceLabel: EvaluatedResumeSourceKind = "working draft",
+  precomputedSplit?: { bodyLower: string; skillsLower: string }
 ): SkillBackingDetail {
   if (skillEval.status === "UNSUPPORTED_GAP") {
     return {
@@ -106,7 +107,7 @@ export function classifySkillBacking(
   }
 
   const skillLower = skillEval.skill.toLowerCase();
-  const { bodyLower, skillsLower } = splitResumeBodyAndSkills(evaluatedTypstContent);
+  const { bodyLower, skillsLower } = precomputedSplit ?? splitResumeBodyAndSkills(evaluatedTypstContent);
 
   if (bodyLower.includes(skillLower)) {
     return {
@@ -285,6 +286,13 @@ export function AtsScorePanel({
   const onEvaluationCompleteRef = useRef(onEvaluationComplete);
   onEvaluationCompleteRef.current = onEvaluationComplete;
   const qualitativeContextRef = useRef<{ typstContent: string; useMasterResume: boolean } | null>(null);
+  const qualitativeAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      qualitativeAbortRef.current?.abort();
+    };
+  }, []);
 
   const evaluationRequestBody =
     !useMasterResume && !typstContent.trim()
@@ -377,6 +385,10 @@ export function AtsScorePanel({
       return;
     }
 
+    qualitativeAbortRef.current?.abort();
+    const controller = new AbortController();
+    qualitativeAbortRef.current = controller;
+
     setIsLoadingQualitative(true);
     setQualitativeError(null);
 
@@ -384,6 +396,7 @@ export function AtsScorePanel({
       const res = await fetch("/api/ai/qualitative-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           providerConfig: {
             provider: aiSettings.provider,
@@ -404,6 +417,7 @@ export function AtsScorePanel({
       });
 
       const json = await res.json();
+      if (controller.signal.aborted) return;
 
       if (!res.ok || !json.success) {
         setQualitativeError(json.error || "Failed to generate qualitative review.");
@@ -413,10 +427,13 @@ export function AtsScorePanel({
         setQualitativeResult(json.data);
       }
     } catch (err) {
+      if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) return;
       setQualitativeError(`Error generating review: ${err instanceof Error ? err.message : String(err)}`);
       setQualitativeResult(null);
     } finally {
-      setIsLoadingQualitative(false);
+      if (!controller.signal.aborted) {
+        setIsLoadingQualitative(false);
+      }
     }
   };
 
@@ -425,16 +442,25 @@ export function AtsScorePanel({
     onProfileChange?.(profile);
   };
 
+  const splitResume = useMemo(
+    () => splitResumeBodyAndSkills(typstContent),
+    [typstContent]
+  );
+
+  const skillBackingDetails = useMemo(
+    () =>
+      (result?.skillEvaluations ?? []).map((se) => ({
+        eval: se,
+        backing: classifySkillBacking(se, typstContent, includeEvidenceBank, sourceLabel, splitResume),
+      })),
+    [result?.skillEvaluations, typstContent, includeEvidenceBank, sourceLabel, splitResume]
+  );
+
   if (!useMasterResume && !typstContent.trim()) {
     return null;
   }
 
   const displayState = result ? getAtsDisplayState(result, extractedRequirements, roleTitle) : null;
-
-  const skillBackingDetails = (result?.skillEvaluations ?? []).map((se) => ({
-    eval: se,
-    backing: classifySkillBacking(se, typstContent, includeEvidenceBank, sourceLabel),
-  }));
   const evidenceBankOnlyCount = skillBackingDetails.filter(
     (item) => item.backing.evidenceBankOnly
   ).length;
@@ -468,6 +494,7 @@ export function AtsScorePanel({
           </p>
           {evidenceBankOnlyCount > 0 && (
             <p
+              role="alert"
               data-testid="ats-evidence-bank-only-notice"
               className="mt-2 rounded-md border border-primary/35 bg-primary/10 px-3 py-2 text-xs text-foreground leading-relaxed"
             >
@@ -486,7 +513,7 @@ export function AtsScorePanel({
                 data-testid="ats-overall-score"
                 className="relative grid h-[72px] w-[72px] shrink-0 place-items-center rounded-full"
                 style={{
-                  background: `conic-gradient(rgb(var(--accent-contrast)) ${displayState.overallRingPct}%, rgb(214 196 176 / 0.14) 0)`,
+                  background: `conic-gradient(rgb(var(--accent-contrast)) ${displayState.overallRingPct}%, rgb(var(--text-secondary) / 0.14) 0)`,
                   filter: displayState.hasJobRequirements
                     ? "drop-shadow(0 0 14px rgb(var(--accent-contrast) / 0.35))"
                     : undefined,
@@ -594,8 +621,8 @@ export function AtsScorePanel({
             </div>
             <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
               <div
-                className={`${result.baseHealth.percentage >= 75 ? "bg-signal" : "bg-primary"} h-full rounded-full transition-all`}
-                style={{ width: `${result.baseHealth.percentage}%` }}
+                className={`${result.baseHealth.percentage >= 75 ? "bg-signal" : "bg-primary"} h-full w-full origin-left rounded-full transition-transform motion-reduce:transition-none`}
+                style={{ transform: `scaleX(${Math.max(0, Math.min(1, result.baseHealth.percentage / 100))})` }}
               />
             </div>
             <ul className="text-xs space-y-1.5 text-on-surface-variant leading-relaxed break-words">
@@ -629,8 +656,8 @@ export function AtsScorePanel({
             </div>
             <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
               <div
-                className={`${(displayState?.requiredMatchPct ?? 0) >= 75 ? "bg-signal" : "bg-primary"} h-full rounded-full transition-all`}
-                style={{ width: `${displayState?.requiredMatchPct ?? 0}%` }}
+                className={`${(displayState?.requiredMatchPct ?? 0) >= 75 ? "bg-signal" : "bg-primary"} h-full w-full origin-left rounded-full transition-transform motion-reduce:transition-none`}
+                style={{ transform: `scaleX(${Math.max(0, Math.min(1, (displayState?.requiredMatchPct ?? 0) / 100))})` }}
               />
             </div>
             <ul className="text-xs space-y-1.5 text-on-surface-variant leading-relaxed break-words">
@@ -653,8 +680,8 @@ export function AtsScorePanel({
             </div>
             <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
               <div
-                className={`${(displayState?.preferredMatchPct ?? 0) >= 75 ? "bg-signal" : "bg-primary"} h-full rounded-full transition-all`}
-                style={{ width: `${displayState?.preferredMatchPct ?? 0}%` }}
+                className={`${(displayState?.preferredMatchPct ?? 0) >= 75 ? "bg-signal" : "bg-primary"} h-full w-full origin-left rounded-full transition-transform motion-reduce:transition-none`}
+                style={{ transform: `scaleX(${Math.max(0, Math.min(1, (displayState?.preferredMatchPct ?? 0) / 100))})` }}
               />
             </div>
             <ul className="text-xs space-y-1.5 text-on-surface-variant leading-relaxed break-words">
@@ -677,8 +704,8 @@ export function AtsScorePanel({
             </div>
             <div className="w-full bg-panel h-1.5 rounded-full overflow-hidden">
               <div
-                className={`${result.roleEvidence.percentage >= 75 ? "bg-signal" : "bg-primary"} h-full rounded-full transition-all`}
-                style={{ width: `${result.roleEvidence.percentage}%` }}
+                className={`${result.roleEvidence.percentage >= 75 ? "bg-signal" : "bg-primary"} h-full w-full origin-left rounded-full transition-transform motion-reduce:transition-none`}
+                style={{ transform: `scaleX(${Math.max(0, Math.min(1, result.roleEvidence.percentage / 100))})` }}
               />
             </div>
             <ul className="text-xs space-y-1.5 text-on-surface-variant leading-relaxed break-words">

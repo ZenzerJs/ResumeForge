@@ -164,9 +164,9 @@ describe("managed resume form safety", () => {
     const html = renderToStaticMarkup(
       React.createElement(ManagedResumeForm, { value: rendered, onChange: () => {} })
     );
-    const textareaIds = Array.from(html.matchAll(/<textarea[^>]*\sid="([^"]+)"/g)).map((m) => m[1]);
-    expect(textareaIds.length).toBe(allLabels.length);
-    for (const id of textareaIds) {
+    const controlIds = Array.from(html.matchAll(/<(?:textarea|input)[^>]*\sid="([^"]+)"/g)).map((m) => m[1]);
+    expect(controlIds.length).toBe(allLabels.length);
+    for (const id of controlIds) {
       expect(html).toContain(`for="${id}"`);
     }
     expect(html).toContain(">Email</label>");

@@ -44,9 +44,13 @@ if (process.env.NODE_ENV === "production") {
 }
 
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_RESUME_LAYOUT_V2:
+      process.env.NEXT_PUBLIC_RESUME_LAYOUT_V2 ?? "true",
+  },
   serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
   experimental: {
-    optimizePackageImports: ["lucide-react"],
+    optimizePackageImports: ["lucide-react", "simple-icons"],
   },
   webpack: (config) => {
     config.experiments = {

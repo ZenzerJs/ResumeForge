@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { fetchDemoConfig } from "@/components/auth/session-user";
 import { readApiResponse } from "@/lib/api-error";
 import { CompanyIntelDossierPanel } from "./company-intel-dossier-panel";
+import { useRovingTablist } from "@/lib/hooks/use-roving-tablist";
 
 export interface ApplyPrepSheetModalProps {
   isOpen: boolean;
@@ -78,6 +79,7 @@ export interface ApplyPrepSheetModalProps {
 }
 
 export type PrepTab = "oa-mock" | "star" | "intel" | "form" | "cover";
+const PREP_TABS: ReadonlyArray<PrepTab> = ["oa-mock", "star", "intel", "form", "cover"];
 
 export function shouldFetchInterviewPrep(jobId: string | undefined, demoMode: boolean): boolean {
   if (demoMode) return false;
@@ -118,6 +120,9 @@ export function ApplyPrepSheetModal({
   prepResult,
 }: ApplyPrepSheetModalProps) {
   const [activeTab, setActiveTab] = useState<PrepTab>(initialTab);
+  const { tablistRef: prepTablistRef, getTabProps: getPrepTabProps } = useRovingTablist(
+    Math.max(0, PREP_TABS.indexOf(activeTab))
+  );
   const [problemSearch, setProblemSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -377,9 +382,17 @@ export function ApplyPrepSheetModal({
         </DialogHeader>
 
         {/* Segmented Navigation Tabs */}
-        <div className="flex items-center gap-1 border-b border-hairline px-6 pt-3 pb-2 bg-inset/70 overflow-x-auto">
+        <div
+          ref={prepTablistRef}
+          role="tablist"
+          aria-label="Prep sheet sections"
+          className="flex items-center gap-1 border-b border-hairline px-6 pt-3 pb-2 bg-inset/70 overflow-x-auto"
+        >
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "oa-mock"}
+            {...getPrepTabProps(0)}
             onClick={() => setActiveTab("oa-mock")}
             data-testid="tab-oa-mock"
             className={cn(
@@ -389,16 +402,19 @@ export function ApplyPrepSheetModal({
                 : "text-muted-foreground hover:text-foreground hover:bg-elevated"
             )}
           >
-            <Code2 className="size-3.5" />
+            <Code2 className="size-3.5" aria-hidden="true" />
             <span>Technical Interview &amp; Practice Problems</span>
             {oaProblems.length > 0 && (
-              <span className="text-xs px-1.5 py-0.2 rounded-full bg-panel text-primary font-mono">
+              <span className="text-xs px-1.5 py-0.2 rounded-full bg-panel text-primary font-mono tabular-nums">
                 {oaProblems.length}
               </span>
             )}
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "star"}
+            {...getPrepTabProps(1)}
             onClick={() => setActiveTab("star")}
             data-testid="tab-star-stories"
             className={cn(
@@ -408,16 +424,19 @@ export function ApplyPrepSheetModal({
                 : "text-muted-foreground hover:text-foreground hover:bg-elevated"
             )}
           >
-            <Sparkles className="size-3.5" />
+            <Sparkles className="size-3.5" aria-hidden="true" />
             <span>STAR Behavioral Stories</span>
             {starPrep.stories.length > 0 && (
-              <span className="text-xs px-1.5 py-0.2 rounded-full bg-panel text-primary font-mono">
+              <span className="text-xs px-1.5 py-0.2 rounded-full bg-panel text-primary font-mono tabular-nums">
                 {starPrep.stories.length}
               </span>
             )}
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "intel"}
+            {...getPrepTabProps(2)}
             onClick={() => setActiveTab("intel")}
             data-testid="tab-intel-culture"
             className={cn(
@@ -427,11 +446,14 @@ export function ApplyPrepSheetModal({
                 : "text-muted-foreground hover:text-foreground hover:bg-elevated"
             )}
           >
-            <Building2 className="size-3.5" />
+            <Building2 className="size-3.5" aria-hidden="true" />
             <span>Intel &amp; Culture</span>
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "form"}
+            {...getPrepTabProps(3)}
             onClick={() => setActiveTab("form")}
             data-testid="tab-form-highlights"
             className={cn(
@@ -441,11 +463,14 @@ export function ApplyPrepSheetModal({
                 : "text-muted-foreground hover:text-foreground hover:bg-elevated"
             )}
           >
-            <User className="size-3.5" />
+            <User className="size-3.5" aria-hidden="true" />
             <span>Form Highlights &amp; Contact</span>
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "cover"}
+            {...getPrepTabProps(4)}
             onClick={() => setActiveTab("cover")}
             data-testid="tab-cover-letter"
             className={cn(
@@ -455,7 +480,7 @@ export function ApplyPrepSheetModal({
                 : "text-muted-foreground hover:text-foreground hover:bg-elevated"
             )}
           >
-            <FileText className="size-3.5" />
+            <FileText className="size-3.5" aria-hidden="true" />
             <span>Cover Letter Draft</span>
           </button>
         </div>
@@ -482,6 +507,7 @@ export function ApplyPrepSheetModal({
               </div>
               <textarea
                 readOnly
+                aria-label="Clipboard fallback text"
                 value={fallbackText}
                 data-testid="clipboard-fallback-textarea"
                 className="w-full h-24 p-2 bg-inset border border-control/70 rounded-[6px] text-foreground font-mono text-xs select-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
@@ -542,9 +568,10 @@ export function ApplyPrepSheetModal({
               {/* Search & Category Filter Controls */}
               <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-2.5 size-3.5 text-muted-foreground" />
+                  <Search className="absolute left-3 top-2.5 size-3.5 text-muted-foreground" aria-hidden="true" />
                   <input
                     type="text"
+                    aria-label="Search practice problems"
                     value={problemSearch}
                     onChange={(e) => setProblemSearch(e.target.value)}
                     placeholder="Search practice problems by title, topic, or tag (e.g. DP, array, graph)..."
@@ -553,10 +580,11 @@ export function ApplyPrepSheetModal({
                   {problemSearch && (
                     <button
                       type="button"
+                      aria-label="Clear search"
                       onClick={() => setProblemSearch("")}
                       className="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground"
                     >
-                      <X className="size-3.5" />
+                      <X className="size-3.5" aria-hidden="true" />
                     </button>
                   )}
                 </div>
@@ -624,7 +652,7 @@ export function ApplyPrepSheetModal({
                         <div
                           key={prob.id || idx}
                           data-testid="oa-problem-card"
-                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-lg bg-inset/80 border border-hairline hover:border-control transition"
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-lg bg-inset/80 border border-hairline hover:border-control transition [content-visibility:auto] [contain-intrinsic-size:auto_180px]"
                         >
                           <div className="min-w-0 flex-1 space-y-1.5">
                             <div className="flex flex-wrap items-center gap-2">

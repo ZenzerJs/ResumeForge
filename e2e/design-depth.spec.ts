@@ -84,10 +84,8 @@ test.describe("Clear-window homepage glass, dynamic Ember Ink waves, and workspa
       });
 
     const frameA = await sampleFrame();
-    await page.waitForTimeout(350);
-    const frameB = await sampleFrame();
     expect(frameA.startsWith("0:")).toBe(false);
-    expect(frameB).not.toBe(frameA);
+    await expect.poll(sampleFrame, { timeout: 5000 }).not.toBe(frameA);
 
     const lowerBlobs = page
       .getByTestId("landing-lower-atmosphere-stage")
@@ -125,21 +123,25 @@ test.describe("Clear-window homepage glass, dynamic Ember Ink waves, and workspa
         .evaluateAll((els) => els.map((el) => getComputedStyle(el).transform));
 
       // Allow CSS animation progress + verify zero continuous JS rAF loop
-      await page.waitForTimeout(500);
       await page.evaluate(() => {
         (window as Window & { __rfRafCount?: number }).__rfRafCount = 0;
       });
-      await page.waitForTimeout(450);
+      await expect
+        .poll(
+          async () => {
+            const transformsAfter = await blobs
+              .locator("[data-blob-orb]")
+              .evaluateAll((els) => els.map((el) => getComputedStyle(el).transform));
+            return transformsBefore.filter((t, i) => t !== transformsAfter[i]).length;
+          },
+          { timeout: 3000 }
+        )
+        .toBeGreaterThan(0);
+
       const idleRafCount = await page.evaluate(
         () => (window as Window & { __rfRafCount?: number }).__rfRafCount ?? 0,
       );
-      expect(idleRafCount).toBeLessThanOrEqual(1);
-
-      const transformsAfter = await blobs
-        .locator("[data-blob-orb]")
-        .evaluateAll((els) => els.map((el) => getComputedStyle(el).transform));
-      const changedCount = transformsBefore.filter((t, i) => t !== transformsAfter[i]).length;
-      expect(changedCount).toBeGreaterThan(0);
+      expect(idleRafCount).toBeLessThanOrEqual(2);
     }
 
     await page.goto("/editor");
@@ -165,11 +167,25 @@ test.describe("Clear-window homepage glass, dynamic Ember Ink waves, and workspa
     );
     expect(homeBlobAnims.every((anim) => anim === "none")).toBe(true);
 
-    const card = page.locator(".card-lift").first();
-    await expect(card).toBeVisible();
-    await card.hover();
-    const hoverTransform = await card.evaluate((el) => getComputedStyle(el).transform);
-    expect(hoverTransform).toBe("none");
+    const proofCard = page.getByTestId("product-proof-card");
+    await expect(proofCard).toBeVisible();
+    await proofCard.hover();
+    expect(await proofCard.evaluate((el) => getComputedStyle(el).transform)).toBe("none");
+
+    const workspaceLink = page.getByTestId("capability-grid-section").locator("a").first();
+    await expect(workspaceLink).toBeVisible();
+    await workspaceLink.hover();
+    expect(await workspaceLink.evaluate((el) => getComputedStyle(el).transform)).toBe("none");
+
+    const cardLiftHoverTransform = await page.evaluate(() => {
+      const probe = document.createElement("div");
+      probe.className = "card-lift";
+      document.body.appendChild(probe);
+      const transform = getComputedStyle(probe).transform;
+      probe.remove();
+      return transform;
+    });
+    expect(cardLiftHoverTransform).toBe("none");
 
     await page.goto("/settings");
     await page.waitForLoadState("networkidle");

@@ -11,7 +11,7 @@ export const DEFAULT_EDITOR_LAYOUT: EditorLayoutState = {
     "panel-preview": 50,
     "panel-ai": 20,
   },
-  isAiCollapsed: false,
+  isAiCollapsed: true,
 };
 
 export const MIN_PANEL_SIZES: Record<string, number> = {

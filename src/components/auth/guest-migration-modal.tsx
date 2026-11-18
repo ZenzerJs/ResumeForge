@@ -390,7 +390,7 @@ export function GuestMigrationModal({
   onClose,
   draftSource,
   hasCustomResumeDraft,
-  hasExistingMaster = true,
+  hasExistingMaster = false,
   onSuccess,
 }: GuestMigrationModalProps) {
   const [strategy, setStrategy] = useState<ConflictStrategy>("IMPORT_AS_DRAFT");
@@ -574,7 +574,7 @@ export function GuestMigrationModal({
                   checked={strategy === "IMPORT_AS_DRAFT"}
                   onChange={() => setStrategy("IMPORT_AS_DRAFT")}
                   data-testid="strategy-import-draft"
-                  className="mt-0.5 text-primary focus:ring-0"
+                  className="mt-0.5 text-primary focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 <div>
                   <span className="font-semibold text-foreground block text-xs">
@@ -601,7 +601,7 @@ export function GuestMigrationModal({
                     checked={strategy === "REPLACE_MASTER"}
                     onChange={() => setStrategy("REPLACE_MASTER")}
                     data-testid="strategy-replace-master"
-                    className="mt-0.5 text-primary focus:ring-0"
+                    className="mt-0.5 text-primary focus-visible:ring-2 focus-visible:ring-ring"
                   />
                   <div>
                     <span className="font-semibold text-foreground block text-xs">
@@ -628,7 +628,7 @@ export function GuestMigrationModal({
                   checked={strategy === "DISCARD"}
                   onChange={() => setStrategy("DISCARD")}
                   data-testid="strategy-discard"
-                  className="mt-0.5 text-primary focus:ring-0"
+                  className="mt-0.5 text-primary focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 <div>
                   <span className="font-semibold text-foreground block text-xs">
@@ -661,7 +661,7 @@ export function GuestMigrationModal({
                   checked={confirmReplaceMaster}
                   onChange={(e) => setConfirmReplaceMaster(e.target.checked)}
                   data-testid="confirm-replace-master-checkbox"
-                  className="mt-0.5 rounded border-primary text-primary focus:ring-0"
+                  className="mt-0.5 rounded border-primary text-primary focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 <span className="text-xs text-foreground font-medium leading-snug">
                   I understand this will archive my existing Master Resume and freeze this guest draft as the new canonical baseline.

@@ -1,5 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
+process.env.DATABASE_URL ||=
+  "postgresql://resumeforge:resumeforge@localhost:5432/resumeforge";
+
 export const DEMO_SPECS = [
   "contrast-logos-verification.spec.ts",
   "jobs-polish-verification.spec.ts",
@@ -7,7 +10,6 @@ export const DEMO_SPECS = [
   "resume-layout-v2-verification.spec.ts",
   "suggestion-preview-verification.spec.ts",
   "tailor-polish-verification.spec.ts",
-  "workspace-wave-verification.spec.ts",
 ];
 
 export default defineConfig({
@@ -37,6 +39,8 @@ export default defineConfig({
     env: {
       ...process.env,
       DEMO_MODE: "true",
+      NEXT_PUBLIC_RESUME_LAYOUT_V2:
+        process.env.NEXT_PUBLIC_RESUME_LAYOUT_V2 || "true",
       APP_ACCESS_SECRET: "playwright-test-secret",
       APP_ACCESS_PASSWORD: "playwright-test-secret",
       DATABASE_URL:

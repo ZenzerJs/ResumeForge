@@ -214,8 +214,8 @@ export function JobCardSignalBadge({
                   </div>
                   <div className="h-1.5 w-full bg-elevated rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-signal rounded-full transition-[width] duration-300"
-                      style={{ width: `${effectiveScoreResult.breakdown.coreStackScore}%` }}
+                      className="h-full bg-signal rounded-full transition-transform duration-300 origin-left"
+                      style={{ transform: `scaleX(${effectiveScoreResult.breakdown.coreStackScore / 100})` }}
                     />
                   </div>
                 </div>
@@ -230,8 +230,8 @@ export function JobCardSignalBadge({
                   </div>
                   <div className="h-1.5 w-full bg-elevated rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-primary rounded-full transition-[width] duration-300"
-                      style={{ width: `${effectiveScoreResult.breakdown.seniorityScore}%` }}
+                      className="h-full bg-primary rounded-full transition-transform duration-300 origin-left"
+                      style={{ transform: `scaleX(${effectiveScoreResult.breakdown.seniorityScore / 100})` }}
                     />
                   </div>
                 </div>
@@ -246,8 +246,8 @@ export function JobCardSignalBadge({
                   </div>
                   <div className="h-1.5 w-full bg-elevated rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-ember rounded-full transition-[width] duration-300"
-                      style={{ width: `${effectiveScoreResult.breakdown.toolsScore}%` }}
+                      className="h-full bg-ember rounded-full transition-transform duration-300 origin-left"
+                      style={{ transform: `scaleX(${effectiveScoreResult.breakdown.toolsScore / 100})` }}
                     />
                   </div>
                 </div>
@@ -262,8 +262,8 @@ export function JobCardSignalBadge({
                   </div>
                   <div className="h-1.5 w-full bg-elevated rounded-full overflow-hidden">
                     <div
-                      className="h-full ombre-bar rounded-full transition-[width] duration-300"
-                      style={{ width: `${effectiveScoreResult.breakdown.evidenceCoverageScore}%` }}
+                      className="h-full ombre-bar rounded-full transition-transform duration-300 origin-left"
+                      style={{ transform: `scaleX(${effectiveScoreResult.breakdown.evidenceCoverageScore / 100})` }}
                     />
                   </div>
                 </div>

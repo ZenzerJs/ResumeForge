@@ -155,14 +155,13 @@ export async function POST(request: Request) {
     const result = await prisma.$transaction(async (tx) => {
       let createdResumeId: string | null = null;
       let targetIsMaster = false;
+      let resumeTitle = title || "Imported Guest Draft";
       let historySnapshotCreated = false;
 
       if (existingMatch) {
         createdResumeId = existingMatch.id;
         targetIsMaster = existingMatch.isMaster;
-      } else if (shouldCreateResume && typstSource) {
-        let resumeTitle = title || "Imported Guest Draft";
-
+      } else if (shouldCreateResume && trimmedTypstSource) {
         if (!existingMaster) {
           // No existing master -> new resume becomes master baseline
           targetIsMaster = true;
@@ -193,25 +192,9 @@ export async function POST(request: Request) {
             resumeTitle = title || "Imported Guest Draft";
           }
         }
-
-        const factSnapshot = targetIsMaster
-          ? (extractResumeFacts(typstSource) as unknown as Prisma.InputJsonValue)
-          : undefined;
-
-        const createdResume = await tx.resume.create({
-          data: {
-            userId,
-            title: resumeTitle,
-            typstSource,
-            isMaster: targetIsMaster,
-            isProtected: targetIsMaster,
-            factSnapshot,
-          },
-        });
-        createdResumeId = createdResume.id;
       }
 
-      // Migrate any provided evidenceItems, deduplicating against existing titles for this user
+      // Migrate any provided evidenceItems first so factSnapshot includes their verified IDs, skills, and metrics
       let evidenceCount = 0;
       let skippedDuplicateCount = 0;
 
@@ -257,6 +240,36 @@ export async function POST(request: Request) {
           existingTitles.add(normTitle);
           evidenceCount++;
         }
+      }
+
+      if (!existingMatch && shouldCreateResume && trimmedTypstSource) {
+        const allVerifiedEvidence = targetIsMaster
+          ? await tx.evidenceItem.findMany({
+              where: { userId, status: "verified" },
+              include: {
+                bullets: {
+                  where: { verified: true },
+                  orderBy: { orderIndex: "asc" },
+                },
+              },
+            })
+          : [];
+
+        const factSnapshot = targetIsMaster
+          ? (extractResumeFacts(trimmedTypstSource, allVerifiedEvidence) as unknown as Prisma.InputJsonValue)
+          : undefined;
+
+        const createdResume = await tx.resume.create({
+          data: {
+            userId,
+            title: resumeTitle,
+            typstSource: trimmedTypstSource,
+            isMaster: targetIsMaster,
+            isProtected: targetIsMaster,
+            factSnapshot,
+          },
+        });
+        createdResumeId = createdResume.id;
       }
 
       return {

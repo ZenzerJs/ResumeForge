@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useId, useRef, useState } from "react";
+import { Undo2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { InlineLink } from "@/lib/typst/inline-content";
 import {
@@ -499,6 +500,16 @@ function remapSpanRecord(
   return next;
 }
 
+const SINGLE_LINE_BLOCK_KINDS = new Set([
+  "name",
+  "contact",
+  "entry-title",
+  "entry-role",
+  "entry-location",
+  "entry-date",
+]);
+const LIVE_COMMIT_DEBOUNCE_MS = 200;
+
 export function ManagedResumeForm({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const baseId = useId();
   const [preset, setPreset] = useState<Preset>("professional");
@@ -506,9 +517,25 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
     preset: Preset;
     sourceSnapshot: string;
   } | null>(null);
+  const [pendingRemoveField, setPendingRemoveField] = useState<ManagedFieldDescriptor | null>(null);
+  const [undoRemoveState, setUndoRemoveState] = useState<{
+    label: string;
+    previousSource: string;
+  } | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const lastCommittedValueRef = useRef<string | null>(null);
+  const valueRef = useRef<string>(value);
+  valueRef.current = value;
+  const liveDebounceTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => {
+    const timers = liveDebounceTimersRef.current;
+    return () => {
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
+    };
+  }, []);
 
   useEffect(() => {
     if (lastCommittedValueRef.current !== null && lastCommittedValueRef.current === value) {
@@ -561,7 +588,45 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
     setPendingPresetApply({ preset, sourceSnapshot: value });
   };
 
+  const clearDebounceTimer = (fieldKey: string) => {
+    const existing = liveDebounceTimersRef.current.get(fieldKey);
+    if (existing) {
+      clearTimeout(existing);
+      liveDebounceTimersRef.current.delete(fieldKey);
+    }
+  };
+
+  const scheduleLiveFieldCommit = (fieldKey: string, nextVal: string) => {
+    clearDebounceTimer(fieldKey);
+    if (!nextVal.trim()) return;
+    const timer = setTimeout(() => {
+      liveDebounceTimersRef.current.delete(fieldKey);
+      const latestSource = valueRef.current;
+      const latestManaged = parseManagedResume(latestSource);
+      if (!latestManaged) return;
+      const latestFields = buildManagedFormFields(latestManaged.document, latestManaged.links);
+      const allFields = [
+        ...latestFields.headerFields,
+        ...latestFields.sectionGroups.flatMap((g) => [g.headingField, ...g.blockFields]),
+      ];
+      const latestField = allFields.find((f) => f.key === fieldKey);
+      if (!latestField) return;
+      const outcome = commitManagedFieldBlur({
+        managed: latestManaged,
+        field: latestField,
+        rawValue: nextVal,
+      });
+      if (outcome.status !== "committed") return;
+      lastCommittedValueRef.current = outcome.nextSource;
+      setDrafts((prev) => remapSpanRecord(prev, latestField.spanKey, latestField.block.span.end, outcome.delta));
+      setErrors((prev) => remapSpanRecord(prev, latestField.spanKey, latestField.block.span.end, outcome.delta));
+      onChange(outcome.nextSource);
+    }, LIVE_COMMIT_DEBOUNCE_MS);
+    liveDebounceTimersRef.current.set(fieldKey, timer);
+  };
+
   const handleFieldBlur = (field: ManagedFieldDescriptor, rawValue: string) => {
+    clearDebounceTimer(field.key);
     const outcome = commitManagedFieldBlur({ managed, field, rawValue });
     if (outcome.status === "unchanged") {
       setDrafts((prev) => {
@@ -592,6 +657,8 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
   };
 
   const handleRemoveField = (field: ManagedFieldDescriptor) => {
+    clearDebounceTimer(field.key);
+    const previousSource = value;
     const outcome = removeManagedFieldBlock({ managed, field });
     if (outcome.status === "error") {
       setErrors((prev) => ({ ...prev, [field.spanKey]: outcome.error }));
@@ -599,6 +666,7 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
     }
     const removedDelta = -(outcome.removedRange.end - outcome.removedRange.start);
     lastCommittedValueRef.current = outcome.nextSource;
+    setUndoRemoveState({ label: field.label, previousSource });
     setDrafts((prev) => remapSpanRecord(prev, field.spanKey, outcome.removedRange.end, removedDelta));
     setErrors((prev) => remapSpanRecord(prev, field.spanKey, outcome.removedRange.end, removedDelta));
     onChange(outcome.nextSource);
@@ -609,6 +677,24 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
     const errorId = `${inputId}-error`;
     const currentValue = field.spanKey in drafts ? drafts[field.spanKey] : field.block.text;
     const errorMessage = errors[field.spanKey];
+    const isSingleLine = SINGLE_LINE_BLOCK_KINDS.has(field.block.kind);
+    const sharedControlClass = `w-full rounded border px-3 py-2 text-sm text-foreground bg-inset transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+      errorMessage
+        ? "border-status-danger focus-visible:border-status-danger"
+        : "border-outline/70 focus-visible:border-ring"
+    }`;
+
+    const handleControlChange = (nextVal: string) => {
+      setDrafts((prev) => ({ ...prev, [field.spanKey]: nextVal }));
+      if (nextVal.trim() && errors[field.spanKey]) {
+        setErrors((prev) => {
+          const copy = { ...prev };
+          delete copy[field.spanKey];
+          return copy;
+        });
+      }
+      scheduleLiveFieldCommit(field.key, nextVal);
+    };
 
     return (
       <div key={field.key} className="space-y-1.5">
@@ -619,7 +705,7 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
           {field.removable && (
             <button
               type="button"
-              onClick={() => handleRemoveField(field)}
+              onClick={() => setPendingRemoveField(field)}
               aria-label={`Remove ${field.label}`}
               data-testid={`remove-${field.key}`}
               className="inline-flex min-h-7 shrink-0 items-center rounded border border-outline/70 bg-elevated px-2 py-0.5 text-xs font-medium text-text-secondary hover:border-status-danger/60 hover:text-status-danger transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -628,30 +714,29 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
             </button>
           )}
         </div>
-        <textarea
-          id={inputId}
-          value={currentValue}
-          onChange={(event) => {
-            const nextVal = event.currentTarget.value;
-            setDrafts((prev) => ({ ...prev, [field.spanKey]: nextVal }));
-            if (nextVal.trim() && errors[field.spanKey]) {
-              setErrors((prev) => {
-                const copy = { ...prev };
-                delete copy[field.spanKey];
-                return copy;
-              });
-            }
-          }}
-          onBlur={(event) => handleFieldBlur(field, event.currentTarget.value)}
-          aria-invalid={errorMessage ? "true" : undefined}
-          aria-describedby={errorMessage ? errorId : undefined}
-          rows={currentValue.length > 100 ? 3 : 1}
-          className={`w-full rounded border px-3 py-2 text-sm text-foreground bg-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-            errorMessage
-              ? "border-status-danger focus-visible:border-status-danger"
-              : "border-outline/70 focus-visible:border-ring"
-          }`}
-        />
+        {isSingleLine ? (
+          <input
+            id={inputId}
+            type="text"
+            value={currentValue}
+            onChange={(event) => handleControlChange(event.currentTarget.value)}
+            onBlur={(event) => handleFieldBlur(field, event.currentTarget.value)}
+            aria-invalid={errorMessage ? "true" : undefined}
+            aria-describedby={errorMessage ? errorId : undefined}
+            className={sharedControlClass}
+          />
+        ) : (
+          <textarea
+            id={inputId}
+            value={currentValue}
+            onChange={(event) => handleControlChange(event.currentTarget.value)}
+            onBlur={(event) => handleFieldBlur(field, event.currentTarget.value)}
+            aria-invalid={errorMessage ? "true" : undefined}
+            aria-describedby={errorMessage ? errorId : undefined}
+            rows={currentValue.length > 100 ? 3 : 1}
+            className={sharedControlClass}
+          />
+        )}
         {errorMessage && (
           <p
             id={errorId}
@@ -664,6 +749,11 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
         )}
       </div>
     );
+  };
+
+  const scrollToSection = (elementId: string) => {
+    const target = document.getElementById(elementId);
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
@@ -685,16 +775,75 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
         <button
           type="button"
           onClick={applyPreset}
-          className="rounded bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="rounded bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           Apply to draft
         </button>
       </div>
+
+      {/* Section Jump Pills */}
+      <nav
+        aria-label="Jump to resume section"
+        data-testid="managed-form-section-pills"
+        className="flex flex-wrap items-center gap-1.5"
+      >
+        <button
+          type="button"
+          onClick={() => scrollToSection(`${baseId}-section-header`)}
+          className="rounded-full border border-outline/70 bg-inset px-2.5 py-1 text-xs font-medium text-text-secondary transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Header
+        </button>
+        {sectionGroups.map(({ sectionIndex, headingField }) => (
+          <button
+            key={`jump-${sectionIndex}`}
+            type="button"
+            onClick={() => scrollToSection(`${baseId}-section-${sectionIndex}`)}
+            className="rounded-full border border-outline/70 bg-inset px-2.5 py-1 text-xs font-medium text-text-secondary transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {headingField.block.text.trim() || `Section ${sectionIndex + 1}`}
+          </button>
+        ))}
+      </nav>
+
+      {undoRemoveState && (
+        <div
+          role="status"
+          aria-live="polite"
+          data-testid="managed-remove-undo-banner"
+          className="flex items-center justify-between gap-2 rounded-[8px] border border-primary/40 bg-primary/10 px-3 py-2 text-xs text-foreground"
+        >
+          <span>Removed {undoRemoveState.label}.</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                lastCommittedValueRef.current = undoRemoveState.previousSource;
+                onChange(undoRemoveState.previousSource);
+                setUndoRemoveState(null);
+              }}
+              data-testid="managed-remove-undo-btn"
+              className="inline-flex items-center gap-1 rounded bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Undo2 className="h-3 w-3" aria-hidden="true" />
+              Undo
+            </button>
+            <button
+              type="button"
+              onClick={() => setUndoRemoveState(null)}
+              className="text-xs text-text-secondary hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       <p className="text-sm text-text-muted">
-        Changes apply when you leave a field. Use Remove to delete optional fields or bullets, or Typst Source for custom edits.
+        Changes update your preview automatically as you type. Use Remove to delete optional fields or bullets, or Typst Source for custom edits.
       </p>
       {links.length > 0 && (
-        <section className="space-y-3 rounded border border-outline/70 bg-canvas/40 p-3" aria-label="PDF link placement">
+        <section className="space-y-3 border-t border-outline/60 pt-4" aria-label="PDF link placement">
           <h2 className="text-sm font-semibold text-foreground">PDF link placement</h2>
           <p className="text-sm text-text-secondary">
             Choose the matching text for each destination when needed. Editing a block clears placement choices inside that block so they can be reviewed again.
@@ -752,13 +901,41 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
           })}
         </section>
       )}
-      <div className="space-y-3">{headerFields.map((field) => renderField(field))}</div>
+      <div id={`${baseId}-section-header`} className="space-y-3 border-t border-outline/60 pt-4 scroll-mt-4">
+        {headerFields.map((field) => renderField(field))}
+      </div>
       {sectionGroups.map(({ sectionIndex, headingField, blockFields }) => (
-        <section key={`section-${sectionIndex}`} className="space-y-3 rounded border border-outline/70 bg-canvas/40 p-3">
+        <section
+          key={`section-${sectionIndex}`}
+          id={`${baseId}-section-${sectionIndex}`}
+          className="space-y-3 border-t border-outline/60 pt-4 scroll-mt-4"
+        >
           {renderField(headingField)}
           {blockFields.map((field) => renderField(field))}
         </section>
       ))}
+      <ConfirmDialog
+        open={Boolean(pendingRemoveField)}
+        onOpenChange={(open) => {
+          if (!open) setPendingRemoveField(null);
+        }}
+        title="Remove Resume Field"
+        description={
+          pendingRemoveField
+            ? `Remove "${pendingRemoveField.label}"? You can undo this immediately after.`
+            : ""
+        }
+        confirmLabel="Remove"
+        tone="destructive"
+        dialogTestId="managed-remove-confirm-modal"
+        confirmTestId="confirm-managed-remove-btn"
+        cancelTestId="cancel-managed-remove-btn"
+        onConfirm={() => {
+          if (!pendingRemoveField) return;
+          handleRemoveField(pendingRemoveField);
+          setPendingRemoveField(null);
+        }}
+      />
       <ConfirmDialog
         open={Boolean(pendingPresetApply)}
         onOpenChange={(open) => {

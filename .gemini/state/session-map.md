@@ -1,25 +1,24 @@
 ### Modified Interfaces
-- `DESIGN.md` — Documented static `AsciiWaves`, frosted glass diffusion layer, landing `ProductProofCard` `palette-lab.html#ember` ATS Match pop-out spec, and `/editor` integrated docked `ATS Grade` + `CodeEditor` syntax tokens.
-- `tailwind.config.ts` — Added `bg-deep` (`#0a0808`) token.
-- `C:/Users/jayde/.gemini/antigravity/brain/99cc49cb-77c3-4e64-8b4c-bd82398cb02b/palette-lab.html` — Removed cursor ripple/pointer listeners and added frosted glass diffusion plane (`ascii-glass-veil`) between the static `AsciiWaves` canvas and foreground text.
-- `src/components/design-system/ascii-waves.tsx` — Defaulted `hasCursorInteraction = false` and `speed = 0`, added synchronous dimension synchronization on `getContext` and `ResizeObserver` for static mode.
-- `src/components/landing/landing-atmosphere.tsx` — Added `data-testid="landing-ascii-glass-layer"` frosted glass diffusion plane (`backdrop-blur-md bg-canvas/55` + warm radial motif sheen + glass hairline highlights) between `AsciiWaves` and hero content; static `speed={0}` & `hasCursorInteraction={false}`.
-- `src/components/landing/home-landing.tsx` — Added subtle frosted glass card framing behind the hero narrative column (`data-testid="landing-hero-copy-glass"`).
-- `src/components/landing/product-proof-card.tsx` — Styled to match `palette-lab.html#ember` `02 · Landing hero` ATS Match pop-out card (`.surface-glass`, `ATS MATCH · STRIPE, BACKEND ENG.`, `Live` Electric Blue pill, `86` Electric Blue conic-gradient ring with glow, `Go`/`PostgreSQL`/`gRPC`/`Kafka` Electric Blue chips, `Terraform`/`PCI-DSS` Warm Gold gap chips, monospace diff with `#ffb3ab` removal & `#4f8fff` addition + `cites ev_0142 · ev_0157` footer, and `Accept` / `Reject` buttons).
-- `src/components/editor/code-editor.tsx` — Styled CodeMirror theme and live Typst line decorations to match `palette-lab.html#ember` `03 · Editor` (`bg-inset` `#151211`, Ember `#ff8b3d` directives, Warm Gold `#f7bd3f` functions, Electric Blue `#4f8fff` strings/metrics, muted stone `#9e9287` comments, and Warm Gold active line bar).
-- `src/components/editor/preview-panel.tsx`, `src/components/tailor/ats-score-panel.tsx`, `src/components/tailor/ats-score-panel.module.css` — Styled `AtsScorePanel` to match `palette-lab.html#ember` (Electric Blue conic score ring with glow, Electric Blue & Warm Gold progress bars, `Urgent` / `Non-urgent` issue cards on `bg-inset`) and integrated a docked right-hand `ATS Grade` column alongside the paper preview in `/editor` (`Preview · Grade` split view + full `ATS Grade` drawer).
-- Swept all remaining navy hexes and `slate-*` classes across `library/`, `evidence/`, `tracker/`, `tailor/`, `editor/`, `interview/`, `practice/`, `settings/`, `navigation/`, `ui/`, and `app/opengraph-image.tsx` onto Ember Ink tokens.
+- **Merged 4 Wave 2 branches (`--no-ff`) into `playwright_browser_testing_plan`**:
+  - `swarm-ws2-a-backend-008abf10` (`ea6bbf39`): `/api/ats/evaluate` `sharedOrSelfJobWhere(userId)` tenant scoping; `/api/auth/migrate-guest-drafts` verified evidence persistence before `extractResumeFacts(trimmedSource)` & replay idempotency; malformed JSON `400` guards in `/api/resumes` & `/api/jobs/match`; `extractResumeFacts` V2 `#block`/`#grid`/`#entry` support & Typst directive stripping; 14 additive composite `@@index` declarations (`prisma/migrations/20261118010000_add_hot_composite_indexes/migration.sql` + `docs/migrations/20261118-hot-composite-indexes-dry-run.md`); `getJobsList` column omission (`normalized`, `formattedJd`), batched `bulkEvidenceAction`, parallelized route/AI lookups.
+  - `swarm-ws2-b-editor-b473bdd2` (`fb27ed40`): `src/lib/editor/mode-utils.ts` pure mode/form helpers + `"simple-icons"` `optimizePackageImports`; `DEFAULT_EDITOR_LAYOUT.isAiCollapsed = true`; `ManagedResumeForm` single-line `<input type="text">`, jump pills, 200ms debounced live `onChange`, confirm+undo on remove; `BrandMark` shared across `TopNav`/`LandingFooter`/`LoginForm`; dark `themeColor: "#121010"`, `viewportFit: "cover"`, dark `select, option`, expanded `prefers-reduced-motion`, removed `top-16` `.ombre-divider`, `t=0ms` focus rings (`box-shadow` dropped from transitions + `:focus-visible`), `overscroll-contain` Dialog/Sheet, `scaleX` progress bars, `AsciiWaves` pause/play toggle, guest `SetupChecklist` gating.
+  - `swarm-ws2-c-surfaces-067ca042` (`6914d000`): `bg-elevated` `More filters` popover; normalized `(companyName, title, location)` dedupe; `min-h-11` `TrackerSubNav` + `top-[45px]`/`scroll-pt-28` clearance; `next/dynamic` splits for `PatchDiffReview`, `AtsScorePanel`, and `pdfExtractor`; `src/lib/hooks/use-roving-tablist.ts` WAI-ARIA arrow-key navigation across tabs; `/practice` mobile collapsed filters (`<812px` fold); `content-visibility:auto` & `tabular-nums` polish.
+  - `swarm-ws2-d-tests-00b9dbac` (`ac92761b`): aligned `tests/editor-resizable-panels.test.ts`, `tests/managed-resume-form.test.ts`, `e2e/phase9-resizable-editor.spec.ts`, `e2e/phase10-repair.spec.ts`; added `tests/phase4-opt-and-wui.test.ts` and `e2e/phase4-polish-and-wui.spec.ts`.
+- **Wave 2 integration & E2E fixes (`integrator-2`)**:
+  - `src/components/evidence/bulk-pdf-dropzone.tsx` — Kept `pdfExtractor` dynamically split outside initial `/library` bundle while pre-warming `loadPdfExtractor()` on mount (`useEffect`) so offline PDF extraction works after `networkidle`.
+  - `tests/phase4-opt-and-wui.test.ts` — Filtered out `baseHealth` `Warning:`/`Penalized:` structural tips when asserting zero cross-tenant skill-gap leakage in `POST /api/ats/evaluate`.
+  - `tests/tailor-task-sequence.test.ts` — Updated `useLayoutEffect` deps expectation to `[activeTab, isBootstrapping, isLoadingJob, tabListRef]` after `useRovingTablist` integration.
+  - `e2e/critique-remediation-regression.spec.ts` — Confirmed `ManagedResumeForm` `confirm-managed-remove-btn` dialog before filling `Location`; fixed Test 4 `/api/jobs` route regex (`/\/api\/jobs(?:\?|$)/`) to match `?scope=tracked` + `test.setTimeout(90_000)`; matched mobile compact `· Saved` indicator on `<640px`.
+  - `e2e/hosted-security.spec.ts` — Verified `@username` visibility in `header` after `TopNav` consolidated account display.
+  - `e2e/phase10-polish.spec.ts` — Updated expected `meta[name="theme-color"]` to `#121010`.
 
 ### Verified Checks
-- `git grep -n -E "bg-slate-|border-slate-|from-slate-|to-slate-|via-slate-|#0b1326|#0f172a|#131b2e|#171f33|#172033|#1e293b|#060e20|#121929|#030712|#0d1727|#0d1526|#162035" -- src/` (0 matches)
-- `npm run check:env` (Passed — 37 env names declared)
-- `npm run lint` (Passed — 0 warnings or errors)
-- `npm run typecheck` (Passed — 0 TypeScript errors)
-- `npm run test` (Passed — 134 test files, 895 unit tests)
-- `npm run test:integration` (Passed — 11 PostgreSQL integration tests)
-- `npm run build` (Passed — Next.js production build)
-- `npx playwright test --config=playwright.demo.config.ts` (Passed — 35/35 E2E tests)
-- `npx playwright test --config=playwright.config.ts e2e/ws0-ux-bugs.spec.ts e2e/phase9-ats-grade.spec.ts e2e/phase10-polish.spec.ts e2e/phase10-repair.spec.ts e2e/landing-tailor-discover-enhancements.spec.ts --project=chromium` (Passed — 29/29 E2E tests)
+- `npx prisma migrate deploy` + `npx prisma generate` + `npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --exit-code` — Passed (`0`, `No difference detected`).
+- `npx playwright test --project=chromium` — Passed (`158/158` passed, `0` failed, `0` skipped).
+- `npx playwright test --config=playwright.demo.config.ts` — Passed (`33/33` passed, `0` failed, `0` skipped).
+- `impeccable detect --json src/app`, `src/components`, `http://127.0.0.1:3005` — Passed (`0` errors, `0` WCAG contrast warnings; 6/6/9 advisories & warnings).
+- Live Chromium check (`browser-verifier-2` on `http://127.0.0.1:3005`, `320x700`/`375x812`/`1440x900`, 17 routes = 51 checks) — Passed (`51/51` HTTP status & `#main-content` visible, `0` overflow, `0` console/page/HTTP `>=400` errors, `/editor@1440x900` `paperRect.top=128 <= 128`, opaque `More filters`, dark `<option>`s, `t=0ms` focus ring, `0` `top-16` `.ombre-divider`); port-`3005` daemon stopped (`0` listeners on `3005`/`3006`).
+- Final post-commit `check:env`, `lint`, `typecheck`, `test`, and `build` run scheduled immediately after committing.
 
 ### Open Blockers
 - None.

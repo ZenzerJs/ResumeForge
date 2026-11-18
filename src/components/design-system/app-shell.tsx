@@ -108,7 +108,7 @@ export function AppShell({
   const [showMigrationModal, setShowMigrationModal] = useState(false);
   const [guestDraft, setGuestDraft] = useState<string | null>(null);
   const [hasCustomResumeDraft, setHasCustomResumeDraft] = useState<boolean>(false);
-  const [hasExistingMaster, setHasExistingMaster] = useState<boolean>(true);
+  const [hasExistingMaster, setHasExistingMaster] = useState<boolean>(false);
   const [isDesktopLg, setIsDesktopLg] = useState(true);
 
   useEffect(() => {
@@ -210,8 +210,9 @@ export function AppShell({
       ) : null}
       <main
         id="main-content"
+        tabIndex={-1}
         className={cn(
-          "relative z-10 flex min-h-0 flex-1 flex-col",
+          "relative z-10 flex min-h-0 flex-1 flex-col outline-none scroll-mt-16",
           !hideNav &&
             (variant === "editor"
               ? "pt-[calc(3rem+env(safe-area-inset-top))]"

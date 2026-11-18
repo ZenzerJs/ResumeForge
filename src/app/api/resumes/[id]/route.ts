@@ -47,7 +47,12 @@ export async function PUT(
     if (userId instanceof NextResponse) return userId;
 
     const { id } = await params;
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON payload" }, { status: 400 });
+    }
     const validation = UpdateResumeSchema.safeParse(body);
 
     if (!validation.success) {

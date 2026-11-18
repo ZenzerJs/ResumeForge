@@ -84,6 +84,15 @@ function hasAnyJobDetails(summary: ActiveTailorJobSummary | null | undefined): s
   );
 }
 
+function isSavedActiveJobSummary(
+  summary: ActiveTailorJobSummary | null | undefined,
+  explicitJobId?: string | null
+): summary is ActiveTailorJobSummary {
+  if (!summary || !summary.jobId) return false;
+  if (summary.jobId.startsWith("demo-sample-") && !explicitJobId) return false;
+  return true;
+}
+
 /**
  * Reads the scoped active Tailor job snapshot from sessionStorage, clearing mismatched scopes.
  */
@@ -313,7 +322,9 @@ export function ChatPanel({ typstSource, resumeTitle, jobId }: ChatPanelProps) {
           propJobId: jobId,
           scope: resolvedScope,
         });
-        setActiveJobSummary(resolved.jobSummary);
+        setActiveJobSummary(
+          isSavedActiveJobSummary(resolved.jobSummary, jobId) ? resolved.jobSummary : null
+        );
       } catch {
         // Active job context is optional
       }
@@ -386,8 +397,13 @@ export function ChatPanel({ typstSource, resumeTitle, jobId }: ChatPanelProps) {
         propJobId: jobId,
         scope,
       });
-      const activeJobId = resolved.activeJobId;
-      let jobSummary = resolved.jobSummary;
+      const activeJobId =
+        resolved.activeJobId && (!resolved.activeJobId.startsWith("demo-sample-") || Boolean(jobId))
+          ? resolved.activeJobId
+          : undefined;
+      let jobSummary = isSavedActiveJobSummary(resolved.jobSummary, jobId)
+        ? resolved.jobSummary
+        : null;
 
       if (
         activeJobId &&
@@ -584,11 +600,43 @@ export function ChatPanel({ typstSource, resumeTitle, jobId }: ChatPanelProps) {
     }
   };
 
-  const resizeTextarea = () => {
+  const resizeRafRef = useRef<number | null>(null);
+  const lastTextareaHeightRef = useRef<number | null>(null);
+  const lastInputLengthRef = useRef<number>(0);
+
+  useEffect(() => {
+    return () => {
+      if (resizeRafRef.current !== null) {
+        cancelAnimationFrame(resizeRafRef.current);
+      }
+    };
+  }, []);
+
+  const resizeTextarea = (nextLength: number) => {
     const el = textareaRef.current;
+    const isShrinking = nextLength < lastInputLengthRef.current;
+    lastInputLengthRef.current = nextLength;
     if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 96)}px`;
+    // Skip layout read/write when text fits without overflow and is not shrinking from multi-line
+    if (
+      lastTextareaHeightRef.current !== null &&
+      !isShrinking &&
+      el.scrollHeight <= el.clientHeight
+    ) {
+      return;
+    }
+    if (resizeRafRef.current !== null) {
+      cancelAnimationFrame(resizeRafRef.current);
+    }
+    resizeRafRef.current = requestAnimationFrame(() => {
+      resizeRafRef.current = null;
+      const target = textareaRef.current;
+      if (!target) return;
+      target.style.height = "auto";
+      const nextHeight = Math.min(target.scrollHeight, 96);
+      target.style.height = `${nextHeight}px`;
+      lastTextareaHeightRef.current = nextHeight;
+    });
   };
 
   return (
@@ -713,13 +761,14 @@ export function ChatPanel({ typstSource, resumeTitle, jobId }: ChatPanelProps) {
         <textarea
           ref={textareaRef}
           data-testid="chat-input"
+          aria-label="Ask Career Assistant"
           rows={1}
           value={input}
           disabled={isStreaming}
           onChange={(e) => {
             setInput(e.target.value);
             setError(null);
-            resizeTextarea();
+            resizeTextarea(e.target.value.length);
           }}
           onKeyDown={onKeyDown}
           placeholder="Ask about your resume, evidence, or a job…"

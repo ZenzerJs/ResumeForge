@@ -357,8 +357,8 @@ export function SetupChecklist({
             className="w-32 bg-inset h-2 rounded-full overflow-hidden"
           >
             <div
-              className="ombre-bar h-full rounded-full transition-all duration-300"
-              style={{ width: `${progressPct}%` }}
+              className="ombre-bar h-full w-full origin-left rounded-full transition-transform duration-300"
+              style={{ transform: `scaleX(${progressPct / 100})` }}
             />
           </div>
           <button
@@ -585,6 +585,12 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [sessionUser, setSessionUser] = useState<SessionUser | null | undefined>(undefined);
   const [savedRole, setSavedRole] = useState<SavedRoleEntry | null>(null);
+  const [hasLocalResume, setHasLocalResume] = useState(false);
+  const [guestEvidence, setGuestEvidence] = useState<GuestEvidenceSummary>(EMPTY_GUEST_EVIDENCE);
+  const [guestJobs, setGuestJobs] = useState<GuestJobsSummary>(EMPTY_GUEST_JOBS);
+  const [hasAiKey, setHasAiKey] = useState(false);
+  const [aiKeyless, setAiKeyless] = useState(false);
+  const [checklistDismissed, setChecklistDismissed] = useState(false);
 
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const cancelClearBtnRef = useRef<HTMLButtonElement>(null);
@@ -618,6 +624,19 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
           rawGuestJobs
         )
       );
+
+      const typstSource = localStorage.getItem("resumeforge_typst_source");
+      setHasLocalResume(hasLocalPersonalResume(typstSource));
+      setGuestEvidence(parseGuestEvidenceSummary(localStorage.getItem("resumeforge_guest_evidence")));
+      setGuestJobs(parseGuestJobsSummary(rawGuestJobs));
+      setChecklistDismissed(localStorage.getItem("resumeforge_checklist_dismissed") === "true");
+
+      const provider = localStorage.getItem("resumeforge_ai_provider");
+      const key = localStorage.getItem("resumeforge_api_key");
+      const customUrl = localStorage.getItem("resumeforge_custom_ai_url");
+      const isKeyless = provider === "ollama" || (provider === "custom" && !key);
+      setAiKeyless(isKeyless);
+      setHasAiKey(Boolean(key || (isKeyless && customUrl) || provider === "ollama"));
     };
 
     refreshLocalState();
@@ -633,6 +652,101 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
       window.removeEventListener("resumeforge:application-context-changed", refreshLocalState);
     };
   }, [demoMode, sessionUser]);
+
+  const convertGuestPdfLocally = async (file: File): Promise<string> => {
+    const [
+      { extractPdfEvidence, detectSectionHeading },
+      { buildResumeDocument, renderResumeDocument, isResumeLayoutV2Enabled, typstContent },
+    ] = await Promise.all([
+      import("@/lib/evidence/pdfExtractor"),
+      import("@/lib/typst/resume-document"),
+    ]);
+
+    const arrayBuffer = await file.arrayBuffer();
+    const evidence = await extractPdfEvidence(arrayBuffer, file.name);
+    const rawLines = evidence.pages
+      .flatMap((p) => p.text.split(/\r?\n/))
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (rawLines.length === 0) {
+      throw new Error("Could not extract readable text from PDF.");
+    }
+
+    const safeFileName = file.name.replace(/[\r\n\u2028\u2029]/g, " ");
+    const headerComments = [
+      "// @pdf-conversion-draft: Review and edit before saving as Master Resume",
+      "// @conversion-path: fallback",
+      `// PDF source: "${safeFileName}" — converted ${new Date().toISOString().slice(0, 10)}`,
+    ].join("\n");
+
+    if (isResumeLayoutV2Enabled()) {
+      const normalizedSource = rawLines.join("\n");
+      const assignments: import("@/lib/typst/resume-document").ResumeAssignment[] = [];
+      let offset = 0;
+      let seenSection = false;
+      let currentSecKind: string | null = null;
+
+      rawLines.forEach((line, idx) => {
+        const start = offset;
+        const end = start + line.length;
+        offset = end + 1;
+
+        if (idx === 0) {
+          assignments.push({ kind: "name", span: { start, end } });
+          return;
+        }
+        const detectedSec = detectSectionHeading(line);
+        if (detectedSec) {
+          assignments.push({ kind: "section", span: { start, end } });
+          seenSection = true;
+          currentSecKind = detectedSec;
+          return;
+        }
+        if (
+          !seenSection &&
+          /(@|https?:\/\/|linkedin\.com|github\.com|\b\d{3}[-. )\s]\d{3})/i.test(line)
+        ) {
+          assignments.push({ kind: "contact", span: { start, end } });
+          return;
+        }
+        if (/^[-–—•*▪\u2022]\s+/.test(line)) {
+          assignments.push({ kind: "bullet", span: { start, end } });
+          return;
+        }
+        if (currentSecKind === "skills") {
+          assignments.push({ kind: "skill", span: { start, end } });
+        }
+      });
+
+      const doc = buildResumeDocument(normalizedSource, assignments);
+      return `${headerComments}\n\n${renderResumeDocument(doc, "comfortable")}`;
+    }
+
+    const titleLine = typstContent(rawLines[0]);
+    const bodyLines = rawLines.slice(1).map((line) => {
+      if (detectSectionHeading(line)) {
+        return `\n== ${typstContent(line.replace(/[:\-—–\s]+$/, "").trim())}\n`;
+      }
+      if (/^[-–—•*▪\u2022]\s+/.test(line)) {
+        return `- ${typstContent(line.replace(/^[-–—•*▪\u2022]\s+/, ""))}`;
+      }
+      return typstContent(line);
+    });
+
+    const v1Body = [
+      '#set page(paper: "us-letter", margin: (x: 1.5cm, y: 1.35cm))',
+      '#set text(font: "Liberation Sans", size: 9.5pt, fill: rgb("#1c1e20"))',
+      "#set par(leading: 0.55em)",
+      "#set list(marker: [•], spacing: 0.28em, indent: 0em, body-indent: 0.45em)",
+      "",
+      `= ${titleLine}`,
+      "",
+      ...bodyLines,
+    ].join("\n");
+
+    return `${headerComments}\n\n${v1Body}\n`;
+  };
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -662,6 +776,17 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
         body: formData,
       });
 
+      if (res.status === 401) {
+        const localTypstSource = await convertGuestPdfLocally(file);
+        clearDemoSamplesForPersonalResume(localTypstSource);
+        localStorage.setItem("resumeforge_typst_source", localTypstSource);
+        localStorage.setItem("resumeforge_has_guest_draft", "true");
+        localStorage.removeItem("resumeforge_draft_migrated");
+        localStorage.removeItem("resumeforge_migration_dismissed");
+        router.push("/editor");
+        return;
+      }
+
       const rawText = await res.text();
       let json: {
         success?: boolean;
@@ -673,7 +798,7 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
       } catch {
         const message =
           res.status === 413
-            ? "PDF upload exceeds the hosted 4.5 MB request size limit."
+            ? "PDF upload exceeds the hosted 4.5\u00A0MB request size limit."
             : `PDF upload failed (HTTP ${res.status || 500}). Please try again.`;
         setNotification({ type: "error", message });
         return;
@@ -682,9 +807,9 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
         clearDemoSamplesForPersonalResume(json.data.typstSource);
         localStorage.setItem("resumeforge_typst_source", json.data.typstSource);
         localStorage.setItem("resumeforge_has_guest_draft", "true");
-        router.push("/editor?mode=visual");
+        router.push("/editor");
       } else if (res.ok && json.success && json.data?.id) {
-        router.push(`/editor?resumeId=${json.data.id}&mode=visual`);
+        router.push(`/editor?resumeId=${json.data.id}`);
       } else {
         setNotification({
           type: "error",
@@ -737,6 +862,28 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
     sample: demoMode ? "demo" : undefined,
     tab: "job-info",
   });
+  const isSignedInViewer =
+    Boolean(sessionUser?.id) ||
+    (stats as { isGuest?: boolean }).isGuest === false ||
+    (!demoMode &&
+      sessionUser === undefined &&
+      (stats.hasMasterResume ||
+        stats.evidenceCount > 0 ||
+        stats.jobsCount > 0 ||
+        stats.variantsCount > 0 ||
+        stats.coverLettersCount > 0));
+
+  const checklistState = computeOnboardingChecklistState({
+    stats,
+    hasLocalResume,
+    guestEvidence,
+    guestJobs,
+    hasAiKey,
+    aiKeyless,
+  });
+
+  const isGuestViewer = (stats as { isGuest?: boolean }).isGuest ?? !isSignedInViewer;
+  const showChecklist = (!isGuestViewer || hasLocalResume) && !checklistDismissed && checklistState.completedCount < 4;
 
   return (
     <div className="bg-canvas text-foreground font-body-regular min-h-dvh min-w-0 flex flex-col overflow-x-hidden antialiased selection:bg-primary/25 selection:text-primary leading-[1.6] relative">
@@ -744,7 +891,7 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
 
       <TopNav />
 
-      <main id="main-content" className="flex-grow min-w-0 pt-[calc(6rem+env(safe-area-inset-top))] pb-16 flex flex-col relative z-10 overflow-visible">
+      <main id="main-content" tabIndex={-1} className="flex-grow min-w-0 scroll-mt-16 outline-none pt-[calc(6rem+env(safe-area-inset-top))] pb-16 flex flex-col relative z-10 overflow-visible">
         {/* Notification Toast */}
         {notification ? (
           <div
@@ -752,15 +899,15 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
             aria-live="polite"
             className={`p-3.5 rounded-[8px] border flex items-center justify-between text-xs font-semibold max-w-xl mx-auto w-full shadow-lg z-20 transition-opacity duration-150 ${
               notification.type === "success"
-                ? "bg-status-success/10 border-status-success/30 text-status-success"
+                ? "bg-status-success/10 border-status-success/30 text-status-success-soft"
                 : "bg-status-danger/10 border-status-danger/30 text-status-danger"
             }`}
           >
             <div className="flex items-center gap-2">
               {notification.type === "success" ? (
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success" />
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success-soft" aria-hidden="true" />
               ) : (
-                <AlertCircle className="h-4 w-4 shrink-0 text-status-danger" />
+                <AlertCircle className="h-4 w-4 shrink-0 text-status-danger" aria-hidden="true" />
               )}
               <span>{notification.message}</span>
             </div>
@@ -775,6 +922,28 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
           </div>
         ) : null}
 
+        {showChecklist ? (
+          <div className="mx-auto w-full max-w-7xl px-6 pt-2 pb-6 md:px-12 z-20">
+            <SetupChecklist
+              stats={stats}
+              hasLocalResume={hasLocalResume}
+              guestEvidence={guestEvidence}
+              guestJobs={guestJobs}
+              hasAiKey={hasAiKey}
+              aiKeyless={aiKeyless}
+              demoMode={demoMode}
+              savedRole={savedRole}
+              onUploadPdf={() => pdfInputRef.current?.click()}
+              onDismiss={() => {
+                setChecklistDismissed(true);
+                try {
+                  localStorage.setItem("resumeforge_checklist_dismissed", "true");
+                } catch {}
+              }}
+            />
+          </div>
+        ) : null}
+
         {/* Hero Section with Staggered Reveal */}
         <section className="relative min-h-[680px] flex items-center px-6 md:px-12 max-w-7xl mx-auto w-full z-10 py-12">
           <div className="grid md:grid-cols-2 gap-12 items-center relative z-10 w-full">
@@ -783,11 +952,13 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
               data-testid="landing-hero-copy-glass"
               className="flex flex-col gap-6 rounded-[14px] glass-pane p-6 sm:p-8"
             >
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-hairline bg-inset/80 w-fit">
-                <span className="h-2 w-2 rounded-full bg-signal shadow-[0_0_0_3px_rgb(var(--accent-contrast)/0.2)]" aria-hidden />
-                <KeyRound className="h-3.5 w-3.5 text-primary" aria-hidden />
-                <span className="font-mono text-xs text-text-secondary">Guest drafts stay in your browser · Use your own AI key</span>
-              </div>
+              {!isSignedInViewer && (
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-hairline bg-inset/80 w-fit">
+                  <span className="h-2 w-2 rounded-full bg-signal shadow-[0_0_0_3px_rgb(var(--accent-contrast)/0.2)]" aria-hidden />
+                  <KeyRound className="h-3.5 w-3.5 text-primary" aria-hidden />
+                  <span className="font-mono text-xs text-text-secondary">Guest drafts stay in your browser · Use your own AI key</span>
+                </div>
+              )}
 
               <h1 className="text-4xl md:text-5xl lg:text-6xl text-foreground leading-tight font-bold tracking-[-0.04em] text-pretty">
                 Tailor your resume. <span className="text-ember-gradient">Keep every claim true.</span>
