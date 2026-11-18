@@ -147,4 +147,60 @@ describe("buildEvidenceMatchChecklist", () => {
       { label: "Trading", matched: false, status: "missing" },
     ]);
   });
+
+  it("uses boundary-aware token matching and flags [UNVERIFIED]/[PLANNED] items as needs_verification", () => {
+    const boundaryEvidence: EvidenceItemWithBullets[] = [
+      {
+        id: "e-false-pos",
+        type: "project",
+        title: "Cargo Algorithm Viewer",
+        organization: null,
+        dates: "2025",
+        verifiedSummary: "Built React + Tailwind UI over SQLite and PostgreSQL",
+        tags: ["React", "SQLite", "PostgreSQL"],
+        status: "verified",
+        bullets: [
+          {
+            id: "b-fp",
+            text: "Optimized algorithm using C++ and Node.js",
+            technologies: ["C++", "Node.js"],
+            roleAffinity: [],
+            verified: true,
+          },
+        ],
+      },
+      {
+        id: "e-planned",
+        type: "project",
+        title: "[PLANNED] Go Worker",
+        organization: null,
+        dates: "2025",
+        verifiedSummary: "[UNVERIFIED] Planned Go service",
+        tags: ["Go"],
+        status: "verified",
+        bullets: [],
+      },
+    ];
+
+    const result = buildEvidenceMatchChecklist(
+      {
+        requiredSkills: ["Go", "C", "C++", "R", "AI", "SQL", "Node.js"],
+        preferredSkills: [],
+        domainTerms: [],
+      },
+      boundaryEvidence,
+    );
+
+    expect(result.items).toEqual([
+      { label: "Go", matched: false, status: "needs_verification" },
+      { label: "C", matched: false, status: "missing" },
+      { label: "C++", matched: true, status: "verified" },
+      { label: "R", matched: false, status: "missing" },
+      { label: "AI", matched: false, status: "missing" },
+      { label: "SQL", matched: false, status: "missing" },
+      { label: "Node.js", matched: true, status: "verified" },
+    ]);
+    expect(result.matched).toBe(2);
+    expect(result.needsVerification).toBe(1);
+  });
 });

@@ -23,6 +23,7 @@ import {
 } from "@/lib/jobs/posting-identity";
 import {
   canAutoHydrateTrackerJobs,
+  executeRefreshFromSource,
   type JobItem,
 } from "@/components/tracker/tracker-feed";
 import { computeLocalOutcomePayload } from "@/components/tracker/outcomes-panel";
@@ -648,6 +649,92 @@ describe("Tracker UX Remediation & Deduplication", () => {
       });
       // (1 interviewing + 1 offer) / (1 applied + 1 interviewing + 1 offer + 1 rejected) = 0.5
       expect(outcomes.interviewRate).toBe(0.5);
+    });
+  });
+
+  describe("5. Refresh from Source confirmation guard & Discover-only vs Tracker import", () => {
+    it("opens confirmation dialog on Refresh click without calling bulk-import directly", () => {
+      const src = readProjectFile("src/components/tracker/tracker-feed.tsx");
+      expect(src).toContain("setRefreshConfirmOpen(true)");
+      expect(src).toContain("RefreshFromSourceDialog");
+      expect(src).toContain('data-testid="refresh-from-source-dialog"');
+      expect(src).toContain('data-testid="refresh-sync-discover-btn"');
+      expect(src).toContain('data-testid="refresh-import-tracker-btn"');
+      expect(src).toContain("Sync Discover Feed Only");
+      expect(src).toContain("Import Listings to Tracker");
+
+      // Ensure handleRefreshFromSource itself only opens the dialog instead of calling bulk-import
+      const handlerMatch = src.match(
+        /const handleRefreshFromSource = async \(\) => \{([\s\S]*?)\n  \};/,
+      );
+      expect(handlerMatch).not.toBeNull();
+      expect(handlerMatch![1]).not.toContain("/api/jobs/bulk-import");
+      expect(handlerMatch![1]).not.toContain("/api/connectors/sync");
+      expect(handlerMatch![1]).toContain("setRefreshConfirmOpen(true)");
+    });
+
+    it("executes Discover-only sync without calling /api/jobs/bulk-import and reports exact counts", async () => {
+      const calledUrls: string[] = [];
+      const mockFetch = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        calledUrls.push(url);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              summary: { totalInserted: 14, totalFound: 120, providerCount: 4 },
+              results: [{ source: "greenhouse", success: true }],
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }) as unknown as typeof fetch;
+
+      const outcome = await executeRefreshFromSource("sync-discover", mockFetch);
+
+      expect(calledUrls).toEqual(["/api/connectors/sync"]);
+      expect(outcome.syncSucceeded).toBe(true);
+      expect(outcome.shouldReloadJobs).toBe(false);
+      expect(outcome.notice).toBe(
+        "Discover feed: 14 new of 120 from 4 sources. Tracker unchanged.",
+      );
+    });
+
+    it("executes Tracker bulk-import + Discover sync when confirmed and reports exact counts", async () => {
+      const calledUrls: string[] = [];
+      const mockFetch = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        calledUrls.push(url);
+        if (url === "/api/jobs/bulk-import") {
+          return new Response(
+            JSON.stringify({
+              success: true,
+              createdCount: 25,
+              skippedCount: 1175,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              summary: { totalInserted: 8, totalFound: 95, providerCount: 3 },
+              results: [],
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }) as unknown as typeof fetch;
+
+      const outcome = await executeRefreshFromSource("import-tracker", mockFetch);
+
+      expect(calledUrls).toEqual(["/api/jobs/bulk-import", "/api/connectors/sync"]);
+      expect(outcome.syncSucceeded).toBe(true);
+      expect(outcome.shouldReloadJobs).toBe(true);
+      expect(outcome.notice).toBe(
+        "Tracker: 25 new (1175 already saved). Discover feed: 8 new of 95 from 3 sources.",
+      );
     });
   });
 });

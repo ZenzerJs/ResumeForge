@@ -1,6 +1,8 @@
 import type { JobRequirements } from "@/lib/jd-parser/types";
 import {
+  hasUnverifiedMarker,
   matchEvidenceToRequirements,
+  matchSkillToken,
   type EvidenceItemWithBullets,
 } from "@/lib/matching/matcher";
 
@@ -23,22 +25,26 @@ export interface EvidenceMatchChecklist {
   items: EvidenceMatchChecklistItem[];
 }
 
-function containsIgnoreCase(target: string | null | undefined, query: string): boolean {
-  if (!target) return false;
-  return target.toLowerCase().includes(query.toLowerCase());
-}
-
 function isVerifiedEvidenceMatchForRequirement(
   item: EvidenceItemWithBullets,
   reqLabel: string,
 ): boolean {
   if (item.status !== "verified") return false;
+  if (
+    hasUnverifiedMarker(item.title) ||
+    hasUnverifiedMarker(item.verifiedSummary) ||
+    hasUnverifiedMarker(item.organization) ||
+    item.tags.some((t) => hasUnverifiedMarker(t))
+  ) {
+    return false;
+  }
+
   const lowerReq = reqLabel.toLowerCase();
 
   if (
-    item.tags.some((t) => t.toLowerCase() === lowerReq) ||
-    containsIgnoreCase(item.title, reqLabel) ||
-    containsIgnoreCase(item.verifiedSummary, reqLabel)
+    item.tags.some((t) => t.toLowerCase() === lowerReq || matchSkillToken(t, reqLabel)) ||
+    matchSkillToken(item.title, reqLabel) ||
+    matchSkillToken(item.verifiedSummary, reqLabel)
   ) {
     return true;
   }
@@ -46,8 +52,9 @@ function isVerifiedEvidenceMatchForRequirement(
   return item.bullets.some(
     (b) =>
       b.verified &&
-      (b.technologies.some((t) => t.toLowerCase() === lowerReq) ||
-        containsIgnoreCase(b.text, reqLabel)),
+      !hasUnverifiedMarker(b.text) &&
+      (b.technologies.some((t) => t.toLowerCase() === lowerReq || matchSkillToken(t, reqLabel)) ||
+        matchSkillToken(b.text, reqLabel)),
   );
 }
 
@@ -61,9 +68,11 @@ export function buildEvidenceMatchChecklist(
   requirements: JobRequirements,
   evidence: EvidenceItemWithBullets[],
 ): EvidenceMatchChecklist {
-  const ranked = matchEvidenceToRequirements(evidence, requirements);
+  const rankedWithDrafts = matchEvidenceToRequirements(evidence, requirements, {
+    includeDrafts: true,
+  });
   const matchedAnyKeys = new Set<string>();
-  for (const hit of ranked) {
+  for (const hit of rankedWithDrafts) {
     for (const req of hit.matchedRequirements) {
       matchedAnyKeys.add(req.toLowerCase());
     }

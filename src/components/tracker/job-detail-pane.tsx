@@ -34,7 +34,10 @@ import {
   buildEvidenceMatchChecklist,
   type EvidenceMatchChecklist,
 } from "@/lib/jobs/evidence-match-checklist";
-import type { EvidenceItemWithBullets } from "@/lib/matching/matcher";
+import {
+  hasUnverifiedMarker,
+  type EvidenceItemWithBullets,
+} from "@/lib/matching/matcher";
 import type { JobItem } from "@/components/tracker/job-types";
 import { isSafeHref } from "@/lib/security/safe-url";
 import { JobDescriptionMarkdown } from "@/components/tracker/job-description-markdown";
@@ -315,7 +318,15 @@ export function JobDetailPane({
         const res = await fetch("/api/evidence", { signal: controller.signal });
         const json = await res.json();
         if (!controller.signal.aborted && res.ok && json.success) {
-          setEvidence(json.data as EvidenceItemWithBullets[]);
+          if (json.guest) {
+            const raw = localStorage.getItem("resumeforge_guest_evidence");
+            const parsed = raw ? JSON.parse(raw) : [];
+            if (Array.isArray(parsed)) {
+              setEvidence(parsed as EvidenceItemWithBullets[]);
+            }
+          } else if (Array.isArray(json.data)) {
+            setEvidence(json.data as EvidenceItemWithBullets[]);
+          }
         }
       } catch {
         // non-blocking
@@ -406,6 +417,25 @@ export function JobDetailPane({
       controller.abort();
     };
   }, [detailJob.id, detailJob.company]);
+
+  const verifiedHighlights = useMemo(
+    () =>
+      evidence
+        .filter(
+          (e) =>
+            e.status === "verified" &&
+            !hasUnverifiedMarker(e.title) &&
+            !hasUnverifiedMarker(e.verifiedSummary) &&
+            !e.tags.some((t) => hasUnverifiedMarker(t)),
+        )
+        .flatMap((e) =>
+          e.bullets
+            .filter((b) => b.verified && !hasUnverifiedMarker(b.text))
+            .map((b) => b.text),
+        )
+        .slice(0, 5),
+    [evidence],
+  );
 
   const hasVariant = (detailJob.variants?.length ?? 0) > 0;
   const hasCoverLetter = (detailJob.coverLetters?.length ?? 0) > 0;
@@ -956,7 +986,7 @@ export function JobDetailPane({
                 requirements: parsedRequirements,
               }}
               coverLetter={null}
-              matchedHighlights={evidence.flatMap((e) => e.bullets.map((b) => b.text)).slice(0, 5)}
+              matchedHighlights={verifiedHighlights}
               evidenceItems={evidence}
               candidateInfo={candidateInfo}
             />

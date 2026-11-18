@@ -213,6 +213,7 @@ export function TrackerRefreshButton({
       type="button"
       onClick={onClick}
       disabled={isImporting}
+      aria-haspopup="dialog"
       aria-label={isImporting ? "Refreshing from source" : "Refresh from source"}
       data-testid="refresh-from-source-btn"
       className="flex min-h-9 items-center gap-1.5 rounded-lg border border-hairline bg-inset px-2.5 sm:px-3 py-1.5 text-xs font-medium text-text-secondary transition hover:bg-elevated hover:text-foreground disabled:opacity-50"

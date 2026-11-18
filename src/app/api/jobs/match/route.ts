@@ -22,7 +22,10 @@ export async function POST(request: Request) {
     }
 
     const userId = await getRequestUserId(request);
-    const evidenceItems = userId ? await getEvidenceItems(undefined, userId) : [];
+    if (!userId) {
+      return NextResponse.json({ success: true, guest: true, data: [] });
+    }
+    const evidenceItems = await getEvidenceItems(undefined, userId);
     const matches = matchEvidenceToRequirements(evidenceItems, validation.data);
 
     return NextResponse.json({ success: true, data: matches });
