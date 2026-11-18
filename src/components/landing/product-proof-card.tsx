@@ -24,7 +24,7 @@ export function ProductProofCard() {
           </span>
           <span className="sr-only">Sample Workspace Layout · Protected Master</span>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-signal/40 bg-signal/10 px-2.5 py-0.5 text-xs font-semibold text-signal">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-signal/40 bg-signal/10 px-2.5 py-0.5 text-xs font-semibold text-status-success-soft">
           <span className="h-1.5 w-1.5 rounded-full bg-signal" aria-hidden />
           Synthetic example
         </span>
@@ -36,12 +36,12 @@ export function ProductProofCard() {
           className="relative grid h-[84px] w-[84px] shrink-0 place-items-center rounded-full"
           style={{
             background:
-              "conic-gradient(rgb(var(--accent-contrast)) 86%, rgb(214 196 176 / 0.14) 0)",
+              "conic-gradient(rgb(var(--accent-contrast)) 86%, rgb(var(--border-hairline)) 0)",
             filter: "drop-shadow(0 0 14px rgb(var(--accent-contrast) / 0.35))",
           }}
           aria-label="ATS match score 86"
         >
-          <div className="grid h-[68px] w-[68px] place-items-center rounded-full bg-panel font-sans text-[26px] font-bold tracking-[-0.03em] tabular-nums text-foreground">
+          <div className="grid h-[68px] w-[68px] place-items-center rounded-full bg-panel font-sans text-heading-xl tabular-nums text-foreground">
             86
           </div>
         </div>
@@ -49,7 +49,7 @@ export function ProductProofCard() {
           <strong className="block text-base font-semibold text-foreground">
             Strong match
           </strong>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             14 of 17 requirements backed by evidence
           </p>
         </div>
@@ -60,7 +60,7 @@ export function ProductProofCard() {
         {MATCHED_SKILLS.map((skill) => (
           <span
             key={skill}
-            className="inline-flex items-center gap-1.5 rounded-[6px] border border-signal/35 bg-signal/10 px-2.5 py-1 text-xs font-semibold text-signal"
+            className="inline-flex items-center gap-1.5 rounded-[6px] border border-signal/35 bg-signal/10 px-2.5 py-1 text-xs font-semibold text-status-success-soft"
           >
             <BrandIcon name={skill} className="h-3 w-3 shrink-0" />
             <span>{skill}</span>
@@ -78,17 +78,11 @@ export function ProductProofCard() {
       </div>
 
       {/* Atomic diff block with citation footer */}
-      <div className="overflow-hidden rounded-[8px] border border-hairline font-mono text-[12.5px] leading-[1.6]">
-        <div
-          className="px-3 py-[7px]"
-          style={{
-            backgroundColor: "rgb(255 138 128 / 0.09)",
-            color: "#ffb3ab",
-          }}
-        >
+      <div className="overflow-hidden rounded-[8px] border border-hairline font-mono text-mono-data leading-[1.6]">
+        <div className="bg-status-danger/10 px-3 py-[7px] text-status-danger">
           − Built backend endpoints for a class project.
         </div>
-        <div className="bg-signal/10 px-3 py-[7px] text-signal">
+        <div className="bg-signal/10 px-3 py-[7px] text-status-success-soft">
           + Implemented idempotent Go webhook handlers backed by PostgreSQL transactions.
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 bg-inset px-3 py-[7px] text-xs text-muted-foreground">
@@ -104,7 +98,7 @@ export function ProductProofCard() {
             type="button"
             onClick={() => setDecision("accepted")}
             aria-pressed={decision === "accepted"}
-            className="inline-flex h-9 items-center justify-center rounded-[8px] bg-primary px-3.5 text-[13px] font-semibold text-primary-foreground btn-glow transition-transform active:scale-[0.98]"
+            className="inline-flex h-9 items-center justify-center rounded-[8px] bg-primary px-3.5 text-sm font-semibold text-primary-foreground btn-glow transition-transform active:scale-[0.98]"
           >
             {decision === "accepted" ? "Accepted ✓" : "Accept"}
           </button>
@@ -112,7 +106,7 @@ export function ProductProofCard() {
             type="button"
             onClick={() => setDecision("rejected")}
             aria-pressed={decision === "rejected"}
-            className="inline-flex h-9 items-center justify-center rounded-[8px] border border-control/60 bg-white/[0.04] px-3.5 text-[13px] font-semibold text-foreground backdrop-blur-sm transition-colors hover:border-control"
+            className="inline-flex h-9 items-center justify-center rounded-[8px] border border-control/60 bg-white/[0.04] px-3.5 text-sm font-semibold text-foreground backdrop-blur-sm transition-colors hover:border-control"
           >
             {decision === "rejected" ? "Rejected" : "Reject"}
           </button>

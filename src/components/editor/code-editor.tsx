@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState, useCallback, useEffect, useId } from "react";
+import React, { useRef, useState, useCallback, useEffect, useMemo, useId } from "react";
 import dynamic from "next/dynamic";
 import CodeMirror, { ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { RangeSetBuilder, type Transaction } from "@codemirror/state";
@@ -72,7 +72,7 @@ const emberInkEditorTheme = EditorView.theme(
     },
     ".cm-gutters": {
       backgroundColor: "#151211",
-      color: "rgba(214, 196, 176, 0.45)",
+      color: "#9e9287",
       border: "none",
       paddingLeft: "6px",
     },
@@ -238,6 +238,14 @@ export function CodeEditor({ value, onChange, mode, onModeChange }: CodeEditorPr
   const reviewMarkerHelpId = useId();
   const [reviewMarkerCount, setReviewMarkerCount] = useState(0);
   const hasExplicitModeRef = useRef<boolean>(mode !== undefined);
+  const lastEmittedValueRef = useRef<string>(value);
+  const pendingEmittedValuesRef = useRef<Set<string>>(new Set());
+  const isSyncingExternalRef = useRef<boolean>(false);
+  const valueRef = useRef<string>(value);
+  valueRef.current = value;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const [codeMountSeed, setCodeMountSeed] = useState<string>(value);
   const [internalMode, setInternalMode] = useState<"code" | "visual">(() => {
     if (mode !== undefined) return mode;
     const urlParam =
@@ -250,6 +258,9 @@ export function CodeEditor({ value, onChange, mode, onModeChange }: CodeEditorPr
   const setEditorMode = useCallback(
     (nextMode: "code" | "visual") => {
       hasExplicitModeRef.current = true;
+      if (nextMode === "code") {
+        setCodeMountSeed(valueRef.current);
+      }
       if (mode === undefined) {
         setInternalMode(nextMode);
       }
@@ -264,9 +275,80 @@ export function CodeEditor({ value, onChange, mode, onModeChange }: CodeEditorPr
     description: string;
   } | null>(null);
 
+  const codeMirrorExtensions = useMemo(
+    () => [
+      ...EDITOR_EXTENSIONS,
+      EditorView.updateListener.of((update: ViewUpdate) => {
+        if (!update.docChanged || isSyncingExternalRef.current) return;
+        const nextDoc = update.state.doc.toString();
+        if (nextDoc === lastEmittedValueRef.current) return;
+        lastEmittedValueRef.current = nextDoc;
+        const pending = pendingEmittedValuesRef.current;
+        pending.add(nextDoc);
+        if (pending.size > 64) {
+          const oldest = pending.values().next().value;
+          if (oldest !== undefined) pending.delete(oldest);
+        }
+        onChangeRef.current(nextDoc);
+      }),
+    ],
+    []
+  );
+
+  const handleCreateEditor = useCallback((view: EditorView) => {
+    const latest = valueRef.current;
+    const currentDoc = view.state.doc.toString();
+    if (currentDoc === latest) {
+      lastEmittedValueRef.current = latest;
+      return;
+    }
+    isSyncingExternalRef.current = true;
+    try {
+      lastEmittedValueRef.current = latest;
+      view.dispatch({
+        changes: { from: 0, to: currentDoc.length, insert: latest },
+      });
+    } finally {
+      isSyncingExternalRef.current = false;
+    }
+  }, []);
+
   useEffect(() => {
-    setReformatAlert(null);
+    setReformatAlert((prev) => (prev === null ? prev : null));
   }, [value]);
+
+  useEffect(() => {
+    if (editorMode !== "code") {
+      lastEmittedValueRef.current = value;
+      pendingEmittedValuesRef.current.clear();
+      return;
+    }
+    if (value === lastEmittedValueRef.current) {
+      pendingEmittedValuesRef.current.clear();
+      return;
+    }
+    if (pendingEmittedValuesRef.current.has(value)) {
+      pendingEmittedValuesRef.current.delete(value);
+      return;
+    }
+    pendingEmittedValuesRef.current.clear();
+    const view = editorRef.current?.view;
+    if (!view) return;
+    const currentDoc = view.state.doc.toString();
+    if (currentDoc === value) {
+      lastEmittedValueRef.current = value;
+      return;
+    }
+    isSyncingExternalRef.current = true;
+    try {
+      lastEmittedValueRef.current = value;
+      view.dispatch({
+        changes: { from: 0, to: currentDoc.length, insert: value },
+      });
+    } finally {
+      isSyncingExternalRef.current = false;
+    }
+  }, [editorMode, value]);
 
   useEffect(() => {
     if (mode !== undefined) return;
@@ -274,12 +356,16 @@ export function CodeEditor({ value, onChange, mode, onModeChange }: CodeEditorPr
       const param = new URLSearchParams(window.location.search).get("mode");
       if (param === "visual" || param === "code") {
         hasExplicitModeRef.current = true;
-        setInternalMode(param);
+        setInternalMode((prev) => (prev === param ? prev : param));
         return;
       }
     }
     if (!hasExplicitModeRef.current) {
-      setInternalMode(resolveDefaultEditorMode(value, null));
+      if (value === lastEmittedValueRef.current || pendingEmittedValuesRef.current.has(value)) {
+        return;
+      }
+      const next = resolveDefaultEditorMode(value, null);
+      setInternalMode((prev) => (prev === next ? prev : next));
     }
   }, [mode, value]);
 
@@ -351,7 +437,9 @@ export function CodeEditor({ value, onChange, mode, onModeChange }: CodeEditorPr
         }`}
       >
         <div
-          className="flex shrink-0 items-center gap-0.5 rounded border border-outline/70 bg-inset p-0.5"
+          className={`${
+            mode !== undefined && editorMode === "code" ? "hidden lg:flex" : "flex"
+          } shrink-0 items-center gap-0.5 rounded border border-outline/70 bg-inset p-0.5`}
           role="tablist"
           aria-label="Editor input mode"
         >
@@ -459,11 +547,11 @@ export function CodeEditor({ value, onChange, mode, onModeChange }: CodeEditorPr
         ) : (
           <CodeMirror
             ref={editorRef}
-            value={value}
+            value={codeMountSeed}
+            onCreateEditor={handleCreateEditor}
             height="100%"
             theme={emberInkEditorTheme}
-            extensions={EDITOR_EXTENSIONS}
-            onChange={onChange}
+            extensions={codeMirrorExtensions}
             className="h-full text-sm font-mono bg-inset"
           />
         )}

@@ -312,7 +312,7 @@ export function AtsSandboxSection() {
 
   const scoreBadgeColor =
     scoreResult.compositeScore >= 80
-      ? "text-signal border-signal/40 bg-signal/10"
+      ? "text-status-success-soft border-signal/40 bg-signal/10"
       : scoreResult.compositeScore >= 60
       ? "text-status-warning border-status-warning/40 bg-status-warning/10"
       : "text-status-danger border-status-danger/40 bg-status-danger/10";
@@ -377,6 +377,7 @@ export function AtsSandboxSection() {
               value={customDescription}
               onChange={(e) => setCustomDescription(e.target.value)}
               rows={8}
+              aria-label="Target Job Description"
               data-testid="sandbox-jd-input"
               className="w-full bg-inset border border-outline/70 rounded-[8px] p-3.5 font-mono text-xs md:text-sm text-foreground leading-relaxed resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-ring"
             />
@@ -495,12 +496,12 @@ export function AtsSandboxSection() {
                     key={link.skill}
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-xs font-mono border ${
                       link.verified
-                        ? "bg-signal/10 border-signal/35 text-signal"
+                        ? "bg-signal/10 border-signal/35 text-status-success-soft"
                         : "bg-status-warning/10 border-status-warning/35 text-status-warning"
                     }`}
                   >
                     {link.verified ? (
-                      <CheckCircle2 className="h-3.5 w-3.5 text-signal" />
+                      <CheckCircle2 className="h-3.5 w-3.5 text-status-success-soft" />
                     ) : (
                       <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
                     )}
@@ -530,19 +531,22 @@ export function AtsSandboxSection() {
               <button
                 type="button"
                 onClick={() => setShowDerivationLog((prev) => !prev)}
+                aria-expanded={showDerivationLog}
+                aria-controls="sandbox-derivation-log"
                 data-testid="toggle-derivation-log-btn"
                 className="w-full flex items-center justify-between text-xs md:text-sm font-mono text-muted-foreground hover:text-primary py-1.5 transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[4px]"
               >
                 <span>Formula Derivation Audit Log</span>
                 {showDerivationLog ? (
-                  <ChevronUp className="h-4 w-4" />
+                  <ChevronUp className="h-4 w-4" aria-hidden="true" />
                 ) : (
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown className="h-4 w-4" aria-hidden="true" />
                 )}
               </button>
 
               {showDerivationLog && (
                 <div
+                  id="sandbox-derivation-log"
                   data-testid="sandbox-derivation-log"
                   className="mt-3 p-4 md:p-5 rounded-[8px] bg-inset border border-outline/70 space-y-2 font-mono text-xs md:text-sm text-foreground leading-relaxed tabular-nums"
                 >
@@ -633,7 +637,7 @@ export function AtsSandboxSection() {
                       </div>
                     ) : sanitizedSvg?.raw === svgOutput && sanitizedSvg.clean ? (
                       <div
-                        className="typst-preview-svg w-full bg-paper text-paper-ink rounded-[6px] border border-[#d8dce0] shadow-xl overflow-hidden p-2 [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-w-full"
+                        className="typst-preview-svg w-full bg-paper text-paper-ink rounded-[6px] border border-hairline shadow-xl overflow-hidden p-2 [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-w-full"
                         style={{ maxWidth: "580px" }}
                         dangerouslySetInnerHTML={{ __html: sanitizedSvg.clean }}
                       />
@@ -681,6 +685,7 @@ export function AtsSandboxSection() {
                   {isEditingSnippet ? (
                     <textarea
                       data-testid="sandbox-typst-textarea"
+                      aria-label="Resume Typst source"
                       value={customSnippet}
                       onChange={(e) => setCustomSnippet(e.target.value)}
                       rows={14}

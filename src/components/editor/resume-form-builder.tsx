@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useId, useRef } from "react";
+import React, { useState, useEffect, useId, useRef, useCallback } from "react";
 import { buildResumeDocument, typstContent, typstString, type ResumeAssignment } from "@/lib/typst/resume-document";
 import {
   User,
@@ -12,6 +12,9 @@ import {
   Plus,
   Trash2,
   Sparkles,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 export interface ResumeEntryItem {
@@ -609,7 +612,7 @@ ${bulletLines}
 #set text(
   font: "Liberation Sans",
   size: ${model.fontSize},
-  fill: rgb("#111827"),
+  fill: rgb("#1c1e20"),
 )
 
 #set par(justify: true, leading: 0.48em)
@@ -664,7 +667,7 @@ ${bulletLines}
 
 // HEADER
 #align(center)[
-  #text(size: 18pt, weight: "bold", fill: rgb("#111827"))[${typstContent(model.fullName)}] \\
+  #text(size: 18pt, weight: "bold", fill: rgb("#1c1e20"))[${typstContent(model.fullName)}] \\
   #v(2pt)
   #text(size: 9pt, fill: rgb("#475569"))[
     ${[model.location && typstContent(model.location), model.email && `#link(${typstString(`mailto:${model.email}`)})[${escapedEmailDisplay}]`, model.phone && typstContent(model.phone), githubClean && `#link(${typstString(`https://${githubClean}`)})[${typstContent(githubClean)}]`, linkedinClean && `#link(${typstString(`https://${linkedinClean}`)})[${typstContent(linkedinClean)}]`].filter(Boolean).join(" #sym.dot ")}
@@ -780,6 +783,7 @@ export function isResumeSourceSafeForForm(source: string): boolean {
         /^\/\/ (?:Link styling matching LaTeX linkblue \(#1155CC\)|Section heading helper|Header\/entry helper for aligned roles & dates|Compact list styling)\r?\n/gm,
         ""
       )
+      .replace(/rgb\("#111827"\)/gi, 'rgb("#1c1e20")')
       .replace(/\\([/+-])/g, "$1")
       .replace(/[ \t]+$/gm, "")
       .replace(/[ \t]+\]/g, "]")
@@ -903,7 +907,34 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
   const [activeSection, setActiveSection] = useState<
     "contact" | "experience" | "education" | "projects" | "skills"
   >("contact");
+  const [mobileFormattingOpen, setMobileFormattingOpen] = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const sectionTabsRef = useRef<HTMLDivElement>(null);
   const lastCommittedValueRef = useRef<string | null>(null);
+
+  const updateSectionTabOverflow = useCallback(() => {
+    const el = sectionTabsRef.current;
+    if (!el) return;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    setCanScrollLeft(el.scrollLeft > 2);
+    setCanScrollRight(maxScroll - el.scrollLeft > 2);
+  }, []);
+
+  useEffect(() => {
+    updateSectionTabOverflow();
+    const el = sectionTabsRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => updateSectionTabOverflow());
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [
+    updateSectionTabOverflow,
+    model.experience.length,
+    model.education.length,
+    model.projects.length,
+    model.skills.length,
+  ]);
 
   // Re-sync if external source changes substantially (e.g. template reset or AI patch applied)
   useEffect(() => {
@@ -1005,83 +1036,144 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
       data-testid="resume-form-builder"
       className="flex h-full flex-col overflow-hidden bg-panel text-foreground"
     >
-      {/* Formatting Quick Controls Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-outline/70 bg-canvas px-4 py-2 text-xs">
-        <div className="flex items-center gap-2 text-text-secondary font-semibold">
-          <SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
-          <span>Formatting:</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs text-text-muted font-mono">
-            <span>Font Size</span>
-            <select
-              value={model.fontSize}
-              onChange={(e) =>
-                commitModel({
-                  ...model,
-                  fontSize: e.target.value as StructuredResumeModel["fontSize"],
-                })
-              }
-              data-testid="form-builder-font-size"
-              className="rounded border border-outline/70 bg-inset px-2 py-0.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <option value="8.5pt">8.5 pt (Dense)</option>
-              <option value="9pt">9.0 pt (Default)</option>
-              <option value="9.5pt">9.5 pt (Readable)</option>
-              <option value="10pt">10.0 pt (Large)</option>
-              <option value="10.5pt">10.5 pt (Executive)</option>
-            </select>
-          </label>
+      {/* Formatting Quick Controls Bar (compact disclosure on <sm, inline on >=sm) */}
+      <div className="border-b border-outline/70 bg-canvas px-3 py-1.5 sm:px-4 sm:py-2 text-xs">
+        <button
+          type="button"
+          onClick={() => setMobileFormattingOpen((prev) => !prev)}
+          aria-expanded={mobileFormattingOpen}
+          aria-controls={`${formId}-formatting-controls`}
+          data-testid="form-builder-formatting-toggle"
+          className="flex w-full items-center justify-between gap-2 py-0.5 text-xs font-semibold text-text-secondary sm:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <SlidersHorizontal className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+            <span>Formatting</span>
+            <span className="font-mono text-text-muted font-normal">
+              ({model.fontSize} · {model.marginPreset})
+            </span>
+          </span>
+          <ChevronDown
+            className={`h-3.5 w-3.5 text-text-muted transition-transform ${
+              mobileFormattingOpen ? "rotate-180" : ""
+            }`}
+            aria-hidden="true"
+          />
+        </button>
 
-          <label className="flex items-center gap-1.5 text-xs text-text-muted font-mono">
-            <span>Margins</span>
-            <select
-              value={model.marginPreset}
-              onChange={(e) =>
-                commitModel({
-                  ...model,
-                  marginPreset: e.target.value as StructuredResumeModel["marginPreset"],
-                })
-              }
-              data-testid="form-builder-margins"
-              className="rounded border border-outline/70 bg-inset px-2 py-0.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <option value="compact">Compact (1.0 cm)</option>
-              <option value="balanced">Balanced (1.25 cm)</option>
-              <option value="spacious">Spacious (1.5 cm)</option>
-            </select>
-          </label>
+        <div
+          id={`${formId}-formatting-controls`}
+          className={`${
+            mobileFormattingOpen ? "flex pt-2" : "hidden"
+          } sm:flex sm:pt-0 flex-wrap items-center justify-between gap-2`}
+        >
+          <div className="hidden sm:flex items-center gap-2 text-text-secondary font-semibold">
+            <SlidersHorizontal className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+            <span>Formatting:</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-1.5 text-xs text-text-muted font-mono">
+              <span>Font Size</span>
+              <select
+                value={model.fontSize}
+                onChange={(e) =>
+                  commitModel({
+                    ...model,
+                    fontSize: e.target.value as StructuredResumeModel["fontSize"],
+                  })
+                }
+                data-testid="form-builder-font-size"
+                className="rounded border border-outline/70 bg-inset px-2 py-0.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="8.5pt">8.5 pt (Dense)</option>
+                <option value="9pt">9.0 pt (Default)</option>
+                <option value="9.5pt">9.5 pt (Readable)</option>
+                <option value="10pt">10.0 pt (Large)</option>
+                <option value="10.5pt">10.5 pt (Executive)</option>
+              </select>
+            </label>
+
+            <label className="flex items-center gap-1.5 text-xs text-text-muted font-mono">
+              <span>Margins</span>
+              <select
+                value={model.marginPreset}
+                onChange={(e) =>
+                  commitModel({
+                    ...model,
+                    marginPreset: e.target.value as StructuredResumeModel["marginPreset"],
+                  })
+                }
+                data-testid="form-builder-margins"
+                className="rounded border border-outline/70 bg-inset px-2 py-0.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="compact">Compact (1.0 cm)</option>
+                <option value="balanced">Balanced (1.25 cm)</option>
+                <option value="spacious">Spacious (1.5 cm)</option>
+              </select>
+            </label>
+          </div>
         </div>
       </div>
 
-      {/* Section Navigation Pills */}
-      <div className="flex items-center gap-1.5 overflow-x-auto border-b border-outline/70 bg-panel px-4 py-2 no-scrollbar">
-        {[
-          { id: "contact", label: "Contact & Summary", icon: User },
-          { id: "experience", label: `Experience (${model.experience.length})`, icon: Briefcase },
-          { id: "education", label: `Education (${model.education.length})`, icon: GraduationCap },
-          { id: "projects", label: `Projects (${model.projects.length})`, icon: FolderKanban },
-          { id: "skills", label: `Skills (${model.skills.length})`, icon: Wrench },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const active = activeSection === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveSection(tab.id as typeof activeSection)}
-              data-testid={`form-builder-tab-${tab.id}`}
-              className={`flex items-center gap-1.5 shrink-0 rounded px-2.5 py-1.5 text-xs font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                active
-                  ? "bg-primary/15 border border-primary/50 text-primary"
-                  : "border border-transparent text-text-secondary hover:bg-elevated hover:text-foreground"
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
+      {/* Section Navigation Pills + Horizontal Scroll Indicator */}
+      <div className="relative border-b border-outline/70 bg-panel">
+        {canScrollLeft && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-6 items-center justify-start bg-gradient-to-r from-panel via-panel/90 to-transparent pl-1 text-text-muted"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </div>
+        )}
+        <div
+          ref={sectionTabsRef}
+          onScroll={updateSectionTabOverflow}
+          role="tablist"
+          aria-label="Resume sections"
+          className="flex items-center gap-1 overflow-x-auto px-2.5 py-1.5"
+        >
+          {[
+            { id: "contact", label: "Contact", title: "Contact & Summary", count: null, icon: User },
+            { id: "experience", label: "Experience", title: "Experience", count: model.experience.length, icon: Briefcase },
+            { id: "education", label: "Education", title: "Education", count: model.education.length, icon: GraduationCap },
+            { id: "projects", label: "Projects", title: "Projects", count: model.projects.length, icon: FolderKanban },
+            { id: "skills", label: "Skills", title: "Skills", count: model.skills.length, icon: Wrench },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const active = activeSection === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                title={tab.title}
+                onClick={() => setActiveSection(tab.id as typeof activeSection)}
+                data-testid={`form-builder-tab-${tab.id}`}
+                className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-2 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  active
+                    ? "bg-primary/15 border border-primary/50 text-primary"
+                    : "border border-transparent text-text-secondary hover:bg-elevated hover:text-foreground"
+                }`}
+              >
+                <Icon className="hidden 2xl:inline h-3 w-3 shrink-0" aria-hidden="true" />
+                <span>{tab.label}</span>
+                {tab.count !== null && (
+                  <span className="font-mono text-xs tabular-nums opacity-75">{tab.count}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        {canScrollRight && (
+          <div
+            aria-hidden="true"
+            data-testid="section-tabs-scroll-indicator"
+            className="pointer-events-none absolute inset-y-0 right-0 z-10 flex w-7 items-center justify-end bg-gradient-to-l from-panel via-panel/90 to-transparent pr-1 text-text-muted"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </div>
+        )}
       </div>
 
       {/* Form Content Area */}
@@ -1427,8 +1519,8 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
 
       {/* Footer Sync Indicator */}
       <div className="flex items-center justify-between border-t border-outline/70 bg-canvas px-4 py-2 text-xs text-text-muted font-mono">
-        <span className="flex items-center gap-1.5 text-status-success">
-          <Sparkles className="h-3 w-3" />
+        <span className="flex items-center gap-1.5 text-status-success-soft">
+          <Sparkles className="h-3 w-3" aria-hidden="true" />
           Live-synced with Typst WASM Preview
         </span>
         <span>Switch to Typst Code anytime for advanced layout control</span>

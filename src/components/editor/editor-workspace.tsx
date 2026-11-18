@@ -176,6 +176,7 @@ export function EditorWorkspace() {
   const [activeTab, setActiveTab] = useState<WorkspacePanelTab>("editor");
   const modeParam = normalizeEditorModeParam(searchParams.get("mode"));
   const hasExplicitModeRef = useRef<boolean>(modeParam !== null);
+  const hasResolvedDocModeRef = useRef<boolean>(false);
   const [editorMode, setEditorMode] = useState<"code" | "visual">(() =>
     modeParam === "code" ? "code" : "visual"
   );
@@ -477,6 +478,7 @@ export function EditorWorkspace() {
   const loadCanonicalDocument = useCallback(async () => {
     const generation = ++loadGeneration.current;
     const current = () => generation === loadGeneration.current;
+    hasResolvedDocModeRef.current = false;
     setIsLoadingDocument(true);
     setDocumentError(null);
     const persistedAiPatched =
@@ -632,8 +634,14 @@ export function EditorWorkspace() {
   }, [loadCanonicalDocument]);
 
   useEffect(() => {
-    if (isLoadingDocument || !source || hasExplicitModeRef.current) return;
-    setEditorMode(resolveDefaultEditorMode(source, null));
+    if (isLoadingDocument) {
+      hasResolvedDocModeRef.current = false;
+      return;
+    }
+    if (!source || hasExplicitModeRef.current || hasResolvedDocModeRef.current) return;
+    hasResolvedDocModeRef.current = true;
+    const nextMode = resolveDefaultEditorMode(source, null);
+    setEditorMode((prev) => (prev === nextMode ? prev : nextMode));
   }, [isLoadingDocument, source]);
 
   useEffect(() => {
@@ -707,6 +715,7 @@ export function EditorWorkspace() {
 
   // Task 9.3: Ctrl+S / Cmd+S save & instant recompile handler
   const isSavingShortcutRef = useRef<boolean>(false);
+  const shortcutToastTimerRef = useRef<number | null>(null);
   const sourceRef = useRef<string>(source);
 
   useEffect(() => {
@@ -717,11 +726,23 @@ export function EditorWorkspace() {
     const currentSource = sourceRef.current;
     if (typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEY, currentSource);
+      if (shortcutToastTimerRef.current !== null) {
+        window.clearTimeout(shortcutToastTimerRef.current);
+        shortcutToastTimerRef.current = null;
+      }
     }
     setShowShortcutSaveToast(true);
-    scheduleUiTimer(() => setShowShortcutSaveToast(false), 2000);
 
     await runCompile(currentSource);
+
+    if (typeof window !== "undefined") {
+      const timerId = window.setTimeout(() => {
+        shortcutToastTimerRef.current = null;
+        setShowShortcutSaveToast(false);
+      }, 2200);
+      shortcutToastTimerRef.current = timerId;
+      uiTimers.current.push(timerId);
+    }
   }, [runCompile]);
 
   useEffect(() => {
@@ -778,6 +799,7 @@ export function EditorWorkspace() {
       type: "LOCAL_FALLBACK",
       title: "Blank Resume",
     });
+    hasResolvedDocModeRef.current = false;
     setSource(blankSource);
     setBaselineSource(blankSource);
     setSvg(null);
@@ -850,6 +872,7 @@ export function EditorWorkspace() {
     if (docMetadata.type === "LOCAL_FALLBACK") {
       setDocMetadata({ type: "LOCAL_FALLBACK", title: "Starter Template" });
     }
+    hasResolvedDocModeRef.current = false;
     handleSourceChange(starter);
   };
 
@@ -1123,10 +1146,21 @@ export function EditorWorkspace() {
             {showShortcutSaveToast && (
               <div
                 data-testid="shortcut-save-toast"
-                className="flex items-center gap-1.5 px-2.5 py-0.5 bg-elevated border border-status-success/60 text-foreground text-xs font-semibold rounded transition-all"
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-0.5 bg-elevated border text-foreground text-xs font-semibold rounded transition-all",
+                  error ? "border-status-warning/60" : "border-status-success/60"
+                )}
               >
-                <Check className="h-3.5 w-3.5 text-status-success" />
-                <span>Draft Saved &amp; Recompiled</span>
+                {error ? (
+                  <AlertTriangle className="h-3.5 w-3.5 text-status-warning" aria-hidden="true" />
+                ) : (
+                  <Check className="h-3.5 w-3.5 text-status-success" aria-hidden="true" />
+                )}
+                <span>
+                  {error
+                    ? "Draft Saved — Fix syntax error to update preview"
+                    : "Draft Saved & Recompiled"}
+                </span>
               </div>
             )}
             <Button
@@ -1138,8 +1172,10 @@ export function EditorWorkspace() {
               className="min-h-10 xl:min-h-0 xl:h-7 px-2.5 text-xs border-outline/70 bg-transparent text-text-secondary hover:bg-elevated hover:text-foreground gap-1.5 focus-visible:ring-2 focus-visible:ring-ring"
               title="Discard unsaved live buffer changes and reload persisted Master Resume"
             >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Revert to Master</span>
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>
+                Revert<span className="hidden sm:inline"> to Master</span>
+              </span>
             </Button>
 
             <Button
@@ -1236,7 +1272,6 @@ export function EditorWorkspace() {
       )}
 
       {(documentError ||
-        showSampleResumeBanner ||
         showConversionFallbackBanner ||
         showConversionAiBanner ||
         lastSnapshotId ||
@@ -1262,28 +1297,6 @@ export function EditorWorkspace() {
             </div>
           )}
 
-          {showSampleResumeBanner && (
-            <div
-              data-testid="sample-resume-banner"
-              className="flex flex-wrap items-center justify-between gap-2 px-4 py-1.5 bg-primary/10 border-b border-primary/30 text-xs text-foreground"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <FileText className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
-                <span>
-                  <strong className="font-semibold text-primary">Sample Resume Loaded</strong> — This placeholder example uses fictional experience so you can explore the editor.
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleStartBlankResume}
-                data-testid="start-blank-resume-btn"
-                className="shrink-0 rounded border border-primary/40 bg-elevated px-2.5 py-0.5 text-xs font-semibold text-foreground hover:bg-muted transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                Start Blank Resume
-              </button>
-            </div>
-          )}
-
           {/* Task 9.1: PDF Conversion Status Banners (suppressed on frozen Master Resume) */}
           {showConversionFallbackBanner && (
             <div
@@ -1297,11 +1310,12 @@ export function EditorWorkspace() {
               <button
                 type="button"
                 onClick={handleDismissConversionBanner}
+                aria-label="Dismiss conversion banner"
                 className="p-1 text-primary/80 hover:text-foreground transition inline-flex items-center justify-center rounded"
                 title="Dismiss banner"
                 data-testid="dismiss-conversion-banner-btn"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </div>
           )}
@@ -1309,20 +1323,21 @@ export function EditorWorkspace() {
           {showConversionAiBanner && (
             <div
               data-testid="pdf-conversion-ai-banner"
-              className="flex items-center justify-between gap-2 px-4 py-1.5 bg-status-success/15 border-b border-status-success/35 text-xs text-status-info"
+              className="flex items-center justify-between gap-2 px-4 py-1.5 bg-status-success/15 border-b border-status-success/35 text-xs text-status-success-soft"
             >
               <div className="flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 shrink-0 text-status-success" />
+                <Sparkles className="h-3.5 w-3.5 shrink-0 text-status-success-soft" />
                 <span>AI-Converted Draft — Converted using BYOK AI provider</span>
               </div>
               <button
                 type="button"
                 onClick={handleDismissConversionBanner}
-                className="p-1 text-status-info hover:text-foreground transition inline-flex items-center justify-center rounded"
+                aria-label="Dismiss conversion banner"
+                className="p-1 text-status-success-soft hover:text-foreground transition inline-flex items-center justify-center rounded"
                 title="Dismiss banner"
                 data-testid="dismiss-conversion-banner-btn"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </div>
           )}
@@ -1353,9 +1368,9 @@ export function EditorWorkspace() {
           {undoSuccess && (
             <div
               data-testid="undo-success-banner"
-              className="flex items-center gap-2 px-4 py-1.5 bg-status-success/15 border-b border-status-success/35 text-xs text-status-info"
+              className="flex items-center gap-2 px-4 py-1.5 bg-status-success/15 border-b border-status-success/35 text-xs text-status-success-soft"
             >
-              <Check className="h-3.5 w-3.5 text-status-success" />
+              <Check className="h-3.5 w-3.5 text-status-success-soft" />
               <span>Restored Master Resume to pre-overwrite snapshot!</span>
             </div>
           )}
@@ -1365,7 +1380,7 @@ export function EditorWorkspace() {
               data-testid="evidence-extract-toast"
               className="flex items-center gap-2 px-4 py-1.5 bg-status-info/10 border-b border-status-info/30 text-xs text-foreground"
             >
-              <BookOpen className="h-3.5 w-3.5 text-status-info shrink-0" />
+              <BookOpen className="h-3.5 w-3.5 text-status-success-soft shrink-0" />
               <span>{evidenceExtractToast}</span>
               {evidenceExtractToast.includes("Library") && (
                 <Link
@@ -1383,7 +1398,7 @@ export function EditorWorkspace() {
                         : null),
                     mode: normalizeEditorModeParam(searchParams.get("mode")),
                   })}
-                  className="ml-auto text-status-info underline underline-offset-2 hover:text-foreground"
+                  className="ml-auto text-status-success-soft underline underline-offset-2 hover:text-foreground"
                 >
                   Open Library
                 </Link>
@@ -1443,7 +1458,11 @@ export function EditorWorkspace() {
                 <PortalSlot host={hosts.code} className="h-full min-h-0" />
               </ResizablePanel>
 
-              <ResizableHandle withHandle onDoubleClick={handleLayoutReset} />
+              <ResizableHandle
+                withHandle
+                aria-label="Resize editor and preview panes"
+                onDoubleClick={handleLayoutReset}
+              />
 
               {/* Panel 2: Live Preview */}
               <ResizablePanel
@@ -1458,7 +1477,12 @@ export function EditorWorkspace() {
 
               {isXlDesktop && (
                 <>
-                  <ResizableHandle withHandle disabled={isAiPoppedOut} onDoubleClick={handleLayoutReset} />
+                  <ResizableHandle
+                    withHandle
+                    disabled={isAiPoppedOut}
+                    aria-label="Resize preview and AI assistant panes"
+                    onDoubleClick={handleLayoutReset}
+                  />
 
                   {/* Panel 3: AI Sidebar (Collapsible, >= xl) */}
                   <ResizablePanel
@@ -1644,12 +1668,41 @@ export function EditorWorkspace() {
       {/* Persistent pane portals preserve CodeMirror selection/undo and AI state across tabs and resizes */}
       {hosts &&
         createPortal(
-          <CodeEditor
-            value={source}
-            onChange={handleSourceChange}
-            mode={editorMode}
-            onModeChange={handleEditorModeChange}
-          />,
+          <div className="flex h-full min-h-0 flex-col">
+            {showSampleResumeBanner && (
+              <div
+                data-testid="sample-resume-banner"
+                className="flex shrink-0 items-center justify-between gap-2 border-x border-t border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-foreground"
+              >
+                <span className="flex min-w-0 items-center gap-1.5 truncate">
+                  <FileText className="h-3 w-3 shrink-0 text-primary" aria-hidden="true" />
+                  <span className="truncate">
+                    <strong className="font-semibold text-primary">Sample Resume Loaded</strong>
+                    <span className="hidden sm:inline text-text-secondary">
+                      {" "}
+                      — Fictional placeholder example.
+                    </span>
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleStartBlankResume}
+                  data-testid="start-blank-resume-btn"
+                  className="shrink-0 rounded border border-primary/40 bg-elevated px-2 py-0.5 text-xs font-semibold text-foreground hover:bg-muted transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  Start Blank Resume
+                </button>
+              </div>
+            )}
+            <div className="min-h-0 flex-1">
+              <CodeEditor
+                value={source}
+                onChange={handleSourceChange}
+                mode={editorMode}
+                onModeChange={handleEditorModeChange}
+              />
+            </div>
+          </div>,
           hosts.code
         )}
       {hosts &&
