@@ -88,7 +88,8 @@ const PROFILE_PRIORITIES: Record<RoleProfile, string[]> = {
 export function evaluateAtsScore(
   typstContent: string,
   requirements: JobRequirements,
-  roleProfile: RoleProfile
+  roleProfile: RoleProfile,
+  options?: { measuredPages?: number }
 ): AtsEvaluationResult {
   const contentLower = typstContent.toLowerCase();
 
@@ -99,7 +100,12 @@ export function evaluateAtsScore(
   const skillsLower = skillsSectionText.toLowerCase();
 
   // 1. Base Resume Health (30 pts)
-  const baseHealth = evaluateBaseHealth(typstContent, bodyText, skillsSectionText);
+  const baseHealth = evaluateBaseHealth(
+    typstContent,
+    bodyText,
+    skillsSectionText,
+    options?.measuredPages
+  );
 
   // 2. Required Role Match (40 pts)
   const { category: requiredMatch, evaluations: requiredEvals } = evaluateSkillsMatch(
@@ -242,7 +248,8 @@ function stripTypstCommentsAndPreamble(source: string): string {
 function evaluateBaseHealth(
   fullContent: string,
   bodyText: string,
-  skillsText: string
+  skillsText: string,
+  measuredPages?: number
 ): CategoryResult {
   let score = 0;
   const maxScore = 30;
@@ -252,14 +259,16 @@ function evaluateBaseHealth(
   // Sub-check A: ATS Readability & Page Fit (8 pts)
   let readabilityPts = 0;
   const charLength = cleanContent.length;
-  if (charLength > 100 && charLength <= 4000) {
+  const hasMeasuredPages =
+    typeof measuredPages === "number" && Number.isFinite(measuredPages) && measuredPages > 0;
+  if (charLength <= 100) {
+    findings.push("Warning: Document length is unusually short.");
+  } else if (hasMeasuredPages ? measuredPages <= 1 : charLength <= 4000) {
     readabilityPts += 4;
     findings.push("✓ Standard one-page length constraints satisfied.");
-  } else if (charLength > 4000) {
+  } else {
     readabilityPts += 2;
     findings.push("Warning: Document length may exceed a single page.");
-  } else {
-    findings.push("Warning: Document length is unusually short.");
   }
 
   if (

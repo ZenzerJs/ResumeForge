@@ -7,8 +7,10 @@ import {
 } from "@/lib/ai/cover-letter-prompt";
 import {
   extractCandidateNameFromTypst,
+  managedResumeExport,
   replacePlaceholderSignature,
 } from "@/lib/export/resume-text";
+import { cleanTypstToText } from "@/lib/export/zip";
 import { buildResumeDocument, renderResumeDocument } from "@/lib/typst/resume-document";
 import { classifyPdfTextFallback } from "@/lib/pdf/parser";
 
@@ -130,5 +132,38 @@ describe("Cover Letter Evidence Grounding Verifier (Fail-First Protocol)", () =>
     );
     expect(signed).toContain("Sincerely,\nAlex Morgan");
     expect(signed).not.toContain("Sincerely,\nCandidate");
+
+    expect(
+      replacePlaceholderSignature("Kind regards,\n  [Your Name]", "Jane $1 Doe")
+    ).toBe("Kind regards,\n  Jane $1 Doe");
+    expect(
+      replacePlaceholderSignature("Best,\n[Candidate]", "Alex Morgan")
+    ).toBe("Best,\nAlex Morgan");
+    expect(
+      replacePlaceholderSignature("Warmly,\nYour Name", "Alex Morgan")
+    ).toBe("Warmly,\nAlex Morgan");
+    expect(
+      replacePlaceholderSignature("Sincerely,\nCandidate Name", "Alex Morgan")
+    ).toBe("Sincerely,\nAlex Morgan");
+    expect(
+      replacePlaceholderSignature("Sincerely,\nCandidate Smith", "Alex Morgan")
+    ).toBe("Sincerely,\nCandidate Smith");
+  });
+
+  it("6. emits bare email and bare URL in plain-text resume exports instead of label (url)", () => {
+    const unmanaged = `= Jordan Example\n#link("mailto:jordan@example.invalid")[jordan\\@example.invalid] | #link("https://github.com/jordan")[github.com/jordan]\n== Experience\n- Built API`;
+    const cleaned = cleanTypstToText(unmanaged);
+    expect(cleaned).toContain("jordan@example.invalid | https://github.com/jordan");
+    expect(cleaned).not.toContain("(mailto:");
+    expect(cleaned).not.toContain("(https://");
+
+    const raw = "Morgan Sample\nmorgan@example.com | github.com/morgan\nExperience\n- Built API";
+    const managed = renderResumeDocument(
+      buildResumeDocument(raw, classifyPdfTextFallback(raw)),
+      "comfortable"
+    ).replace("Built API", "Built edited API");
+    const exported = managedResumeExport(managed)?.text ?? "";
+    expect(exported).toContain("morgan@example.com");
+    expect(exported).not.toContain("(mailto:");
   });
 });

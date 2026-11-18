@@ -203,4 +203,65 @@ describe("Tracker, Editor, DSA, and Typst Audit Fixes", () => {
     expect(pollSection).toContain("el.width");
     expect(pollSection).toContain("1600");
   });
+
+  it("7. EditorWorkspace and ConfirmMasterDialog surface save errors inside the open dialog with role='alert' and Retry", () => {
+    const editorSrc = readProjectFile("src/components/editor/editor-workspace.tsx");
+    const saveStart = editorSrc.indexOf("const handleConfirmSaveAsMaster = async");
+    const revertStart = editorSrc.indexOf("const handleRevertToMaster =");
+    const saveBlock = editorSrc.slice(saveStart, revertStart);
+
+    expect(saveBlock).toContain("throw new Error(");
+    expect(saveBlock).toContain("throw err instanceof Error ? err : new Error(msg)");
+
+    const dialogSrc = readProjectFile("src/components/editor/confirm-master-dialog.tsx");
+    const handleConfirmStart = dialogSrc.indexOf("const handleConfirm = async");
+    const returnStart = dialogSrc.indexOf("return (", handleConfirmStart);
+    const handleConfirmBlock = dialogSrc.slice(handleConfirmStart, returnStart);
+
+    expect(handleConfirmBlock).toContain("catch (err)");
+    expect(handleConfirmBlock).toContain("setSaveError(");
+    expect(dialogSrc).toContain('role="alert"');
+    expect(dialogSrc).toContain('data-testid="confirm-master-save-error"');
+    expect(dialogSrc).toContain('data-testid="confirm-save-master-retry-btn"');
+    expect(dialogSrc).toContain("Retry");
+  });
+
+  it("8. JobDetailPane renders explicit status text on every checklist row and clarifies required-skill coverage", () => {
+    const src = readProjectFile("src/components/tracker/job-detail-pane.tsx");
+    const coverageStart = src.indexOf('data-testid="tracker-required-evidence-coverage"');
+    const checklistStart = src.indexOf("checklist.items.map");
+    const coverageBlock = src.slice(coverageStart, checklistStart);
+    const checklistBlock = src.slice(checklistStart, src.indexOf("</ul>", checklistStart));
+
+    expect(coverageBlock).toContain("Required-skill coverage:");
+    expect(coverageBlock).toContain("{requiredMatched}/{requiredEvidence.length}");
+    expect(coverageBlock).toContain("aria-label={`Required-skill coverage:");
+
+    expect(checklistBlock).toContain("Verified:");
+    expect(checklistBlock).toContain("Needs verification");
+    expect(checklistBlock).toContain("Missing:");
+    expect(checklistBlock).toContain("aria-hidden");
+  });
+
+  it("9. TrackerFeed reads resumeforge_guest_jobs for any signed-out guest and supports arrow-key roving tablist", () => {
+    const src = readProjectFile("src/components/tracker/tracker-feed.tsx");
+    const fetchStart = src.indexOf("const fetchJobs = useCallback");
+    const fetchEnd = src.indexOf("const params = new URLSearchParams", fetchStart);
+    const fetchBlock = src.slice(fetchStart, fetchEnd);
+
+    expect(fetchBlock).toContain("fetchSessionPayload");
+    expect(fetchBlock).toContain("sessionPayload?.guest === true");
+    expect(fetchBlock).toContain("!sessionPayload?.data");
+    expect(fetchBlock).toContain('localStorage.getItem("resumeforge_guest_jobs")');
+
+    const tablistStart = src.indexOf('aria-label="Tracker display mode"');
+    const tablistBlock = src.slice(tablistStart, src.indexOf("Kanban Board", tablistStart) + 300);
+    expect(tablistBlock).toContain("onKeyDown=");
+    expect(tablistBlock).toContain("ArrowRight");
+    expect(tablistBlock).toContain("ArrowLeft");
+    expect(tablistBlock).toContain("Home");
+    expect(tablistBlock).toContain("End");
+    expect(tablistBlock).toContain('tabIndex={viewMode === "split" ? 0 : -1}');
+    expect(tablistBlock).toContain('tabIndex={viewMode === "kanban" ? 0 : -1}');
+  });
 });

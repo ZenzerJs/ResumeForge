@@ -25,6 +25,7 @@ import { RoleProfile, ROLE_PROFILES, AtsEvaluationResult } from "@/lib/ats-evalu
 import { auditResume } from "@/lib/diagnostics/auditResume";
 import {
   BYOK_UPDATED_EVENT,
+  getActiveConfig,
   markProviderConnectionStatus,
   resolveClientProviderConfig,
 } from "@/lib/byok-vault";
@@ -639,23 +640,35 @@ export function TailorWorkspace() {
   const [providerConfigStatus, setProviderConfigStatus] = useState<{
     checked: boolean;
     ready: boolean;
-  }>({ checked: false, ready: false });
+    hasSavedConfig: boolean;
+  }>({ checked: false, ready: false, hasSavedConfig: false });
 
   const refreshProviderStatus = useCallback(async () => {
     try {
-      const [cfg, demoConfig] = await Promise.all([resolveClientProviderConfig(), fetchDemoConfig()]);
-      const ready = Boolean(cfg && ProviderConfigSchema.safeParse(cfg).success && (
-        !demoConfig.demoMode || (
-          cfg.provider !== "ollama" && cfg.provider !== "custom" &&
-          cfg.apiKey && cfg.apiKey.length <= 500
-        )
-      ));
+      const [cfg, activeConfig, demoConfig] = await Promise.all([
+        resolveClientProviderConfig(),
+        getActiveConfig(),
+        fetchDemoConfig(),
+      ]);
+      const hasSavedConfig = Boolean(
+        cfg &&
+          ProviderConfigSchema.safeParse(cfg).success &&
+          (!demoConfig.demoMode ||
+            (cfg.provider !== "ollama" &&
+              cfg.provider !== "custom" &&
+              cfg.apiKey &&
+              cfg.apiKey.length <= 500))
+      );
+      const ready = demoConfig.demoMode
+        ? hasSavedConfig
+        : Boolean(hasSavedConfig && activeConfig.verified);
       setProviderConfigStatus({
         checked: true,
         ready,
+        hasSavedConfig,
       });
     } catch {
-      setProviderConfigStatus({ checked: true, ready: false });
+      setProviderConfigStatus({ checked: true, ready: false, hasSavedConfig: false });
     }
   }, []);
 
@@ -1124,10 +1137,20 @@ export function TailorWorkspace() {
       return;
     }
 
-    const aiSettings = await resolveClientProviderConfig();
+    const [aiSettings, activeConfig, demoConfig] = await Promise.all([
+      resolveClientProviderConfig(),
+      getActiveConfig(),
+      fetchDemoConfig(),
+    ]);
 
     if (!aiSettings) {
       setPatchError("No AI provider configured. Please configure your API key in Settings.");
+      setPatchStage("error");
+      return;
+    }
+
+    if (!demoConfig.demoMode && !activeConfig.verified) {
+      setPatchError("AI provider is saved but not verified. Test your connection in Settings before generating edits.");
       setPatchStage("error");
       return;
     }
@@ -1137,28 +1160,19 @@ export function TailorWorkspace() {
     setPatchError(null);
     setStructuredPatchError(null);
     setShowErrorTechDetails(false);
-    setSelectedPatchId(null);
-    setPatchVerified([]);
-    setPatchRejected([]);
-    setPatchGaps([]);
-    setPatchDecisions({});
-    setAcknowledgedSkills(new Set());
-    setPatchBatch(null);
-    setDemoPatchBaseSource(null);
-    setPatchReviewGeneration((generation) => generation + 1);
 
     try {
-      const demoConfig = await fetchDemoConfig();
       const isDemo = demoConfig?.demoMode === true;
       let jobId: string | null = null;
       let demoContext: ReturnType<typeof getDemoContextFromBrowser>;
+      let nextDemoPatchBaseSource: string | null = null;
       if (isDemo) {
         demoContext = getDemoContextFromBrowser();
         const currentSource = masterTypstSource || activeVariantContent;
         if (!demoContext?.masterTypst || demoContext.masterTypst !== currentSource) {
           throw new Error("The local resume changed. Reload the demo workspace before generating patches.");
         }
-        setDemoPatchBaseSource(currentSource);
+        nextDemoPatchBaseSource = currentSource;
       } else {
         jobId = await ensureJobSaved({ forceUpdate: false, silent: true });
         if (!jobId) throw new Error("Failed to save job posting before patch generation.");
@@ -1247,6 +1261,8 @@ export function TailorWorkspace() {
       setPatchRejected(json.data.rejected || []);
       setPatchGaps(json.data.gaps || []);
       setPatchBatch(json.data.batch || null);
+      setDemoPatchBaseSource(nextDemoPatchBaseSource);
+      setPatchReviewGeneration((generation) => generation + 1);
       setMasterResumeId(json.data.masterResumeId || (json.data.demo ? "demo-local" : null));
       setSelectedPatchId(verifiedList[0]?.id ?? null);
       if (verifiedList.length > 0) {
@@ -1833,7 +1849,13 @@ export function TailorWorkspace() {
     {
       label: "AI provider",
       ready: providerConfigStatus.ready,
-      detail: providerConfigStatus.ready ? "Configured" : providerConfigStatus.checked ? "Setup needed" : "Checking…",
+      detail: providerConfigStatus.ready
+        ? "Configured"
+        : !providerConfigStatus.checked
+          ? "Checking…"
+          : providerConfigStatus.hasSavedConfig
+            ? "Test needed"
+            : "Setup needed",
     },
   ];
   const nextStep = !hasJobRequirements ? "job" : !resumeReady ? "resume"
@@ -1988,7 +2010,7 @@ export function TailorWorkspace() {
       <div className="relative z-10 flex-1 pt-4 md:pt-8 pb-12 px-4 md:px-8 max-w-[1600px] mx-auto w-full font-body-regular motion-reduce:[&_*]:transition-none motion-reduce:[&_.animate-spin]:animate-none motion-reduce:[&_.animate-pulse]:animate-none">
         <PageHeader
           title="Tailor"
-          className="mb-4 gap-3 md:[&>div:last-child]:max-w-none"
+          className="mb-4 gap-3 md:flex-col md:items-stretch md:[&>div:last-child]:max-w-none md:[&>div:last-child]:justify-start 2xl:flex-row 2xl:items-center 2xl:[&>div:last-child]:justify-end"
           statusBadge={
             isAutoScanning ? (
               <span
@@ -2077,7 +2099,11 @@ export function TailorWorkspace() {
                 )}
                 {nextStep === "provider" && (
                   <Button onClick={() => void handleOpenSettings()} disabled={isNavigatingAway || !providerConfigStatus.checked}>
-                    {isOpeningSettings ? "Saving…" : "Configure in Settings"}
+                    {isOpeningSettings
+                      ? "Saving…"
+                      : providerConfigStatus.hasSavedConfig
+                        ? "Verify in Settings"
+                        : "Configure in Settings"}
                   </Button>
                 )}
                 <Button
@@ -2222,6 +2248,28 @@ export function TailorWorkspace() {
                 setPatchStage("done");
               }}
             />
+            {patchError && !providerConfigStatus.ready && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-hairline bg-panel px-4 py-3 text-sm">
+                <span className="text-text-secondary">
+                  {providerConfigStatus.hasSavedConfig
+                    ? "Test and verify your AI provider connection in Settings before generating edits."
+                    : "Add and verify an AI provider key in Settings before generating edits."}
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void handleOpenSettings()}
+                  disabled={isNavigatingAway}
+                  data-testid="patch-error-open-settings"
+                >
+                  {isOpeningSettings
+                    ? "Saving…"
+                    : providerConfigStatus.hasSavedConfig
+                      ? "Verify in Settings"
+                      : "Configure in Settings"}
+                </Button>
+              </div>
+            )}
             {structuredPatchError && (
               <div
                 role="alert"
@@ -3371,9 +3419,17 @@ export function TailorWorkspace() {
           <div className="flex flex-col gap-6 min-w-0">
             <section className="rounded-xl surface-raised p-5">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-4 pb-2 border-b border-hairline">
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 min-w-0">
                   <Database className="h-4 w-4 text-primary shrink-0" aria-hidden />
                   <h2 className="text-lg text-foreground font-semibold">Evidence Matches</h2>
+                  {extractedRequirements && (
+                    <span
+                      data-testid="evidence-matches-coverage"
+                      className="rounded-md border border-hairline bg-inset px-2 py-0.5 text-xs font-mono tabular-nums text-muted-foreground"
+                    >
+                      {verifiedRequiredSkills.length}/{extractedRequirements.requiredSkills.length} required skills covered
+                    </span>
+                  )}
                 </div>
                 <span className="rounded-md border border-hairline bg-inset px-2 py-0.5 text-xs font-mono tabular-nums text-muted-foreground">
                   {matches.length} matched
@@ -3386,9 +3442,29 @@ export function TailorWorkspace() {
                   </div>
                 )}
                 {!isMatching && matches.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No evidence matches yet. Re-scan after updating the Evidence Bank.</p>
+                  <div className="space-y-2 text-sm text-muted-foreground" data-testid="evidence-matches-empty">
+                    {verifiedEvidenceCount === 0 ? (
+                      <>
+                        <p>
+                          Your Evidence Bank has no verified items yet. Add or verify experience in the Evidence Bank to match against this job&apos;s requirements.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => void handleOpenLibrary()}
+                          disabled={isNavigatingAway}
+                          className="inline-flex items-center rounded-md border border-hairline bg-inset px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary/50 disabled:opacity-60"
+                        >
+                          {pendingNavTarget === "library" ? "Saving…" : "Open Evidence Bank"}
+                        </button>
+                      </>
+                    ) : (
+                      <p>
+                        No Evidence Bank items matched these extracted requirements yet. Add matching skills in the Evidence Bank or click Re-Scan.
+                      </p>
+                    )}
+                  </div>
                 )}
-                {matches.slice(0, 6).map((m) => (
+                {matches.map((m) => (
                   <div
                     key={m.id}
                     className="p-3 bg-inset border border-hairline rounded hover:border-primary/50 transition-colors"
@@ -3397,12 +3473,13 @@ export function TailorWorkspace() {
                       <h4 className="font-bold text-sm text-foreground min-w-0">{m.title}</h4>
                       <span
                         className={`shrink-0 text-xs font-mono tabular-nums px-2 py-0.5 rounded border ${
-                          m.matchPercentage >= 60
+                          m.matchedRequirements.length > 0
                             ? "bg-status-success/15 border-status-success/40 text-status-success"
                             : "bg-elevated text-muted-foreground border-hairline"
                         }`}
                       >
-                        {m.matchPercentage}% evidence match · {m.matchPercentage >= 60 ? "High" : "Low"}
+                        Supports {m.matchedRequirements.length}{" "}
+                        {m.matchedRequirements.length === 1 ? "skill" : "skills"}
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">
@@ -3413,7 +3490,7 @@ export function TailorWorkspace() {
                     <p className="text-sm leading-relaxed text-on-surface-variant line-clamp-2">{m.verifiedSummary}</p>
                     {m.matchedRequirements.length > 0 ? (
                       <div className="mt-2 flex flex-wrap gap-1">
-                        {m.matchedRequirements.slice(0, 4).map((req) => (
+                        {m.matchedRequirements.map((req) => (
                           <span
                             key={req}
                             data-testid="matched-req-badge"

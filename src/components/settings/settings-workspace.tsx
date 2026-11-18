@@ -540,9 +540,9 @@ export function SettingsWorkspace() {
                 className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <option value="gemini">Google Gemini (Direct API)</option>
-                <option value="openai">OpenAI (BYOK)</option>
-                <option value="anthropic">Anthropic (BYOK)</option>
-                <option value="groq">Groq (BYOK)</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="groq">Groq</option>
                 {!demoMode && <option value="ollama">Ollama (Local Inference)</option>}
                 {!demoMode && <option value="custom">Custom OpenAI-compatible endpoint (Local / self-hosted endpoint)</option>}
               </select>
@@ -680,11 +680,21 @@ export function SettingsWorkspace() {
                   </div>
                   {apiKey && (
                     <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-                      <Key className="h-3.5 w-3.5 text-status-warning" />
+                      <Key
+                        className={`h-3.5 w-3.5 ${
+                          verificationStatus === "verified"
+                            ? "text-status-success"
+                            : verificationStatus === "failed"
+                            ? "text-status-danger"
+                            : "text-status-warning"
+                        }`}
+                      />
                       <span>
-                        {verificationStatus === "failed"
+                        {verificationStatus === "verified"
+                          ? "Verified key: "
+                          : verificationStatus === "failed"
                           ? "Saved key (last test failed): "
-                          : "Configured key: "}
+                          : "Saved key (not tested): "}
                         <code className="text-text-secondary font-mono">{maskKey(apiKey)}</code>
                       </span>
                     </div>

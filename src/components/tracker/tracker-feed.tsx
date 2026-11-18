@@ -48,7 +48,7 @@ import {
   buildTrackerDisambiguators,
   collapseDuplicateTrackerJobs,
 } from "@/lib/jobs/posting-identity";
-import { fetchDemoConfig, fetchSessionUser } from "@/components/auth/session-user";
+import { fetchDemoConfig, fetchSessionPayload, fetchSessionUser } from "@/components/auth/session-user";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
 import { DEMO_JOB } from "@/lib/demo-samples";
 import { buildTailorNewJobHref } from "@/lib/tailor/application-context";
@@ -493,6 +493,8 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
 
   const fetchJobsAbortRef = useRef<AbortController | null>(null);
   const noticeTimerRef = useRef<number | null>(null);
+  const splitTabRef = useRef<HTMLButtonElement | null>(null);
+  const kanbanTabRef = useRef<HTMLButtonElement | null>(null);
 
   const scheduleNoticeClear = useCallback(() => {
     if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
@@ -508,8 +510,12 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       setIsLoading(true);
       const demoConfig = await fetchDemoConfig();
       if (controller.signal.aborted) return;
-      setIsDemoMode(demoConfig?.demoMode === true);
-      if (demoConfig?.demoMode) {
+      const isDemo = demoConfig?.demoMode === true;
+      setIsDemoMode(isDemo);
+      const sessionPayload = isDemo ? null : await fetchSessionPayload();
+      if (controller.signal.aborted) return;
+      const isGuest = isDemo || sessionPayload?.guest === true || !sessionPayload?.data;
+      if (isGuest) {
         let localJobs: JobItem[] = [];
         try {
           const raw = localStorage.getItem("resumeforge_guest_jobs");
@@ -875,7 +881,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const patchJob = async (jobId: string, body: { status?: JobStatus; variantId?: string | null }) => {
     setIsUpdatingStatus((p) => ({ ...p, [jobId]: true }));
     try {
-      if (isDemoMode) {
+      if (isDemoMode || authStatus === "guest") {
         const rows = JSON.parse(localStorage.getItem("resumeforge_guest_jobs") || "[]");
         if (!Array.isArray(rows)) throw new Error("Invalid local tracker data");
         const next = rows.map((job) => job.id === jobId ? {
@@ -938,7 +944,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const handleSaveNotes = async (jobId: string) => {
     setIsSavingNotes((p) => ({ ...p, [jobId]: true }));
     try {
-      if (isDemoMode) {
+      if (isDemoMode || authStatus === "guest") {
         const rows = JSON.parse(localStorage.getItem("resumeforge_guest_jobs") || "[]");
         if (!Array.isArray(rows)) throw new Error("Invalid local tracker data");
         const notes = editingNotes[jobId] || "";
@@ -985,7 +991,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       return false;
     }
     try {
-      if (isDemoMode) {
+      if (isDemoMode || authStatus === "guest") {
         const rows = JSON.parse(localStorage.getItem("resumeforge_guest_jobs") || "[]");
         if (!Array.isArray(rows)) throw new Error("Invalid local tracker data");
         localStorage.setItem("resumeforge_guest_jobs", JSON.stringify(rows.filter((job) => job.id !== jobId)));
@@ -1437,11 +1443,31 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             className="flex items-center rounded-md border border-hairline bg-inset p-0.5"
             role="tablist"
             aria-label="Tracker display mode"
+            onKeyDown={(e) => {
+              const order: Array<"split" | "kanban"> = ["split", "kanban"];
+              const idx = order.indexOf(viewMode);
+              let next: "split" | "kanban" | null = null;
+              if (e.key === "ArrowRight") {
+                next = order[(idx + 1) % order.length]!;
+              } else if (e.key === "ArrowLeft") {
+                next = order[(idx - 1 + order.length) % order.length]!;
+              } else if (e.key === "Home") {
+                next = order[0]!;
+              } else if (e.key === "End") {
+                next = order[order.length - 1]!;
+              }
+              if (!next) return;
+              e.preventDefault();
+              setViewMode(next);
+              (next === "split" ? splitTabRef : kanbanTabRef).current?.focus();
+            }}
           >
             <button
+              ref={splitTabRef}
               type="button"
               role="tab"
               aria-selected={viewMode === "split"}
+              tabIndex={viewMode === "split" ? 0 : -1}
               onClick={() => setViewMode("split")}
               data-testid="tracker-view-split"
               className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-mono font-semibold transition ${
@@ -1454,9 +1480,11 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
               <span>Split View</span>
             </button>
             <button
+              ref={kanbanTabRef}
               type="button"
               role="tab"
               aria-selected={viewMode === "kanban"}
+              tabIndex={viewMode === "kanban" ? 0 : -1}
               onClick={() => setViewMode("kanban")}
               data-testid="tracker-view-kanban"
               className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-mono font-semibold transition ${

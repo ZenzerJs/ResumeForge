@@ -269,5 +269,21 @@ describe("audit tailor, library, tracker & auth fixes", () => {
       expect(dbSource).toContain('input.status === "verified"');
       expect(dbSource).toContain("tx.bullet.updateMany");
     });
+
+    it("drops (BYOK) from Settings provider labels, distinguishes saved vs verified keys, and redirects /signup", () => {
+      const settingsSource = fs.readFileSync(
+        path.resolve("src/components/settings/settings-workspace.tsx"),
+        "utf8"
+      );
+      expect(settingsSource).not.toContain("OpenAI (BYOK)");
+      expect(settingsSource).not.toContain("Anthropic (BYOK)");
+      expect(settingsSource).not.toContain("Groq (BYOK)");
+      expect(settingsSource).toContain('"Verified key: "');
+      expect(settingsSource).toContain('"Saved key (not tested): "');
+      expect(settingsSource).toContain('"Saved key (last test failed): "');
+
+      const signupSource = fs.readFileSync(path.resolve("src/app/signup/page.tsx"), "utf8");
+      expect(signupSource).toContain('redirect("/login?mode=signup")');
+    });
   });
 });

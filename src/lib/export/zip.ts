@@ -427,13 +427,12 @@ function formatTypstLinks(source: string): string {
     if (source[cursor] === "[") {
       const closeBracket = findMatchingDelimiter(source, cursor, "[", "]");
       if (closeBracket >= 0) {
-        const label = source.slice(cursor + 1, closeBracket).trim();
-        out += !label || label === url ? url : `${label} (${url})`;
+        out += url.replace(/^mailto:/i, "");
         i = closeBracket + 1;
         continue;
       }
     }
-    out += url;
+    out += url.replace(/^mailto:/i, "");
     i += match[0].length;
   }
   return out;

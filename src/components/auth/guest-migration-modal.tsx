@@ -61,6 +61,196 @@ export function hasPendingGuestDraftInStorage(storage: StorageReadOnlyLike | nul
   return false;
 }
 
+export const GUEST_EVIDENCE_BATCH_SIZE = 50;
+
+export interface GuestEvidenceItemPayload {
+  title: string;
+  organization?: string;
+  category?: string;
+  tags?: string[];
+  bullets?: string[];
+}
+
+export function parseGuestEvidenceItems(
+  rawEvidence: string | null | undefined
+): GuestEvidenceItemPayload[] {
+  if (!rawEvidence) return [];
+  try {
+    const parsed: unknown = JSON.parse(rawEvidence);
+    if (!Array.isArray(parsed)) return [];
+    const isRecord = (v: unknown): v is Record<string, unknown> =>
+      typeof v === "object" && v !== null;
+    return parsed
+      .filter(
+        (item): item is Record<string, unknown> & { title: string } =>
+          isRecord(item) && typeof item.title === "string" && item.title.trim().length > 0
+      )
+      .map((item) => ({
+        title: item.title.trim(),
+        organization: typeof item.organization === "string" ? item.organization : undefined,
+        category:
+          typeof item.type === "string"
+            ? item.type.toUpperCase()
+            : typeof item.category === "string"
+              ? item.category.toUpperCase()
+              : "PROJECT",
+        tags: Array.isArray(item.tags)
+          ? item.tags.filter((t): t is string => typeof t === "string")
+          : [],
+        bullets: Array.isArray(item.bullets)
+          ? item.bullets
+              .map((b) =>
+                typeof b === "string"
+                  ? b
+                  : isRecord(b) && typeof b.text === "string"
+                    ? b.text
+                    : ""
+              )
+              .filter((t) => t.trim().length > 0)
+          : typeof item.verifiedSummary === "string" && item.verifiedSummary.trim()
+            ? [item.verifiedSummary.trim()]
+            : [],
+      }));
+  } catch {
+    return [];
+  }
+}
+
+export async function executeGuestMigrationBatches(params: {
+  storage: StorageReadWriteLike | null | undefined;
+  fetchFn: typeof fetch;
+  draftSource: string | null | undefined;
+  hasCustomResumeDraft: boolean;
+  evidenceItems: GuestEvidenceItemPayload[];
+  strategy: ConflictStrategy;
+  confirmReplaceMaster: boolean;
+  migrationId: string;
+  onResumeMigrated?: () => void;
+  onRemainingEvidenceChange?: (remaining: GuestEvidenceItemPayload[]) => void;
+}): Promise<
+  | { ok: true; remainingEvidence: GuestEvidenceItemPayload[] }
+  | { ok: false; error: string; remainingEvidence: GuestEvidenceItemPayload[] }
+> {
+  const {
+    storage,
+    fetchFn,
+    draftSource,
+    hasCustomResumeDraft,
+    evidenceItems,
+    strategy,
+    confirmReplaceMaster,
+    migrationId,
+    onResumeMigrated,
+    onRemainingEvidenceChange,
+  } = params;
+
+  const hasValidDraft = hasCustomResumeDraft && Boolean(draftSource && draftSource.trim().length > 0);
+
+  if (strategy === "DISCARD") {
+    const res = await fetchFn("/api/auth/migrate-guest-drafts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        conflictStrategy: "DISCARD",
+        migrationId,
+        ...(hasValidDraft ? { title: "Imported Guest Resume", typstSource: draftSource } : { evidenceOnly: true }),
+      }),
+    });
+    const json = await res.json();
+    if (res.ok && json?.success) {
+      return { ok: true, remainingEvidence: [] };
+    }
+    return {
+      ok: false,
+      error: json?.message || json?.error || "Failed to discard guest draft.",
+      remainingEvidence: evidenceItems,
+    };
+  }
+
+  if (evidenceItems.length === 0) {
+    if (!hasValidDraft) {
+      return { ok: true, remainingEvidence: [] };
+    }
+    const res = await fetchFn("/api/auth/migrate-guest-drafts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Imported Guest Resume",
+        typstSource: draftSource,
+        conflictStrategy: strategy,
+        confirmReplaceMaster: strategy === "REPLACE_MASTER" ? confirmReplaceMaster : undefined,
+        migrationId,
+      }),
+    });
+    const json = await res.json();
+    if (res.ok && json?.success) {
+      storage?.removeItem("resumeforge_typst_source");
+      storage?.removeItem("resumeforge_has_guest_draft");
+      onResumeMigrated?.();
+      return { ok: true, remainingEvidence: [] };
+    }
+    return {
+      ok: false,
+      error: json?.message || json?.error || "Failed to import guest draft to account.",
+      remainingEvidence: [],
+    };
+  }
+
+  let remaining = [...evidenceItems];
+  let sentResume = false;
+
+  while (remaining.length > 0) {
+    const batch = remaining.slice(0, GUEST_EVIDENCE_BATCH_SIZE);
+    const includeResume = !sentResume && hasValidDraft;
+    const payload = includeResume
+      ? {
+          title: "Imported Guest Resume",
+          typstSource: draftSource,
+          conflictStrategy: strategy,
+          confirmReplaceMaster: strategy === "REPLACE_MASTER" ? confirmReplaceMaster : undefined,
+          evidenceItems: batch,
+          migrationId,
+        }
+      : {
+          evidenceOnly: true,
+          conflictStrategy: strategy,
+          evidenceItems: batch,
+          migrationId,
+        };
+
+    const res = await fetchFn("/api/auth/migrate-guest-drafts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok || !json?.success) {
+      return {
+        ok: false,
+        error: json?.message || json?.error || "Failed to import guest draft to account.",
+        remainingEvidence: remaining,
+      };
+    }
+
+    if (includeResume) {
+      sentResume = true;
+      storage?.removeItem("resumeforge_typst_source");
+      storage?.removeItem("resumeforge_has_guest_draft");
+      onResumeMigrated?.();
+    }
+
+    remaining = remaining.slice(batch.length);
+    if (remaining.length > 0) {
+      storage?.setItem("resumeforge_guest_evidence", JSON.stringify(remaining));
+    } else {
+      storage?.removeItem("resumeforge_guest_evidence");
+    }
+    onRemainingEvidenceChange?.(remaining);
+  }
+
+  return { ok: true, remainingEvidence: [] };
+}
+
 export function evaluateGuestMigrationState(
   storage: StorageReadWriteLike | null | undefined,
   opts: { isAuthUser: boolean; isGuest: boolean; demoMode: boolean }
@@ -124,9 +314,9 @@ export function evaluateGuestMigrationState(
       hasCustomResumeDraft: hasPendingCustomDraft,
       hasGuestEvidence,
       draftSource:
-        stored && stored.trim().length > 0 && isCustomDraft
+        hasPendingCustomDraft && stored && stored.trim().length > 0
           ? stored
-          : "// Imported Guest Workspace\n= Resume Draft\n",
+          : null,
     };
   }
 
@@ -141,7 +331,8 @@ export function evaluateGuestMigrationState(
 export interface GuestMigrationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  draftSource: string;
+  draftSource?: string | null;
+  hasCustomResumeDraft?: boolean;
   hasExistingMaster?: boolean;
   onSuccess?: () => void;
 }
@@ -150,12 +341,14 @@ export function GuestMigrationModal({
   isOpen,
   onClose,
   draftSource,
+  hasCustomResumeDraft,
   hasExistingMaster = true,
   onSuccess,
 }: GuestMigrationModalProps) {
   const [strategy, setStrategy] = useState<ConflictStrategy>("IMPORT_AS_DRAFT");
   const [confirmReplaceMaster, setConfirmReplaceMaster] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [hasMigratedResume, setHasMigratedResume] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [migrationId] = useState<string>(() => {
@@ -173,59 +366,19 @@ export function GuestMigrationModal({
     return "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
   });
 
-  const [guestEvidenceItems] = useState<
-    Array<{
-      title: string;
-      organization?: string;
-      category?: string;
-      tags?: string[];
-      bullets?: string[];
-    }>
-  >(() => {
+  const [guestEvidenceItems, setGuestEvidenceItems] = useState<GuestEvidenceItemPayload[]>(() => {
     if (typeof window === "undefined") return [];
-    try {
-      const raw = localStorage.getItem("resumeforge_guest_evidence");
-      if (!raw) return [];
-      const parsed: unknown = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      const isRecord = (v: unknown): v is Record<string, unknown> =>
-        typeof v === "object" && v !== null;
-      return parsed
-        .filter(
-          (item): item is Record<string, unknown> & { title: string } =>
-            isRecord(item) && typeof item.title === "string" && item.title.trim().length > 0
-        )
-        .slice(0, 50)
-        .map((item) => ({
-          title: item.title.trim(),
-          organization: typeof item.organization === "string" ? item.organization : undefined,
-          category: typeof item.type === "string" ? item.type.toUpperCase() : "PROJECT",
-          tags: Array.isArray(item.tags)
-            ? item.tags.filter((t): t is string => typeof t === "string")
-            : [],
-          bullets: Array.isArray(item.bullets)
-            ? item.bullets
-                .map((b) =>
-                  typeof b === "string"
-                    ? b
-                    : isRecord(b) && typeof b.text === "string"
-                      ? b.text
-                      : ""
-                )
-                .filter((t) => t.trim().length > 0)
-            : typeof item.verifiedSummary === "string" && item.verifiedSummary.trim()
-            ? [item.verifiedSummary.trim()]
-            : [],
-        }));
-    } catch {
-      return [];
-    }
+    return parseGuestEvidenceItems(localStorage.getItem("resumeforge_guest_evidence"));
   });
 
   if (!isOpen) return null;
 
+  const hasResumeDraft =
+    !hasMigratedResume &&
+    (hasCustomResumeDraft ?? Boolean(draftSource && draftSource.trim().length > 0));
+
   const handleMigrate = async () => {
-    if (strategy === "REPLACE_MASTER" && !confirmReplaceMaster) {
+    if (hasResumeDraft && strategy === "REPLACE_MASTER" && !confirmReplaceMaster) {
       setError("Explicit confirmation is required to replace your active Master Resume.");
       return;
     }
@@ -248,22 +401,21 @@ export function GuestMigrationModal({
         localStorage.setItem(lockKey, String(now));
       }
 
-      const res = await fetch("/api/auth/migrate-guest-drafts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: "Imported Guest Resume",
-          typstSource: draftSource,
-          conflictStrategy: strategy,
-          confirmReplaceMaster: strategy === "REPLACE_MASTER" ? confirmReplaceMaster : undefined,
-          evidenceItems: guestEvidenceItems.length > 0 ? guestEvidenceItems : undefined,
-          migrationId,
-        }),
+      const result = await executeGuestMigrationBatches({
+        storage: typeof window !== "undefined" ? localStorage : null,
+        fetchFn: fetch,
+        draftSource,
+        hasCustomResumeDraft: hasResumeDraft,
+        evidenceItems: guestEvidenceItems,
+        strategy: !hasResumeDraft && strategy === "REPLACE_MASTER" ? "IMPORT_AS_DRAFT" : strategy,
+        confirmReplaceMaster,
+        migrationId,
+        onResumeMigrated: () => setHasMigratedResume(true),
+        onRemainingEvidenceChange: (remaining) => setGuestEvidenceItems(remaining),
       });
 
-      const json = await res.json();
-      if (res.ok && json.success) {
-        // Strict cleanup ONLY after successful 200 response
+      if (result.ok) {
+        // Strict cleanup ONLY after all batches succeed
         if (typeof window !== "undefined") {
           localStorage.removeItem("resumeforge_typst_source");
           localStorage.removeItem("resumeforge_has_guest_draft");
@@ -279,7 +431,7 @@ export function GuestMigrationModal({
         onSuccess?.();
         onClose();
       } else {
-        setError(json.message || json.error || "Failed to import guest draft to account.");
+        setError(result.error);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error during draft import.");
@@ -298,7 +450,8 @@ export function GuestMigrationModal({
     onClose();
   };
 
-  const isConfirmDisabled = isMigrating || (strategy === "REPLACE_MASTER" && !confirmReplaceMaster);
+  const isConfirmDisabled =
+    isMigrating || (hasResumeDraft && strategy === "REPLACE_MASTER" && !confirmReplaceMaster);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleDismiss()}>
@@ -319,12 +472,16 @@ export function GuestMigrationModal({
         </DialogHeader>
 
         <div className="space-y-3.5 py-2 text-xs">
-          {/* Draft Preview */}
+          {/* Draft Preview (or Evidence-Only Summary) */}
           <div className="space-y-1">
             <div className="flex items-center justify-between gap-2 text-text-secondary font-semibold">
               <div className="flex items-center gap-2">
                 <FileText className="size-3.5 text-signal" />
-                <span>Draft Preview ({draftSource.split("\n").length} lines)</span>
+                <span>
+                  {hasResumeDraft && draftSource
+                    ? `Draft Preview (${draftSource.split("\n").length} lines)`
+                    : "Guest Evidence Items Ready"}
+                </span>
               </div>
               {guestEvidenceItems.length > 0 && (
                 <span
@@ -335,10 +492,16 @@ export function GuestMigrationModal({
                 </span>
               )}
             </div>
-            <div className="max-h-28 overflow-y-auto rounded-md border border-hairline bg-inset p-2.5 font-mono text-xs text-text-secondary whitespace-pre-wrap leading-relaxed">
-              {draftSource.slice(0, 400)}
-              {draftSource.length > 400 ? "\n..." : ""}
-            </div>
+            {hasResumeDraft && draftSource ? (
+              <div className="max-h-28 overflow-y-auto rounded-md border border-hairline bg-inset p-2.5 font-mono text-xs text-text-secondary whitespace-pre-wrap leading-relaxed">
+                {draftSource.slice(0, 400)}
+                {draftSource.length > 400 ? "\n..." : ""}
+              </div>
+            ) : (
+              <div className="rounded-md border border-hairline bg-inset p-2.5 text-xs text-text-secondary">
+                No custom resume draft was modified. Only your guest evidence bank items will be imported—your Master Resume will not be created or overwritten.
+              </div>
+            )}
           </div>
 
           {/* Conflict Strategy Selector */}
@@ -371,31 +534,33 @@ export function GuestMigrationModal({
                 </div>
               </label>
 
-              <label
-                className={`flex items-start gap-2.5 p-2.5 rounded-md border cursor-pointer transition-colors ${
-                  strategy === "REPLACE_MASTER"
-                    ? "border-primary/80 bg-primary/10"
-                    : "border-hairline bg-inset hover:border-control"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="conflictStrategy"
-                  value="REPLACE_MASTER"
-                  checked={strategy === "REPLACE_MASTER"}
-                  onChange={() => setStrategy("REPLACE_MASTER")}
-                  data-testid="strategy-replace-master"
-                  className="mt-0.5 text-primary focus:ring-0"
-                />
-                <div>
-                  <span className="font-semibold text-foreground block text-xs">
-                    Replace Account Master Resume
-                  </span>
-                  <span className="text-xs text-text-muted leading-tight block mt-0.5">
-                    Replaces your primary Master baseline with this guest draft.
-                  </span>
-                </div>
-              </label>
+              {hasResumeDraft && (
+                <label
+                  className={`flex items-start gap-2.5 p-2.5 rounded-md border cursor-pointer transition-colors ${
+                    strategy === "REPLACE_MASTER"
+                      ? "border-primary/80 bg-primary/10"
+                      : "border-hairline bg-inset hover:border-control"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="conflictStrategy"
+                    value="REPLACE_MASTER"
+                    checked={strategy === "REPLACE_MASTER"}
+                    onChange={() => setStrategy("REPLACE_MASTER")}
+                    data-testid="strategy-replace-master"
+                    className="mt-0.5 text-primary focus:ring-0"
+                  />
+                  <div>
+                    <span className="font-semibold text-foreground block text-xs">
+                      Replace Account Master Resume
+                    </span>
+                    <span className="text-xs text-text-muted leading-tight block mt-0.5">
+                      Replaces your primary Master baseline with this guest draft.
+                    </span>
+                  </div>
+                </label>
+              )}
 
               <label
                 className={`flex items-start gap-2.5 p-2.5 rounded-md border cursor-pointer transition-colors ${
@@ -426,7 +591,7 @@ export function GuestMigrationModal({
           </div>
 
           {/* Secondary Confirmation for REPLACE_MASTER */}
-          {strategy === "REPLACE_MASTER" && (
+          {hasResumeDraft && strategy === "REPLACE_MASTER" && (
             <div
               data-testid="replace-master-confirmation-box"
               className="p-2.5 rounded-md bg-primary/10 border border-primary/50 space-y-2 text-xs"

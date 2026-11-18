@@ -630,18 +630,24 @@ export function JobDetailPane({
                     <>
                       {requiredEvidence.length > 0 ? (
                       <div className="flex items-center gap-3 mb-4" data-testid="tracker-required-evidence-coverage">
-                        <div className="w-10 h-10 rounded-full border-2 border-status-success/40 flex items-center justify-center font-bold text-xs tabular-nums text-status-success bg-status-success/10 shrink-0">
+                        <div
+                          aria-label={`Required-skill coverage: ${requiredCoveragePercent}% (${requiredMatched} of ${requiredEvidence.length} required skills)`}
+                          className="w-10 h-10 rounded-full border-2 border-status-success/40 flex items-center justify-center font-bold text-xs tabular-nums text-status-success bg-status-success/10 shrink-0"
+                        >
                           {requiredCoveragePercent}%
                         </div>
                         <div className="text-sm font-body-dense text-on-surface-variant">
                           <span className="text-on-surface font-bold">
-                            {requiredCoveragePercent >= 70
-                              ? "High match"
-                              : requiredCoveragePercent >= 40
-                              ? "Partial match"
-                              : "Low match"}
+                            Required-skill coverage:{" "}
+                            <span className="tabular-nums">{requiredMatched}/{requiredEvidence.length}</span>
                           </span>{" "}
-                          — <span className="tabular-nums">{requiredMatched}</span> of <span className="tabular-nums">{requiredEvidence.length}</span> required skills backed by verified evidence.
+                          (
+                          {requiredCoveragePercent >= 70
+                            ? "High match"
+                            : requiredCoveragePercent >= 40
+                            ? "Partial match"
+                            : "Low match"}
+                          ) backed by verified evidence.
                         </div>
                       </div>
                       ) : (
@@ -657,11 +663,17 @@ export function JobDetailPane({
                         {checklist.items.map((item) => (
                           <li key={item.label} className="flex items-center gap-2 text-on-surface-variant">
                             {item.status === "verified" ? (
-                              <Check className="h-4 w-4 shrink-0 text-status-success" aria-hidden />
+                              <>
+                                <Check className="h-4 w-4 shrink-0 text-status-success" aria-hidden />
+                                <span className="sr-only">Verified: </span>
+                              </>
                             ) : item.status === "needs_verification" ? (
                               <AlertCircle className="h-4 w-4 shrink-0 text-primary" aria-hidden />
                             ) : (
-                              <X className="h-4 w-4 shrink-0 text-error" aria-hidden />
+                              <>
+                                <X className="h-4 w-4 shrink-0 text-error" aria-hidden />
+                                <span className="sr-only">Missing: </span>
+                              </>
                             )}
                             <span className="min-w-0 truncate">{item.label}</span>
                             {item.status === "needs_verification" && (

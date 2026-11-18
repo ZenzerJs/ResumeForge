@@ -903,14 +903,16 @@ export function EditorWorkspace() {
 
   const handleConfirmSaveAsMaster = async () => {
     if (!source || source.trim().length === 0) {
-      setDocumentError("Resume source is still loading. Try saving again in a moment.");
-      return;
+      const msg = "Resume source is still loading. Try saving again in a moment.";
+      setDocumentError(msg);
+      throw new Error(msg);
     }
     const shouldExtractEvidence = draftEvidenceFromMaster;
     const cleanMasterSource = stripPatchedDocumentMarker(source);
     try {
       setIsSavingMaster(true);
       setSaveSuccess(false);
+      setDocumentError(null);
 
       const demoConfig = await fetchDemoConfig();
       setIsDemoMode(Boolean(demoConfig?.demoMode));
@@ -943,9 +945,9 @@ export function EditorWorkspace() {
         }),
       });
 
-      const json = await res.json();
+      const json = await res.json().catch(() => null);
 
-      if (res.ok && json.success) {
+      if (res.ok && json?.success) {
         setSaveSuccess(true);
         setSource(cleanMasterSource);
         setBaselineSource(cleanMasterSource);
@@ -971,10 +973,16 @@ export function EditorWorkspace() {
           await runEvidenceExtractAfterSave(source);
         }
       } else {
-        setDocumentError(json.error || "Failed to save Master Resume.");
+        throw new Error(json?.error || `Failed to save Master Resume (HTTP ${res.status}).`);
       }
     } catch (err) {
       console.error("Failed to save master resume:", err);
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : "Failed to save Master Resume.";
+      setDocumentError(msg);
+      throw err instanceof Error ? err : new Error(msg);
     } finally {
       setIsSavingMaster(false);
     }

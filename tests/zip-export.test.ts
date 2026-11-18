@@ -290,7 +290,8 @@ jane.doe@example.com | San Francisco, CA
 
     const cleaned = cleanTypstToText(raw);
     expect(cleaned).toContain("=== Jane Doe ===");
-    expect(cleaned).toContain("github.com/janedoe (https://github.com/janedoe)");
+    expect(cleaned).toContain("https://github.com/janedoe");
+    expect(cleaned).not.toContain("(https://");
     expect(cleaned).toContain("--- EXPERIENCE ---");
     expect(cleaned).toContain("Stripe -- Software Engineer");
     expect(cleaned).not.toContain("#show");
@@ -362,10 +363,12 @@ jane.doe@example.com | San Francisco, CA
     const cleaned = cleanTypstToText(aiConvertedTypst);
     expect(cleaned.length).toBeGreaterThan(500);
     expect(cleaned).toContain("Priya Nair");
-    expect(cleaned).toContain("priya@example.com (mailto:priya@example.com)");
+    expect(cleaned).toContain("priya@example.com");
+    expect(cleaned).toContain("https://github.com/priyanair");
+    expect(cleaned).not.toContain("(mailto:");
     expect(cleaned).toContain("Cascade Cloud -- Backend Software Engineer | Seattle, WA | 2023 – Present");
     expect(cleaned).toContain("Built TypeScript and Go ingestion services handling 50k events/sec.");
-    expect(cleaned).toContain("QueryPulse | GitHub (https://github.com/priyanair/querypulse) | TypeScript, PostgreSQL, Docker | 2024");
+    expect(cleaned).toContain("QueryPulse | https://github.com/priyanair/querypulse | TypeScript, PostgreSQL, Docker | 2024");
     expect(cleaned).toContain("C# and SQL workloads");
     expect(cleaned).toContain("Languages: TypeScript, Go, SQL, Python");
     expect(cleaned).toContain("Infrastructure: Docker, PostgreSQL, Redis");
@@ -386,7 +389,8 @@ jane.doe@example.com | San Francisco, CA
     const cleaned = cleanTypstToText(guestTypst);
     expect(cleaned).toContain("=== Jordan Example ===");
     expect(cleaned).toContain("--- Projects ---");
-    expect(cleaned).toContain("jordan@example.invalid (mailto:jordan@example.invalid) • example.invalid (https://example.invalid)");
+    expect(cleaned).toContain("jordan@example.invalid • https://example.invalid");
+    expect(cleaned).not.toContain("(mailto:");
     expect(cleaned).not.toContain("#show");
     expect(cleaned).not.toContain("#resume-section");
     expect(cleaned).not.toContain("#sym");

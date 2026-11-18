@@ -334,4 +334,128 @@ describe("Migrate Guest Drafts API Endpoint (POST /api/auth/migrate-guest-drafts
     });
     expect(userEvidence.length).toBe(2);
   });
+
+  it("imports evidence-only payload without creating a Master Resume", async () => {
+    const { user, cookie } = await createTestUser();
+
+    const request = authedRequest(
+      "http://localhost:3000/api/auth/migrate-guest-drafts",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          evidenceOnly: true,
+          conflictStrategy: "IMPORT_AS_DRAFT",
+          evidenceItems: [
+            {
+              title: "Search Ranking Pipeline",
+              organization: "Shopify",
+              category: "PROJECT",
+              tags: ["Go", "Redis"],
+              bullets: ["Reduced p95 latency by 35%."],
+            },
+          ],
+          migrationId: "223e4567-e89b-12d3-a456-426614174000",
+        }),
+      },
+      cookie
+    );
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+
+    const json = await response.json();
+    expect(json.success).toBe(true);
+    expect(json.data.resumeId).toBeNull();
+    expect(json.data.isMaster).toBe(false);
+    expect(json.data.evidenceCount).toBe(1);
+
+    const resumeCount = await prisma.resume.count({ where: { userId: user.id } });
+    expect(resumeCount).toBe(0);
+
+    const evidenceCount = await prisma.evidenceItem.count({ where: { userId: user.id } });
+    expect(evidenceCount).toBe(1);
+  });
+
+  it("supports multi-batch >50 evidence migration with evidenceOnly on subsequent batches sharing migrationId", async () => {
+    const { user, cookie } = await createTestUser();
+    const migrationId = "323e4567-e89b-12d3-a456-426614174000";
+
+    const batch0Items = Array.from({ length: 50 }, (_, i) => ({
+      title: `Batch Item ${i + 1}`,
+      category: "PROJECT",
+      bullets: [`Bullet ${i + 1}`],
+    }));
+    const batch1Items = Array.from({ length: 15 }, (_, i) => ({
+      title: `Batch Item ${51 + i}`,
+      category: "PROJECT",
+      bullets: [`Bullet ${51 + i}`],
+    }));
+
+    const res0 = await POST(
+      authedRequest(
+        "http://localhost:3000/api/auth/migrate-guest-drafts",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            typstSource: "= Multi Batch User\n== EXPERIENCE\n*Linear*",
+            conflictStrategy: "IMPORT_AS_DRAFT",
+            evidenceItems: batch0Items,
+            migrationId,
+          }),
+        },
+        cookie
+      )
+    );
+    expect(res0.status).toBe(200);
+    const json0 = await res0.json();
+    expect(json0.data.evidenceCount).toBe(50);
+
+    const res1 = await POST(
+      authedRequest(
+        "http://localhost:3000/api/auth/migrate-guest-drafts",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            evidenceOnly: true,
+            conflictStrategy: "IMPORT_AS_DRAFT",
+            evidenceItems: batch1Items,
+            migrationId,
+          }),
+        },
+        cookie
+      )
+    );
+    expect(res1.status).toBe(200);
+    const json1 = await res1.json();
+    expect(json1.data.resumeId).toBeNull();
+    expect(json1.data.evidenceCount).toBe(15);
+
+    const totalEvidence = await prisma.evidenceItem.count({ where: { userId: user.id } });
+    expect(totalEvidence).toBe(65);
+    const totalResumes = await prisma.resume.count({ where: { userId: user.id } });
+    expect(totalResumes).toBe(1);
+  });
+
+  it("rejects evidenceOnly=true when evidenceItems is empty", async () => {
+    const { cookie } = await createTestUser();
+
+    const response = await POST(
+      authedRequest(
+        "http://localhost:3000/api/auth/migrate-guest-drafts",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            evidenceOnly: true,
+            evidenceItems: [],
+          }),
+        },
+        cookie
+      )
+    );
+    expect(response.status).toBe(400);
+  });
 });

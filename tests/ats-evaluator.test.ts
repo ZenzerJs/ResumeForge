@@ -189,6 +189,17 @@ Languages & Tools: GraphQL, Redis
     const genuinelyLongBody = `${SAMPLE_TYPST_RESUME}\n${"- Delivered measurable improvements across distributed services.\n".repeat(70)}`;
     const longRes = evaluateAtsScore(genuinelyLongBody, SAMPLE_REQUIREMENTS, "Backend");
     expect(longRes.baseHealth.findings).toContain("Warning: Document length may exceed a single page.");
+
+    const measuredOnePage = evaluateAtsScore(genuinelyLongBody, SAMPLE_REQUIREMENTS, "Backend", {
+      measuredPages: 1,
+    });
+    expect(measuredOnePage.baseHealth.findings).toContain("✓ Standard one-page length constraints satisfied.");
+    expect(measuredOnePage.baseHealth.findings).not.toContain("Warning: Document length may exceed a single page.");
+
+    const measuredTwoPages = evaluateAtsScore(SAMPLE_TYPST_RESUME, SAMPLE_REQUIREMENTS, "Backend", {
+      measuredPages: 2,
+    });
+    expect(measuredTwoPages.baseHealth.findings).toContain("Warning: Document length may exceed a single page.");
   });
 
   it("marks AtsScorePanel display state as No job loaded / unscored when requirements are empty", () => {

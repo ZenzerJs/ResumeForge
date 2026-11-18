@@ -76,6 +76,23 @@ describe("Deterministic JD Parser Unit Tests", () => {
     expect(result.preferredSkills).toContain("AWS");
   });
 
+  it("splits one-line Nice to have, Preferred, and Bonus clauses even after whitespace or >80 chars", () => {
+    const afterPeriod =
+      "Backend role. Required: TypeScript, PostgreSQL. Nice to have: AWS, Docker, Kubernetes, GraphQL, Go, Redis, Python, Rust.";
+    const res1 = parseJobDescription(afterPeriod);
+    expect(res1.requiredSkills).toEqual(expect.arrayContaining(["TypeScript", "PostgreSQL"]));
+    expect(res1.requiredSkills).not.toContain("AWS");
+    expect(res1.requiredSkills).not.toContain("Kubernetes");
+    expect(res1.preferredSkills).toEqual(expect.arrayContaining(["AWS", "Docker", "Kubernetes", "GraphQL"]));
+
+    const afterWhitespace = "Required: React and Node.js Preferred: Terraform Bonus: Rust";
+    const res2 = parseJobDescription(afterWhitespace);
+    expect(res2.requiredSkills).toEqual(expect.arrayContaining(["React", "Node.js"]));
+    expect(res2.requiredSkills).not.toContain("Terraform");
+    expect(res2.requiredSkills).not.toContain("Rust");
+    expect(res2.preferredSkills).toEqual(expect.arrayContaining(["Terraform", "Rust"]));
+  });
+
   it("outputs valid JobRequirements matching Zod schema", () => {
     const result = parseJobDescription(backendJD);
     const parsed = JobRequirementsSchema.safeParse(result);

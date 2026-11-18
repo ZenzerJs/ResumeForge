@@ -401,6 +401,11 @@ export function collapseDuplicateTrackerJobs<T extends TrackerDedupeCandidate>(r
     const companyTitleKey = normCompany && normTitle ? `${normCompany}::${normTitle}` : null;
     const hasHistory = hasJobSavedApplicationHistory(row);
 
+    const isUserCreatedOrPasted = (candidate: TrackerDedupeCandidate) => {
+      const src = (candidate.source ?? "").trim().toLowerCase();
+      return src === "pasted" || src === "manual" || Boolean(candidate.userId);
+    };
+
     let matchedIndex: number | null = null;
 
     if (reqUrl) {
@@ -408,16 +413,12 @@ export function collapseDuplicateTrackerJobs<T extends TrackerDedupeCandidate>(r
       for (const idx of candidates) {
         const existing = entries[idx]!;
         if (existing.hasHistory && hasHistory) continue;
+        if (isUserCreatedOrPasted(existing.row) !== isUserCreatedOrPasted(row)) continue;
         if (!arePostingLocationsCompatible(existing.location, location)) continue;
         matchedIndex = idx;
         break;
       }
     }
-
-    const isUserCreatedOrPasted = (candidate: TrackerDedupeCandidate) => {
-      const src = (candidate.source ?? "").trim().toLowerCase();
-      return src === "pasted" || src === "manual" || Boolean(candidate.userId);
-    };
 
     if (matchedIndex === null && companyTitleKey && !reqUrl && !hasHistory && !isUserCreatedOrPasted(row)) {
       const candidates = byCompanyTitle.get(companyTitleKey) ?? [];
@@ -554,9 +555,11 @@ export function collapseDuplicateIngestedJobs<T extends IngestedDedupeCandidate>
       for (const idx of candidates) {
         const existing = entries[idx]!;
         if (existing.reqUrl) continue;
-        // Different externalIds from the same source with generic URLs remain distinct postings.
+        // When both postings lack requisition URLs, do not collapse cross-source rows on companyTitleKey + location alone.
         if (
-          sourceNorm === existing.row.source.trim().toLowerCase() &&
+          !sourceNorm ||
+          !extNorm ||
+          sourceNorm !== existing.row.source.trim().toLowerCase() ||
           extNorm !== existing.row.externalId.trim().toLowerCase()
         ) {
           continue;
