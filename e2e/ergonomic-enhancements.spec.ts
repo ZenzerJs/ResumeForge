@@ -34,43 +34,68 @@ test.describe("Ergonomic Enhancements E2E", () => {
     await expect(page.locator("[data-testid='export-json-menu-item']")).toBeVisible();
   });
 
-  test("3. Job Detail Pane contains Prep Sheet modal trigger", async ({ page }) => {
+  test("3. Job Detail Pane contains Prep Sheet modal trigger", async ({ page, request }) => {
+    const created = await request.post("/api/jobs", {
+      data: {
+        company: "Prep Sheet Corp",
+        roleTitle: "Platform Engineer",
+        rawDescription: "TypeScript, React, PostgreSQL",
+        personal: true,
+      },
+    });
+    expect(created.ok()).toBeTruthy();
+
     await page.goto("/tracker");
-    await page.waitForLoadState("domcontentloaded");
+    const firstCard = page.locator("[data-testid^='tracker-job-card-']").first();
+    await expect(firstCard).toBeVisible({ timeout: 15000 });
+    await firstCard.locator("[data-testid^='job-select-btn-']").first().click();
 
     const prepSheetBtn = page.locator("[data-testid='open-prep-sheet-btn']").first();
-    if (await prepSheetBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await prepSheetBtn.click();
-      const modal = page.locator("[data-testid='apply-prep-sheet-modal']");
-      await expect(modal).toBeVisible();
-      await expect(modal.getByText("Candidate Information")).toBeVisible();
+    await expect(prepSheetBtn).toBeVisible({ timeout: 10000 });
+    await prepSheetBtn.click();
+    const modal = page.locator("[data-testid='apply-prep-sheet-modal']");
+    await expect(modal).toBeVisible();
+    await expect(modal.getByText("Candidate Information")).toBeVisible();
 
-      // Close modal
-      await page.locator("[data-testid='close-prep-sheet-btn']").click();
-      await expect(modal).not.toBeVisible();
-    }
+    // Close modal
+    await page.locator("[data-testid='close-prep-sheet-btn']").click();
+    await expect(modal).not.toBeVisible();
   });
 
   test("4. Tailor Workspace allows inline gap resolution", async ({ page }) => {
+    await page.route("**/api/evidence", async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ success: true, data: [] }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+
     await page.goto("/tailor?tab=job-info");
-    await page.waitForLoadState("domcontentloaded");
 
     // Click sample backend JD to populate requirements
-    const sampleBtn = page.locator("[data-testid='tailor-sample-backend-btn']");
-    if (await sampleBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await sampleBtn.click();
+    const sampleBtn = page.getByTestId("sample-backend-btn");
+    await expect(sampleBtn).toBeVisible({ timeout: 10000 });
+    await sampleBtn.click();
 
-      // Check if resolve gap buttons exist on uncovered skills
-      const resolveGapBtn = page.locator("[data-testid^='resolve-gap-']").first();
-      if (await resolveGapBtn.isVisible({ timeout: 4000 }).catch(() => false)) {
-        await resolveGapBtn.click();
-        const modal = page.locator("[data-testid='quick-add-evidence-modal']");
-        await expect(modal).toBeVisible();
-        await expect(page.locator("[data-testid='quick-evidence-title-input']")).toBeVisible();
-        await page.locator("[data-testid='close-add-evidence-btn']").click();
-        await expect(modal).not.toBeVisible();
-      }
-    }
+    const extractBtn = page.getByTestId("extract-reqs-btn");
+    await expect(extractBtn).toBeVisible();
+    await extractBtn.click();
+
+    // Assert resolve gap button exists on uncovered skills and opens quick-add modal
+    const resolveGapBtn = page.locator("[data-testid^='resolve-gap-']").first();
+    await expect(resolveGapBtn).toBeVisible({ timeout: 10000 });
+    await resolveGapBtn.click();
+
+    const modal = page.locator("[data-testid='quick-add-evidence-modal']");
+    await expect(modal).toBeVisible();
+    await expect(page.locator("[data-testid='quick-evidence-title-input']")).toBeVisible();
+    await page.locator("[data-testid='close-add-evidence-btn']").click();
+    await expect(modal).not.toBeVisible();
   });
 
   test("5. UI-06: Dialogs trap focus, return focus to opener, and cancel without writes", async ({ page }) => {

@@ -3,34 +3,26 @@ import path from "node:path";
 import fs from "node:fs";
 
 const PROJECT_DIR = process.cwd();
-const WITH_AI_DIR = path.join(PROJECT_DIR, "screenshots", "with-ai");
-const BRAIN_WITH_AI_DIR = "C:/Users/jayde/.gemini/antigravity/brain/d4a531ea-5f55-4906-92f1-dc2c20108fd4/screenshots/with-ai";
-const BRAIN_ROOT_DIR = "C:/Users/jayde/.gemini/antigravity/brain/d4a531ea-5f55-4906-92f1-dc2c20108fd4/screenshots";
+const SCREENSHOTS_ROOT = path.join(PROJECT_DIR, "test-results", "screenshots");
+const WITH_AI_DIR = path.join(SCREENSHOTS_ROOT, "with-ai");
 
 fs.mkdirSync(WITH_AI_DIR, { recursive: true });
-fs.mkdirSync(BRAIN_WITH_AI_DIR, { recursive: true });
 
-const typstSourcePath = path.join(PROJECT_DIR, "screenshots", "jayden_resume.typ");
-const typstSource = fs.readFileSync(typstSourcePath, "utf8");
+const starterTypstPath = path.join(PROJECT_DIR, "public", "templates", "starter-resume.typ");
+const typstSource = fs.readFileSync(starterTypstPath, "utf8");
 
 const AI_CONFIG = {
   provider: "openai",
   baseUrl: "http://127.0.0.1:3001",
-  apiKey: "freellmapi-24dfc2cc6f92df01031ff7afa72fb809dec7e9ee6c3b2cbe",
+  apiKey: "test-redacted-placeholder-key",
   model: "gemini-2.5-flash",
 };
 
 async function capture(page: Page, filename: string, options: { fullPage?: boolean } = {}) {
   const p1 = path.join(WITH_AI_DIR, filename);
-  const p2 = path.join(BRAIN_WITH_AI_DIR, filename);
   const buffer = await page.screenshot({ ...options });
   fs.writeFileSync(p1, buffer);
-  fs.writeFileSync(p2, buffer);
-
-  // Also mirror primary files to project root screenshots if needed
-  const rootFilename = filename.replace("-with-ai.png", ".png");
-  fs.writeFileSync(path.join(PROJECT_DIR, "screenshots", filename), buffer);
-  fs.writeFileSync(path.join(BRAIN_ROOT_DIR, filename), buffer);
+  fs.writeFileSync(path.join(SCREENSHOTS_ROOT, filename), buffer);
 
   console.log(`[Captured With AI] ${filename} (${buffer.length} bytes)`);
 }
@@ -48,12 +40,11 @@ test.describe("ResumeForge Showcase Gallery — With AI Integration", () => {
   test("01 - Settings & BYOK Connection with FreeLLMAPI", async ({ page }) => {
     await page.goto("/settings");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1000);
 
     // Select OpenAI provider
     const providerSelect = page.locator("#provider-select");
+    await expect(providerSelect).toBeVisible();
     await providerSelect.selectOption("openai");
-    await page.waitForTimeout(400);
 
     // Fill Base URL
     const baseUrlInput = page.locator("#base-url-input");
@@ -72,8 +63,7 @@ test.describe("ResumeForge Showcase Gallery — With AI Integration", () => {
     await testBtn.click();
 
     // Wait for the success result banner
-    await page.waitForSelector("#test-result-banner", { timeout: 20000 });
-    await page.waitForTimeout(1000);
+    await expect(page.locator("#test-result-banner")).toBeVisible({ timeout: 20000 });
 
     await capture(page, "13-settings-byok-with-ai.png");
   });
@@ -81,47 +71,39 @@ test.describe("ResumeForge Showcase Gallery — With AI Integration", () => {
   test("02 - Evidence Bank Library Populated with AI-Extracted Items", async ({ page }) => {
     await page.goto("/library");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1500);
+    await expect(page.locator("h1")).toBeVisible();
 
     await capture(page, "06-evidence-bank-with-ai.png");
-    // Also save as explicit before/after comparison asset
-    const p1 = path.join(PROJECT_DIR, "screenshots", "evidence-bank-after-ai.png");
-    const p2 = path.join(BRAIN_ROOT_DIR, "evidence-bank-after-ai.png");
+    const p1 = path.join(SCREENSHOTS_ROOT, "evidence-bank-after-ai.png");
     const buffer = await page.screenshot();
     fs.writeFileSync(p1, buffer);
-    fs.writeFileSync(p2, buffer);
   });
 
   test("03 & 04 & 05 - Typst Editor, AI Assistant & Master Dialog", async ({ page }) => {
     await page.goto("/editor");
     await page.waitForLoadState("networkidle");
 
-    await page.waitForSelector(".cm-editor", { timeout: 25000 });
-    try {
-      await page.waitForSelector(".typst-preview-svg svg", { timeout: 20000 });
-    } catch {
-      console.log("Typst preview svg timeout; proceeding with workspace capture");
-    }
-    await page.waitForTimeout(2000);
+    await expect(page.locator('[data-testid="panel-code"]')).toBeVisible({ timeout: 25000 });
+    await expect(page.locator(".typst-preview-svg svg").first()).toBeVisible({ timeout: 20000 });
 
-    // 03 - Live editor with Jayden's resume and active AI configuration
+    // 03 - Live editor with active AI configuration
     await capture(page, "03-editor-typst-preview-with-ai.png");
 
     // 05 - Save as Master Dialog
     const saveMasterBtn = page.locator('[data-testid="save-as-master-btn"]').first();
     if (await saveMasterBtn.isVisible()) {
       await saveMasterBtn.click();
-      await page.waitForTimeout(800);
+      await expect(page.getByTestId("save-master-confirm-modal")).toBeVisible();
       await capture(page, "05-editor-master-dialog-with-ai.png");
       await page.keyboard.press("Escape");
-      await page.waitForTimeout(600);
+      await expect(page.getByTestId("save-master-confirm-modal")).toBeHidden();
     }
 
     // 04 - AI Assistant Docked Panel
     const aiBtn = page.locator('button:has-text("AI Assistant")').first();
     if (await aiBtn.isVisible()) {
       await aiBtn.click();
-      await page.waitForTimeout(1200);
+      await expect(page.getByTestId("panel-ai")).toBeVisible();
       await capture(page, "04-editor-ai-dock-with-ai.png");
     }
   });
@@ -129,7 +111,7 @@ test.describe("ResumeForge Showcase Gallery — With AI Integration", () => {
   test("06 & 07 - Resume Tailor Workspace & Diagnostics", async ({ page }) => {
     await page.goto("/tailor");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1500);
+    await expect(page.getByTestId("tailor-tab-3-pane")).toBeVisible();
 
     await capture(page, "09-tailor-workspace-with-ai.png");
 
@@ -137,7 +119,7 @@ test.describe("ResumeForge Showcase Gallery — With AI Integration", () => {
     const atsTab = page.locator('[data-testid="tailor-tab-ats"], button:has-text("ATS"), button:has-text("Diagnostics")').first();
     if (await atsTab.isVisible()) {
       await atsTab.click();
-      await page.waitForTimeout(1000);
+      await expect(page.getByTestId("ats-score-panel")).toBeVisible();
       await capture(page, "10-tailor-ats-diagnostic-with-ai.png");
     }
   });
@@ -146,13 +128,13 @@ test.describe("ResumeForge Showcase Gallery — With AI Integration", () => {
     // Applications Board
     await page.goto("/tracker");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1500);
+    await expect(page.getByTestId("tracker-page-title")).toBeVisible();
     await capture(page, "07-job-tracker-with-ai.png");
 
     // Live Ingested Discover Feed
     await page.goto("/tracker/feed");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1500);
+    await expect(page.getByTestId("discover-search-input")).toBeVisible();
     await capture(page, "08-job-discover-feed-with-ai.png");
   });
 
@@ -160,25 +142,25 @@ test.describe("ResumeForge Showcase Gallery — With AI Integration", () => {
     // Problem Hub
     await page.goto("/practice");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1500);
+    await expect(page.getByTestId("practice-main-tabs")).toBeVisible();
     await capture(page, "11-practice-interview-hub-with-ai.png");
 
     // DSA Code Runner
     await page.goto("/practice?tab=runner");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(2000);
+    await expect(page.getByTestId("dsa-run-btn")).toBeVisible();
     await capture(page, "12-practice-dsa-runner-with-ai.png");
   });
 
   test("12 & 13 - Landing Page Hero and Features", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1000);
+    await expect(page.locator("h1")).toBeVisible();
 
     await capture(page, "01-landing-hero-with-ai.png");
 
     await page.evaluate(() => window.scrollTo({ top: 750, behavior: "instant" }));
-    await page.waitForTimeout(1000);
+    await expect(page.getByTestId("capability-grid-section")).toBeVisible();
     await capture(page, "02-landing-features-with-ai.png");
   });
 
@@ -189,7 +171,7 @@ test.describe("ResumeForge Showcase Gallery — With AI Integration", () => {
 
     await page.goto("/login");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1200);
+    await expect(page.locator("h1")).toBeVisible();
 
     await capture(page, "14-auth-login-with-ai.png");
     await context.close();

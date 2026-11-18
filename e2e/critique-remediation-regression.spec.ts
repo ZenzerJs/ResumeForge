@@ -861,7 +861,7 @@ test.describe("Critique Remediation E2E Regression Suite", () => {
         if (new URL(req.url()).pathname === "/api/jobs/hydrate") sgHydrate += 1;
       });
       await sgPage.goto("/tracker", { waitUntil: "networkidle" });
-      await sgPage.waitForTimeout(500);
+      await expect(sgPage.getByTestId("tracker-page-title")).toBeVisible();
       expect(sgHydrate).toBe(0);
 
       await sgPage.goto("/settings", { waitUntil: "networkidle" });
@@ -883,7 +883,7 @@ test.describe("Critique Remediation E2E Regression Suite", () => {
       });
       await dgPage.route("**/api/demo-config", (route) => route.fulfill({ json: { demoMode: true } }));
       await dgPage.goto("/tracker", { waitUntil: "networkidle" });
-      await dgPage.waitForTimeout(500);
+      await expect(dgPage.getByTestId("tracker-page-title")).toBeVisible();
       expect(dgHydrate).toBe(0);
 
       await dgPage.goto("/settings", { waitUntil: "networkidle" });

@@ -38,11 +38,10 @@ test.describe("Task 8.3 & Task 8.6: Tracker Card Click-Zone & Unified Actions E2
     context.on("page", pageListener);
 
     await cardWithLink.locator("h3").first().click();
-    await page.waitForTimeout(500);
+    await expect(page.locator("[data-testid='job-detail-pane']")).toBeVisible();
 
     context.off("page", pageListener);
     expect(popupTriggered).toBe(false);
-    await expect(page.locator("[data-testid='job-detail-pane']")).toBeVisible();
   });
 
   test("2. Clicking Tailor Resume does NOT open external popup", async ({ page, context }) => {
@@ -60,7 +59,7 @@ test.describe("Task 8.3 & Task 8.6: Tracker Card Click-Zone & Unified Actions E2
 
     const tailorBtn = cardWithLink.locator("a:has-text('Tailor Resume')").first();
     await tailorBtn.click();
-    await page.waitForTimeout(500);
+    await page.waitForURL(/\/tailor\?jobId=/, { timeout: 10000 });
 
     context.off("page", pageListener);
     expect(popupTriggered).toBe(false);

@@ -5,6 +5,7 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     await page.goto("/editor");
     await page.waitForLoadState("networkidle");
 
+    await page.locator('[data-testid="panel-code"] [data-testid="editor-mode-code"]').click();
     const editor = page.locator('[data-testid="panel-code"] .cm-content');
     await expect(editor).toBeVisible();
 
@@ -33,6 +34,7 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     await page.goto("/editor");
     await page.waitForLoadState("networkidle");
 
+    await page.locator('[data-testid="panel-code"] [data-testid="editor-mode-code"]').click();
     const editor = page.locator('[data-testid="panel-code"] .cm-content');
     await expect(editor).toBeVisible();
 
@@ -88,6 +90,7 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     await page.goto("/editor");
     await page.waitForLoadState("networkidle");
 
+    await page.locator('[data-testid="panel-code"] [data-testid="editor-mode-code"]').click();
     const editor = page.locator('[data-testid="panel-code"] .cm-content');
     await expect(editor).toBeVisible();
 
@@ -231,6 +234,7 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     await page.goto("/editor");
     await page.waitForLoadState("networkidle");
 
+    await page.locator('[data-testid="panel-code"] [data-testid="editor-mode-code"]').click();
     const editor = page.locator('[data-testid="panel-code"] .cm-content');
     await expect(editor).toBeVisible();
 
@@ -283,6 +287,7 @@ test.describe("Task 10.4 & Task 10.5 — Atmospheric Landing & Typst Repair Assi
     await page.goto("/editor");
     await page.waitForLoadState("networkidle");
 
+    await page.locator('[data-testid="panel-code"] [data-testid="editor-mode-code"]').click();
     const editor = page.locator('[data-testid="panel-code"] .cm-content');
     await expect(editor).toBeVisible({ timeout: 15000 });
 
