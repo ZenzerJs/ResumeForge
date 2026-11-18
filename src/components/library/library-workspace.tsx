@@ -47,6 +47,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const BulkPdfDropzone = dynamic(
   () => import("@/components/evidence/bulk-pdf-dropzone").then((mod) => mod.BulkPdfDropzone),
@@ -339,6 +345,7 @@ export function LibraryWorkspace() {
     scopeResolved: false,
   });
   const [items, setItems] = useState<EvidenceItem[]>([]);
+  const [unfilteredTotal, setUnfilteredTotal] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<"library" | "review">("library");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -507,6 +514,11 @@ export function LibraryWorkspace() {
 
       if (controller.signal.aborted) return;
       setItems(annotated);
+      if (filterStatus === "all") {
+        setUnfilteredTotal(annotated.length);
+      } else if (annotated.length > 0) {
+        setUnfilteredTotal((prev) => Math.max(prev ?? 0, annotated.length));
+      }
       // Expand first item by default while preserving existing expanded items
       if (annotated.length > 0) {
         setExpandedIds((prev) => ({
@@ -1768,7 +1780,7 @@ export function LibraryWorkspace() {
                   type="button"
                   data-testid="add-evidence-item-btn"
                   onClick={(e) => openCreateModal(e.currentTarget)}
-                  className="flex min-h-11 sm:min-h-9 items-center gap-1.5 rounded-[6px] border border-primary/40 bg-primary/10 px-3.5 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  className="flex min-h-11 sm:min-h-9 items-center gap-1.5 rounded-[6px] bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   <Plus className="h-3.5 w-3.5" aria-hidden />
                   Add Evidence Item
@@ -1869,9 +1881,13 @@ export function LibraryWorkspace() {
 
         {activeTab === "library" ? (
         <>
-        {/* Search Input Bar + Status Select Dropdown + Select Toggle + Item Count Bar */}
+        {/* Search Input Bar + Status Select Dropdown + Select Toggle + Item Count Bar (hidden when unfiltered bank is empty) */}
+        {(isLoading ||
+          (filterStatus === "all" ? items.length : unfilteredTotal ?? items.length) > 0 ||
+          filterStatus !== "all" ||
+          Boolean(searchQuery.trim())) && (
         <div className="flex flex-col gap-3 rounded-xl border glass-bar px-4 py-3">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
             {/* Search Input Box */}
             <div className="relative flex-1 w-full max-w-md">
               <label htmlFor="evidence-search" className="sr-only">
@@ -1891,15 +1907,15 @@ export function LibraryWorkspace() {
             </div>
 
             {/* Status Dropdown + Select Toggle + Item Counter */}
-            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-              <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-none">
-                <span className="shrink-0 text-xs font-mono text-muted-foreground">Status:</span>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end">
+              <div className="flex items-center gap-2 min-w-0 shrink-0">
+                <span className="sr-only sm:not-sr-only shrink-0 text-xs font-mono text-muted-foreground">Status:</span>
                 <select
                   value={filterStatus}
                   onChange={(e) => handleFilterStatusChange(e.target.value)}
                   data-testid="evidence-status-filter"
                   aria-label="Filter evidence by status"
-                  className="h-11 sm:h-9 w-full sm:w-auto max-w-full min-w-0 whitespace-nowrap bg-inset border border-hairline text-foreground rounded-[6px] px-3 py-0 leading-normal text-xs font-mono outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="h-11 sm:h-9 min-w-[8.75rem] w-auto max-w-full whitespace-nowrap bg-inset border border-hairline text-foreground rounded-[6px] px-2.5 pr-7 py-0 leading-normal text-xs font-mono outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <option value="all">All statuses</option>
                   <option value="verified">Verified Only</option>
@@ -1929,7 +1945,7 @@ export function LibraryWorkspace() {
               </Button>
 
               <span className="shrink-0 text-xs font-mono tabular-nums text-muted-foreground">
-                {filteredItems.length} items
+                {filteredItems.length} {filteredItems.length === 1 ? "item" : "items"}
               </span>
             </div>
           </div>
@@ -1971,7 +1987,7 @@ export function LibraryWorkspace() {
                   htmlFor="select-all-filtered"
                   className="cursor-pointer select-none text-text-secondary hover:text-foreground"
                 >
-                  Select all {filteredItems.length} filtered items
+                  Select all {filteredItems.length} filtered {filteredItems.length === 1 ? "item" : "items"}
                 </label>
               </div>
               {selectedIds.length > 0 && (
@@ -1987,6 +2003,7 @@ export function LibraryWorkspace() {
             </div>
           )}
         </div>
+        )}
 
         {/* Evidence Items List matching preview (1).webp */}
         {isLoading ? (
@@ -2176,62 +2193,56 @@ export function LibraryWorkspace() {
                           <Archive className="h-3.5 w-3.5" />
                         </button>
                       )}
-                      <div className="relative">
-                        <button
-                          type="button"
-                          aria-haspopup="menu"
-                          aria-expanded={isItemMenuOpen}
-                          aria-label={`More actions for ${item.title}`}
-                          data-testid={`item-more-btn-${item.id}`}
-                          onClick={() =>
-                            setOpenItemMenuId((prev) =>
-                              prev === item.id ? null : item.id
-                            )
-                          }
-                          className="text-muted-foreground hover:text-foreground p-2 rounded-[6px] hover:bg-elevated transition-colors min-h-11 min-w-11 inline-flex items-center justify-center"
-                        >
-                          <MoreVertical className="h-3.5 w-3.5" />
-                        </button>
-                        {isItemMenuOpen && (
-                          <div
-                            role="menu"
-                            aria-label={`Actions for ${item.title}`}
-                            className="absolute right-0 top-full mt-1 z-30 min-w-48 rounded-lg border border-hairline bg-panel p-1 shadow-xl"
+                      <DropdownMenu
+                        open={isItemMenuOpen}
+                        onOpenChange={(nextOpen) =>
+                          setOpenItemMenuId(nextOpen ? item.id : null)
+                        }
+                      >
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label={`More actions for ${item.title}`}
+                            data-testid={`item-more-btn-${item.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-muted-foreground hover:text-foreground p-2 rounded-[6px] hover:bg-elevated transition-colors min-h-11 min-w-11 inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                           >
-                            {isArchived ? (
-                              <button
-                                type="button"
-                                role="menuitem"
-                                onClick={() => void handleRestoreItem(item, "draft")}
-                                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-foreground hover:bg-elevated transition-colors"
-                              >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                                Restore to Draft
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                role="menuitem"
-                                onClick={() => void handleArchiveItem(item.id)}
-                                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-foreground hover:bg-elevated transition-colors"
-                              >
-                                <Archive className="h-3.5 w-3.5" />
-                                Archive
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              role="menuitem"
-                              data-testid={`item-delete-permanently-${item.id}`}
-                              onClick={() => void handleRequestPermanentDelete([item])}
-                              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-status-danger hover:bg-status-danger/10 transition-colors"
+                            <MoreVertical className="h-3.5 w-3.5" aria-hidden="true" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="end"
+                          aria-label={`Actions for ${item.title}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="min-w-48 rounded-lg border-hairline bg-panel p-1 text-foreground shadow-xl"
+                        >
+                          {isArchived ? (
+                            <DropdownMenuItem
+                              onSelect={() => void handleRestoreItem(item, "draft")}
+                              className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-xs text-foreground focus:bg-elevated focus:text-foreground"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              Delete permanently…
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                              Restore to Draft
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem
+                              onSelect={() => void handleArchiveItem(item.id)}
+                              className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-xs text-foreground focus:bg-elevated focus:text-foreground"
+                            >
+                              <Archive className="h-3.5 w-3.5" aria-hidden="true" />
+                              Archive
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem
+                            data-testid={`item-delete-permanently-${item.id}`}
+                            onSelect={() => void handleRequestPermanentDelete([item])}
+                            className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-xs text-status-danger focus:bg-status-danger/10 focus:text-status-danger"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            Delete permanently…
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
 
@@ -2559,52 +2570,46 @@ export function LibraryWorkspace() {
                   <Archive className="h-3.5 w-3.5" />
                   Archive
                 </Button>
-                <div className="relative">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={isBulkSubmitting}
-                    aria-haspopup="menu"
-                    aria-expanded={bulkMoreOpen}
-                    data-testid="bulk-more-btn"
-                    onClick={() => setBulkMoreOpen((prev) => !prev)}
-                    className="min-h-10 sm:min-h-8 gap-1 border-hairline bg-inset text-xs font-mono text-foreground hover:bg-elevated"
-                  >
-                    More
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  </Button>
-                  {bulkMoreOpen && (
-                    <div
-                      role="menu"
-                      aria-label="More bulk evidence actions"
-                      className="absolute bottom-full right-0 mb-2 z-40 min-w-52 rounded-lg border border-hairline bg-panel p-1 shadow-xl"
+                <DropdownMenu open={bulkMoreOpen} onOpenChange={setBulkMoreOpen}>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={isBulkSubmitting}
+                      data-testid="bulk-more-btn"
+                      className="min-h-10 sm:min-h-8 gap-1 border-hairline bg-inset text-xs font-mono text-foreground hover:bg-elevated"
                     >
-                      {selectedArchivedCount > 0 && (
-                        <button
-                          type="button"
-                          role="menuitem"
-                          data-testid="bulk-restore-btn"
-                          onClick={() => void handleBulkAction("restore")}
-                          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-foreground hover:bg-elevated transition-colors"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" />
-                          Restore selected ({selectedArchivedCount})
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        role="menuitem"
-                        data-testid="bulk-delete-permanently-btn"
-                        onClick={() => void handleRequestPermanentDelete(selectedItems)}
-                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-status-danger hover:bg-status-danger/10 transition-colors"
+                      More
+                      <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    side="top"
+                    align="end"
+                    aria-label="More bulk evidence actions"
+                    className="min-w-52 rounded-lg border-hairline bg-panel p-1 text-foreground shadow-xl"
+                  >
+                    {selectedArchivedCount > 0 && (
+                      <DropdownMenuItem
+                        data-testid="bulk-restore-btn"
+                        onSelect={() => void handleBulkAction("restore")}
+                        className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-xs text-foreground focus:bg-elevated focus:text-foreground"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Delete permanently…
-                      </button>
-                    </div>
-                  )}
-                </div>
+                        <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                        Restore selected ({selectedArchivedCount})
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      data-testid="bulk-delete-permanently-btn"
+                      onSelect={() => void handleRequestPermanentDelete(selectedItems)}
+                      className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-xs text-status-danger focus:bg-status-danger/10 focus:text-status-danger"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      Delete permanently…
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Button
                   type="button"
                   size="sm"

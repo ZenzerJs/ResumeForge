@@ -150,7 +150,7 @@ export function GuestMigrationModal({
   isOpen,
   onClose,
   draftSource,
-  hasExistingMaster = true,
+  hasExistingMaster = false,
   onSuccess,
 }: GuestMigrationModalProps) {
   const [strategy, setStrategy] = useState<ConflictStrategy>("IMPORT_AS_DRAFT");

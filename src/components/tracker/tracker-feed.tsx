@@ -12,6 +12,7 @@ import {
   MapPin,
   Columns3,
   LayoutList,
+  SlidersHorizontal,
 } from "lucide-react";
 import { JobStatus, type WorkplaceFilter } from "@/lib/db/jobs";
 import { AppShell } from "@/components/design-system/app-shell";
@@ -449,6 +450,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const [importNotice, setImportNotice] = useState<string | null>(null);
   const [hydrateProgress, setHydrateProgress] = useState<{ done: number; total: number } | null>(null);
   const [viewMode, setViewMode] = useState<"split" | "kanban">("split");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [draggedJobId, setDraggedJobId] = useState<string | null>(null);
   const hydrateAttemptedRef = useRef<Set<string>>(new Set());
   const mountedRef = useRef(true);
@@ -600,6 +602,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         page: String(page),
         limit: String(PAGE_SIZE),
         postedWithin,
+        scope: "tracked",
       });
       if (debouncedSearch) params.set("q", debouncedSearch);
       if (debouncedLocation) params.set("location", debouncedLocation);
@@ -1173,6 +1176,13 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
     setPage(1);
   };
 
+  const activeMobileFilterCount =
+    (locationQuery.trim() ? 1 : 0) +
+    (workplace !== "all" ? 1 : 0) +
+    (statusFilter !== "ALL" ? 1 : 0) +
+    (postedWithin !== "all" ? 1 : 0) +
+    (minSalary !== "0" ? 1 : 0);
+
   const pipelineApplied = pipelineCounts.applied;
   const pipelineInterviewing = pipelineCounts.interviewing;
 
@@ -1245,23 +1255,53 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       )}
 
       {/* Filter subheader — sticky glass bar under TrackerSubNav */}
-      <div className="sticky top-11 z-10 flex shrink-0 flex-wrap items-center gap-2 border-b glass-bar px-3 py-2 sm:px-4 sm:py-2.5">
-        <div className="relative w-full sm:w-auto sm:min-w-[180px] sm:flex-1 sm:max-w-xs">
-          <label htmlFor="tracker-job-search" className="sr-only">
-            Search jobs, companies, or keywords
-          </label>
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <input
-            id="tracker-job-search"
-            data-testid="tracker-job-search"
-            type="search"
-            placeholder="Search jobs, companies…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className={`${FILTER_CONTROL} w-full py-0 pl-8 pr-3`}
-          />
+      <div className="sticky top-11 z-10 relative flex shrink-0 flex-wrap items-center gap-2 border-b glass-bar px-3 py-2 sm:px-4 sm:py-2.5">
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:min-w-[180px] sm:flex-1 sm:max-w-xs">
+          <div className="relative min-w-0 flex-1">
+            <label htmlFor="tracker-job-search" className="sr-only">
+              Search jobs, companies, or keywords
+            </label>
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              id="tracker-job-search"
+              data-testid="tracker-job-search"
+              type="search"
+              placeholder="Search jobs, companies…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={`${FILTER_CONTROL} w-full py-0 pl-8 pr-3`}
+            />
+          </div>
+          <button
+            type="button"
+            data-testid="tracker-mobile-filters-btn"
+            aria-expanded={mobileFiltersOpen}
+            aria-controls="tracker-collapsible-filters"
+            onClick={() => setMobileFiltersOpen((open) => !open)}
+            className={`sm:hidden inline-flex h-11 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold transition-colors ${
+              mobileFiltersOpen || activeMobileFilterCount > 0
+                ? "border-primary/50 bg-primary/15 text-primary"
+                : "border-hairline bg-inset text-rf-cloud hover:bg-elevated"
+            }`}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>Filters</span>
+            {activeMobileFilterCount > 0 && (
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold tabular-nums text-primary-foreground">
+                {activeMobileFilterCount}
+              </span>
+            )}
+          </button>
         </div>
 
+        <div
+          id="tracker-collapsible-filters"
+          className={
+            mobileFiltersOpen
+              ? "flex w-full flex-wrap items-center gap-2 sm:visible sm:pointer-events-auto sm:contents"
+              : "absolute left-0 top-0 w-full h-0 overflow-hidden invisible pointer-events-none flex flex-wrap items-center gap-2 sm:static sm:w-auto sm:h-auto sm:overflow-visible sm:visible sm:pointer-events-auto sm:contents"
+          }
+        >
         <div ref={locationComboboxRef} className="relative min-w-0 flex-1 basis-[calc(50%-0.25rem)] sm:basis-auto sm:min-w-[140px] sm:max-w-[180px]">
           <label htmlFor="tracker-location-filter" className="sr-only">
             Filter by location
@@ -1431,41 +1471,61 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             </option>
           ))}
         </select>
+        </div>
 
         <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:ml-auto sm:w-auto sm:justify-end sm:gap-3 text-xs text-muted-foreground">
           <div
             className="flex items-center rounded-md border border-hairline bg-inset p-0.5"
             role="tablist"
             aria-label="Tracker display mode"
+            onKeyDown={(event) => {
+              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+              const tabs = Array.from(
+                event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+              );
+              const current = tabs.indexOf(document.activeElement as HTMLButtonElement);
+              if (current < 0 || tabs.length === 0) return;
+              const next =
+                event.key === "Home"
+                  ? 0
+                  : event.key === "End"
+                  ? tabs.length - 1
+                  : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+              event.preventDefault();
+              tabs[next]?.focus();
+              tabs[next]?.click();
+            }}
           >
             <button
               type="button"
               role="tab"
               aria-selected={viewMode === "split"}
+              tabIndex={viewMode === "split" ? 0 : -1}
               onClick={() => setViewMode("split")}
               data-testid="tracker-view-split"
-              className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-mono font-semibold transition ${
+              className={`inline-flex items-center gap-1.5 rounded px-2 py-1 sm:px-2.5 text-xs font-mono font-semibold transition ${
                 viewMode === "split"
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <LayoutList className="h-3.5 w-3.5" />
+              <LayoutList className="h-3.5 w-3.5" aria-hidden="true" />
               <span>Split View</span>
             </button>
             <button
               type="button"
               role="tab"
               aria-selected={viewMode === "kanban"}
+              tabIndex={viewMode === "kanban" ? 0 : -1}
               onClick={() => setViewMode("kanban")}
               data-testid="tracker-view-kanban"
-              className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-mono font-semibold transition ${
+              className={`inline-flex items-center gap-1.5 rounded px-2 py-1 sm:px-2.5 text-xs font-mono font-semibold transition ${
                 viewMode === "kanban"
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Columns3 className="h-3.5 w-3.5" />
+              <Columns3 className="h-3.5 w-3.5" aria-hidden="true" />
               <span>Kanban Board</span>
             </button>
           </div>

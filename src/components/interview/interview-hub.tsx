@@ -68,7 +68,21 @@ export function InterviewHub({
   const [track, setTrack] = useState<InterviewTrack | "all">("all");
   const [difficulty, setDifficulty] = useState<"Easy" | "Medium" | "Hard" | "all">("all");
   const [company, setCompany] = useState<string | "all">("all");
+  const [showAllCompanies, setShowAllCompanies] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<InterviewQuestion | null>(null);
+
+  const VISIBLE_COMPANY_PILL_CAP = 8;
+  const visibleCompanies = showAllCompanies
+    ? COMPANY_LOGOS
+    : (() => {
+        const initial = COMPANY_LOGOS.slice(0, VISIBLE_COMPANY_PILL_CAP);
+        if (company !== "all" && !initial.some((c) => c.slug === company)) {
+          const active = COMPANY_LOGOS.find((c) => c.slug === company);
+          if (active) return [...initial, active];
+        }
+        return initial;
+      })();
+  const hiddenCompanyCount = Math.max(0, COMPANY_LOGOS.length - visibleCompanies.length);
 
   useEffect(() => {
     if (!targetCompany) {
@@ -162,7 +176,7 @@ export function InterviewHub({
 
         {/* Company Filter Pills */}
         <div className="pt-2 border-t border-border">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground flex-shrink-0">
               Company:
             </span>
@@ -178,7 +192,7 @@ export function InterviewHub({
             >
               All Companies
             </button>
-            {COMPANY_LOGOS.map(c => {
+            {visibleCompanies.map(c => {
               const isSelected = company === c.slug;
               return (
                 <button
@@ -197,6 +211,17 @@ export function InterviewHub({
                 </button>
               );
             })}
+            {COMPANY_LOGOS.length > VISIBLE_COMPANY_PILL_CAP && (
+              <button
+                type="button"
+                data-testid="toggle-more-companies-btn"
+                aria-expanded={showAllCompanies}
+                onClick={() => setShowAllCompanies((prev) => !prev)}
+                className="min-h-11 sm:min-h-0 px-2.5 py-1 rounded-[6px] text-xs font-medium transition-colors flex-shrink-0 border border-hairline bg-inset text-text-secondary hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                {showAllCompanies ? "Show fewer" : `+${hiddenCompanyCount} more`}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -232,7 +257,7 @@ export function InterviewHub({
 
             <div className="pt-3 border-t border-border flex flex-wrap items-center justify-between gap-2 mt-auto">
               <div className="flex flex-wrap gap-1.5">
-                {q.companyTags.map(tag => {
+                {q.companyTags.slice(0, 3).map(tag => {
                   const comp = COMPANY_LOGOS.find(c => c.slug === tag);
                   const logo = getCompanyLogo(tag, "w-3 h-3 flex-shrink-0 grayscale");
                   return (
@@ -245,6 +270,11 @@ export function InterviewHub({
                     </span>
                   );
                 })}
+                {q.companyTags.length > 3 && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-inset border border-hairline text-xs font-mono text-muted-foreground">
+                    +{q.companyTags.length - 3}
+                  </span>
+                )}
               </div>
               {q.timeComplexity && (
                 <span className="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">

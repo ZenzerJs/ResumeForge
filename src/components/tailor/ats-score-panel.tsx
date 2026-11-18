@@ -465,6 +465,7 @@ export function AtsScorePanel({
           </p>
           {evidenceBankOnlyCount > 0 && (
             <p
+              role="alert"
               data-testid="ats-evidence-bank-only-notice"
               className="mt-2 rounded-md border border-primary/35 bg-primary/10 px-3 py-2 text-xs text-foreground leading-relaxed"
             >
@@ -483,7 +484,7 @@ export function AtsScorePanel({
                 data-testid="ats-overall-score"
                 className="relative grid h-[72px] w-[72px] shrink-0 place-items-center rounded-full"
                 style={{
-                  background: `conic-gradient(rgb(var(--accent-contrast)) ${displayState.overallRingPct}%, rgb(214 196 176 / 0.14) 0)`,
+                  background: `conic-gradient(rgb(var(--accent-contrast)) ${displayState.overallRingPct}%, rgb(var(--text-secondary) / 0.14) 0)`,
                   filter: displayState.hasJobRequirements
                     ? "drop-shadow(0 0 14px rgb(var(--accent-contrast) / 0.35))"
                     : undefined,

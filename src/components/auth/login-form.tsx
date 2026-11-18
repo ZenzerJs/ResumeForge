@@ -229,7 +229,10 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
     >
       <div className="mb-6">
         <div className="flex items-center gap-2.5 mb-2">
-          <div className="w-8 h-8 rounded-[6px] bg-primary flex items-center justify-center font-bold text-primary-foreground text-base">
+          <div
+            aria-hidden="true"
+            className="w-8 h-8 rounded-[6px] bg-primary flex items-center justify-center font-bold text-primary-foreground text-base"
+          >
             R
           </div>
           <span className="text-xl font-bold tracking-tight text-foreground">ResumeForge</span>
@@ -376,21 +379,12 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
       ) : (
         <div
           data-testid="login-recovery-notice"
-          className="mb-5 rounded-[6px] border border-hairline bg-inset px-3 py-2.5 text-xs text-on-surface-variant leading-relaxed"
+          className="mb-5 border-t border-hairline pt-3 text-xs text-on-surface-variant leading-relaxed"
         >
           <p className="font-semibold text-foreground">Forgot your password?</p>
           <p className="mt-0.5 text-muted-foreground">
             Self-serve email password reset is not enabled yet. If you are locked out, contact your instance
-            administrator or{" "}
-            <a
-              href="https://github.com/ZenzerJs/ResumeForge/issues"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline rounded-[2px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              open a recovery request on GitHub
-            </a>
-            , or continue as a guest in this browser.
+            administrator or continue as a guest in this browser.
           </p>
         </div>
       )}

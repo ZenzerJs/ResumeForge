@@ -9,7 +9,7 @@ import { AppShell } from "@/components/design-system/app-shell";
 import { PageHeader } from "@/components/design-system/page-header";
 import { StatusPill } from "@/components/design-system/status-pill";
 import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
-import { InterviewHub } from "@/components/interview/interview-hub";
+import { InterviewHub, formatQuestionCountText } from "@/components/interview/interview-hub";
 import { extractLocationFromNotes } from "@/lib/ingestion/helpers";
 import {
   buildTrackerDisambiguators,
@@ -185,7 +185,7 @@ export function PracticeWorkspace() {
     async function loadJobs() {
       let loaded: TrackedJobOption[] = [];
       try {
-        const res = await fetch("/api/jobs");
+        const res = await fetch("/api/jobs?scope=tracked");
         if (res.ok) {
           const data = await res.json();
           const apiJobs = Array.isArray(data?.data)
@@ -280,13 +280,12 @@ export function PracticeWorkspace() {
         {mainTab === "questions" ? (
           <div className="mx-auto w-full max-w-6xl px-4 pt-6 md:px-8 space-y-4">
             <PageHeader
-              eyebrow="Technical interview"
               title="Interview Prep"
               description="Core algorithmic patterns, system design, and online assessments. Open a problem in the code runner when you want to write it."
               statusBadge={
                 <StatusPill
                   status="slate"
-                  label={formatPracticeQuestionCountLabel(filteredQuestionCount, ALL_QUESTIONS.length)}
+                  label={formatQuestionCountText(filteredQuestionCount, ALL_QUESTIONS.length)}
                 />
               }
             />
@@ -366,6 +365,25 @@ export function PracticeWorkspace() {
 
         <div className="border-b border-hairline mt-2">
         <div
+          role="tablist"
+          aria-label="Practice workspace views"
+          onKeyDown={(event) => {
+            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+            const tabs = Array.from(
+              event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+            );
+            const current = tabs.indexOf(document.activeElement as HTMLButtonElement);
+            if (current < 0 || tabs.length === 0) return;
+            const next =
+              event.key === "Home"
+                ? 0
+                : event.key === "End"
+                ? tabs.length - 1
+                : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+            event.preventDefault();
+            tabs[next]?.focus();
+            tabs[next]?.click();
+          }}
           className={cn(
             "flex items-center gap-4 sm:gap-6 px-4 md:px-8 overflow-x-auto scrollbar-none",
             mainTab === "questions" && "mx-auto w-full max-w-6xl"
@@ -374,6 +392,9 @@ export function PracticeWorkspace() {
         >
           <button
             type="button"
+            role="tab"
+            aria-selected={mainTab === "questions"}
+            tabIndex={mainTab === "questions" ? 0 : -1}
             onClick={() => openTab("questions")}
             data-testid="tab-technical-questions"
             className={cn(
@@ -387,6 +408,9 @@ export function PracticeWorkspace() {
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={mainTab === "runner"}
+            tabIndex={mainTab === "runner" ? 0 : -1}
             onClick={() => openTab("runner")}
             data-testid="tab-code-runner"
             className={cn(

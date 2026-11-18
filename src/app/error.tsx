@@ -3,6 +3,7 @@
 import React, { useEffect } from "react";
 import Link from "next/link";
 import { AlertOctagon, RefreshCw, Home } from "lucide-react";
+import { WorkspaceAtmosphere } from "@/components/design-system/workspace-atmosphere";
 
 export default function Error({
   error,
@@ -17,8 +18,14 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-canvas text-foreground flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-md bg-panel border border-outline/70 rounded-[10px] p-8 shadow-lg space-y-6 text-center">
+    <div className="relative min-h-dvh bg-canvas text-foreground flex flex-col">
+      <WorkspaceAtmosphere variant="quiet" />
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="relative z-10 flex flex-1 flex-col items-center justify-center p-6 outline-none"
+      >
+        <div className="w-full max-w-md surface-raised edge-glow rounded-[10px] p-8 space-y-6 text-center">
         <div className="inline-flex items-center justify-center h-12 w-12 rounded-[8px] bg-status-danger/10 border border-status-danger/40 text-status-danger mx-auto">
           <AlertOctagon className="h-6 w-6" aria-hidden />
         </div>
@@ -68,10 +75,11 @@ export default function Error({
           </Link>
         </div>
 
-        <div className="border-t border-outline/70 pt-4 text-xs text-muted-foreground font-mono">
-          ResumeForge Workspace
+          <div className="border-t border-outline/70 pt-4 text-xs text-muted-foreground font-mono">
+            ResumeForge Workspace
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
