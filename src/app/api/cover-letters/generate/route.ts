@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { CoverLetterResponseSchema } from "@/lib/ai/cover-letter-schema";
 import { generateCoverLetter, resolveServerProviderConfig } from "@/lib/ai/gateway";
-import { verifyCoverLetterGrounding } from "@/lib/ai/cover-letter-verifier";
-import { extractJsonObject, normalizeCoverLetterPayload } from "@/lib/ai/json-response";
+import { parseAndVerifyCoverLetterOutput } from "@/lib/ai/cover-letter-verifier";
 import { getEvidenceItems } from "@/lib/db/evidence";
 import { createCoverLetter } from "@/lib/db/cover-letters";
 import { getMasterResume } from "@/lib/db/resumes";
-import { extractCandidateNameFromTypst, replacePlaceholderSignature } from "@/lib/export/resume-text";
+import { extractCandidateNameFromTypst } from "@/lib/export/resume-text";
 import { sanitizeError } from "@/lib/ai/redact";
 import { ProviderConfigSchema } from "@/lib/ai/types";
 import { requireUserId } from "@/lib/security/auth-request";
@@ -146,59 +144,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Parse + normalize AI JSON
-    let parsedResponse: unknown;
-    try {
-      parsedResponse = extractJsonObject(gatewayResult.rawJson);
-    } catch {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "AI provider returned malformed non-JSON output for cover letter.",
-          rawOutput: sanitizeError(gatewayResult.rawJson.slice(0, 300)),
-        },
-        { status: 422 }
-      );
-    }
-
-    const normalized = normalizeCoverLetterPayload(
-      parsedResponse,
-      resolvedCandidateName
+    const validated = parseAndVerifyCoverLetterOutput(
+      gatewayResult.rawJson,
+      resolvedCandidateName,
+      activeEvidenceIds
     );
-    if (normalized && typeof normalized === "object" && "fullMarkdown" in normalized) {
-      const record = normalized as Record<string, unknown>;
-      if (typeof record.fullMarkdown === "string") {
-        record.fullMarkdown = replacePlaceholderSignature(record.fullMarkdown, resolvedCandidateName);
-      }
-    }
-    const schemaValidation = CoverLetterResponseSchema.safeParse(normalized);
-    if (!schemaValidation.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Generated cover letter output failed schema validation.",
-          details: schemaValidation.error.flatten().fieldErrors,
-        },
-        { status: 422 }
-      );
+    if (!validated.ok) {
+      return NextResponse.json(validated.body, { status: validated.status });
     }
 
-    const coverLetterData = schemaValidation.data;
-
-    // Verify evidence grounding contract
-    const groundingVerification = verifyCoverLetterGrounding(coverLetterData, activeEvidenceIds);
-    if (!groundingVerification.verified) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "SECURITY CONTRACT REJECTION: Generated cover letter contained unverified or hallucinated evidence citations.",
-          reason: groundingVerification.reason,
-          invalidCitations: groundingVerification.invalidCitations,
-        },
-        { status: 422 }
-      );
-    }
+    const coverLetterData = validated.data;
 
     // Persist draft in database
     const persisted = await createCoverLetter({

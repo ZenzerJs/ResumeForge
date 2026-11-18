@@ -1,6 +1,7 @@
 import { safeFetch } from "../http";
 import { sanitizeJobPayload } from "../sanitize";
 import { ConnectorClient, ConnectorSkippedError, RawJobListing } from "../types";
+import { sanitizeError } from "@/lib/ai/redact";
 
 export class AdzunaCaConnector implements ConnectorClient {
   readonly id = "adzuna_ca" as const;
@@ -71,7 +72,7 @@ export class AdzunaCaConnector implements ConnectorClient {
 
       return listings;
     } catch (err) {
-      console.error("[AdzunaCA] Fetch error:", err);
+      console.error("[AdzunaCA] Fetch error:", sanitizeError(err));
       return [];
     }
   }

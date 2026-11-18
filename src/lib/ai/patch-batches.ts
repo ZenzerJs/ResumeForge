@@ -13,6 +13,7 @@ import {
   type PatchApplicationErrorDetails,
   type ResolvedEvidenceRegistry,
 } from "@/lib/ai/patch-schema";
+import { validateAndBuildPatchCitations } from "@/lib/ai/patch-citations";
 import { applyPatchProposals } from "@/lib/ai/patch-application";
 import {
   assertCanApplyPatches,
@@ -419,16 +420,7 @@ export async function applyProposalBatch(input: ApplyBatchInput) {
         operation: p.operation, targetSection: p.targetSection, targetId: p.targetId,
         beforeContent: p.before, afterContent: p.after, evidenceCitations: JSON.stringify(p.evidenceIds),
         rationale: p.rationale, confidence: p.confidence, status: "ACCEPTED",
-        citations: { create: (p.citations && p.citations.length > 0
-          ? resolvePatchCitationReferences(p.citations, registry).map(cit => ({
-              ...(cit.evidenceId ? { evidenceId: cit.evidenceId } : {}),
-              ...(cit.bulletId ? { bulletId: cit.bulletId, evidenceId: cit.evidenceId ?? registry.bulletToEvidenceId.get(cit.bulletId) } : {}),
-            }))
-          : p.evidenceIds.map(ref => (
-              registry.evidenceIds.has(ref)
-                ? { evidenceId: ref }
-                : { bulletId: ref, evidenceId: registry.bulletToEvidenceId.get(ref) }
-            ))) },
+        citations: { create: validateAndBuildPatchCitations(p, registry) },
       })) },
     }, include: { patches: { include: { citations: true } } } });
     await tx.patchProposalBatch.update({ where: { id: batch.id }, data: { status: "CONSUMED", consumedAt: new Date() } });

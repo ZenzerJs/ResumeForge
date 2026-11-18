@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { GenerateCoverLetterInputSchema, CoverLetterResponseSchema } from "@/lib/ai/cover-letter-schema";
+import { GenerateCoverLetterInputSchema } from "@/lib/ai/cover-letter-schema";
 import { generateCoverLetter, resolveServerProviderConfig } from "@/lib/ai/gateway";
-import { verifyCoverLetterGrounding } from "@/lib/ai/cover-letter-verifier";
-import { extractJsonObject, normalizeCoverLetterPayload } from "@/lib/ai/json-response";
+import { parseAndVerifyCoverLetterOutput } from "@/lib/ai/cover-letter-verifier";
 import { getEvidenceItems } from "@/lib/db/evidence";
 import { getMasterResume } from "@/lib/db/resumes";
-import { extractCandidateNameFromTypst, replacePlaceholderSignature } from "@/lib/export/resume-text";
+import { extractCandidateNameFromTypst } from "@/lib/export/resume-text";
 import { sanitizeError } from "@/lib/ai/redact";
 import { requireUserId } from "@/lib/security/auth-request";
 
@@ -14,7 +13,12 @@ export async function POST(request: Request) {
     const userId = await requireUserId(request);
     if (userId instanceof NextResponse) return userId;
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON payload" }, { status: 400 });
+    }
 
     const parseResult = GenerateCoverLetterInputSchema.safeParse(body);
     if (!parseResult.success) {
@@ -92,59 +96,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // Parse + normalize AI JSON (fences, length floors, etc.)
-    let parsedResponse: unknown;
-    try {
-      parsedResponse = extractJsonObject(gatewayResult.rawJson);
-    } catch {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "AI provider returned malformed non-JSON output for cover letter.",
-          rawOutput: sanitizeError(gatewayResult.rawJson.slice(0, 300)),
-        },
-        { status: 422 }
-      );
-    }
-
-    const normalized = normalizeCoverLetterPayload(parsedResponse, resolvedCandidateName);
-    if (normalized && typeof normalized === "object" && "fullMarkdown" in normalized) {
-      const record = normalized as Record<string, unknown>;
-      if (typeof record.fullMarkdown === "string") {
-        record.fullMarkdown = replacePlaceholderSignature(record.fullMarkdown, resolvedCandidateName);
-      }
-    }
-    const schemaValidation = CoverLetterResponseSchema.safeParse(normalized);
-    if (!schemaValidation.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Generated cover letter output failed schema validation.",
-          details: schemaValidation.error.flatten().fieldErrors,
-        },
-        { status: 422 }
-      );
-    }
-
-    const coverLetter = schemaValidation.data;
-
-    // Verify Evidence Grounding Contract
-    const groundingVerification = verifyCoverLetterGrounding(coverLetter, activeEvidenceIds);
-    if (!groundingVerification.verified) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "SECURITY CONTRACT REJECTION: Generated cover letter contained unverified or hallucinated evidence citations.",
-          reason: groundingVerification.reason,
-          invalidCitations: groundingVerification.invalidCitations,
-        },
-        { status: 422 }
-      );
+    const validated = parseAndVerifyCoverLetterOutput(
+      gatewayResult.rawJson,
+      resolvedCandidateName,
+      activeEvidenceIds
+    );
+    if (!validated.ok) {
+      return NextResponse.json(validated.body, { status: validated.status });
     }
 
     return NextResponse.json({
       success: true,
-      data: coverLetter,
+      data: validated.data,
     });
   } catch (err) {
     return NextResponse.json(

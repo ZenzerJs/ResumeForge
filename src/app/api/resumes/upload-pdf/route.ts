@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { parsePdfBuffer, convertTextToTypst, classifyPdfTextFallback } from "@/lib/pdf/parser";
 import { buildResumeDocument, renderResumeDocument, isResumeLayoutV2Enabled, type ResumeDocument } from "@/lib/typst/resume-document";
 import { createInlineRenderer } from "@/lib/typst/inline-content";
 import { createResume } from "@/lib/db/resumes";
-import { convertPdfTextToTypst } from "@/lib/ai/gateway";
+import {
+  convertPdfTextToTypst,
+  detectServerFallbackProviderConfig,
+  resolveServerProviderConfig,
+} from "@/lib/ai/gateway";
 import { ProviderConfig, ProviderConfigSchema } from "@/lib/ai/types";
+
+const V1PdfAiOutputSchema = z.object({
+  typstSource: z.string().trim().min(1),
+});
 import { sanitizeTypstSource } from "@/lib/typst/sanitizer";
 import { ensureTypstLinks } from "@/lib/typst/ensure-links";
 import { redactError, sanitizeError } from "@/lib/ai/redact";
@@ -248,16 +257,11 @@ export async function POST(request: Request) {
     }
 
     // Fallback to server-side environment variables if client did not supply providerConfig
-    if (!isDemoMode() && (!providerConfig || (!providerConfig.apiKey && providerConfig.provider !== "custom"))) {
-      if (process.env.OPENAI_API_KEY?.trim()) {
-        providerConfig = { provider: "openai" };
-      } else if (process.env.ANTHROPIC_API_KEY?.trim()) {
-        providerConfig = { provider: "anthropic" };
-      } else if (process.env.GEMINI_API_KEY?.trim()) {
-        providerConfig = { provider: "gemini" };
-      } else if (process.env.CUSTOM_OPENAI_API_KEY?.trim()) {
-        providerConfig = { provider: "custom" };
-      }
+    if (!demoMode && (!providerConfig || (!providerConfig.apiKey && providerConfig.provider !== "custom"))) {
+      providerConfig = detectServerFallbackProviderConfig() ?? providerConfig;
+    }
+    if (providerConfig) {
+      providerConfig = resolveServerProviderConfig(providerConfig);
     }
 
     const title = fileName.replace(/\.pdf$/i, "") || "Uploaded Resume";
@@ -282,9 +286,12 @@ export async function POST(request: Request) {
         if (layoutV2 && aiResult.success && aiResult.assignments) {
           assignments = aiResult.assignments;
           conversionPath = "ai";
-        } else if (!layoutV2 && aiResult.success && aiResult.typstSource && aiResult.typstSource.trim().length > 0) {
-          conversionPath = "ai";
-          convertedSource = aiResult.typstSource;
+        } else if (!layoutV2 && aiResult.success && aiResult.typstSource) {
+          const validatedV1 = V1PdfAiOutputSchema.safeParse({ typstSource: aiResult.typstSource });
+          if (validatedV1.success) {
+            conversionPath = "ai";
+            convertedSource = validatedV1.data.typstSource;
+          }
         }
       } catch (aiErr) {
         console.warn("AI PDF conversion failed, falling back to heuristic parser:", redactError(aiErr));

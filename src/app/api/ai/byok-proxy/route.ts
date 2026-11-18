@@ -1,5 +1,5 @@
 import { requireUserId } from "@/lib/security/auth-request";
-import { assertSafePublicUrl, UnsafeUrlError } from "@/lib/security/safe-fetch";
+import { assertSafePublicUrl, safeFetch, UnsafeUrlError } from "@/lib/security/safe-fetch";
 import { originAllowed } from "@/lib/security/session";
 import { isDemoMode } from "@/lib/demo-mode";
 import { clientKey, rateLimit } from "@/lib/security/rate-limit";
@@ -165,18 +165,29 @@ export async function POST(req: Request): Promise<Response> {
       forwardHeaders.set("authorization", authHeader);
     }
 
-    // 6. Upstream fetch with timeout and manual redirect blocking
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), BYOK_PROXY_TIMEOUT_MS);
-
+    // 6. Upstream fetch via safeFetch (enforces publicDispatcher DNS-rebinding guard, timeout, and no redirects)
     try {
-      const upstreamRes = await fetch(parsedUrl.toString(), {
-        method: "POST",
-        headers: forwardHeaders,
-        body: bodyBytes,
-        redirect: "error",
-        signal: controller.signal,
-      });
+      const upstreamRes = await safeFetch(
+        parsedUrl.toString(),
+        {
+          method: "POST",
+          headers: forwardHeaders,
+          body: bodyBytes,
+        },
+        {
+          allowLocalhost: false,
+          allowedHosts: ALLOWED_HOSTS,
+          timeoutMs: BYOK_PROXY_TIMEOUT_MS,
+          followRedirects: false,
+        }
+      );
+
+      if (upstreamRes.status >= 300 && upstreamRes.status < 400) {
+        return new Response(
+          JSON.stringify({ error: "Upstream redirects are not allowed" }),
+          { status: 502, headers: { "content-type": "application/json" } }
+        );
+      }
 
       return new Response(upstreamRes.body, {
         status: upstreamRes.status,
@@ -187,6 +198,12 @@ export async function POST(req: Request): Promise<Response> {
         },
       });
     } catch (err) {
+      if (err instanceof UnsafeUrlError || (err as Error)?.name === "UnsafeUrlError") {
+        return new Response(
+          JSON.stringify({ error: { code: "SSRF_BLOCKED", message: (err as Error).message } }),
+          { status: 403, headers: { "content-type": "application/json" } }
+        );
+      }
       if ((err as Error)?.name === "AbortError") {
         return new Response(
           JSON.stringify({ error: { code: "UPSTREAM_TIMEOUT", message: "Upstream provider timed out" } }),
@@ -197,8 +214,6 @@ export async function POST(req: Request): Promise<Response> {
         JSON.stringify({ error: "Proxy connection error" }),
         { status: 502, headers: { "content-type": "application/json" } }
       );
-    } finally {
-      clearTimeout(timeoutId);
     }
   } catch {
     return new Response(
