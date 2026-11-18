@@ -13,14 +13,19 @@ describe("Task 9.2 — Resizable & Collapsible Editor Panels Unit Tests", () => 
     vi.restoreAllMocks();
   });
 
-  it("1. Default self-hosted layout gives preview the largest share", () => {
+  it("1. Default self-hosted layout starts with AI collapsed and gives preview 70%", () => {
     const layout = parsePersistedLayout(null);
     expect(layout.sizes).toEqual({
       "panel-code": 30,
       "panel-preview": 50,
       "panel-ai": 20,
     });
-    expect(layout.isAiCollapsed).toBe(false);
+    expect(layout.isAiCollapsed).toBe(true);
+    expect(getDesktopPanelLayout(layout.sizes, layout.isAiCollapsed)).toEqual({
+      "panel-code": 30,
+      "panel-preview": 70,
+      "panel-ai": 0,
+    });
   });
 
   it("starts with AI collapsed in the public demo and preserves a saved open layout", () => {
