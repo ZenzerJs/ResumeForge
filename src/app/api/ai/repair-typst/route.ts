@@ -6,6 +6,7 @@ import { sanitizeError } from "@/lib/ai/redact";
 import { requireUserId } from "@/lib/security/auth-request";
 import { isDemoMode } from "@/lib/demo-mode";
 import { originAllowed } from "@/lib/security/session";
+import { DEFAULT_MODELS } from "@/lib/byok-vault";
 
 export async function POST(request: Request) {
   const demoMode = isDemoMode();
@@ -76,17 +77,17 @@ export async function POST(request: Request) {
         : undefined;
     if ((!providerConfigToUse || !providerConfigToUse.provider) && !demoMode) {
       if (process.env.OPENAI_API_KEY) {
-        providerConfigToUse = { provider: "openai", apiKey: process.env.OPENAI_API_KEY, model: "gpt-4o" };
+        providerConfigToUse = { provider: "openai", apiKey: process.env.OPENAI_API_KEY, model: DEFAULT_MODELS.openai };
       } else if (process.env.ANTHROPIC_API_KEY) {
-        providerConfigToUse = { provider: "anthropic", apiKey: process.env.ANTHROPIC_API_KEY, model: "claude-3-5-sonnet-20241022" };
+        providerConfigToUse = { provider: "anthropic", apiKey: process.env.ANTHROPIC_API_KEY, model: DEFAULT_MODELS.anthropic };
       } else if (process.env.GEMINI_API_KEY) {
-        providerConfigToUse = { provider: "gemini", apiKey: process.env.GEMINI_API_KEY, model: "gemini-1.5-pro" };
+        providerConfigToUse = { provider: "gemini", apiKey: process.env.GEMINI_API_KEY, model: DEFAULT_MODELS.gemini };
       } else if (process.env.CUSTOM_OPENAI_API_KEY) {
         providerConfigToUse = { provider: "custom", apiKey: process.env.CUSTOM_OPENAI_API_KEY, baseUrl: process.env.CUSTOM_OPENAI_BASE_URL };
       } else {
         providerConfigToUse = {
           provider: process.env.NEXT_PUBLIC_DEFAULT_AI_PROVIDER || "openai",
-          model: process.env.NEXT_PUBLIC_DEFAULT_AI_MODEL || "gpt-4o",
+          model: process.env.NEXT_PUBLIC_DEFAULT_AI_MODEL || DEFAULT_MODELS.openai,
           apiKey: process.env.OPENAI_API_KEY || "",
         };
       }

@@ -63,6 +63,7 @@ export const AtsEvaluateInputSchema = z.object({
   includeEvidenceBank: z.boolean().optional().default(false),
   /** When true and typstContent is empty, load the saved master resume from DB. */
   useMasterResume: z.boolean().optional().default(false),
+  measuredPages: z.number().int().positive().max(20).optional(),
 });
 
 export type AtsEvaluateInput = z.infer<typeof AtsEvaluateInputSchema>;

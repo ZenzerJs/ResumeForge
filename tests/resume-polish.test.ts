@@ -54,7 +54,10 @@ describe("dense source-backed resume", () => {
   });
   it("exports visible entry content after a direct edit", () => {
     const output = renderResumeDocument(document, "balanced", links).replace("Built Atlas", "Built edited Atlas");
-    expect(managedResumeExport(output)?.text).toContain("Atlas | https://github.com/example/atlas | https://atlas.example.test");
+    const exported = managedResumeExport(output)?.text ?? "";
+    expect(exported).toContain("Atlas | GitHub (https://github.com/example/atlas) | Live Demo (https://atlas.example.test)");
+    expect(exported).toContain("morgan@example.test");
+    expect(exported).not.toContain("(mailto:");
   });
   it("deduplicates a verified portfolio address without discarding header details", () => {
     const raw = "Morgan Example\nPortland | 555-010-1234 | Portfolio\nwork.example.test/path\nExperience\n- Built tools";

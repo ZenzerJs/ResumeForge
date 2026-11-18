@@ -541,7 +541,7 @@ describe("Tracker UX Remediation & Deduplication", () => {
       expect(collapseDuplicateIngestedJobs(crossSourceGenericRows)).toHaveLength(2);
     });
 
-    it("preserves personal/pasted job alongside catalog copy even when sharing an exact requisition URL", () => {
+    it("collapses personal/pasted job and catalog copy sharing an exact requisition URL with personal job winning regardless of order", () => {
       const personalJob = {
         id: "job-personal",
         userId: "user-1",
@@ -567,9 +567,13 @@ describe("Tracker UX Remediation & Deduplication", () => {
         createdAt: "2026-11-15T00:00:00.000Z",
       };
 
-      const preserved = collapseDuplicateTrackerJobs([personalJob, catalogJob]);
-      expect(preserved).toHaveLength(2);
-      expect(preserved.map((j) => j.id)).toEqual(["job-personal", "job-catalog"]);
+      const forward = collapseDuplicateTrackerJobs([personalJob, catalogJob]);
+      expect(forward).toHaveLength(1);
+      expect(forward[0]?.id).toBe("job-personal");
+
+      const reversed = collapseDuplicateTrackerJobs([catalogJob, personalJob]);
+      expect(reversed).toHaveLength(1);
+      expect(reversed[0]?.id).toBe("job-personal");
     });
   });
 

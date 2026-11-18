@@ -264,4 +264,101 @@ describe("Tracker, Editor, DSA, and Typst Audit Fixes", () => {
     expect(tablistBlock).toContain('tabIndex={viewMode === "split" ? 0 : -1}');
     expect(tablistBlock).toContain('tabIndex={viewMode === "kanban" ? 0 : -1}');
   });
+
+  it("10. fetchSessionPayload returns { data: null, guest: false, error: true } on HTTP 502 and network/parse failures without caching errors", async () => {
+    const user = { id: "user-1", email: "alice@example.com", username: "alice" };
+
+    vi.resetModules();
+    const fetch502ThenOk = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        json: async () => ({ error: "Bad Gateway" }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: user, guest: false }),
+      });
+    vi.stubGlobal("fetch", fetch502ThenOk);
+
+    let sessionMod = await import("@/components/auth/session-user");
+    const first = await sessionMod.fetchSessionPayload();
+    expect(first).toEqual({ data: null, guest: false, error: true });
+
+    const second = await sessionMod.fetchSessionPayload();
+    expect(second).toEqual({ data: user, guest: false });
+    expect(fetch502ThenOk).toHaveBeenCalledTimes(2);
+
+    const third = await sessionMod.fetchSessionPayload();
+    expect(third).toEqual({ data: user, guest: false });
+    expect(fetch502ThenOk).toHaveBeenCalledTimes(2);
+
+    vi.resetModules();
+    const fetchNetAndParseThenGuest = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Network failure"))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => {
+          throw new SyntaxError("Unexpected end of JSON input");
+        },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: null, guest: true }),
+      });
+    vi.stubGlobal("fetch", fetchNetAndParseThenGuest);
+
+    sessionMod = await import("@/components/auth/session-user");
+    expect(await sessionMod.fetchSessionPayload()).toEqual({
+      data: null,
+      guest: false,
+      error: true,
+    });
+    expect(await sessionMod.fetchSessionUser()).toBeNull();
+    expect(await sessionMod.fetchSessionPayload()).toEqual({ data: null, guest: true });
+    expect(fetchNetAndParseThenGuest).toHaveBeenCalledTimes(3);
+  });
+
+  it("11. TrackerFeed fetchJobs syncs authStatus before branching, bypasses guest storage on sessionPayload.error, and cleans up activeJobId for guests", () => {
+    const src = readProjectFile("src/components/tracker/tracker-feed.tsx");
+    const fetchStart = src.indexOf("const fetchJobs = useCallback");
+    const fetchEnd = src.indexOf("const params = new URLSearchParams", fetchStart);
+    const fetchBlock = src.slice(fetchStart, fetchEnd);
+
+    const demoAuthIdx = fetchBlock.indexOf('setAuthStatus("guest")');
+    const errorGuardIdx = fetchBlock.indexOf("!sessionPayload?.error");
+    const authSyncIdx = fetchBlock.indexOf('setAuthStatus(isGuest ? "guest" : "authenticated")');
+    const localStorageIdx = fetchBlock.indexOf('localStorage.getItem("resumeforge_guest_jobs")');
+
+    expect(demoAuthIdx).toBeGreaterThan(-1);
+    expect(errorGuardIdx).toBeGreaterThan(demoAuthIdx);
+    expect(authSyncIdx).toBeGreaterThan(errorGuardIdx);
+    expect(localStorageIdx).toBeGreaterThan(authSyncIdx);
+
+    const jobsFetchEnd = src.indexOf("}, [page,", fetchEnd);
+    const apiJobsBlock = src.slice(fetchEnd, jobsFetchEnd);
+    expect(apiJobsBlock).toContain('fetch(`/api/jobs?${params.toString()}`');
+    expect(apiJobsBlock).toContain("setImportNotice(formatApiError");
+
+    const cleanupStart = src.indexOf('if ((!isDemoMode && authStatus !== "guest")');
+    expect(cleanupStart).toBeGreaterThan(-1);
+    const cleanupEnd = src.indexOf("]);", cleanupStart);
+    const cleanupBlock = src.slice(cleanupStart, cleanupEnd + 3);
+    expect(cleanupBlock).toContain("[isDemoMode, authStatus, isLoading, activeJobId, jobs]");
+  });
+
+  it("12. ConfirmMasterDialog Retry button disables when busy or confirmation is unchecked", () => {
+    const dialogSrc = readProjectFile("src/components/editor/confirm-master-dialog.tsx");
+    const retryStart = dialogSrc.indexOf('data-testid="confirm-save-master-retry-btn"') - 220;
+    const retryEnd = dialogSrc.indexOf("Retry", retryStart + 220) + 40;
+    const retryBlock = dialogSrc.slice(retryStart, retryEnd);
+
+    expect(retryBlock).toContain("disabled={busy || !confirmed}");
+    expect(retryBlock).not.toMatch(/disabled=\{busy\}\s/);
+  });
 });

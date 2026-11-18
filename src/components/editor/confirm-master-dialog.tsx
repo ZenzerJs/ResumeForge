@@ -427,7 +427,7 @@ export function ConfirmMasterDialog({
               variant="outline"
               size="sm"
               onClick={() => handleConfirm()}
-              disabled={busy}
+              disabled={busy || !confirmed}
               data-testid="confirm-save-master-retry-btn"
               className="shrink-0 h-7 px-2.5 text-xs border-status-danger/40 text-status-danger hover:bg-status-danger/15"
             >

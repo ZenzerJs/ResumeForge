@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { NextRequest } from "next/server";
+import { POST } from "@/app/api/ats/evaluate/route";
 import { evaluateAtsScore } from "@/lib/ats-evaluator/evaluator";
 import { inferRoleProfile } from "@/lib/ats-evaluator/profile-inference";
 import { JobRequirements } from "@/lib/jd-parser/types";
@@ -231,5 +233,43 @@ Languages & Tools: GraphQL, Redis
     expect(loadedDisplay.hasJobRequirements).toBe(true);
     expect(loadedDisplay.requiredMatchLabel).toContain("/ 40 pts");
     expect(loadedDisplay.overallMatchLabel).not.toContain("No job loaded");
+  });
+
+  it("POST /api/ats/evaluate honors measuredPages=1 on >4000-char resumes and warns on measuredPages=2", async () => {
+    const longResume = `${SAMPLE_TYPST_RESUME}\n${"- Delivered measurable improvements across distributed services.\n".repeat(75)}`;
+    expect(longResume.length).toBeGreaterThan(4000);
+
+    const reqOnePage = new NextRequest("http://localhost:3000/api/ats/evaluate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        typstContent: longResume,
+        extractedRequirements: SAMPLE_REQUIREMENTS,
+        roleProfile: "Backend",
+        measuredPages: 1,
+      }),
+    });
+    const resOnePage = await POST(reqOnePage);
+    const jsonOnePage = await resOnePage.json();
+    expect(resOnePage.status).toBe(200);
+    expect(jsonOnePage.success).toBe(true);
+    expect(jsonOnePage.data.baseHealth.findings).toContain("✓ Standard one-page length constraints satisfied.");
+    expect(jsonOnePage.data.baseHealth.findings).not.toContain("Warning: Document length may exceed a single page.");
+
+    const reqTwoPages = new NextRequest("http://localhost:3000/api/ats/evaluate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        typstContent: SAMPLE_TYPST_RESUME,
+        extractedRequirements: SAMPLE_REQUIREMENTS,
+        roleProfile: "Backend",
+        measuredPages: 2,
+      }),
+    });
+    const resTwoPages = await POST(reqTwoPages);
+    const jsonTwoPages = await resTwoPages.json();
+    expect(resTwoPages.status).toBe(200);
+    expect(jsonTwoPages.success).toBe(true);
+    expect(jsonTwoPages.data.baseHealth.findings).toContain("Warning: Document length may exceed a single page.");
   });
 });

@@ -31,6 +31,7 @@ import { FormattedJd, FormattedJdSchema } from "./jd-format-schema";
 import { buildJdFormatSystemPrompt, buildJdFormatUserPrompt, JdFormatPromptInput } from "./jd-format-prompt";
 import { sanitizeTypstSource } from "../typst/sanitizer";
 import { isDemoMode } from "../demo-mode";
+import { DEFAULT_MODELS } from "@/lib/byok-vault";
 import {
   isServerManagedLocalConfig,
   markServerManagedLocalConfig,
@@ -223,7 +224,7 @@ export async function generateQualitativeReview(input: QualitativeReviewPromptIn
       true,
       {
         temperature: 0.3,
-        defaultModel: resolvedConfig.provider === "anthropic" ? "claude-3-5-sonnet-20241022" : undefined,
+        defaultModel: resolvedConfig.provider === "anthropic" ? DEFAULT_MODELS.anthropic : undefined,
         taskLabel: "qualitative review",
       }
     );
@@ -267,7 +268,7 @@ export async function generateCoverLetter(
       true,
       {
         temperature: 0.4,
-        defaultModel: resolvedConfig.provider === "anthropic" ? "claude-3-5-sonnet-20241022" : undefined,
+        defaultModel: resolvedConfig.provider === "anthropic" ? DEFAULT_MODELS.anthropic : undefined,
         taskLabel: "cover letter generation",
       }
     );
@@ -308,7 +309,7 @@ export async function convertPdfTextToTypst(input: ConvertPdfInput): Promise<Con
         temperature: resolvedConfig.provider === "gemini" ? 0.1 : 0.2,
         timeoutMs: 30_000,
         thinkingBudget: resolvedConfig.provider === "gemini" ? 1024 : undefined,
-        defaultModel: resolvedConfig.provider === "anthropic" ? "claude-3-5-sonnet-20241022" : undefined,
+        defaultModel: resolvedConfig.provider === "anthropic" ? DEFAULT_MODELS.anthropic : undefined,
         taskLabel: "PDF conversion",
       }
     );
@@ -388,7 +389,7 @@ export async function repairTypstSource(
           resolvedConfig.provider === "gemini"
             ? "gemini-1.5-pro"
             : resolvedConfig.provider === "anthropic"
-            ? "claude-3-5-sonnet-20241022"
+            ? DEFAULT_MODELS.anthropic
             : undefined,
         missingKeyMessage: missingKeyByProvider[resolvedConfig.provider],
         taskLabel: "repair",

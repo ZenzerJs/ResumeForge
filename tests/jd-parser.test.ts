@@ -76,7 +76,7 @@ describe("Deterministic JD Parser Unit Tests", () => {
     expect(result.preferredSkills).toContain("AWS");
   });
 
-  it("splits one-line Nice to have, Preferred, and Bonus clauses even after whitespace or >80 chars", () => {
+  it("splits one-line Nice-to-have, Preferred, and Bonus clauses after delimiters and handles Preferred qualifications", () => {
     const afterPeriod =
       "Backend role. Required: TypeScript, PostgreSQL. Nice to have: AWS, Docker, Kubernetes, GraphQL, Go, Redis, Python, Rust.";
     const res1 = parseJobDescription(afterPeriod);
@@ -85,12 +85,46 @@ describe("Deterministic JD Parser Unit Tests", () => {
     expect(res1.requiredSkills).not.toContain("Kubernetes");
     expect(res1.preferredSkills).toEqual(expect.arrayContaining(["AWS", "Docker", "Kubernetes", "GraphQL"]));
 
-    const afterWhitespace = "Required: React and Node.js Preferred: Terraform Bonus: Rust";
-    const res2 = parseJobDescription(afterWhitespace);
+    const afterDelimiters = "Required: React and Node.js; Preferred: Terraform | Bonus: Rust";
+    const res2 = parseJobDescription(afterDelimiters);
     expect(res2.requiredSkills).toEqual(expect.arrayContaining(["React", "Node.js"]));
     expect(res2.requiredSkills).not.toContain("Terraform");
     expect(res2.requiredSkills).not.toContain("Rust");
     expect(res2.preferredSkills).toEqual(expect.arrayContaining(["Terraform", "Rust"]));
+
+    const hyphenated = parseJobDescription("Required: Python, SQL. Nice-to-have: AWS, Docker.");
+    expect(hyphenated.requiredSkills).toEqual(expect.arrayContaining(["Python", "SQL"]));
+    expect(hyphenated.requiredSkills).not.toContain("AWS");
+    expect(hyphenated.preferredSkills).toEqual(expect.arrayContaining(["AWS", "Docker"]));
+
+    const preferredQuals = parseJobDescription("Preferred qualifications: Kubernetes, Terraform.");
+    expect(preferredQuals.preferredSkills).toEqual(expect.arrayContaining(["Kubernetes", "Terraform"]));
+    expect(preferredQuals.requiredSkills).toEqual([]);
+  });
+
+  it("does not flip subsequent skills to preferred when prose mentions Annual bonus", () => {
+    const multiLineProse = `
+      Required: Python, SQL.
+      Annual bonus: 15% + equity.
+      Experience with Docker and Kubernetes.
+    `;
+    const resMulti = parseJobDescription(multiLineProse);
+    expect(resMulti.requiredSkills).toEqual(
+      expect.arrayContaining(["Python", "SQL", "Docker", "Kubernetes"])
+    );
+    expect(resMulti.preferredSkills).toEqual([]);
+
+    const inlineProse =
+      "Required: Python, SQL. Annual bonus: 15% + equity. Experience with Docker.";
+    const resInline = parseJobDescription(inlineProse);
+    expect(resInline.requiredSkills).toEqual(expect.arrayContaining(["Python", "SQL", "Docker"]));
+    expect(resInline.preferredSkills).toEqual([]);
+
+    const unsectionedBonusProse =
+      "We offer competitive pay and an annual bonus: 15% + equity. Experience with Docker.";
+    const resUnsectioned = parseJobDescription(unsectionedBonusProse);
+    expect(resUnsectioned.requiredSkills).toContain("Docker");
+    expect(resUnsectioned.preferredSkills).toEqual([]);
   });
 
   it("outputs valid JobRequirements matching Zod schema", () => {

@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import {
+  DEFAULT_MODELS,
   getActiveConfig,
   getKey,
   markProviderConnectionStatus,
@@ -34,14 +35,6 @@ export interface CallByokModelResult<T = unknown> {
   model: string;
   latencyMs: number;
 }
-
-const DEFAULT_MODELS: Record<string, string> = {
-  gemini: "gemini-2.5-flash",
-  openai: "gpt-4o",
-  anthropic: "claude-3-5-sonnet-20241022",
-  groq: "llama-3.3-70b-versatile",
-  ollama: "llama3",
-};
 
 function isBrowser(): boolean {
   return typeof window !== "undefined";

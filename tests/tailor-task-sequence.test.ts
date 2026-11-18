@@ -338,8 +338,27 @@ describe("Tailor task-sequence navigation & state helpers", () => {
     expect(tailorSrc).toContain('"Verify in Settings"');
     expect(tailorSrc).toContain('data-testid="patch-error-open-settings"');
 
+    const handleGenStart = tailorSrc.indexOf("const handleGeneratePatches = async () => {");
+    const handleGenGuardEnd = tailorSrc.indexOf("const [aiSettings, activeConfig, demoConfig]", handleGenStart);
+    const nextStepGuardBlock = tailorSrc.slice(handleGenStart, handleGenGuardEnd);
+    expect(nextStepGuardBlock).toContain("providerConfigStatus.hasSavedConfig");
+    expect(nextStepGuardBlock).toContain(
+      "AI provider is saved but not verified. Test your connection in Settings before generating edits."
+    );
+    expect(nextStepGuardBlock).toContain(
+      "No AI provider configured. Please configure your API key in Settings."
+    );
+
+    const readinessStart = tailorSrc.indexOf('data-testid="tailor-readiness"');
+    const readinessEnd = tailorSrc.indexOf("</ul>", readinessStart);
+    const readinessBlock = tailorSrc.slice(readinessStart, readinessEnd);
+    expect(readinessBlock).toContain("providerConfigStatus.hasSavedConfig");
+    expect(readinessBlock).toContain('"Verify in Settings"');
+    expect(readinessBlock).toContain('"Configure in Settings"');
+
     expect(headerSrc).not.toContain("xl:shrink-0");
     expect(tailorSrc).toContain("md:flex-col md:items-stretch");
     expect(tailorSrc).toContain("2xl:flex-row 2xl:items-center");
+    expect(tailorSrc).toContain("2xl:[&>div:last-child]:max-w-[75%]");
   });
 });

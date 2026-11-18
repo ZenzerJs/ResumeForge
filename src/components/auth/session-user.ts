@@ -7,6 +7,7 @@ export type SessionUser = {
 export type SessionPayload = {
   data?: SessionUser | null;
   guest?: boolean;
+  error?: boolean;
 };
 
 const SESSION_TTL_MS = 3000;
@@ -44,10 +45,20 @@ export function resetDemoConfigCache(): void {
 export function fetchSessionPayload(): Promise<SessionPayload> {
   if (inflight && Date.now() - fetchedAt < SESSION_TTL_MS) return inflight;
   fetchedAt = Date.now();
-  inflight = fetch("/api/auth/me")
-    .then((res) => res.json() as Promise<SessionPayload>)
-    .catch(() => ({ data: null, guest: true }) as SessionPayload);
-  return inflight;
+  const request = fetch("/api/auth/me")
+    .then(async (res) => {
+      if (!res.ok) {
+        if (inflight === request) inflight = null;
+        return { data: null, guest: false, error: true } as SessionPayload;
+      }
+      return (await res.json()) as SessionPayload;
+    })
+    .catch(() => {
+      if (inflight === request) inflight = null;
+      return { data: null, guest: false, error: true } as SessionPayload;
+    });
+  inflight = request;
+  return request;
 }
 
 export async function fetchSessionUser(): Promise<SessionUser | null> {

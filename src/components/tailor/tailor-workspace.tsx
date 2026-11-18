@@ -1129,7 +1129,10 @@ export function TailorWorkspace() {
       const message = nextStep === "resume"
         ? isDemo ? "Save a resume draft in the Editor first." : "Save and freeze your master resume in the Editor first."
         : nextStep === "evidence" ? "Add or verify an item in the Evidence Bank first."
-        : nextStep === "provider" ? "No AI provider configured. Please configure your API key in Settings."
+        : nextStep === "provider"
+          ? providerConfigStatus.hasSavedConfig
+            ? "AI provider is saved but not verified. Test your connection in Settings before generating edits."
+            : "No AI provider configured. Please configure your API key in Settings."
         : "Extract requirements from the job description first.";
       setStructuredPatchError(null);
       setPatchError(message);
@@ -2010,7 +2013,7 @@ export function TailorWorkspace() {
       <div className="relative z-10 flex-1 pt-4 md:pt-8 pb-12 px-4 md:px-8 max-w-[1600px] mx-auto w-full font-body-regular motion-reduce:[&_*]:transition-none motion-reduce:[&_.animate-spin]:animate-none motion-reduce:[&_.animate-pulse]:animate-none">
         <PageHeader
           title="Tailor"
-          className="mb-4 gap-3 md:flex-col md:items-stretch md:[&>div:last-child]:max-w-none md:[&>div:last-child]:justify-start 2xl:flex-row 2xl:items-center 2xl:[&>div:last-child]:justify-end"
+          className="mb-4 gap-3 md:flex-col md:items-stretch md:[&>div:last-child]:max-w-none md:[&>div:last-child]:justify-start 2xl:flex-row 2xl:items-center 2xl:[&>div:last-child]:justify-end 2xl:[&>div:last-child]:max-w-[75%]"
           statusBadge={
             isAutoScanning ? (
               <span
@@ -2043,7 +2046,11 @@ export function TailorWorkspace() {
                           disabled={isNavigatingAway}
                           className="text-left font-medium underline underline-offset-2 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 disabled:opacity-60"
                         >
-                          {isOpeningSettings ? "Saving…" : "Configure in Settings"}
+                          {isOpeningSettings
+                            ? "Saving…"
+                            : providerConfigStatus.hasSavedConfig
+                              ? "Verify in Settings"
+                              : "Configure in Settings"}
                         </button>
                       ) : (label === "Master resume" || label === "Resume draft") && nextStep !== "resume" && ready === false ? (
                         <button

@@ -368,7 +368,7 @@ jane.doe@example.com | San Francisco, CA
     expect(cleaned).not.toContain("(mailto:");
     expect(cleaned).toContain("Cascade Cloud -- Backend Software Engineer | Seattle, WA | 2023 – Present");
     expect(cleaned).toContain("Built TypeScript and Go ingestion services handling 50k events/sec.");
-    expect(cleaned).toContain("QueryPulse | https://github.com/priyanair/querypulse | TypeScript, PostgreSQL, Docker | 2024");
+    expect(cleaned).toContain("QueryPulse | GitHub (https://github.com/priyanair/querypulse) | TypeScript, PostgreSQL, Docker | 2024");
     expect(cleaned).toContain("C# and SQL workloads");
     expect(cleaned).toContain("Languages: TypeScript, Go, SQL, Python");
     expect(cleaned).toContain("Infrastructure: Docker, PostgreSQL, Redis");
@@ -395,5 +395,21 @@ jane.doe@example.com | San Francisco, CA
     expect(cleaned).not.toContain("#resume-section");
     expect(cleaned).not.toContain("#sym");
     expect(cleaned).not.toContain("=>");
+  });
+
+  it("deduplicates bare email and normalized URL labels while preserving descriptive link titles", () => {
+    const raw = `
+= Jane Doe
+#link("mailto:jane@example.com")[jane\\@example.com] | #link("https://www.github.com/janedoe/")[github.com/janedoe] | #link("https://janedoe.dev")[Portfolio] | #link("mailto:jane@example.com")[Email Jane]
+== PROJECTS
+- #link("https://demo.example.com")[Live Demo]
+`;
+    const cleaned = cleanTypstToText(raw);
+    expect(cleaned).toContain(
+      "jane@example.com | https://www.github.com/janedoe/ | Portfolio (https://janedoe.dev) | Email Jane (jane@example.com)"
+    );
+    expect(cleaned).toContain("Live Demo (https://demo.example.com)");
+    expect(cleaned).not.toContain("(mailto:");
+    expect(cleaned).not.toContain("github.com/janedoe (https://");
   });
 });

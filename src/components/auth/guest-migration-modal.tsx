@@ -71,49 +71,60 @@ export interface GuestEvidenceItemPayload {
   bullets?: string[];
 }
 
+export interface ParsedGuestEvidenceEntries {
+  items: GuestEvidenceItemPayload[];
+  rawEntries: unknown[];
+}
+
+export function parseGuestEvidenceEntries(
+  rawEvidence: string | null | undefined
+): ParsedGuestEvidenceEntries {
+  if (!rawEvidence) return { items: [], rawEntries: [] };
+  try {
+    const parsed: unknown = JSON.parse(rawEvidence);
+    if (!Array.isArray(parsed)) return { items: [], rawEntries: [] };
+    const isRecord = (v: unknown): v is Record<string, unknown> =>
+      typeof v === "object" && v !== null;
+    const rawEntries = parsed.filter(
+      (item): item is Record<string, unknown> & { title: string } =>
+        isRecord(item) && typeof item.title === "string" && item.title.trim().length > 0
+    );
+    const items: GuestEvidenceItemPayload[] = rawEntries.map((item) => ({
+      title: item.title.trim(),
+      organization: typeof item.organization === "string" ? item.organization : undefined,
+      category:
+        typeof item.type === "string"
+          ? item.type.toUpperCase()
+          : typeof item.category === "string"
+            ? item.category.toUpperCase()
+            : "PROJECT",
+      tags: Array.isArray(item.tags)
+        ? item.tags.filter((t): t is string => typeof t === "string")
+        : [],
+      bullets: Array.isArray(item.bullets)
+        ? item.bullets
+            .map((b) =>
+              typeof b === "string"
+                ? b
+                : isRecord(b) && typeof b.text === "string"
+                  ? b.text
+                  : ""
+            )
+            .filter((t) => t.trim().length > 0)
+        : typeof item.verifiedSummary === "string" && item.verifiedSummary.trim()
+          ? [item.verifiedSummary.trim()]
+          : [],
+    }));
+    return { items, rawEntries };
+  } catch {
+    return { items: [], rawEntries: [] };
+  }
+}
+
 export function parseGuestEvidenceItems(
   rawEvidence: string | null | undefined
 ): GuestEvidenceItemPayload[] {
-  if (!rawEvidence) return [];
-  try {
-    const parsed: unknown = JSON.parse(rawEvidence);
-    if (!Array.isArray(parsed)) return [];
-    const isRecord = (v: unknown): v is Record<string, unknown> =>
-      typeof v === "object" && v !== null;
-    return parsed
-      .filter(
-        (item): item is Record<string, unknown> & { title: string } =>
-          isRecord(item) && typeof item.title === "string" && item.title.trim().length > 0
-      )
-      .map((item) => ({
-        title: item.title.trim(),
-        organization: typeof item.organization === "string" ? item.organization : undefined,
-        category:
-          typeof item.type === "string"
-            ? item.type.toUpperCase()
-            : typeof item.category === "string"
-              ? item.category.toUpperCase()
-              : "PROJECT",
-        tags: Array.isArray(item.tags)
-          ? item.tags.filter((t): t is string => typeof t === "string")
-          : [],
-        bullets: Array.isArray(item.bullets)
-          ? item.bullets
-              .map((b) =>
-                typeof b === "string"
-                  ? b
-                  : isRecord(b) && typeof b.text === "string"
-                    ? b.text
-                    : ""
-              )
-              .filter((t) => t.trim().length > 0)
-          : typeof item.verifiedSummary === "string" && item.verifiedSummary.trim()
-            ? [item.verifiedSummary.trim()]
-            : [],
-      }));
-  } catch {
-    return [];
-  }
+  return parseGuestEvidenceEntries(rawEvidence).items;
 }
 
 export async function executeGuestMigrationBatches(params: {
@@ -122,11 +133,12 @@ export async function executeGuestMigrationBatches(params: {
   draftSource: string | null | undefined;
   hasCustomResumeDraft: boolean;
   evidenceItems: GuestEvidenceItemPayload[];
+  rawEvidenceEntries?: unknown[];
   strategy: ConflictStrategy;
   confirmReplaceMaster: boolean;
   migrationId: string;
   onResumeMigrated?: () => void;
-  onRemainingEvidenceChange?: (remaining: GuestEvidenceItemPayload[]) => void;
+  onRemainingEvidenceChange?: (remaining: GuestEvidenceItemPayload[], remainingRaw: unknown[]) => void;
 }): Promise<
   | { ok: true; remainingEvidence: GuestEvidenceItemPayload[] }
   | { ok: false; error: string; remainingEvidence: GuestEvidenceItemPayload[] }
@@ -137,6 +149,7 @@ export async function executeGuestMigrationBatches(params: {
     draftSource,
     hasCustomResumeDraft,
     evidenceItems,
+    rawEvidenceEntries,
     strategy,
     confirmReplaceMaster,
     migrationId,
@@ -156,7 +169,7 @@ export async function executeGuestMigrationBatches(params: {
         ...(hasValidDraft ? { title: "Imported Guest Resume", typstSource: draftSource } : { evidenceOnly: true }),
       }),
     });
-    const json = await res.json();
+    const json = await res.json().catch(() => null);
     if (res.ok && json?.success) {
       return { ok: true, remainingEvidence: [] };
     }
@@ -182,7 +195,7 @@ export async function executeGuestMigrationBatches(params: {
         migrationId,
       }),
     });
-    const json = await res.json();
+    const json = await res.json().catch(() => null);
     if (res.ok && json?.success) {
       storage?.removeItem("resumeforge_typst_source");
       storage?.removeItem("resumeforge_has_guest_draft");
@@ -197,6 +210,10 @@ export async function executeGuestMigrationBatches(params: {
   }
 
   let remaining = [...evidenceItems];
+  let remainingRaw =
+    rawEvidenceEntries && rawEvidenceEntries.length === evidenceItems.length
+      ? [...rawEvidenceEntries]
+      : [...evidenceItems];
   let sentResume = false;
 
   while (remaining.length > 0) {
@@ -223,7 +240,7 @@ export async function executeGuestMigrationBatches(params: {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const json = await res.json();
+    const json = await res.json().catch(() => null);
     if (!res.ok || !json?.success) {
       return {
         ok: false,
@@ -240,12 +257,13 @@ export async function executeGuestMigrationBatches(params: {
     }
 
     remaining = remaining.slice(batch.length);
+    remainingRaw = remainingRaw.slice(batch.length);
     if (remaining.length > 0) {
-      storage?.setItem("resumeforge_guest_evidence", JSON.stringify(remaining));
+      storage?.setItem("resumeforge_guest_evidence", JSON.stringify(remainingRaw));
     } else {
       storage?.removeItem("resumeforge_guest_evidence");
     }
-    onRemainingEvidenceChange?.(remaining);
+    onRemainingEvidenceChange?.(remaining, remainingRaw);
   }
 
   return { ok: true, remainingEvidence: [] };
@@ -328,6 +346,36 @@ export function evaluateGuestMigrationState(
   };
 }
 
+export function getGuestMigrationCopy(hasResumeDraft: boolean, hasGuestEvidence: boolean) {
+  if (!hasResumeDraft) {
+    return {
+      title: "Unsaved Guest Evidence Detected",
+      description:
+        "We found guest Evidence Bank items in this browser. Choose whether to import or discard them.",
+      importLabel: "Import Guest Evidence (Recommended)",
+      importDescription:
+        "Adds your browser Evidence Bank items to your account without touching your Master Resume.",
+      discardLabel: "Discard Local Evidence",
+      discardDescription:
+        "Clear local browser evidence items without importing to your account.",
+      discardButtonLabel: "Discard Evidence",
+    };
+  }
+  return {
+    title: "Unsaved Guest Draft Detected",
+    description:
+      "We found a resume draft in this browser from your unauthenticated session. Choose how to synchronize it with your account.",
+    importLabel: "Import as Draft Resume (Recommended)",
+    importDescription:
+      "Saves draft safely without overwriting your existing Master Resume.",
+    discardLabel: hasGuestEvidence ? "Discard Local Draft & Evidence" : "Discard Local Draft",
+    discardDescription: hasGuestEvidence
+      ? "Clear this local draft and evidence items without importing to your account."
+      : "Clear this local draft without importing to your account.",
+    discardButtonLabel: hasGuestEvidence ? "Discard Draft & Evidence" : "Discard Draft",
+  };
+}
+
 export interface GuestMigrationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -366,16 +414,18 @@ export function GuestMigrationModal({
     return "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
   });
 
-  const [guestEvidenceItems, setGuestEvidenceItems] = useState<GuestEvidenceItemPayload[]>(() => {
-    if (typeof window === "undefined") return [];
-    return parseGuestEvidenceItems(localStorage.getItem("resumeforge_guest_evidence"));
+  const [guestEvidenceState, setGuestEvidenceState] = useState<ParsedGuestEvidenceEntries>(() => {
+    if (typeof window === "undefined") return { items: [], rawEntries: [] };
+    return parseGuestEvidenceEntries(localStorage.getItem("resumeforge_guest_evidence"));
   });
+  const guestEvidenceItems = guestEvidenceState.items;
 
   if (!isOpen) return null;
 
   const hasResumeDraft =
     !hasMigratedResume &&
     (hasCustomResumeDraft ?? Boolean(draftSource && draftSource.trim().length > 0));
+  const copy = getGuestMigrationCopy(hasResumeDraft, guestEvidenceItems.length > 0);
 
   const handleMigrate = async () => {
     if (hasResumeDraft && strategy === "REPLACE_MASTER" && !confirmReplaceMaster) {
@@ -407,11 +457,13 @@ export function GuestMigrationModal({
         draftSource,
         hasCustomResumeDraft: hasResumeDraft,
         evidenceItems: guestEvidenceItems,
+        rawEvidenceEntries: guestEvidenceState.rawEntries,
         strategy: !hasResumeDraft && strategy === "REPLACE_MASTER" ? "IMPORT_AS_DRAFT" : strategy,
         confirmReplaceMaster,
         migrationId,
         onResumeMigrated: () => setHasMigratedResume(true),
-        onRemainingEvidenceChange: (remaining) => setGuestEvidenceItems(remaining),
+        onRemainingEvidenceChange: (remaining, remainingRaw) =>
+          setGuestEvidenceState({ items: remaining, rawEntries: remainingRaw }),
       });
 
       if (result.ok) {
@@ -463,11 +515,11 @@ export function GuestMigrationModal({
           <div className="flex items-center gap-2 text-primary">
             <CloudUpload className="size-5 text-primary" />
             <DialogTitle className="text-base font-bold text-foreground">
-              Unsaved Guest Draft Detected
+              {copy.title}
             </DialogTitle>
           </div>
           <DialogDescription className="text-sm text-text-secondary">
-            We found a resume draft in this browser from your unauthenticated session. Choose how to synchronize it with your account.
+            {copy.description}
           </DialogDescription>
         </DialogHeader>
 
@@ -526,10 +578,10 @@ export function GuestMigrationModal({
                 />
                 <div>
                   <span className="font-semibold text-foreground block text-xs">
-                    Import as Draft Resume (Recommended)
+                    {copy.importLabel}
                   </span>
                   <span className="text-xs text-text-muted leading-tight block mt-0.5">
-                    Saves draft safely without overwriting your existing Master Resume.
+                    {copy.importDescription}
                   </span>
                 </div>
               </label>
@@ -580,10 +632,10 @@ export function GuestMigrationModal({
                 />
                 <div>
                   <span className="font-semibold text-foreground block text-xs">
-                    Discard Local Draft
+                    {copy.discardLabel}
                   </span>
                   <span className="text-xs text-text-muted leading-tight block mt-0.5">
-                    Clear this local draft without importing to your account.
+                    {copy.discardDescription}
                   </span>
                 </div>
               </label>
@@ -659,7 +711,7 @@ export function GuestMigrationModal({
             className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs gap-1.5 shadow-lg shadow-primary/20 disabled:opacity-50"
           >
             {isMigrating ? <Loader2 className="size-3.5 animate-spin" /> : <CloudUpload className="size-3.5" />}
-            {strategy === "DISCARD" ? "Discard Draft" : "Confirm Sync"}
+            {strategy === "DISCARD" ? copy.discardButtonLabel : "Confirm Sync"}
           </Button>
         </DialogFooter>
       </DialogContent>

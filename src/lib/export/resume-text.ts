@@ -7,6 +7,39 @@ export interface ExportResumeSections {
   sections: { title: string; lines: string[] }[];
 }
 
+/** Format a link for plaintext ATS export, omitting redundant labels that duplicate the destination. */
+export function formatPlaintextLink(url: string, label?: string): string {
+  const trimmedUrl = url.trim();
+  const cleanUrl = trimmedUrl.replace(/^mailto:/i, "");
+  const cleanLabel = label?.trim() ?? "";
+  if (!cleanLabel) return cleanUrl;
+
+  if (/^mailto:/i.test(trimmedUrl)) {
+    const cleanEmailLabel = cleanLabel.replace(/^mailto:/i, "").trim();
+    if (
+      cleanEmailLabel.toLowerCase() === cleanUrl.toLowerCase() ||
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmailLabel)
+    ) {
+      return cleanUrl;
+    }
+    return `${cleanLabel} (${cleanUrl})`;
+  }
+
+  const normalize = (value: string) =>
+    value
+      .trim()
+      .replace(/^https?:\/\//i, "")
+      .replace(/^www\./i, "")
+      .replace(/\/+$/, "")
+      .toLowerCase();
+
+  if (normalize(cleanLabel) === normalize(cleanUrl)) {
+    return cleanUrl;
+  }
+
+  return `${cleanLabel} (${cleanUrl})`;
+}
+
 /** Parse the renderer's visible output, never its stale metadata, after direct edits. */
 function visibleManagedExport(source: string): { text: string; sections: ExportResumeSections } {
   const lines = source.split(/\r?\n/);
@@ -40,7 +73,7 @@ function visibleManagedExport(source: string): { text: string; sections: ExportR
         const label = decodeInline(rest.slice(match[0].length, end));
         const url = JSON.parse(match[1]) as string;
         renderedDestinations.add(url);
-        result += url.replace(/^mailto:/i, "");
+        result += formatPlaintextLink(url, label);
         i += end + 1; continue;
       }
       const block = /^#block\(above: \d+(?:\.\d+)?(?:pt|em), below: \d+(?:\.\d+)?(?:pt|em)\)\[/.test(input.slice(i));

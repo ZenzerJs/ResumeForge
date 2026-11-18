@@ -11,14 +11,14 @@ export function parseJobDescription(rawText: string): JobRequirements {
   }
 
   const lines = rawText.split(
-    /\r?\n|\s+(?=(?:required|preferred|nice to have|bonus)(?:\s+skills)?\s*:)/i
+    /\r?\n|(?<=[.;•|])\s+(?=(?:required|preferred|nice[\s-]to[\s-]have|bonus)(?:\s+(?:skills|qualifications))?\s*:)/i
   );
   const requiredSkillsSet = new Set<string>();
   const preferredSkillsSet = new Set<string>();
   const domainTermsSet = new Set<string>();
 
-  const requiredHeaderRegex = /(?:required|qualifications|must have|requirements|what you bring|minimum qualifications|basic qualifications|what we're looking for)/i;
-  const preferredHeaderRegex = /(?:preferred|nice to have|pluses|bonus|desirable|additional qualifications|preferred qualifications)/i;
+  const requiredHeaderRegex = /^(?:[#*\-•]+\s*)*(?:required|qualifications|must[\s-]have|requirements|what you bring|minimum qualifications|basic qualifications|what we're looking for)\b/i;
+  const preferredHeaderRegex = /^(?:[#*\-•]+\s*)*(?:preferred|nice[\s-]to[\s-]have|pluses|bonus|desirable|additional qualifications|preferred qualifications)\b/i;
 
   let currentSection: "required" | "preferred" | "general" = "general";
 
@@ -44,12 +44,12 @@ export function parseJobDescription(rawText: string): JobRequirements {
 
     // Check if line is a section header
     if (
-      /^(?:preferred|nice to have|bonus)(?:\s+skills)?\s*:/i.test(trimmed) ||
+      /^(?:preferred|nice[\s-]to[\s-]have|bonus)(?:\s+(?:skills|qualifications))?\s*:/i.test(trimmed) ||
       (preferredHeaderRegex.test(trimmed) && trimmed.length < 80)
     ) {
       currentSection = "preferred";
     } else if (
-      /^required(?:\s+skills)?\s*:/i.test(trimmed) ||
+      /^required(?:\s+(?:skills|qualifications))?\s*:/i.test(trimmed) ||
       (requiredHeaderRegex.test(trimmed) && trimmed.length < 80)
     ) {
       currentSection = "required";

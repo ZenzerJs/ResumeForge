@@ -514,8 +514,15 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       setIsDemoMode(isDemo);
       const sessionPayload = isDemo ? null : await fetchSessionPayload();
       if (controller.signal.aborted) return;
-      const isGuest = isDemo || sessionPayload?.guest === true || !sessionPayload?.data;
-      if (isGuest) {
+      let shouldLoadGuestJobs = isDemo;
+      if (isDemo) {
+        setAuthStatus("guest");
+      } else if (!sessionPayload?.error) {
+        const isGuest = sessionPayload?.guest === true || !sessionPayload?.data;
+        setAuthStatus(isGuest ? "guest" : "authenticated");
+        shouldLoadGuestJobs = isGuest;
+      }
+      if (shouldLoadGuestJobs) {
         let localJobs: JobItem[] = [];
         try {
           const raw = localStorage.getItem("resumeforge_guest_jobs");
@@ -673,12 +680,12 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   }, [isLoading, activeJobId, jobs]);
 
   useEffect(() => {
-    if (!isDemoMode || isLoading || !activeJobId || jobs.some((job) => job.id === activeJobId)) return;
+    if ((!isDemoMode && authStatus !== "guest") || isLoading || !activeJobId || jobs.some((job) => job.id === activeJobId)) return;
     const nextActiveId = jobs[0]?.id ?? null;
     setActiveJobId(nextActiveId);
     if (nextActiveId) sessionStorage.setItem("resumeforge_active_job_id", nextActiveId);
     else sessionStorage.removeItem("resumeforge_active_job_id");
-  }, [isDemoMode, isLoading, activeJobId, jobs]);
+  }, [isDemoMode, authStatus, isLoading, activeJobId, jobs]);
 
   useEffect(() => {
     let cancelled = false;

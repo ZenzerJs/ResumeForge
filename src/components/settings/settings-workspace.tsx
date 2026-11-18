@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { ProviderType } from "@/lib/ai/types";
 import {
+  DEFAULT_MODELS,
   saveKey,
   getKey,
   removeKey,
@@ -49,15 +50,6 @@ import {
 } from "@/lib/tailor/application-context";
 
 const SETTINGS_STORAGE_KEY = "resumeforge_ai_settings";
-
-const DEFAULT_MODELS: Record<string, string> = {
-  gemini: "gemini-2.5-flash",
-  openai: "gpt-4o",
-  groq: "llama-3.3-70b-versatile",
-  anthropic: "claude-3-5-sonnet-20241022",
-  ollama: "llama3",
-  custom: "llama3",
-};
 
 export type CloudProviderId = "gemini" | "openai" | "anthropic" | "groq";
 
@@ -425,7 +417,8 @@ export function SettingsWorkspace() {
     const nextModel = e.target.value;
     setModel(nextModel);
     setTestResult(null);
-    saveSettingsToStorage(provider, baseUrl, nextModel);
+    setVerificationStatus("untested");
+    saveSettingsToStorage(provider, baseUrl, nextModel, { clearVerification: true });
   };
 
   const handleClearKey = async () => {

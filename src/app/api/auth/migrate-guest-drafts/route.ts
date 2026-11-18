@@ -130,24 +130,26 @@ export async function POST(request: Request) {
     }
 
     // 3. IDEMPOTENCY / REPLAY SAFETY
-    if (migrationId && shouldCreateResume) {
-      const existingMatch = await prisma.resume.findFirst({
-        where: { userId, typstSource: trimmedTypstSource },
+    const existingMatch =
+      migrationId && shouldCreateResume
+        ? await prisma.resume.findFirst({
+            where: { userId, typstSource: trimmedTypstSource },
+          })
+        : null;
+
+    if (existingMatch && evidenceItems.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          resumeId: existingMatch.id,
+          isMaster: existingMatch.isMaster,
+          evidenceCount: 0,
+          skippedDuplicateCount: 0,
+          strategyApplied: conflictStrategy,
+          historySnapshotCreated: false,
+          migrationId,
+        },
       });
-      if (existingMatch) {
-        return NextResponse.json({
-          success: true,
-          data: {
-            resumeId: existingMatch.id,
-            isMaster: existingMatch.isMaster,
-            evidenceCount: 0,
-            skippedDuplicateCount: 0,
-            strategyApplied: conflictStrategy,
-            historySnapshotCreated: false,
-            migrationId,
-          },
-        });
-      }
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -155,7 +157,10 @@ export async function POST(request: Request) {
       let targetIsMaster = false;
       let historySnapshotCreated = false;
 
-      if (shouldCreateResume && typstSource) {
+      if (existingMatch) {
+        createdResumeId = existingMatch.id;
+        targetIsMaster = existingMatch.isMaster;
+      } else if (shouldCreateResume && typstSource) {
         let resumeTitle = title || "Imported Guest Draft";
 
         if (!existingMaster) {
