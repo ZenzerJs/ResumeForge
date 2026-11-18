@@ -1,5 +1,12 @@
 import { GoogleGenAI } from "@google/genai";
-import { getActiveConfig, getKey, resolveClientProviderConfig, ByokProvider } from "./byok-vault";
+import {
+  getActiveConfig,
+  getKey,
+  markProviderConnectionStatus,
+  providerSupportsBaseUrl,
+  resolveClientProviderConfig,
+  ByokProvider,
+} from "./byok-vault";
 
 export interface ByokMessage {
   role: "system" | "user" | "assistant";
@@ -135,9 +142,10 @@ export async function callByokModel<T = unknown>(
     (provider === resolvedClient?.provider ? resolvedClient?.apiKey : null) ||
     (await getKey(provider)) ||
     "";
-  const resolvedBaseUrl =
-    options.baseUrl ||
-    (provider === resolvedClient?.provider ? resolvedClient?.baseUrl : undefined);
+  const resolvedBaseUrl = providerSupportsBaseUrl(provider)
+    ? options.baseUrl ||
+      (provider === resolvedClient?.provider ? resolvedClient?.baseUrl : undefined)
+    : undefined;
 
   if (!apiKey && provider !== "ollama" && provider !== "custom") {
     throw new Error(`API key for provider '${provider}' is missing. Please configure it in Settings.`);
@@ -153,7 +161,9 @@ export async function callByokModel<T = unknown>(
   }
 
   let fullText = "";
+  const trackConfiguredStatus = isBrowser() && !options.apiKey;
 
+  try {
   // 3. Dispatch to provider handler
   if (provider === "gemini") {
     const geminiModel = model === "gemini-3.8-flash" ? "gemini-2.5-flash" : model;
@@ -333,6 +343,16 @@ export async function callByokModel<T = unknown>(
         fullText = json.choices?.[0]?.message?.content || "";
       }
     }
+  }
+
+  if (trackConfiguredStatus) {
+    markProviderConnectionStatus(provider, true);
+  }
+  } catch (err) {
+    if (trackConfiguredStatus && !(err instanceof Error && err.name === "AbortError")) {
+      markProviderConnectionStatus(provider, false);
+    }
+    throw err;
   }
 
   // 4. Parse structured JSON if requested
