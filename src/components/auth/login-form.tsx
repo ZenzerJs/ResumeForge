@@ -14,6 +14,16 @@ export function resolveEffectiveAuthMode(requestedMode: string | null | undefine
   return requestedMode === "signup" ? "signup" : "signin";
 }
 
+export function validateSignupPasswords(password: string, confirmPassword: string): string | null {
+  if (password.length < 8) {
+    return "Password must be at least 8 characters.";
+  }
+  if (password !== confirmPassword) {
+    return "Passwords do not match.";
+  }
+  return null;
+}
+
 export interface LoginFormProps {
   initialMode?: AuthMode;
   redirectTo?: string;
@@ -68,7 +78,9 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [signupEnabled, setSignupEnabled] = useState(true);
@@ -76,6 +88,7 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
   const emailInputRef = useRef<HTMLInputElement>(null);
   const usernameInputRef = useRef<HTMLInputElement>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
+  const confirmPasswordInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,25 +129,33 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
     const domEmail = emailInputRef.current?.value ?? (formEl.elements.namedItem("email") as HTMLInputElement | null)?.value ?? "";
     const domUsername = usernameInputRef.current?.value ?? (formEl.elements.namedItem("username") as HTMLInputElement | null)?.value ?? "";
     const domPassword = passwordInputRef.current?.value ?? (formEl.elements.namedItem("password") as HTMLInputElement | null)?.value ?? "";
+    const domConfirmPassword =
+      confirmPasswordInputRef.current?.value ??
+      (formEl.elements.namedItem("confirmPassword") as HTMLInputElement | null)?.value ??
+      "";
 
     let formEmail = "";
     let formUsername = "";
     let formPassword = "";
+    let formConfirmPassword = "";
     try {
       const formData = new FormData(formEl);
       formEmail = (formData.get("email") as string | null) ?? "";
       formUsername = (formData.get("username") as string | null) ?? "";
       formPassword = (formData.get("password") as string | null) ?? "";
+      formConfirmPassword = (formData.get("confirmPassword") as string | null) ?? "";
     } catch {}
 
     const activeEmail = (domEmail || formEmail || email).trim();
     const activeUsername = (domUsername || formUsername || username).trim();
     const activePassword = domPassword || formPassword || password;
+    const activeConfirmPassword = domConfirmPassword || formConfirmPassword || confirmPassword;
 
     // Sync state back to inputs if filled via autofill
     if (activeEmail !== email) setEmail(activeEmail);
     if (activeUsername !== username) setUsername(activeUsername);
     if (activePassword !== password) setPassword(activePassword);
+    if (activeConfirmPassword !== confirmPassword) setConfirmPassword(activeConfirmPassword);
 
     if (effectiveMode === "signup") {
       if (!activeEmail || !activeEmail.includes("@")) {
@@ -145,8 +166,9 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
         setError("Username must be between 3 and 24 characters.");
         return;
       }
-      if (activePassword.length < 8) {
-        setError("Password must be at least 8 characters.");
+      const passwordError = validateSignupPasswords(activePassword, activeConfirmPassword);
+      if (passwordError) {
+        setError(passwordError);
         return;
       }
     } else {
@@ -315,6 +337,64 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
         </div>
       </div>
 
+      {effectiveMode === "signup" ? (
+        <div className="mb-5">
+          <label htmlFor="confirmPassword" className="block text-xs font-mono uppercase tracking-wider text-on-surface-variant font-semibold mb-1.5">
+            Confirm Password
+          </label>
+          <div className="relative">
+            <input
+              ref={confirmPasswordInputRef}
+              id="confirmPassword"
+              name="confirmPassword"
+              data-testid="login-confirm-password-input"
+              type={showConfirmPassword ? "text" : "password"}
+              autoComplete="new-password"
+              spellCheck={false}
+              required
+              minLength={8}
+              defaultValue={confirmPassword}
+              onChange={(event) => {
+                setConfirmPassword(event.target.value);
+                if (error) setError(null);
+              }}
+              placeholder="Re-enter your password"
+              className="h-11 w-full rounded-[6px] border border-outline/70 bg-input px-3 pl-10 pr-12 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            />
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <button
+              type="button"
+              data-testid="toggle-confirm-password-visibility-btn"
+              onClick={() => setShowConfirmPassword((open) => !open)}
+              className="absolute right-1 top-1/2 inline-flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-[6px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+            >
+              {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          data-testid="login-recovery-notice"
+          className="mb-5 rounded-[6px] border border-hairline bg-inset px-3 py-2.5 text-xs text-on-surface-variant leading-relaxed"
+        >
+          <p className="font-semibold text-foreground">Forgot your password?</p>
+          <p className="mt-0.5 text-muted-foreground">
+            Self-serve email password reset is not enabled yet. If you are locked out, contact your instance
+            administrator or{" "}
+            <a
+              href="https://github.com/ZenzerJs/ResumeForge/issues"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline rounded-[2px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              open a recovery request on GitHub
+            </a>
+            , or continue as a guest in this browser.
+          </p>
+        </div>
+      )}
+
       {error ? (
         <div
           data-testid="login-error-msg"
@@ -351,6 +431,7 @@ export function LoginForm({ initialMode, redirectTo, className = "" }: LoginForm
           className="text-xs md:text-sm text-muted-foreground hover:text-primary transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded py-1 cursor-pointer"
           onClick={() => {
             setError(null);
+            setConfirmPassword("");
             setMode(effectiveMode === "signup" ? "signin" : "signup");
           }}
         >

@@ -50,15 +50,12 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
     await expect(proofCard).not.toContainText("87/100");
   });
 
-  test("5. Quick start presents one preparation sequence", async ({ page }) => {
+  test("5. Public landing page keeps workspace quick-start checklist off marketing hero", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
-    const checklist = page.getByTestId("consumer-onboarding-checklist");
-    await expect(checklist.getByRole("heading", { name: "Quick start" })).toBeVisible();
-    for (const step of [1, 2, 3, 4]) {
-      await expect(checklist.getByTestId(`onboarding-step-${step}`)).toBeVisible();
-    }
+    await expect(page.getByTestId("consumer-onboarding-checklist")).toHaveCount(0);
+    await expect(page.getByTestId("capability-grid-section")).toBeVisible();
   });
 
   test("6. Upload PDF button remains enabled and immediately clickable", async ({ page }) => {
@@ -117,7 +114,7 @@ test.describe("Phase 10 — Production Polish & Editorial Landing Motion E2E Tes
 
     // 768px Tablet Viewport
     await page.setViewportSize({ width: 768, height: 1024 });
-    await expect(page.getByTestId("consumer-onboarding-checklist")).toBeVisible();
+    await expect(page.getByTestId("capability-grid-section")).toBeVisible();
 
     // 1200px Desktop Viewport
     await page.setViewportSize({ width: 1200, height: 800 });

@@ -1,7 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+    back: vi.fn(),
+  }),
+}));
+
 import {
+  HomeLanding,
   SetupChecklist,
   computeOnboardingChecklistState,
   hasLocalPersonalResume,
@@ -289,6 +302,19 @@ describe("Setup progress checklist predicates and UI states", () => {
       // Sample availability notes are hidden once personal setup steps are complete
       expect(html).not.toContain("onboarding-step-2-sample-note");
       expect(html).not.toContain("onboarding-step-4-sample-note");
+    });
+
+    it("omits the workspace quick-start checklist and BYOK jargon from public HomeLanding", () => {
+      const html = renderToStaticMarkup(
+        React.createElement(HomeLanding, {
+          initialStats: makeStats(),
+          demoMode: false,
+        })
+      );
+      expect(html).not.toContain('data-testid="consumer-onboarding-checklist"');
+      expect(html).not.toContain("Quick start");
+      expect(html).toContain("Use your own AI key");
+      expect(html).not.toContain("BYOK");
     });
   });
 });

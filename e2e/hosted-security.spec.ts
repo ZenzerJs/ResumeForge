@@ -247,6 +247,7 @@ test.describe("hosted auth and a11y gates", () => {
     await page.getByTestId("login-username-input").fill(username);
     await page.getByTestId("login-email-input").fill(email);
     await page.getByTestId("login-password-input").fill(password);
+    await page.getByTestId("login-confirm-password-input").fill(password);
     await page.getByTestId("login-submit-btn").click();
 
     // Verify redirected away from /login

@@ -5,7 +5,7 @@ import { TopNav } from "@/components/navigation/top-nav";
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "How ResumeForge handles resume data, guest sessions, accounts, and BYOK API keys.",
+    "How ResumeForge handles resume data, guest sessions, accounts, and AI API keys you provide.",
 };
 
 export default function PrivacyPage() {
@@ -24,8 +24,18 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-base font-semibold text-foreground">What ResumeForge is</h2>
             <p className="mt-2">
-              ResumeForge is a resume workspace. You can use it as a guest in this browser, or create an
-              optional account so resumes, evidence, and jobs persist in our hosted database.
+              ResumeForge is an open-source resume workspace built by a Wilfrid Laurier University CS
+              student. You can inspect the source code on{" "}
+              <a
+                href="https://github.com/ZenzerJs/ResumeForge"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline rounded-[4px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                GitHub
+              </a>
+              , use it as a guest in this browser, or create an optional account so resumes, evidence,
+              and jobs persist in our hosted database.
             </p>
           </section>
 
@@ -48,9 +58,9 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-foreground">AI keys (BYOK)</h2>
+            <h2 className="text-base font-semibold text-foreground">AI keys you provide</h2>
             <p className="mt-2">
-              Bring-your-own API keys are encrypted in this browser’s IndexedDB vault using a
+              API keys you provide are encrypted in this browser’s IndexedDB vault using a
               non-extractable Web Crypto key, and are never stored in our database. Keys are sent to
               your chosen provider only when you run an AI action (extract, tailor, cover letter, ATS
               review). We do not sell keys or resume content.
@@ -84,10 +94,27 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-foreground">Contact</h2>
+            <h2 className="text-base font-semibold text-foreground">Contact &amp; source code</h2>
             <p className="mt-2">
-              Questions about this policy can be sent through the in-app Settings page or the account email
-              you used to sign up.
+              Questions, bug reports, or privacy requests can be opened on{" "}
+              <a
+                href="https://github.com/ZenzerJs/ResumeForge/issues"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline rounded-[4px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                GitHub Issues
+              </a>{" "}
+              or reviewed in the{" "}
+              <a
+                href="https://github.com/ZenzerJs/ResumeForge"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline rounded-[4px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                ResumeForge repository
+              </a>
+              .
             </p>
           </section>
         </div>

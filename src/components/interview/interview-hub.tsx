@@ -14,12 +14,57 @@ import {
 import { CompanyBadge, getCompanyLogo } from "./company-logos";
 import { BrandIcon, hasBrandIcon } from "../design-system/brand-icon";
 
+export const TRACK_FILTERS: ReadonlyArray<{ id: InterviewTrack | "all"; label: string }> = [
+  { id: "all", label: "All Tracks" },
+  { id: "algorithms", label: "Algorithms (Core 150 Patterns)" },
+  { id: "system_design", label: "System Design" },
+  { id: "oa_screening", label: "OA Screening" },
+];
+
+export const DIFFICULTY_FILTERS: ReadonlyArray<"all" | "Easy" | "Medium" | "Hard"> = [
+  "all",
+  "Easy",
+  "Medium",
+  "Hard",
+];
+
+export function filterInterviewQuestions(
+  questions: ReadonlyArray<InterviewQuestion>,
+  filters: {
+    track: InterviewTrack | "all";
+    difficulty: "Easy" | "Medium" | "Hard" | "all";
+    company: string | "all";
+  }
+): InterviewQuestion[] {
+  return questions.filter((q) => {
+    if (filters.track !== "all" && q.track !== filters.track) return false;
+    if (filters.difficulty !== "all" && q.difficulty !== filters.difficulty) return false;
+    if (filters.company !== "all" && !q.companyTags.includes(filters.company)) return false;
+    return true;
+  });
+}
+
+export function formatQuestionCountText(filteredCount: number, totalCount: number): string {
+  return filteredCount === totalCount
+    ? `${totalCount} problems`
+    : `${filteredCount} of ${totalCount} matching`;
+}
+
+export function formatQuestionSourceSet(sourceSet: string): string {
+  return sourceSet === "NeetCode 150" ? "Core 150 Patterns" : sourceSet;
+}
+
 export interface InterviewHubProps {
   onSolveInRunner?: (slug: string) => void;
   targetCompany?: string;
+  onFilteredCountChange?: (filteredCount: number, totalCount: number) => void;
 }
 
-export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubProps = {}) {
+export function InterviewHub({
+  onSolveInRunner,
+  targetCompany,
+  onFilteredCountChange,
+}: InterviewHubProps = {}) {
   const [track, setTrack] = useState<InterviewTrack | "all">("all");
   const [difficulty, setDifficulty] = useState<"Easy" | "Medium" | "Hard" | "all">("all");
   const [company, setCompany] = useState<string | "all">("all");
@@ -45,25 +90,15 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
     }
   }, [targetCompany]);
 
-  const TRACK_FILTERS: ReadonlyArray<{ id: InterviewTrack | "all"; label: string }> = [
-    { id: "all", label: "All Tracks" },
-    { id: "algorithms", label: "Algorithms (NeetCode 150)" },
-    { id: "system_design", label: "System Design" },
-    { id: "oa_screening", label: "OA Screening" },
-  ];
-  const DIFFICULTY_FILTERS: ReadonlyArray<"all" | "Easy" | "Medium" | "Hard"> = [
-    "all",
-    "Easy",
-    "Medium",
-    "Hard",
-  ];
-
-  const filteredQuestions = ALL_QUESTIONS.filter(q => {
-    if (track !== "all" && q.track !== track) return false;
-    if (difficulty !== "all" && q.difficulty !== difficulty) return false;
-    if (company !== "all" && !q.companyTags.includes(company)) return false;
-    return true;
+  const filteredQuestions = filterInterviewQuestions(ALL_QUESTIONS, {
+    track,
+    difficulty,
+    company,
   });
+
+  useEffect(() => {
+    onFilteredCountChange?.(filteredQuestions.length, ALL_QUESTIONS.length);
+  }, [filteredQuestions.length, onFilteredCountChange]);
 
   const getDifficultyBadgeColor = (diff: string) => {
     switch (diff) {
@@ -84,6 +119,8 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
             {TRACK_FILTERS.map(t => (
               <button
                 key={t.id}
+                type="button"
+                aria-pressed={track === t.id}
                 onClick={() => setTrack(t.id)}
                 className={`min-h-11 sm:min-h-0 px-3 py-1.5 rounded-[6px] text-xs font-semibold transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   track === t.id
@@ -97,10 +134,12 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
           </div>
 
           {/* Difficulty Filters */}
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             {DIFFICULTY_FILTERS.map(d => (
               <button
                 key={d}
+                type="button"
+                aria-pressed={difficulty === d}
                 onClick={() => setDifficulty(d)}
                 className={`min-h-11 sm:min-h-0 px-2.5 py-1 rounded-[6px] text-xs font-semibold transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   difficulty === d
@@ -111,6 +150,13 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                 {d === "all" ? "All Levels" : d}
               </button>
             ))}
+            <span
+              data-testid="interview-hub-question-count"
+              aria-live="polite"
+              className="ml-1 rounded-full border border-border bg-inset px-2.5 py-0.5 font-mono text-xs text-muted-foreground tabular-nums"
+            >
+              {formatQuestionCountText(filteredQuestions.length, ALL_QUESTIONS.length)}
+            </span>
           </div>
         </div>
 
@@ -121,6 +167,8 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
               Company:
             </span>
             <button
+              type="button"
+              aria-pressed={company === "all"}
               onClick={() => setCompany("all")}
               className={`min-h-11 sm:min-h-0 px-2.5 py-1 rounded-[6px] text-xs transition-colors flex-shrink-0 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                 company === "all"
@@ -135,6 +183,8 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
               return (
                 <button
                   key={c.slug}
+                  type="button"
+                  aria-pressed={isSelected}
                   onClick={() => setCompany(isSelected ? "all" : c.slug)}
                   className={`inline-flex min-h-11 sm:min-h-0 items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-xs transition-colors flex-shrink-0 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                     isSelected
@@ -176,7 +226,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                   {q.category}
                 </span>
                 <span>•</span>
-                <span>{q.sourceSet}</span>
+                <span>{formatQuestionSourceSet(q.sourceSet)}</span>
               </div>
             </div>
 
@@ -211,6 +261,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
           <p className="text-base font-semibold text-foreground">No questions found</p>
           <p className="text-sm text-muted-foreground mt-1">Try resetting or loosening the active company or track filters.</p>
           <button
+            type="button"
             onClick={() => { setTrack("all"); setDifficulty("all"); setCompany("all"); }}
             className="mt-4 px-4 py-2 border border-outline text-foreground text-xs font-semibold rounded-[6px] hover:bg-elevated transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
@@ -244,7 +295,7 @@ export function InterviewHub({ onSolveInRunner, targetCompany }: InterviewHubPro
                     {selectedQuestion.title}
                   </DialogTitle>
                   <DialogDescription className="mt-0.5 text-sm text-muted-foreground">
-                    {selectedQuestion.sourceSet}
+                    {formatQuestionSourceSet(selectedQuestion.sourceSet)}
                   </DialogDescription>
                 </div>
                 <DialogClose asChild>

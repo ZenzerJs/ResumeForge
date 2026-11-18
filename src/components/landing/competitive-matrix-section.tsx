@@ -33,7 +33,7 @@ const MATRIX_DATA: MatrixRow[] = [
     icon: Zap,
     title: "Unmetered Open Workspace",
     summary:
-      "No subscription paywalls or artificial daily credit pools for Typst compilation, ATS checks, or PDF export. Connect your own BYOK model key when using AI actions.",
+      "No subscription paywalls or artificial daily credit pools for Typst compilation, ATS checks, or PDF export. Connect an AI API key you provide when using AI actions.",
   },
   {
     area: "Document Quality & Layout",
