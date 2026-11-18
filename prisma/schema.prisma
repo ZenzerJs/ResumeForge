@@ -51,6 +51,8 @@ model Resume {
   patchProposalBatches PatchProposalBatch[]
 
   @@index([userId])
+  @@index([userId, isMaster])
+  @@index([userId, updatedAt(sort: Desc)])
 }
 
 model EvidenceItem {
@@ -71,6 +73,8 @@ model EvidenceItem {
   patchCitations  PatchCitation[] @relation("PatchCitationEvidence")
 
   @@index([userId])
+  @@index([userId, status])
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model Bullet {
@@ -87,6 +91,7 @@ model Bullet {
   patchCitations PatchCitation[] @relation("PatchCitationBullet")
 
   @@index([evidenceId])
+  @@index([evidenceId, orderIndex])
 }
 
 model Job {
@@ -172,6 +177,8 @@ model IngestedJob {
   @@index([source, createdAt])
   @@index([companyName])
   @@index([isCanadianEligible])
+  @@index([isCanadianEligible, workplaceType, postedAt(sort: Desc), createdAt(sort: Desc)])
+  @@index([postedAt(sort: Desc), createdAt(sort: Desc)])
 }
 
 model ConnectorSyncLog {
@@ -182,6 +189,9 @@ model ConnectorSyncLog {
   jobsInserted Int       @default(0)
   errorMessage String?
   executedAt   DateTime  @default(now())
+
+  @@index([executedAt(sort: Desc)])
+  @@index([source, executedAt(sort: Desc)])
 }
 
 // Phase 4.2: Job-specific tailored resume variant
@@ -292,6 +302,7 @@ model PatchProposalBatch {
   createdAt       DateTime @default(now())
 
   @@index([userId, status, expiresAt])
+  @@index([jobId])
 }
 
 // Phase 5: Evidence-grounded tailored cover letter
@@ -320,6 +331,8 @@ model CoverLetter {
   @@index([userId])
   @@index([jobId])
   @@index([variantId])
+  @@index([userId, jobId])
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 // Pitt CSC / Simplify Summer 2026 Ingestion Feed
@@ -339,6 +352,7 @@ model DiscoveredJob {
 
   @@index([company])
   @@index([isClosed])
+  @@index([isClosed, createdAt(sort: Desc)])
 }
 
 // Task 7.9: Master Resume Overwrite Pre-Save Snapshot History
@@ -352,6 +366,7 @@ model MasterHistory {
   reason      String   @default("pre-overwrite-snapshot")
 
   @@index([resumeId])
+  @@index([resumeId, savedAt(sort: Desc)])
 }
 
 // Company-Aware Interview Question Bank (OA / Phone Screen / System Design)

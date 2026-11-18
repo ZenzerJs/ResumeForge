@@ -19,6 +19,8 @@ import { ParsedIngestedRequirementsSchema } from "@/lib/jd-parser/types";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
 import { isPlaceholderDescription } from "@/lib/ingestion/helpers";
 import { serializeRequirementsWithMeta } from "@/lib/db/jobs";
+import { upsertApplication } from "@/lib/db/applications";
+import { sanitizeError } from "@/lib/ai/redact";
 import { computeIngestedJobEnrichment } from "./enrichment";
 
 export const CONNECTORS: Record<SourceConnector, ConnectorClient> = {
@@ -214,9 +216,9 @@ export async function syncSingleConnector(
     };
   } catch (err: any) {
     const skipped = err instanceof ConnectorSkippedError || err?.name === "ConnectorSkippedError";
-    const errorMsg = err?.message || String(err);
+    const errorMsg = sanitizeError(err?.message || String(err));
     if (!skipped) {
-      console.error(`[Orchestrator] Connector ${source} failed:`, err);
+      console.error(`[Orchestrator] Connector ${source} failed:`, sanitizeError(err));
     } else {
       console.info(`[Orchestrator] Connector ${source} skipped: ${errorMsg}`);
     }
@@ -290,10 +292,6 @@ export async function promoteIngestedJobToTrackedJob(
     throw new Error(`IngestedJob ${ingestedJobId} not found.`);
   }
 
-  if (ingested.trackedJob) {
-    return ingested.trackedJob;
-  }
-
   // Format rich notes with Location, Workplace, Apply Link, and Salary so TrackerFeed helpers parse them
   const notesParts = [
     `Ingested from ${ingested.source}`,
@@ -315,26 +313,43 @@ export async function promoteIngestedJobToTrackedJob(
       ? serializeRequirementsWithMeta(parseJobDescription(ingested.description), "auto")
       : JSON.stringify({ requiredSkills: [], preferredSkills: [], domainTerms: [] });
 
-  // Create corresponding Job record and link trackedJobId atomically
+  // Promote to a shared catalog Job (userId: null) and upsert the caller's personal JobApplication
   return await prisma.$transaction(async (tx) => {
-    const createdJob = await tx.job.create({
-      data: {
-        userId: userId || null,
-        company: ingested.companyName,
-        roleTitle: ingested.title,
-        rawDescription: ingested.description,
-        extractedRequirements: extractedRequirementsJson,
-        source: ingested.source.toLowerCase(),
-        status: "SAVED",
-        notes: notesParts.join(" | "),
-      },
-    });
+    let targetJob =
+      ingested.trackedJob && ingested.trackedJob.userId === null
+        ? ingested.trackedJob
+        : null;
 
-    await tx.ingestedJob.update({
-      where: { id: ingestedJobId },
-      data: { trackedJobId: createdJob.id },
-    });
+    if (!targetJob) {
+      targetJob = await tx.job.create({
+        data: {
+          userId: null,
+          company: ingested.companyName,
+          roleTitle: ingested.title,
+          rawDescription: ingested.description,
+          extractedRequirements: extractedRequirementsJson,
+          source: ingested.source.toLowerCase(),
+          status: "SAVED",
+          notes: notesParts.join(" | "),
+        },
+      });
 
-    return createdJob;
+      await tx.ingestedJob.update({
+        where: { id: ingestedJobId },
+        data: { trackedJobId: targetJob.id },
+      });
+    }
+
+    if (userId) {
+      const userExists = await tx.user.findUnique({
+        where: { id: userId },
+        select: { id: true },
+      });
+      if (userExists) {
+        await upsertApplication(userId, targetJob.id, {}, tx);
+      }
+    }
+
+    return targetJob;
   });
 }

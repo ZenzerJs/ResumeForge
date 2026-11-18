@@ -1,13 +1,23 @@
 import { test, expect } from "@playwright/test";
 
+async function expandAiSidebarIfCollapsed(page: import("@playwright/test").Page) {
+  const expandBtn = page.locator('[data-testid="expand-ai-sidebar-btn"]');
+  if (await expandBtn.isVisible().catch(() => false)) {
+    await expandBtn.click();
+    await expect(page.locator('[data-testid="toggle-ai-sidebar-btn"]')).toBeVisible();
+  }
+}
+
 test.describe("Task 9.2 — Resizable & Collapsible Editor Panels E2E Tests", () => {
   test.beforeEach(async ({ page }) => {
+    // Ensure xl desktop 3-pane layout (>= 1280px)
+    await page.setViewportSize({ width: 1440, height: 900 });
     // Navigate to /editor
     await page.goto("/editor");
     await page.waitForLoadState("networkidle");
   });
 
-  test("1. Open /editor, verify resizable panel group renders all three desktop panels", async ({ page }) => {
+  test("1. Open /editor, verify panel-ai starts collapsed by default and expands via AI toggle button", async ({ page }) => {
     const group = page.locator('[data-testid="editor-resizable-panel-group"]');
     await expect(group).toBeVisible();
 
@@ -17,34 +27,68 @@ test.describe("Task 9.2 — Resizable & Collapsible Editor Panels E2E Tests", ()
 
     await expect(codePanel).toBeVisible();
     await expect(previewPanel).toBeVisible();
+    await expect(aiPanel).toHaveCount(1);
+
+    // Default layout collapses panel-ai on fresh load
+    const expandBtn = page.locator('[data-testid="expand-ai-sidebar-btn"]');
+    await expect(expandBtn).toBeVisible();
+    await expect(expandBtn).toHaveAttribute("aria-expanded", "false");
+    const collapsedBox = await aiPanel.boundingBox();
+    expect(collapsedBox?.width ?? 0).toBeLessThanOrEqual(1);
+
+    // Expand via AI toggle button
+    await expandBtn.click();
     await expect(aiPanel).toBeVisible();
+    await expect(page.locator('[data-testid="toggle-ai-sidebar-btn"]')).toBeVisible();
+    const expandedBox = await aiPanel.boundingBox();
+    expect(expandedBox).not.toBeNull();
+    expect(expandedBox!.width).toBeGreaterThan(100);
   });
 
-  test("2. Collapse AI sidebar via header toggle button and verify state persistence across reload", async ({ page }) => {
+  test("2. Expand AI sidebar, verify open persistence across reload, and collapse back", async ({ page }) => {
+    const expandBtn = page.locator('[data-testid="expand-ai-sidebar-btn"]');
+    await expect(expandBtn).toBeVisible();
+
+    // Expand AI sidebar via toolbar button
+    await expandBtn.click();
     const toggleBtn = page.locator('[data-testid="toggle-ai-sidebar-btn"]');
     await expect(toggleBtn).toBeVisible();
 
-    // Click to collapse
-    await toggleBtn.click();
-    await page.waitForTimeout(300);
+    // Verify localStorage key resumeforge_editor_layout records isAiCollapsed: false
+    await expect
+      .poll(async () => page.evaluate(() => localStorage.getItem("resumeforge_editor_layout")))
+      .not.toBeNull();
+    const openLayout = await page.evaluate(() => localStorage.getItem("resumeforge_editor_layout"));
+    expect(JSON.parse(openLayout || "{}").isAiCollapsed).toBe(false);
 
-    // Verify localStorage key resumeforge_editor_layout was set
-    const savedLayout = await page.evaluate(() => localStorage.getItem("resumeforge_editor_layout"));
-    expect(savedLayout).not.toBeNull();
-    const parsed = JSON.parse(savedLayout || "{}");
-    expect(parsed.isAiCollapsed).toBe(true);
-
-    // Reload page and verify layout state is restored from localStorage
+    // Reload page and verify expanded layout persists from localStorage
     await page.reload();
     await page.waitForLoadState("networkidle");
+    await expect(toggleBtn).toBeVisible();
+    const reloadedOpen = await page.evaluate(() => localStorage.getItem("resumeforge_editor_layout"));
+    expect(JSON.parse(reloadedOpen || "{}").isAiCollapsed).toBe(false);
 
-    const reloadedSavedLayout = await page.evaluate(() => localStorage.getItem("resumeforge_editor_layout"));
-    expect(reloadedSavedLayout).not.toBeNull();
-    const reloadedParsed = JSON.parse(reloadedSavedLayout || "{}");
-    expect(reloadedParsed.isAiCollapsed).toBe(true);
+    // Collapse back via sidebar toggle button
+    await toggleBtn.click();
+    await expect(expandBtn).toBeVisible();
+
+    await expect
+      .poll(async () => {
+        const raw = await page.evaluate(() => localStorage.getItem("resumeforge_editor_layout"));
+        return raw ? JSON.parse(raw).isAiCollapsed : null;
+      })
+      .toBe(true);
+
+    // Reload and verify collapsed state persists
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+    await expect(expandBtn).toBeVisible();
+    const reloadedCollapsed = await page.evaluate(() => localStorage.getItem("resumeforge_editor_layout"));
+    expect(JSON.parse(reloadedCollapsed || "{}").isAiCollapsed).toBe(true);
   });
 
   test("3. Verify AI sidebar input state and JD text remain intact across collapse and expand cycles", async ({ page }) => {
+    await expandAiSidebarIfCollapsed(page);
     await page.locator('[data-testid="ai-tab-tailor"]').click();
     const jdTextarea = page.locator('textarea[placeholder*="Paste the job posting here"]');
     await expect(jdTextarea).toBeVisible();
@@ -56,13 +100,12 @@ test.describe("Task 9.2 — Resizable & Collapsible Editor Panels E2E Tests", ()
     const toggleBtn = page.locator('[data-testid="toggle-ai-sidebar-btn"]');
     // Collapse sidebar
     await toggleBtn.click();
-    await page.waitForTimeout(300);
 
     // Expand sidebar again
     const expandBtn = page.locator('[data-testid="expand-ai-sidebar-btn"]');
+    await expect(expandBtn).toBeVisible();
     await expandBtn.scrollIntoViewIfNeeded();
     await expandBtn.click();
-    await page.waitForTimeout(300);
 
     // Assert textarea value remained completely intact without resetting
     await expect(jdTextarea).toBeVisible();
@@ -70,6 +113,7 @@ test.describe("Task 9.2 — Resizable & Collapsible Editor Panels E2E Tests", ()
   });
 
   test("4. UI-08: Popped-out AI Assistant supports floating mode, keyboard move/resize handles, aria-pressed, and maximized Esc restore", async ({ page }) => {
+    await expandAiSidebarIfCollapsed(page);
     const popoutBtn = page.getByRole("button", { name: /pop out/i }).first();
     if (await popoutBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await popoutBtn.click();

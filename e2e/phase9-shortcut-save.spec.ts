@@ -4,6 +4,7 @@ test.describe("Task 9.3 — Ctrl+S Save & Auto-Compile Protocol E2E Tests", () =
   test.beforeEach(async ({ page }) => {
     await page.goto("/editor");
     await page.waitForLoadState("networkidle");
+    await page.locator('[data-testid="panel-code"] [data-testid="editor-mode-code"]').click();
   });
 
   test("1. Edit Typst source, press Ctrl+S, verify save confirmation toast appears and preview SVG updates", async ({ page }) => {

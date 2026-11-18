@@ -13,7 +13,12 @@ export async function POST(request: Request) {
     const userId = await requireUserId(request);
     if (userId instanceof NextResponse) return userId;
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON payload" }, { status: 400 });
+    }
     const parseResult = ExtractEvidenceRequestSchema.safeParse(body);
 
     if (!parseResult.success) {

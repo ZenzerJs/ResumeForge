@@ -6,6 +6,7 @@ import {
   resolvePatchCitationReferences,
   type PatchCitationInput,
   type NormalizedPatchCitation,
+  type ResolvedEvidenceRegistry,
 } from "@/lib/ai/patch-schema";
 
 export {
@@ -36,6 +37,29 @@ export function normalizePatchCitations(
 ): NormalizedPatchCitation[] {
   const registry = createVerifiedEvidenceRegistry(evidenceItems, ownerId);
   return resolvePatchCitationReferences(references, registry);
+}
+
+/**
+ * Validates and builds normalized Prisma PatchCitation create inputs for a patch proposal
+ * against a pre-resolved verified evidence registry.
+ */
+export function validateAndBuildPatchCitations(
+  proposal: { evidenceIds: readonly string[]; citations?: readonly PatchCitationInput[] },
+  registry: ResolvedEvidenceRegistry
+): Array<{ evidenceId?: string; bulletId?: string }> {
+  const sourceRefs =
+    proposal.citations && proposal.citations.length > 0
+      ? proposal.citations
+      : proposal.evidenceIds;
+  return resolvePatchCitationReferences(sourceRefs, registry).map((cit) => ({
+    ...(cit.evidenceId ? { evidenceId: cit.evidenceId } : {}),
+    ...(cit.bulletId
+      ? {
+          bulletId: cit.bulletId,
+          evidenceId: cit.evidenceId ?? registry.bulletToEvidenceId.get(cit.bulletId),
+        }
+      : {}),
+  }));
 }
 
 async function findVerifiedOwnerEvidence(

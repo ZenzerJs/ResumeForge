@@ -72,6 +72,12 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  select,
+  option {
+    background-color: rgb(var(--surface-elevated));
+    color: rgb(var(--text-primary));
+  }
+
   a:focus-visible,
   button:focus-visible,
   input:focus-visible,
@@ -156,9 +162,9 @@
     box-shadow: var(--shadow-1);
   }
 
-  /* Hover: 2px lift + warm edge (160ms, composite transform + shadow/border) */
+  /* Hover: 2px lift + warm edge (160ms, composite transform + border) */
   .card-lift {
-    transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+    transition: transform 160ms ease, border-color 160ms ease;
   }
 
   @media (hover: hover) {
@@ -303,32 +309,26 @@
 
   .ambient-blob-a {
     animation: rf-blob-drift-a 18s ease-in-out infinite;
-    will-change: transform;
   }
 
   .ambient-blob-b {
     animation: rf-blob-drift-b 20s ease-in-out infinite;
-    will-change: transform;
   }
 
   .ambient-blob-c {
     animation: rf-blob-drift-c 22s ease-in-out infinite;
-    will-change: transform;
   }
 
   .ambient-blob-d {
     animation: rf-blob-drift-d 19s ease-in-out infinite;
-    will-change: transform;
   }
 
   .ambient-blob-e {
     animation: rf-blob-drift-e 21s ease-in-out infinite;
-    will-change: transform;
   }
 
   .ambient-blob-f {
     animation: rf-blob-drift-f 24s ease-in-out infinite;
-    will-change: transform;
   }
 
   /* One-time page entrance */
@@ -413,7 +413,7 @@
     box-shadow:
       0 0 0 1px rgb(255 255 255 / 0.18) inset,
       0 8px 28px rgb(var(--accent-action) / 0.32);
-    transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+    transition: transform 150ms ease, opacity 150ms ease;
   }
 
   .btn-glow:hover {
@@ -457,9 +457,9 @@
     background: linear-gradient(
       110deg,
       transparent 15%,
-      rgba(245, 166, 35, 0.12) 38%,
-      rgba(255, 255, 255, 0.16) 50%,
-      rgba(76, 141, 255, 0.14) 64%,
+      rgb(var(--accent-action) / 0.12) 38%,
+      rgb(var(--paper-sheet) / 0.16) 50%,
+      rgb(var(--accent-contrast) / 0.14) 64%,
       transparent 85%
     );
     animation: skeleton-glint-sweep 2.15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
@@ -478,7 +478,12 @@
     .ambient-blob-c,
     .ambient-blob-d,
     .ambient-blob-e,
-    .ambient-blob-f {
+    .ambient-blob-f,
+    .animate-spin,
+    .animate-pulse,
+    .animate-in,
+    .animate-out,
+    .btn-glow {
       animation: none !important;
     }
 

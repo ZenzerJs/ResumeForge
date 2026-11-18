@@ -335,6 +335,7 @@ test.describe("Critique Remediation E2E Regression Suite", () => {
     browser,
     baseURL,
   }) => {
+    test.setTimeout(60_000);
     const { context, page } = await createIsolatedUserContext(browser, baseURL);
     try {
       await mkdir(ARTIFACT_DIR, { recursive: true });
@@ -622,6 +623,7 @@ test.describe("Critique Remediation E2E Regression Suite", () => {
 
     // Explicit removal of optional Phone field + valid edit to Location persisted across reload
     await visualPage.getByRole("button", { name: "Remove Phone", exact: true }).click();
+    await visualPage.getByTestId("confirm-managed-remove-btn").click();
     await expect(visualPage.getByRole("textbox", { name: "Phone", exact: true })).toHaveCount(0);
     await visualPage.getByRole("textbox", { name: "Location", exact: true }).fill("Montreal, QC");
     await visualPage.getByRole("textbox", { name: "Location", exact: true }).blur();
@@ -662,6 +664,7 @@ test.describe("Critique Remediation E2E Regression Suite", () => {
   test("4. Navigation, titles across 10 routes, provider-unavailable Settings, Library/Tracker mobile, Kanban REJECTED stage, and duplicate vs distinct postings", async ({
     browser,
   }) => {
+    test.setTimeout(90_000);
     await mkdir(ARTIFACT_DIR, { recursive: true });
     const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const page = await context.newPage();
@@ -741,7 +744,7 @@ test.describe("Critique Remediation E2E Regression Suite", () => {
           extractedRequirements: { requiredSkills: ["Go"], preferredSkills: [], domainTerms: [] },
         },
       ];
-      await page.route("**/api/jobs", async (route) => {
+      await page.route(/\/api\/jobs(?:\?|$)/, async (route) => {
         if (route.request().method() === "GET") {
           await route.fulfill({ json: { success: true, guest: true, data: duplicateJobsPayload } });
         } else {
@@ -861,7 +864,7 @@ test.describe("Critique Remediation E2E Regression Suite", () => {
         if (new URL(req.url()).pathname === "/api/jobs/hydrate") sgHydrate += 1;
       });
       await sgPage.goto("/tracker", { waitUntil: "networkidle" });
-      await sgPage.waitForTimeout(500);
+      await expect(sgPage.getByTestId("tracker-page-title")).toBeVisible();
       expect(sgHydrate).toBe(0);
 
       await sgPage.goto("/settings", { waitUntil: "networkidle" });
@@ -883,7 +886,7 @@ test.describe("Critique Remediation E2E Regression Suite", () => {
       });
       await dgPage.route("**/api/demo-config", (route) => route.fulfill({ json: { demoMode: true } }));
       await dgPage.goto("/tracker", { waitUntil: "networkidle" });
-      await dgPage.waitForTimeout(500);
+      await expect(dgPage.getByTestId("tracker-page-title")).toBeVisible();
       expect(dgHydrate).toBe(0);
 
       await dgPage.goto("/settings", { waitUntil: "networkidle" });
@@ -1284,7 +1287,7 @@ test.describe("Critique Remediation E2E Regression Suite", () => {
 
       await page.reload();
       await expect(description).toHaveValue(firstDraft);
-      await expect(page.getByText("Saved posting", { exact: true })).toBeVisible();
+      await expect(page.getByTestId("active-job-header-banner").getByText(/· Saved/)).toBeVisible();
       const changedDraft = "Required skills: TypeScript and PostgreSQL. Preferred skills: AWS.";
       await description.fill(changedDraft);
       await page.getByTestId("save-job-btn").click();

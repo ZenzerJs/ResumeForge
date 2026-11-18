@@ -54,16 +54,22 @@ test.describe("Typst Live-Preview Workspace E2E Tests", () => {
 
     await page.waitForSelector(".typst-preview-svg svg", { timeout: 15000 });
 
+    const initialSvg = await page.locator(".typst-preview-svg").innerHTML();
+
     // Switch to Typst Source mode and click editor content (using first visible desktop editor)
     await page.getByTestId("editor-mode-code").first().click();
     const cmContent = page.locator(".cm-content").first();
     await expect(cmContent).toBeVisible();
     await cmContent.click();
-    await page.keyboard.press("Control+Home");
-    await page.keyboard.type("// Test Comment Added\n");
+    await page.keyboard.press("Control+End");
+    await page.keyboard.type("\n= E2E Preview Update\n");
 
     // Wait for compilation update
-    await page.waitForTimeout(2000);
+    await expect(cmContent).toContainText("E2E Preview Update");
+    await expect
+      .poll(async () => await page.locator(".typst-preview-svg").innerHTML(), { timeout: 15000 })
+      .not.toBe(initialSvg);
+    await expect(page.locator(".typst-preview-svg svg").first()).toBeVisible({ timeout: 15000 });
 
     const updatedSvg = await page.locator(".typst-preview-svg").innerHTML();
     expect(updatedSvg.length).toBeGreaterThan(100);

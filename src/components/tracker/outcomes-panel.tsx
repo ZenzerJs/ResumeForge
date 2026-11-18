@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/design-system/app-shell";
+import { PageHeader } from "@/components/design-system/page-header";
 import { TrackerSubNav } from "@/components/tracker/tracker-sub-nav";
 import { fetchDemoConfig } from "@/components/auth/session-user";
 
@@ -107,10 +108,10 @@ export function OutcomesPanel() {
     <AppShell variant="tracker" layout="page">
       <TrackerSubNav />
       <div className="mx-auto w-full max-w-4xl space-y-6 p-4">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">Pipeline outcomes</h2>
-          <p className="text-sm text-muted-foreground">Counts are yours only. Shared job listings stay SAVED for everyone else.</p>
-        </div>
+        <PageHeader
+          title="Pipeline outcomes"
+          description="Counts are yours only. Shared job listings stay SAVED for everyone else."
+        />
 
         {guest && demoMode && (
           <div

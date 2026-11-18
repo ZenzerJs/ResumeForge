@@ -13,6 +13,7 @@ import {
   type PatchApplicationErrorDetails,
   type ResolvedEvidenceRegistry,
 } from "@/lib/ai/patch-schema";
+import { validateAndBuildPatchCitations } from "@/lib/ai/patch-citations";
 import { applyPatchProposals } from "@/lib/ai/patch-application";
 import {
   assertCanApplyPatches,
@@ -372,10 +373,12 @@ export async function applyProposalBatch(input: ApplyBatchInput) {
     if (batch.revisionToken !== input.revisionToken) {
       throw new PatchBatchError("stale_resume_or_job", "Proposal revision is stale.", { httpStatus: 409 });
     }
-    await tx.$queryRaw`SELECT "id" FROM "Resume" WHERE "id" = ${batch.masterResumeId} FOR SHARE`;
-    await tx.$queryRaw`SELECT "id" FROM "Job" WHERE "id" = ${batch.jobId} FOR SHARE`;
-    await tx.$queryRaw`SELECT "id" FROM "EvidenceItem" WHERE "userId" = ${input.userId} FOR SHARE`;
-    await tx.$queryRaw`SELECT b."id" FROM "Bullet" b JOIN "EvidenceItem" e ON e."id" = b."evidenceId" WHERE e."userId" = ${input.userId} FOR SHARE OF b`;
+    await Promise.all([
+      tx.$queryRaw`SELECT "id" FROM "Resume" WHERE "id" = ${batch.masterResumeId} FOR SHARE`,
+      tx.$queryRaw`SELECT "id" FROM "Job" WHERE "id" = ${batch.jobId} FOR SHARE`,
+      tx.$queryRaw`SELECT "id" FROM "EvidenceItem" WHERE "userId" = ${input.userId} FOR SHARE`,
+      tx.$queryRaw`SELECT b."id" FROM "Bullet" b JOIN "EvidenceItem" e ON e."id" = b."evidenceId" WHERE e."userId" = ${input.userId} FOR SHARE OF b`,
+    ]);
     const [master, job, evidence] = await Promise.all([
       tx.resume.findFirst({ where: { id: batch.masterResumeId, userId: input.userId, isMaster: true, isProtected: true } }),
       tx.job.findFirst({ where: { id: batch.jobId, OR: [{ userId: input.userId }, { userId: null }] } }),
@@ -419,16 +422,7 @@ export async function applyProposalBatch(input: ApplyBatchInput) {
         operation: p.operation, targetSection: p.targetSection, targetId: p.targetId,
         beforeContent: p.before, afterContent: p.after, evidenceCitations: JSON.stringify(p.evidenceIds),
         rationale: p.rationale, confidence: p.confidence, status: "ACCEPTED",
-        citations: { create: (p.citations && p.citations.length > 0
-          ? resolvePatchCitationReferences(p.citations, registry).map(cit => ({
-              ...(cit.evidenceId ? { evidenceId: cit.evidenceId } : {}),
-              ...(cit.bulletId ? { bulletId: cit.bulletId, evidenceId: cit.evidenceId ?? registry.bulletToEvidenceId.get(cit.bulletId) } : {}),
-            }))
-          : p.evidenceIds.map(ref => (
-              registry.evidenceIds.has(ref)
-                ? { evidenceId: ref }
-                : { bulletId: ref, evidenceId: registry.bulletToEvidenceId.get(ref) }
-            ))) },
+        citations: { create: validateAndBuildPatchCitations(p, registry) },
       })) },
     }, include: { patches: { include: { citations: true } } } });
     await tx.patchProposalBatch.update({ where: { id: batch.id }, data: { status: "CONSUMED", consumedAt: new Date() } });

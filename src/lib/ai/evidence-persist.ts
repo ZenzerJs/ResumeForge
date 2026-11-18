@@ -1,4 +1,5 @@
-import { createEvidenceItem, getEvidenceItems } from "@/lib/db/evidence";
+import { createEvidenceItem } from "@/lib/db/evidence";
+import { prisma } from "@/lib/prisma";
 import type { EvidenceExtractItem, EvidenceExtractResponse } from "@/lib/ai/evidence-extract-schema";
 
 export interface PersistDraftEvidenceResult {
@@ -21,7 +22,15 @@ export async function persistDraftEvidenceFromExtract(
   extract: EvidenceExtractResponse,
   userId?: string
 ): Promise<PersistDraftEvidenceResult> {
-  const existing = await getEvidenceItems(undefined, userId);
+  const existing = await prisma.evidenceItem.findMany({
+    where: userId ? { userId } : undefined,
+    select: {
+      type: true,
+      title: true,
+      organization: true,
+      status: true,
+    },
+  });
   const verifiedKeys = new Set(
     existing
       .filter((e) => e.status === "verified")
@@ -33,10 +42,9 @@ export async function persistDraftEvidenceFromExtract(
       .map((e) => normalizeKey(e.type, e.title, e.organization))
   );
 
-  let createdCount = 0;
   let skippedVerifiedCount = 0;
   let skippedDuplicateDraftCount = 0;
-  const createdIds: string[] = [];
+  const itemsToCreate: EvidenceExtractItem[] = [];
 
   for (const item of extract.items as EvidenceExtractItem[]) {
     const key = normalizeKey(item.type, item.title, item.organization);
@@ -49,33 +57,36 @@ export async function persistDraftEvidenceFromExtract(
       continue;
     }
 
-    const created = await createEvidenceItem({
-      type: item.type,
-      title: item.title,
-      organization: item.organization ?? undefined,
-      dates: item.dates ?? undefined,
-      verifiedSummary: item.verifiedSummary,
-      tags: item.tags || [],
-      status: "draft",
-      userId,
-      bullets: (item.bullets || []).map((b, idx) => ({
-        text: b.text,
-        technologies: b.technologies || [],
-        roleAffinity: b.roleAffinity || [],
-        verified: false,
-        orderIndex: idx,
-      })),
-    });
-
     draftKeys.add(key);
-    createdCount += 1;
-    createdIds.push(created.id);
+    itemsToCreate.push(item);
   }
 
+  const createdItems = await Promise.all(
+    itemsToCreate.map((item) =>
+      createEvidenceItem({
+        type: item.type,
+        title: item.title,
+        organization: item.organization ?? undefined,
+        dates: item.dates ?? undefined,
+        verifiedSummary: item.verifiedSummary,
+        tags: item.tags || [],
+        status: "draft",
+        userId,
+        bullets: (item.bullets || []).map((b, idx) => ({
+          text: b.text,
+          technologies: b.technologies || [],
+          roleAffinity: b.roleAffinity || [],
+          verified: false,
+          orderIndex: idx,
+        })),
+      })
+    )
+  );
+
   return {
-    createdCount,
+    createdCount: createdItems.length,
     skippedVerifiedCount,
     skippedDuplicateDraftCount,
-    createdIds,
+    createdIds: createdItems.map((c) => c.id),
   };
 }

@@ -24,7 +24,7 @@ export const ToolBadge = React.memo(function ToolBadge({
       data-testid={`tool-badge-${name}`}
       data-state={state}
       className={cn(
-        "my-2 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs shadow-xs backdrop-blur-xs transition-all",
+        "my-2 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs shadow-xs backdrop-blur-xs transition-colors",
         state === "running" &&
           "border-status-warning/40 bg-status-warning/15 text-status-warning animate-pulse",
         state === "completed" &&

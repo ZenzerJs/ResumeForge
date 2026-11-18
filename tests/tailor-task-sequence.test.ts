@@ -134,7 +134,7 @@ describe("Tailor task-sequence navigation & state helpers", () => {
     expect(src).toContain('href="/tracker"');
     expect(src).toContain("pendingNavTarget");
     expect(src).toContain("[targetJobToLoad, fetchMatches, triggerTier2Fetch]");
-    expect(src).toContain("[activeTab, isBootstrapping, isLoadingJob]");
+    expect(src).toContain("[activeTab, isBootstrapping, isLoadingJob, tabListRef]");
     expect(src).not.toContain("Open in 3-Pane Tailor");
     expect(src).not.toContain("Back to 3-Pane Workspace");
     expect(src).not.toContain(">USER_ADDED<");

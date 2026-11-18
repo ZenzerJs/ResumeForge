@@ -9,6 +9,8 @@ export const HEAVY_ENDPOINT_LIMITS: Record<string, { limit: number; windowMs: nu
   "/api/resumes/upload-pdf": { limit: 10, windowMs: 60_000 },
   "/api/jobs/extract": { limit: 15, windowMs: 60_000 },
   "/api/connectors/sync": { limit: 5, windowMs: 60_000 },
+  "/api/cover-letters/generate": { limit: 10, windowMs: 60_000 },
+  "/api/jobs/sync-pittcsc": { limit: 5, windowMs: 60_000 },
 };
 
 const HEAVY_ENDPOINT_NAMESPACES: Record<string, RateLimitNamespace> = {
@@ -17,6 +19,8 @@ const HEAVY_ENDPOINT_NAMESPACES: Record<string, RateLimitNamespace> = {
   "/api/resumes/upload-pdf": "heavy:/api/resumes/upload-pdf",
   "/api/jobs/extract": "heavy:/api/jobs/extract",
   "/api/connectors/sync": "heavy:/api/connectors/sync",
+  "/api/cover-letters/generate": "heavy:/api/cover-letters/generate",
+  "/api/jobs/sync-pittcsc": "heavy:/api/jobs/sync-pittcsc",
 };
 
 const FETCH_FULLTEXT_LIMIT = {

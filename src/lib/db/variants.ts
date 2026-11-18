@@ -1,4 +1,6 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { sharedOrSelfJobWhere } from "@/lib/db/jobs";
 
 /**
  * Phase 4.2: ResumeVariant Data Access Layer
@@ -20,6 +22,7 @@ export interface UpdateVariantInput {
   variantTitle?: string;
   typstContent?: string;
   status?: string; // DRAFT | REVIEWED | EXPORTED
+  userId?: string;
 }
 
 /**
@@ -36,9 +39,14 @@ export async function createVariant(input: CreateVariantInput) {
     throw new Error(`Master resume not found: ${input.masterResumeId}`);
   }
 
-  // Verify job exists
+  const effectiveUserId = input.userId ?? masterResume.userId;
+
+  // Verify job exists and is accessible to the caller
   const job = await prisma.job.findFirst({
-    where: { id: input.jobId },
+    where: {
+      id: input.jobId,
+      ...sharedOrSelfJobWhere(effectiveUserId),
+    },
   });
 
   if (!job) {
@@ -51,7 +59,7 @@ export async function createVariant(input: CreateVariantInput) {
       jobId: input.jobId,
       variantTitle: input.variantTitle,
       typstContent: input.typstContent,
-      factSnapshot: masterResume.factSnapshot as any,
+      factSnapshot: (masterResume.factSnapshot ?? undefined) as Prisma.InputJsonValue | undefined,
       status: "DRAFT",
     },
   });
@@ -59,28 +67,25 @@ export async function createVariant(input: CreateVariantInput) {
 
 /**
  * Updates an existing ResumeVariant.
- * Amendment 3: Hard guard — refuses if the target ID resolves to a protected Resume record.
+ * Amendment 3: Hard guard — refuses if the target ID does not resolve to an owned ResumeVariant record.
  */
-export async function updateVariant(variantId: string, input: UpdateVariantInput) {
-  // Verify variant exists and is actually a ResumeVariant (not a Resume)
-  const variant = await prisma.resumeVariant.findUnique({
-    where: { id: variantId },
+export async function updateVariant(
+  variantId: string,
+  input: UpdateVariantInput,
+  userId?: string
+) {
+  const effectiveUserId = userId ?? input.userId;
+
+  // Verify variant exists, belongs to caller when userId is provided, and is actually a ResumeVariant
+  const variant = await prisma.resumeVariant.findFirst({
+    where: {
+      id: variantId,
+      ...(effectiveUserId ? { masterResume: { userId: effectiveUserId } } : {}),
+    },
   });
 
   if (!variant) {
     throw new Error(`ResumeVariant not found: ${variantId}`);
-  }
-
-  // Double-check: ensure we are not somehow writing to a protected master resume
-  // This guards against ID confusion attacks or bugs
-  const protectedResume = await prisma.resume.findFirst({
-    where: { id: variantId, isProtected: true },
-  });
-
-  if (protectedResume) {
-    throw new Error(
-      "SECURITY: Attempted to write AI-generated content to a protected Master Resume. This operation is forbidden."
-    );
   }
 
   return await prisma.resumeVariant.update({
@@ -116,9 +121,12 @@ export async function getVariantById(variantId: string, userId?: string) {
 /**
  * Fetches all variants for a given job.
  */
-export async function getVariantsByJobId(jobId: string) {
+export async function getVariantsByJobId(jobId: string, userId?: string) {
   return await prisma.resumeVariant.findMany({
-    where: { jobId },
+    where: {
+      jobId,
+      ...(userId ? { masterResume: { userId } } : {}),
+    },
     orderBy: { createdAt: "desc" },
   });
 }

@@ -261,18 +261,26 @@ export async function restoreMasterSnapshot(snapshotId: string, userId?: string)
     throw new Error(`MasterHistory snapshot record "${snapshotId}" not found.`);
   }
 
-  if (userId) {
-    const owned = await getResumeById(snapshot.resumeId, userId);
-    if (!owned) {
-      throw new Error(`MasterHistory snapshot record "${snapshotId}" not found.`);
-    }
+  const owned = await getResumeById(snapshot.resumeId, userId);
+  if (userId && !owned) {
+    throw new Error(`MasterHistory snapshot record "${snapshotId}" not found.`);
   }
 
-  const factSnapshot = parseTypstDeterministic(snapshot.typstSource) as unknown as Prisma.InputJsonValue;
+  const effectiveUserId = userId ?? owned?.userId ?? undefined;
 
   return await prisma.$transaction(async (tx) => {
+    const ownerFilter = effectiveUserId ? { userId: effectiveUserId } : {};
+    const evidence = await tx.evidenceItem.findMany({
+      where: { status: "verified", ...ownerFilter },
+      include: { bullets: true },
+    });
+    const factSnapshot = extractResumeFacts(
+      snapshot.typstSource,
+      evidence,
+    ) as unknown as Prisma.InputJsonValue;
+
     await tx.resume.updateMany({
-      where: { ...(userId ? { userId } : {}), isMaster: true, NOT: { id: snapshot.resumeId } },
+      where: { ...ownerFilter, isMaster: true, NOT: { id: snapshot.resumeId } },
       data: { isMaster: false },
     });
 

@@ -38,6 +38,53 @@ async function approvalHash(source: string) {
   return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+export function formatTypstDiagnosticMessage(rawMessage: string): string {
+  if (!rawMessage) return "Failed to compile Typst document.";
+  const unescapeRustStr = (val: string) =>
+    val
+      .replace(/\\"/g, '"')
+      .replace(/\\n/g, "\n")
+      .replace(/\\t/g, "  ")
+      .replace(/\\\\/g, "\\")
+      .trim();
+
+  if (rawMessage.includes("SourceDiagnostic")) {
+    const messages: string[] = [];
+    const msgRegex = /\bmessage:\s*"((?:[^"\\]|\\.)*)"/g;
+    let match: RegExpExecArray | null;
+    while ((match = msgRegex.exec(rawMessage)) !== null) {
+      const text = unescapeRustStr(match[1]);
+      if (text && !messages.includes(text)) messages.push(text);
+    }
+
+    const hints: string[] = [];
+    const hintsBlockRegex = /\bhints:\s*\[([\s\S]*?)\]/g;
+    let hintBlock: RegExpExecArray | null;
+    while ((hintBlock = hintsBlockRegex.exec(rawMessage)) !== null) {
+      const strRegex = /"((?:[^"\\]|\\.)*)"/g;
+      let hMatch: RegExpExecArray | null;
+      while ((hMatch = strRegex.exec(hintBlock[1])) !== null) {
+        const hint = unescapeRustStr(hMatch[1]);
+        if (hint && !hints.includes(hint)) hints.push(`Hint: ${hint}`);
+      }
+    }
+
+    if (messages.length > 0) {
+      return [...messages, ...hints].join("\n");
+    }
+
+    const stripped = rawMessage
+      .replace(/\[?\s*SourceDiagnostic\s*\(?/g, "")
+      .replace(/\b(?:severity|span|trace|hints):\s*(?:\[[\s\S]*?\]|Span\([^)]*\)|[^,}\]]+),?\s*/g, "")
+      .replace(/[{}[\]()]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return stripped || "Typst syntax error — check document markup.";
+  }
+
+  return rawMessage.replace(/^error:\s*/i, "").trim() || "Failed to compile Typst document.";
+}
+
 interface PreviewPanelProps {
   svg: string | null;
   error: { message: string; line?: number; column?: number } | null;
@@ -461,7 +508,19 @@ export function PreviewPanel({
     );
   }, [extractedRequirements, hasHydratedSource, showDockedGrade, showGrade, source, v2]);
 
+  const [canDirectExport, setCanDirectExport] = useState(false);
+
+  const evaluateCanDirectExport = useCallback(() => {
+    try {
+      assertCanExport(sourceRef.current, masterFacts, { allowUnfrozenMasterSelfExport });
+      setCanDirectExport(true);
+    } catch {
+      setCanDirectExport(false);
+    }
+  }, [masterFacts, allowUnfrozenMasterSelfExport]);
+
   const handleExportPdf = async () => {
+    evaluateCanDirectExport();
     try {
       setIsExporting(true);
       setExportError(null);
@@ -476,6 +535,7 @@ export function PreviewPanel({
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
       downloadBlob(blob, "resume.pdf");
     } catch (err) {
+      evaluateCanDirectExport();
       setExportError(err instanceof Error ? err.message : "Failed to export PDF");
     } finally {
       setIsExporting(false);
@@ -483,6 +543,7 @@ export function PreviewPanel({
   };
 
   const handleExportDocx = async () => {
+    evaluateCanDirectExport();
     try {
       setIsExporting(true);
       setExportError(null);
@@ -497,6 +558,7 @@ export function PreviewPanel({
       });
       downloadBlob(blob, "resume.docx");
     } catch (err) {
+      evaluateCanDirectExport();
       setExportError(err instanceof Error ? err.message : "Failed to export DOCX");
     } finally {
       setIsExporting(false);
@@ -550,6 +612,7 @@ export function PreviewPanel({
   };
 
   const handleExportZip = async () => {
+    evaluateCanDirectExport();
     try {
       setIsExporting(true);
       setExportError(null);
@@ -579,6 +642,7 @@ export function PreviewPanel({
       });
       downloadBlob(blob, sanitizeZipFilename("Target_Company", roleTitle || "Resume"));
     } catch (err) {
+      evaluateCanDirectExport();
       setExportError(
         err instanceof Error
           ? err.message
@@ -633,7 +697,7 @@ export function PreviewPanel({
               </span>
             </button>
           )}
-          {isCompiling && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />}
+          {isCompiling && !error && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />}
         </div>
 
         {v2 && (
@@ -648,9 +712,11 @@ export function PreviewPanel({
           >
             <span className="whitespace-nowrap">
               {measurementError
-                ? `Measurement failed: ${measurementError}`
+                ? `Measurement failed: ${formatTypstDiagnosticMessage(measurementError)}`
                 : !measurement || measurement.source !== source
-                ? "Measuring…"
+                ? error
+                  ? "Syntax error — preview paused"
+                  : "Measuring…"
                 : `${measurement.pages} ${measurement.pages === 1 ? "page" : "pages"} measured`}
             </span>
             {onApplyLayout && (
@@ -718,7 +784,7 @@ export function PreviewPanel({
             {showGrade ? "Close Grade" : "Grade"}
           </button>
 
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={(open) => { if (open) evaluateCanDirectExport(); }}>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
@@ -787,7 +853,7 @@ export function PreviewPanel({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={(open) => { if (open) evaluateCanDirectExport(); }}>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
@@ -870,38 +936,44 @@ export function PreviewPanel({
                   )}
                 </div>
                 <p className="mt-1 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap text-text-secondary">
-                  {error.message}
+                  {formatTypstDiagnosticMessage(error.message)}
                 </p>
-                <div className="mt-2 flex items-center justify-between">
-                  <p className="text-sm text-text-muted">
-                    Showing last valid compilation preview below.
-                  </p>
-                  {onTriggerRepair && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const lineNum = typeof error.line === "number" ? error.line : undefined;
-                        const colNum = typeof error.column === "number" ? error.column : undefined;
-                        let excerpt: string | undefined = undefined;
-                        if (source && lineNum) {
-                          const lines = source.split("\n");
-                          excerpt = lines.slice(Math.max(0, lineNum - 3), lineNum + 2).join("\n");
-                        }
-                        onTriggerRepair({
-                          compileError: error.message,
-                          line: lineNum,
-                          column: colNum,
-                          sourceExcerpt: excerpt,
-                        });
-                      }}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      data-testid="fix-typst-ai-btn"
-                    >
-                      <Sparkles className="h-3.5 w-3.5" />
-                      Fix with AI
-                    </button>
-                  )}
-                </div>
+                {(Boolean(svg) || Boolean(onTriggerRepair)) && (
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    {Boolean(svg) ? (
+                      <p className="text-xs text-text-muted">
+                        Showing last valid compilation preview below.
+                      </p>
+                    ) : (
+                      <span />
+                    )}
+                    {onTriggerRepair && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const lineNum = typeof error.line === "number" ? error.line : undefined;
+                          const colNum = typeof error.column === "number" ? error.column : undefined;
+                          let excerpt: string | undefined = undefined;
+                          if (source && lineNum) {
+                            const lines = source.split("\n");
+                            excerpt = lines.slice(Math.max(0, lineNum - 3), lineNum + 2).join("\n");
+                          }
+                          onTriggerRepair({
+                            compileError: formatTypstDiagnosticMessage(error.message),
+                            line: lineNum,
+                            column: colNum,
+                            sourceExcerpt: excerpt,
+                          });
+                        }}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        data-testid="fix-typst-ai-btn"
+                      >
+                        <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                        Fix with AI
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -924,27 +996,29 @@ export function PreviewPanel({
                 Dismiss
               </button>
             </div>
-            <div className="flex items-center gap-2 pt-1 border-t border-outline/60">
-              <span className="text-xs text-text-secondary font-semibold">Fallback direct downloads:</span>
-              <button
-                type="button"
-                onClick={handleExportPdf}
-                data-testid="fallback-download-pdf-btn"
-                className="px-2 py-0.5 rounded bg-elevated border border-outline/70 text-primary hover:bg-muted font-semibold text-xs inline-flex items-center gap-1"
-              >
-                <Download className="size-3" />
-                <span>PDF</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleExportDocx}
-                data-testid="fallback-download-docx-btn"
-                className="px-2 py-0.5 rounded bg-elevated border border-outline/70 text-status-info hover:bg-muted font-semibold text-xs inline-flex items-center gap-1"
-              >
-                <FileText className="size-3" />
-                <span>DOCX</span>
-              </button>
-            </div>
+            {canDirectExport && (
+              <div className="flex items-center gap-2 pt-1 border-t border-outline/60">
+                <span className="text-xs text-text-secondary font-semibold">Fallback direct downloads:</span>
+                <button
+                  type="button"
+                  onClick={handleExportPdf}
+                  data-testid="fallback-download-pdf-btn"
+                  className="px-2 py-0.5 rounded bg-elevated border border-outline/70 text-primary hover:bg-muted font-semibold text-xs inline-flex items-center gap-1"
+                >
+                  <Download className="size-3" />
+                  <span>PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportDocx}
+                  data-testid="fallback-download-docx-btn"
+                  className="px-2 py-0.5 rounded bg-elevated border border-outline/70 text-status-info hover:bg-muted font-semibold text-xs inline-flex items-center gap-1"
+                >
+                  <FileText className="size-3" />
+                  <span>DOCX</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -966,13 +1040,15 @@ export function PreviewPanel({
                     if (el) pageSlotRefs.current.set(pageNumber, el);
                     else pageSlotRefs.current.delete(pageNumber);
                   }}
-                  className="overflow-hidden border border-[#d8dce0] bg-paper text-paper-ink shadow-[0_4px_16px_rgba(0,0,0,0.45)]"
+                  className="overflow-hidden border border-hairline bg-paper text-paper-ink shadow-[0_4px_16px_rgba(0,0,0,0.45)]"
                 >
                   {/* Browser-rendered pages reflect the same PDF bytes used for export. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={renderedImage || BLANK_PAGE_PLACEHOLDER}
                     alt={`Resume page ${pageNumber}`}
+                    width={816}
+                    height={1056}
                     data-page-number={pageNumber}
                     data-page-rendered={renderedImage ? "true" : "false"}
                     className={renderedImage ? "block h-auto w-full" : "block h-auto w-full aspect-[8.5/11]"}
@@ -994,7 +1070,7 @@ export function PreviewPanel({
           ) : sanitizedSvg?.raw === svg && sanitizedSvg.clean ? (
             <div
               data-testid="typst-paper-sheet"
-              className={`${previewView === "actual" ? "w-[816px] shrink-0" : "w-full max-w-[850px]"} rounded-[2px] bg-paper text-paper-ink p-4 sm:p-8 border border-[#d8dce0] shadow-[0_4px_16px_rgba(0,0,0,0.45)]`}
+              className={`${previewView === "actual" ? "w-[816px] shrink-0" : "w-full max-w-[850px]"} rounded-[2px] bg-paper text-paper-ink p-4 sm:p-8 border border-hairline shadow-[0_4px_16px_rgba(0,0,0,0.45)]`}
             >
               <div
                 data-testid="typst-preview-svg"
@@ -1005,13 +1081,23 @@ export function PreviewPanel({
           ) : (
             <div className="flex flex-col items-center justify-center h-64 text-text-muted">
               <Loader2 className="h-6 w-6 animate-spin mb-2 text-primary" />
-              <p className="text-xs">Verifying SVG preview...</p>
+              <p className="text-xs">Verifying SVG preview…</p>
             </div>
           )
+        ) : error ? (
+          <div
+            data-testid="typst-preview-error-empty"
+            className="flex flex-col items-center justify-center h-64 text-center px-4"
+          >
+            <AlertCircle className="h-7 w-7 mb-2 text-status-danger/80" aria-hidden="true" />
+            <p className="text-xs text-text-secondary">
+              Preview unavailable until syntax errors are resolved.
+            </p>
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-64 text-text-muted">
             <Loader2 className="h-8 w-8 animate-spin mb-2 text-primary" />
-            <p className="text-xs">Initializing Typst WASM compiler...</p>
+            <p className="text-xs">Initializing Typst WASM compiler…</p>
           </div>
         )}
         </div>
@@ -1041,7 +1127,7 @@ export function PreviewPanel({
                   <div
                     className="relative grid h-[72px] w-[72px] shrink-0 place-items-center rounded-full"
                     style={{
-                      background: `conic-gradient(rgb(var(--accent-contrast)) ${liveAtsGrade.overallScore}%, rgb(214 196 176 / 0.14) 0)`,
+                      background: `conic-gradient(rgb(var(--accent-contrast)) ${liveAtsGrade.overallScore}%, rgb(var(--border-hairline)) 0)`,
                       filter: "drop-shadow(0 0 14px rgb(var(--accent-contrast) / 0.35))",
                     }}
                   >
@@ -1142,7 +1228,7 @@ export function PreviewPanel({
                 })
               ) : (
                 <div className="flex items-start gap-2.5 rounded-[8px] border border-hairline bg-inset p-2.5 text-xs text-text-secondary">
-                  <span className="shrink-0 rounded-[5px] border border-signal/40 bg-signal/10 px-1.5 py-0.5 text-xs font-semibold text-signal">
+                  <span className="shrink-0 rounded-[5px] border border-signal/40 bg-signal/10 px-1.5 py-0.5 text-xs font-semibold text-status-success-soft">
                     Ready
                   </span>
                   <span className="leading-snug">
@@ -1154,7 +1240,7 @@ export function PreviewPanel({
               </>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Waiting for resume source...
+                Waiting for resume source…
               </p>
             )}
           </aside>

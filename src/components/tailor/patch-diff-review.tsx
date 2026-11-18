@@ -21,8 +21,6 @@ import {
 import {
   getPatchRecoveryAction,
   PatchErrorCategorySchema,
-  resolvePatchCitationReferences,
-  toResolvedEvidenceRegistry,
   type PatchProposal,
   type Gap,
   type RejectedPatch,
@@ -31,6 +29,8 @@ import {
 import { checkGuardrail } from "@/lib/guardrail/check";
 import { assertCanApplyPatches, GuardrailBlockError, markDocumentAsPatched } from "@/lib/guardrail/policy";
 import { applyPatchProposals } from "@/lib/ai/patch-application";
+import { preflightPatchProposal, type PatchPreflightResult } from "./patch-preflight";
+export { preflightPatchProposal, type PatchPreflightResult };
 import type { ResumeFacts, TailoringValidationContext } from "@/lib/facts/types";
 import { readApiResponse } from "@/lib/api-error";
 import {
@@ -40,6 +40,7 @@ import {
   type TailorWorkspaceTab,
 } from "@/lib/tailor/application-context";
 import { SuggestionPreview } from "./suggestion-preview";
+import { useRovingTablist } from "@/lib/hooks/use-roving-tablist";
 
 /**
  * Pure helper that merges accepted patches into Typst source and stamps the document
@@ -77,91 +78,6 @@ export interface StructuredPatchError {
   recoveryAction: string;
   affectedPatchIds?: string[];
   details?: Record<string, unknown>;
-}
-
-export interface PatchPreflightResult {
-  citationChecked: boolean;
-  blocked: boolean;
-  reason?: string;
-  category?: PatchErrorCategory;
-  recoveryAction?: string;
-}
-
-export function preflightPatchProposal(
-  patch: PatchProposal,
-  options: {
-    validationContext?: TailoringValidationContext | null;
-    baseTypstSource?: string | null;
-    masterTypstSource: string;
-    acknowledgedSkills?: string[];
-  }
-): PatchPreflightResult {
-  const { validationContext, baseTypstSource, masterTypstSource, acknowledgedSkills = [] } = options;
-
-  let citationChecked = false;
-  if (validationContext?.version === 2) {
-    const registry = toResolvedEvidenceRegistry(validationContext.registry);
-    const stringRefs = patch.evidenceIds || [];
-    const structuredRefs = patch.citations || [];
-    if (stringRefs.length === 0 && structuredRefs.length === 0) {
-      return {
-        citationChecked: false,
-        blocked: true,
-        category: "evidence_unavailable",
-        reason: "Suggestion has no verified evidence citations.",
-        recoveryAction: getPatchRecoveryAction("evidence_unavailable"),
-      };
-    }
-    try {
-      if (stringRefs.length > 0) resolvePatchCitationReferences(stringRefs, registry);
-      if (structuredRefs.length > 0) resolvePatchCitationReferences(structuredRefs, registry);
-      citationChecked = true;
-    } catch (err) {
-      return {
-        citationChecked: false,
-        blocked: true,
-        category: "evidence_unavailable",
-        reason: err instanceof Error ? err.message : "Cited evidence is unavailable or unverified.",
-        recoveryAction: getPatchRecoveryAction("evidence_unavailable"),
-      };
-    }
-
-    const gResult = checkGuardrail(masterTypstSource, validationContext, {
-      patches: [patch],
-      acknowledgedSkills,
-    });
-    const hardNonSkill = gResult.violations.filter(
-      (v) => v.severity === "HARD" && v.kind !== "skill"
-    );
-    if (hardNonSkill.length > 0) {
-      return {
-        citationChecked: false,
-        blocked: true,
-        category: "evidence_unavailable",
-        reason: hardNonSkill.map((v) => v.message).join(" "),
-        recoveryAction: getPatchRecoveryAction("evidence_unavailable"),
-      };
-    }
-  }
-
-  if (baseTypstSource) {
-    try {
-      applyPatchProposals(baseTypstSource, [patch]);
-    } catch (err) {
-      return {
-        citationChecked,
-        blocked: true,
-        category: "missing_patch_anchor",
-        reason:
-          err instanceof Error
-            ? err.message
-            : "The resume text no longer matches this suggestion target.",
-        recoveryAction: getPatchRecoveryAction("missing_patch_anchor"),
-      };
-    }
-  }
-
-  return { citationChecked, blocked: false };
 }
 
 function normalizeErrorCategory(value: unknown, fallback: PatchErrorCategory): PatchErrorCategory {
@@ -241,6 +157,7 @@ interface PatchDiffReviewProps {
   tailorTab?: TailorWorkspaceTab;
   masterResumeId?: string | null;
   editorMode?: EditorModeParam | null;
+  preflightById?: Record<string, PatchPreflightResult>;
 }
 
 const SEVERITY_STYLES: Record<string, { bg: string; border: string; text: string }> = {
@@ -345,6 +262,7 @@ export function PatchDiffReview({
   tailorTab = "3-pane",
   masterResumeId = null,
   editorMode = null,
+  preflightById: preflightByIdProp,
 }: PatchDiffReviewProps) {
   const [internalDecisions, setInternalDecisions] = useState<Record<string, PatchDecision>>(() => {
     const initial: Record<string, PatchDecision> = {};
@@ -362,6 +280,9 @@ export function PatchDiffReview({
   const setSelectedPatch = onSelectedPatchChange ?? setInternalSelectedPatch;
 
   const [activeSubTab, setActiveSubTab] = useState<ReviewSubTab>("suggestions");
+  const { tablistRef: reviewTablistRef, getTabProps: getReviewTabProps } = useRovingTablist(
+    (["suggestions", "gaps", "blocked"] as const).indexOf(activeSubTab)
+  );
   const [isApplying, setIsApplying] = useState(false);
   const [applyError, setApplyError] = useState<StructuredPatchError | null>(null);
   const [applySuccess, setApplySuccess] = useState<string | null>(null);
@@ -400,6 +321,7 @@ export function PatchDiffReview({
   const validationInput = validationContext ?? masterFactsSnapshot;
 
   const preflightById = useMemo(() => {
+    if (preflightByIdProp) return preflightByIdProp;
     const map: Record<string, PatchPreflightResult> = {};
     const ackArray = Array.from(acknowledgedSkills);
     for (const patch of verified) {
@@ -411,7 +333,7 @@ export function PatchDiffReview({
       });
     }
     return map;
-  }, [verified, validationContext, baseTypstSource, masterTypstSource, acknowledgedSkills]);
+  }, [preflightByIdProp, verified, validationContext, baseTypstSource, masterTypstSource, acknowledgedSkills]);
 
   const actionablePatches = useMemo(
     () => verified.filter((patch) => !preflightById[patch.id]?.blocked),
@@ -744,10 +666,11 @@ export function PatchDiffReview({
   }, [evidenceMetadata]);
 
   return (
-    <div ref={reviewContainerRef} className="space-y-4 pb-6" data-testid="patch-diff-review">
+    <div ref={reviewContainerRef} className="space-y-4 pb-6 scroll-pb-20" data-testid="patch-diff-review">
       {/* Counted Review Tabs + Bulk Actions */}
       <div className="surface-raised rounded-xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3">
         <div
+          ref={reviewTablistRef}
           role="tablist"
           aria-label="Proposal review sections"
           className="flex flex-wrap items-center gap-1.5 rounded-lg bg-inset p-1 border border-hairline"
@@ -755,6 +678,7 @@ export function PatchDiffReview({
           <button
             type="button"
             role="tab"
+            {...getReviewTabProps(0)}
             aria-selected={activeSubTab === "suggestions"}
             onClick={() => setActiveSubTab("suggestions")}
             data-testid="review-tab-suggestions"
@@ -769,6 +693,7 @@ export function PatchDiffReview({
           <button
             type="button"
             role="tab"
+            {...getReviewTabProps(1)}
             aria-selected={activeSubTab === "gaps"}
             onClick={() => setActiveSubTab("gaps")}
             data-testid="review-tab-gaps"
@@ -783,6 +708,7 @@ export function PatchDiffReview({
           <button
             type="button"
             role="tab"
+            {...getReviewTabProps(2)}
             aria-selected={activeSubTab === "blocked"}
             onClick={() => setActiveSubTab("blocked")}
             data-testid="review-tab-blocked"
@@ -1391,6 +1317,7 @@ export function PatchDiffReview({
         <div className="space-y-3">
           {unverifiedSkillsForAccepted.length > 0 && (
             <div
+              role="alert"
               data-testid="unverified-skills-ack-box"
               className="p-3.5 bg-status-warning/15 border border-status-warning/40 rounded-xl space-y-2 text-xs text-status-warning"
             >

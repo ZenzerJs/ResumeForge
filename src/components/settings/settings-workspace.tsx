@@ -30,6 +30,8 @@ import {
   Lock,
   ExternalLink,
   ChevronDown,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { AppShell } from "@/components/design-system/app-shell";
 import { PageHeader } from "@/components/design-system/page-header";
@@ -132,7 +134,7 @@ export function isKeyRejectionFailure(message: string): boolean {
   ) {
     return false;
   }
-  return /api key is missing|api key is required|api_key_invalid|api key not valid|invalid api key|incorrect api key|invalid x-api-key|invalid_api_key|authentication_error|rejected key|returned status 401|test failed \(401\)|invalid authentication|auth failed|unauthorized/i.test(
+  return /api key is missing|api key is required|api_key_invalid|api key not valid|invalid(?:\s+provider)?\s+api\s+key|incorrect api key|invalid x-api-key|invalid_api_key|authentication_error|rejected key|returned status 401|test failed \(401\)|invalid authentication|auth failed|unauthorized/i.test(
     text
   );
 }
@@ -215,6 +217,8 @@ export function SettingsWorkspace() {
   const [isSavingUsername, setIsSavingUsername] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [clearedKeyUndo, setClearedKeyUndo] = useState<{ provider: ProviderType; key: string } | null>(null);
 
   // Load saved settings and vault key on mount
   useEffect(() => {
@@ -429,11 +433,26 @@ export function SettingsWorkspace() {
   };
 
   const handleClearKey = async () => {
+    const previousKey = apiKey;
     setApiKey("");
     setHasVaultKey(false);
     setTestResult(null);
     setVerificationStatus("untested");
     await removeKey(provider);
+    if (previousKey.trim()) {
+      setClearedKeyUndo({ provider, key: previousKey });
+    }
+  };
+
+  const handleUndoClearKey = async () => {
+    if (!clearedKeyUndo || clearedKeyUndo.provider !== provider) return;
+    const restoredKey = clearedKeyUndo.key;
+    setClearedKeyUndo(null);
+    setApiKey(restoredKey);
+    await saveKey(provider as ByokProvider, restoredKey);
+    setHasVaultKey(true);
+    setTestResult(null);
+    setVerificationStatus("untested");
   };
 
   const connectionTestState = getConnectionTestState({
@@ -529,7 +548,7 @@ export function SettingsWorkspace() {
 
           <Surface variant="raised" className="edge-glow p-6 space-y-6">
             {/* Provider Selection */}
-            <div className="rounded-lg border border-hairline bg-inset/60 p-4">
+            <div>
               <label htmlFor="provider-select" className="block font-mono text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
                 AI provider
               </label>
@@ -550,7 +569,7 @@ export function SettingsWorkspace() {
 
             {/* Required Endpoint for Custom / Ollama (never hidden under Advanced) */}
             {(provider === "custom" || provider === "ollama") && (
-              <div className="rounded-lg border border-hairline bg-inset/60 p-4 space-y-2.5">
+              <div className="border-t border-hairline pt-5 space-y-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <label htmlFor="base-url-input" className="block font-mono text-xs font-semibold text-text-secondary uppercase tracking-wider">
                     {provider === "ollama" ? "Ollama Endpoint" : "Endpoint Base URL"}
@@ -559,6 +578,9 @@ export function SettingsWorkspace() {
                 </div>
                 <input
                   id="base-url-input"
+                  name="base-url"
+                  autoComplete="url"
+                  spellCheck={false}
                   data-testid="ollama-endpoint"
                   type="url"
                   value={baseUrl}
@@ -605,13 +627,13 @@ export function SettingsWorkspace() {
 
             {/* Contextual Help + API Key Input (Hidden for Ollama) */}
             {provider !== "ollama" && (
-              <div className="rounded-lg border border-hairline bg-inset/60 p-4 space-y-4">
+              <div className="border-t border-hairline pt-5 space-y-5">
                 {cloudHelp && (
                   <div
                     key={provider}
                     data-testid="provider-help"
                     data-provider={provider}
-                    className="rounded-lg border border-hairline bg-panel/70 p-3.5 space-y-2"
+                    className="border-l border-primary/50 pl-4 py-0.5 space-y-2"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-secondary">
@@ -628,10 +650,10 @@ export function SettingsWorkspace() {
                         <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                       </a>
                     </div>
-                    <p className="text-sm text-foreground leading-relaxed">
+                    <p className="max-w-2xl text-sm text-foreground leading-relaxed">
                       {cloudHelp.whatIsNeeded}
                     </p>
-                    <p className="text-xs text-text-secondary leading-relaxed">
+                    <p className="max-w-2xl text-xs text-text-secondary leading-relaxed">
                       <span className="font-semibold text-foreground">Account &amp; billing: </span>
                       {cloudHelp.prerequisites}
                     </p>
@@ -643,7 +665,7 @@ export function SettingsWorkspace() {
                     <label htmlFor="api-key-input" className="block font-mono text-xs font-semibold text-text-secondary uppercase tracking-wider">
                       API Key {provider === "custom" ? "(Optional)" : ""}
                     </label>
-                    {apiKey && (
+                    {apiKey ? (
                       <button
                         type="button"
                         id="clear-key-btn"
@@ -651,15 +673,28 @@ export function SettingsWorkspace() {
                         onClick={handleClearKey}
                         className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 text-xs text-status-danger hover:text-status-danger/80 transition-colors"
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-3 w-3" aria-hidden="true" />
                         Clear Key
                       </button>
-                    )}
+                    ) : clearedKeyUndo?.provider === provider ? (
+                      <button
+                        type="button"
+                        data-testid="undo-clear-key-btn"
+                        onClick={() => void handleUndoClearKey()}
+                        className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
+                      >
+                        Undo clear key
+                      </button>
+                    ) : null}
                   </div>
                   <div className="relative">
                     <input
                       id="api-key-input"
-                      type="password"
+                      name="api-key"
+                      autoComplete="off"
+                      spellCheck={false}
+                      data-testid="api-key-input"
+                      type={showApiKey ? "text" : "password"}
                       value={apiKey}
                       onChange={handleKeyChange}
                       aria-invalid={testResult && !testResult.success && testResult.isKeyError ? true : undefined}
@@ -675,8 +710,22 @@ export function SettingsWorkspace() {
                           ? "gsk_..."
                           : "Optional API Key for custom endpoint"
                       }
-                      className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
+                      className="w-full rounded-md border border-hairline bg-inset pl-3.5 pr-11 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
                     />
+                    <button
+                      type="button"
+                      data-testid="toggle-api-key-visibility-btn"
+                      onClick={() => setShowApiKey((prev) => !prev)}
+                      aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                      aria-pressed={showApiKey}
+                      className="absolute right-1 top-1/2 inline-flex min-h-9 min-w-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {showApiKey ? (
+                        <EyeOff className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        <Eye className="h-4 w-4" aria-hidden="true" />
+                      )}
+                    </button>
                   </div>
                   {apiKey && (
                     <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
@@ -714,9 +763,9 @@ export function SettingsWorkspace() {
                 setIsAdvancedOpen(event.currentTarget.open);
               }}
               data-testid="advanced-settings-disclosure"
-              className="group rounded-lg border border-hairline bg-inset/60"
+              className="group border-t border-hairline pt-4"
             >
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg p-4 text-sm font-medium text-foreground hover:bg-elevated/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md py-1.5 text-sm font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
                 <div className="flex flex-wrap items-center gap-2 min-w-0">
                   <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-secondary">
                     Advanced
@@ -733,7 +782,7 @@ export function SettingsWorkspace() {
                 />
               </summary>
 
-              <div className="space-y-4 border-t border-hairline p-4">
+              <div className="space-y-4 pt-3">
                 {provider === "openai" && (
                   <div>
                     <label htmlFor="base-url-input" className="block font-mono text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
@@ -741,6 +790,9 @@ export function SettingsWorkspace() {
                     </label>
                     <input
                       id="base-url-input"
+                      name="openai-base-url"
+                      autoComplete="url"
+                      spellCheck={false}
                       data-testid="ollama-endpoint"
                       type="url"
                       value={baseUrl}
@@ -757,6 +809,9 @@ export function SettingsWorkspace() {
                   </label>
                   <input
                     id="model-input"
+                    name="model"
+                    autoComplete="off"
+                    spellCheck={false}
                     type="text"
                     value={model}
                     onChange={handleModelChange}
@@ -795,14 +850,14 @@ export function SettingsWorkspace() {
                   className="inline-flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50 transition-colors"
                 >
                   {isTesting ? (
-                    <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                    <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden="true" />
                   ) : (
-                    <Server className="h-4 w-4 shrink-0" />
+                    <Server className="h-4 w-4 shrink-0" aria-hidden="true" />
                   )}
                   {isTesting
-                    ? "Testing Connection..."
+                    ? "Testing Connection…"
                     : connectionTestState === "loading"
-                      ? "Checking session..."
+                      ? "Checking session…"
                       : "Test Connection"}
                 </button>
               )}
@@ -837,7 +892,7 @@ export function SettingsWorkspace() {
                     </div>
                     <p className="text-sm opacity-90">{testResult.message}</p>
                     {testResult.latencyMs !== undefined && (
-                      <div className="text-xs opacity-75">
+                      <div className="text-xs opacity-75 tabular-nums">
                         Latency: {testResult.latencyMs}ms
                       </div>
                     )}
@@ -876,6 +931,9 @@ export function SettingsWorkspace() {
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <input
                         id="settings-username"
+                        name="username"
+                        autoComplete="username"
+                        spellCheck={false}
                         value={usernameDraft}
                         onChange={(event) => setUsernameDraft(event.target.value)}
                         className="h-11 w-full rounded-md border border-hairline bg-inset px-3.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"

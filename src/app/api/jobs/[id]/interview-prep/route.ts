@@ -9,6 +9,21 @@ const ORDER: Prisma.InterviewProblemOrderByWithRelationInput[] = [
   { createdAt: "desc" },
 ];
 
+const PROBLEM_SUMMARY_SELECT = {
+  id: true,
+  problemTitle: true,
+  company: true,
+  category: true,
+  tags: true,
+  difficulty: true,
+  sourceUrl: true,
+  lastObserved: true,
+} satisfies Prisma.InterviewProblemSelect;
+
+type InterviewProblemSummary = Prisma.InterviewProblemGetPayload<{
+  select: typeof PROBLEM_SUMMARY_SELECT;
+}>;
+
 export async function GET(
   _req: NextRequest,
   props: { params: Promise<{ id?: string; jobId?: string }> }
@@ -36,7 +51,7 @@ export async function GET(
     const companyKey = normalizeCompany(job.company || "");
 
     // 1. Exact match
-    let problems: any[] = [];
+    let problems: InterviewProblemSummary[] = [];
     let isFallback = false;
 
     if (companyKey) {
@@ -44,6 +59,7 @@ export async function GET(
         where: { companyKey },
         orderBy: ORDER,
         take: 50,
+        select: PROBLEM_SUMMARY_SELECT,
       });
 
       // 2. Prefix / substring match for variants (e.g. "amazonwebservices" -> "amazon")
@@ -57,6 +73,7 @@ export async function GET(
           },
           orderBy: ORDER,
           take: 50,
+          select: PROBLEM_SUMMARY_SELECT,
         });
       }
     }
@@ -67,6 +84,7 @@ export async function GET(
       problems = await prisma.interviewProblem.findMany({
         orderBy: ORDER,
         take: 10,
+        select: PROBLEM_SUMMARY_SELECT,
       });
     }
 

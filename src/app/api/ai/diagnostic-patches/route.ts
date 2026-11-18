@@ -17,7 +17,13 @@ export async function POST(request: Request) {
   try {
     const userId = await requireUserId(request);
     if (userId instanceof NextResponse) return userId;
-    const parsed = RequestSchema.safeParse(await request.json());
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON payload" }, { status: 400 });
+    }
+    const parsed = RequestSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ success: false, error: "Invalid diagnostic proposal request." }, { status: 400 });
     const result = await createDiagnosticProposalBatch({ userId, ...parsed.data });
     return NextResponse.json({ success: true, data: result });

@@ -118,7 +118,7 @@ test.describe("Phase 6 Job Application Tracker E2E Tests", () => {
     await expect(card).toBeVisible({ timeout: 15000 });
 
     await card.getByRole("button", { name: "More actions" }).click();
-    await card.locator(`[data-testid='delete-job-btn-${jobId}']`).click();
+    await page.getByTestId(`delete-job-btn-${jobId}`).click();
 
     const confirmModal = page.locator("[data-testid='delete-job-confirm-modal']");
     await expect(confirmModal).toBeVisible();
@@ -145,7 +145,7 @@ test.describe("Phase 6 Job Application Tracker E2E Tests", () => {
       await route.continue();
     });
     await card.getByRole("button", { name: "More actions" }).click();
-    await card.locator(`[data-testid='delete-job-btn-${jobId}']`).click();
+    await page.getByTestId(`delete-job-btn-${jobId}`).click();
     await expect(confirmModal).toBeVisible();
     await page.click("[data-testid='confirm-delete-job-btn']");
     await expect(confirmModal).toBeHidden();
@@ -154,7 +154,7 @@ test.describe("Phase 6 Job Application Tracker E2E Tests", () => {
 
     // Confirm removes the job cleanly and restores focus inside tracker list (never document.body)
     await card.getByRole("button", { name: "More actions" }).click();
-    await card.locator(`[data-testid='delete-job-btn-${jobId}']`).click();
+    await page.getByTestId(`delete-job-btn-${jobId}`).click();
     await expect(confirmModal).toBeVisible();
     const delPromise = page.waitForResponse(
       (resp) => resp.url().includes(`/api/jobs/${jobId}`) && resp.request().method() === "DELETE"

@@ -102,6 +102,10 @@ export function ConfirmMasterDialog({
 
   const isInitialBaseline = !priorSource || priorSource.trim().length === 0;
   const hasNoChanges = priorSource === typstSource;
+  const isStarterOrSampleTemplate =
+    title === "Starter Template" ||
+    /alex\.morgan\\?@example\.com/i.test(typstSource) ||
+    typstSource.includes("// Synthetic sample. This is not a real person's resume or experience.");
 
   const busy = isSaving || localSaving;
 
@@ -122,13 +126,13 @@ export function ConfirmMasterDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="save-master-confirm-modal"
-        className="max-w-2xl bg-panel border-hairline text-foreground shadow-2xl"
+        className="max-w-2xl max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden bg-panel border-hairline text-foreground shadow-2xl"
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           restoreMasterTriggerFocus();
         }}
       >
-        <DialogHeader>
+        <DialogHeader className="shrink-0">
           <div className="flex items-center gap-2 text-status-warning">
             <ShieldCheck className="size-5 text-status-warning" />
             <DialogTitle className="text-lg font-bold text-foreground">
@@ -140,6 +144,28 @@ export function ConfirmMasterDialog({
             Future AI tailoring and exports will be guarded against these verified claims.
           </DialogDescription>
         </DialogHeader>
+
+        <div className="min-h-0 flex-1 overflow-y-auto space-y-3 pr-1">
+
+        {isStarterOrSampleTemplate && (
+          <div
+            role="alert"
+            data-testid="starter-master-warning-banner"
+            className="flex items-start gap-2.5 rounded-lg border border-status-danger/50 bg-status-danger/10 p-3 text-xs text-foreground"
+          >
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-status-danger" aria-hidden="true" />
+            <div className="space-y-1">
+              <p className="font-semibold text-status-danger">
+                Starter sample detected — replace placeholder details before freezing
+              </p>
+              <p className="text-text-secondary leading-relaxed">
+                This resume still contains fictional sample data (<span className="font-mono">Alex Morgan</span> /{" "}
+                <span className="font-mono">alex.morgan@example.com</span>). Freezing it as your Master Resume will
+                bind future AI tailoring and export guardrails to sample claims instead of your real experience.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Tab Selector with Accessible Semantics */}
         <div
@@ -403,7 +429,9 @@ export function ConfirmMasterDialog({
           </div>
         )}
 
-        <DialogFooter className="gap-2 pt-2">
+        </div>
+
+        <DialogFooter className="shrink-0 gap-2 pt-2">
           <Button
             type="button"
             variant="ghost"

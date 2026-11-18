@@ -595,6 +595,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
             <div className="flex gap-2">
               <input
                 type="text"
+                aria-label="Ask the Socratic interview coach"
                 data-testid="dsa-coach-input"
                 value={coachInput}
                 onChange={(e) => setCoachInput(e.target.value)}
@@ -671,7 +672,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                 className="space-y-2.5 rounded-lg border border-status-success/30 bg-status-success/10 p-3 text-xs"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-semibold text-foreground">
+                  <span className="font-semibold text-foreground tabular-nums">
                     Interview Readiness Grade:{" "}
                     <span className="font-mono text-sm text-status-warning">{scorecard.grade}</span>{" "}
                     ({scorecard.overallScore}/100)
@@ -766,7 +767,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               <div
                 ref={gutterRef}
                 aria-hidden
-                className="select-none overflow-hidden border-r border-hairline bg-deep/40 py-4 pl-3 pr-3 text-right font-mono text-[13px] leading-relaxed text-muted-foreground"
+                className="select-none overflow-hidden border-r border-hairline bg-deep/40 py-4 pl-3 pr-3 text-right font-mono text-[13px] tabular-nums leading-relaxed text-muted-foreground"
               >
                 {Array.from({ length: lineCount }, (_, i) => (
                   <div key={i}>{i + 1}</div>
@@ -815,7 +816,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
               <div className="flex flex-wrap items-center gap-3">
                 <span className="text-xs font-semibold text-foreground">Test Cases</span>
 
-                <div data-testid="dsa-execution-status" className="flex items-center gap-2">
+                <div data-testid="dsa-execution-status" aria-live="polite" className="flex items-center gap-2">
                   {executionSummary ? (
                     <div className="flex items-center gap-2">
                       <span
@@ -876,7 +877,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                         : "border-hairline bg-inset text-text-secondary hover:border-control hover:text-foreground"
                     )}
                   >
-                    <span>Case {idx + 1}</span>
+                    <span className="tabular-nums">Case {idx + 1}</span>
                     {res &&
                       (res.passed ? (
                         <CheckCircle2 className="h-3 w-3 text-status-success" aria-label="Passed" />

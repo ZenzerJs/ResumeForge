@@ -96,31 +96,30 @@ export async function PATCH(
     const hasCatalogUpdate = Object.values(catalog).some((value) => value !== undefined);
 
     const job = await prisma.$transaction(async (tx) => {
-      if (hasCatalogUpdate) {
-        const ownedJob = await tx.job.findFirst({
-          where: { id, userId },
-          select: { id: true },
-        });
-        if (!ownedJob) return null;
-      } else {
-        const visibleJob = await tx.job.findFirst({
-          where: { id, OR: [{ userId: null }, { userId }] },
-          select: { id: true },
-        });
-        if (!visibleJob) return null;
+      if (!hasCatalogUpdate && !hasApplicationUpdate) {
+        return getJobById(id, userId, tx);
       }
 
-      if (hasApplicationUpdate) {
+      if (hasCatalogUpdate && !hasApplicationUpdate) {
+        return updateJob(id, catalog, userId, tx);
+      }
+
+      if (!hasCatalogUpdate && hasApplicationUpdate) {
         const application = await upsertApplication(userId, id, { status, appliedAt, variantId }, tx);
         if (!application) return null;
+        return getJobById(id, userId, tx);
       }
 
-      if (hasCatalogUpdate) {
-        const updatedJob = await updateJob(id, catalog, userId, tx);
-        if (!updatedJob) return null;
-      }
+      const ownedJob = await tx.job.findFirst({
+        where: { id, userId },
+        select: { id: true },
+      });
+      if (!ownedJob) return null;
 
-      return getJobById(id, userId, tx);
+      const application = await upsertApplication(userId, id, { status, appliedAt, variantId }, tx);
+      if (!application) return null;
+
+      return updateJob(id, catalog, userId, tx);
     });
 
     if (!job) {

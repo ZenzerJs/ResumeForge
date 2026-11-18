@@ -130,34 +130,34 @@ export async function GET(req: NextRequest) {
 
     const where: Prisma.IngestedJobWhereInput = andConditions.length > 0 ? { AND: andConditions } : {};
 
-    // Pass 1: Fetch only filtering/scoring inputs for the 500-candidate window
-    const candidateJobs = await prisma.ingestedJob.findMany({
-      where,
-      take: 500,
-      orderBy: [{ postedAt: "desc" }, { createdAt: "desc" }],
-      select: {
-        id: true,
-        externalId: true,
-        source: true,
-        companyName: true,
-        title: true,
-        location: true,
-        workplaceType: true,
-        applyUrl: true,
-        trackedJobId: true,
-        postedAt: true,
-        createdAt: true,
-        salaryMin: true,
-        salaryMax: true,
-        lat: true,
-        lng: true,
-        cityNorm: true,
-        parsedRequirements: true,
-      },
-    });
-
-    const userId = await getRequestUserId(req);
-    const { candidateSkills, evidenceItemsForMatching } = await loadScoringEvidence(userId);
+    // Pass 1: Fetch filtering/scoring inputs for the 500-candidate window in parallel with user scoring evidence
+    const [candidateJobs, { candidateSkills, evidenceItemsForMatching }] = await Promise.all([
+      prisma.ingestedJob.findMany({
+        where,
+        take: 500,
+        orderBy: [{ postedAt: "desc" }, { createdAt: "desc" }],
+        select: {
+          id: true,
+          externalId: true,
+          source: true,
+          companyName: true,
+          title: true,
+          location: true,
+          workplaceType: true,
+          applyUrl: true,
+          trackedJobId: true,
+          postedAt: true,
+          createdAt: true,
+          salaryMin: true,
+          salaryMax: true,
+          lat: true,
+          lng: true,
+          cityNorm: true,
+          parsedRequirements: true,
+        },
+      }),
+      getRequestUserId(req).then((userId) => loadScoringEvidence(userId)),
+    ]);
     const hasEvidence = candidateSkills.length > 0 || evidenceItemsForMatching.length > 0;
 
     const targetCityKey = city.toLowerCase();
@@ -373,7 +373,7 @@ export async function GET(req: NextRequest) {
       },
       hasEvidence,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[API connectors/jobs] Error:", err);
     return NextResponse.json(
       { success: false, error: "Failed to fetch ingested jobs" },

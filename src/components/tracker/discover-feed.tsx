@@ -20,10 +20,19 @@ import {
   Compass,
   SlidersHorizontal,
   AlertTriangle,
+  Eye,
 } from "lucide-react";
 import { AppShell } from "@/components/design-system/app-shell";
 import { CommandButton } from "@/components/design-system/command-button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { TrackerSubNav } from "@/components/tracker/tracker-sub-nav";
 import { fetchDemoConfig, fetchSessionUser } from "@/components/auth/session-user";
@@ -31,6 +40,7 @@ import { isSafeHref } from "@/lib/security/safe-url";
 import { type PostedWithin } from "@/lib/jobs/posted-within";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
 import { isPlaceholderDescription } from "@/lib/ingestion/helpers";
+import { convertHtmlToCleanMarkdown } from "@/lib/ingestion/jd-format";
 import type { ScoreBreakdown } from "@/lib/scoring/blended-sort";
 import { displayScore } from "@/lib/scoring/blended-display";
 import type { CompatibilityResult } from "@/lib/scoring/compatibility-engine";
@@ -177,12 +187,27 @@ export function extractPromotedJobId(data: unknown): { id: string | null; status
   };
 }
 
+export function matchesCuratedCompany(companyName: string, targetCompany: string): boolean {
+  const needle = targetCompany.trim().toLowerCase();
+  if (!needle) return true;
+  const hay = (companyName || "").trim().toLowerCase();
+  if (!hay) return false;
+  if (hay === needle) return true;
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`, "i").test(hay);
+}
+
 async function readJsonSafe(res: Response): Promise<Record<string, unknown> | null> {
   try {
     return (await res.json()) as Record<string, unknown>;
   } catch {
     return null;
   }
+}
+
+function normalizeListingKey(job: Pick<IngestedJobItem, "companyName" | "title" | "location">): string {
+  const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  return `${norm(job.companyName)}||${norm(job.title)}||${norm(job.location)}`;
 }
 
 export function DiscoverFeed() {
@@ -194,10 +219,12 @@ export function DiscoverFeed() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("ALL");
   const [workplaceFilter, setWorkplaceFilter] = useState("ALL");
   const [cityFilter, setCityFilter] = useState("ALL");
   const [hasEvidence, setHasEvidence] = useState(false);
+  const [evidenceChecked, setEvidenceChecked] = useState(false);
   const [clientSkills, setClientSkills] = useState<string[]>([]);
   const [radiusFilter, setRadiusFilter] = useState("100");
   const [minSalaryFilter, setMinSalaryFilter] = useState("0");
@@ -205,6 +232,7 @@ export function DiscoverFeed() {
   const [sortOrder, setSortOrder] = useState("blended");
   const [canadianOnly, setCanadianOnly] = useState(false);
   const [postedWithin, setPostedWithin] = useState<PostedWithin>("all");
+  const [previewJob, setPreviewJob] = useState<IngestedJobItem | null>(null);
 
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -216,6 +244,82 @@ export function DiscoverFeed() {
     (workplaceFilter !== "ALL" ? 1 : 0) +
     (canadianOnly ? 1 : 0) +
     (postedWithin !== "all" ? 1 : 0);
+
+  const hasAnyActiveFilter = Boolean(
+    searchQuery.trim() ||
+      debouncedSearch ||
+      companyFilter ||
+      cityFilter !== "ALL" ||
+      minScoreFilter !== "0" ||
+      activeSecondaryFilterCount > 0
+  );
+
+  const handleClearAllFilters = useCallback(() => {
+    setSearchQuery("");
+    setDebouncedSearch("");
+    setCompanyFilter("");
+    setCityFilter("ALL");
+    setRadiusFilter("100");
+    setMinScoreFilter("0");
+    setMinSalaryFilter("0");
+    setSourceFilter("ALL");
+    setWorkplaceFilter("ALL");
+    setCanadianOnly(false);
+    setPostedWithin("all");
+    setPage(1);
+  }, []);
+
+  const urlHydratedRef = useRef(false);
+  const skipNextPageResetRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q") ?? params.get("search");
+    if (q) {
+      skipNextPageResetRef.current = true;
+      setSearchQuery(q);
+      setDebouncedSearch(q.trim());
+    }
+    const c = params.get("company");
+    if (c) {
+      skipNextPageResetRef.current = true;
+      setCompanyFilter(c);
+    }
+    const w = params.get("workplace");
+    if (w && WORKPLACE_OPTIONS.some((o) => o.value === w)) {
+      skipNextPageResetRef.current = true;
+      setWorkplaceFilter(w);
+    }
+    const s = params.get("sort");
+    if (s && SORT_OPTIONS.some((o) => o.value === s)) {
+      skipNextPageResetRef.current = true;
+      setSortOrder(s);
+    }
+    const p = Number(params.get("page"));
+    if (Number.isInteger(p) && p > 0) {
+      skipNextPageResetRef.current = true;
+      setPage(p);
+    }
+    urlHydratedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !urlHydratedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const setOrDel = (k: string, v: string, def = "") => {
+      if (v && v !== def) params.set(k, v);
+      else params.delete(k);
+    };
+    setOrDel("q", debouncedSearch);
+    setOrDel("company", companyFilter);
+    setOrDel("workplace", workplaceFilter, "ALL");
+    setOrDel("sort", sortOrder, "blended");
+    setOrDel("page", String(page), "1");
+    const qs = params.toString();
+    const nextUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState(null, "", nextUrl);
+  }, [debouncedSearch, companyFilter, workplaceFilter, sortOrder, page]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchQuery.trim()), 250);
@@ -272,13 +376,18 @@ export function DiscoverFeed() {
 
     try {
       setIsLoading(true);
+      const effectiveSort =
+        evidenceChecked && !hasEvidence && clientSkills.length === 0 && sortOrder === "blended"
+          ? "newest"
+          : sortOrder;
       const params = new URLSearchParams({
-        page: String(page),
-        limit: "30",
+        page: companyFilter ? "1" : String(page),
+        limit: companyFilter ? "100" : "30",
         postedWithin,
-        sort: sortOrder,
+        sort: effectiveSort,
       });
-      if (debouncedSearch) params.set("search", debouncedSearch);
+      const effectiveQuery = debouncedSearch || companyFilter;
+      if (effectiveQuery) params.set("search", effectiveQuery);
       if (sourceFilter !== "ALL") params.set("source", sourceFilter);
       if (workplaceFilter !== "ALL") params.set("workplace", workplaceFilter);
       if (cityFilter !== "ALL") {
@@ -295,10 +404,39 @@ export function DiscoverFeed() {
       const json = await readJsonSafe(res);
       if (!controller.signal.aborted && res.ok && json?.success) {
         const meta = json.meta as { total?: number; totalPages?: number } | undefined;
-        setJobs((json.data as IngestedJobItem[]) || []);
-        setTotalJobs(meta?.total ?? 0);
-        setTotalPages(meta?.totalPages ?? 1);
-        setHasEvidence(Boolean(json.hasEvidence));
+        const rawData = ((json.data as IngestedJobItem[]) || []);
+        const seenKeys = new Set<string>();
+        const dedupedData = rawData.filter((item) => {
+          const key = normalizeListingKey(item);
+          if (seenKeys.has(key)) return false;
+          seenKeys.add(key);
+          return true;
+        });
+        const dupCount = rawData.length - dedupedData.length;
+        const apiHasEvidence = Boolean(json.hasEvidence);
+        setHasEvidence(apiHasEvidence);
+        setEvidenceChecked(true);
+        if (!apiHasEvidence && clientSkills.length === 0 && sortOrder === "blended") {
+          setSortOrder("newest");
+        }
+        if (companyFilter) {
+          const companyMatched = dedupedData.filter((item) =>
+            matchesCuratedCompany(item.companyName, companyFilter)
+          );
+          const pageSize = 30;
+          const computedTotal = companyMatched.length;
+          const computedPages = Math.max(1, Math.ceil(computedTotal / pageSize));
+          const start = (page - 1) * pageSize;
+          setJobs(companyMatched.slice(start, start + pageSize));
+          setTotalJobs(computedTotal);
+          setTotalPages(computedPages);
+        } else {
+          setJobs(dedupedData);
+          setTotalJobs(
+            meta?.total !== undefined ? Math.max(dedupedData.length, meta.total - dupCount) : dedupedData.length
+          );
+          setTotalPages(meta?.totalPages ?? 1);
+        }
       } else if (!controller.signal.aborted && (!res.ok || !json?.success)) {
         const errMsg =
           (typeof json?.message === "string" && json.message) ||
@@ -320,6 +458,7 @@ export function DiscoverFeed() {
   }, [
     page,
     debouncedSearch,
+    companyFilter,
     sourceFilter,
     workplaceFilter,
     cityFilter,
@@ -329,6 +468,9 @@ export function DiscoverFeed() {
     sortOrder,
     canadianOnly,
     postedWithin,
+    evidenceChecked,
+    hasEvidence,
+    clientSkills.length,
   ]);
 
   useEffect(() => {
@@ -376,9 +518,14 @@ export function DiscoverFeed() {
 
   // Reset to page 1 on filter changes
   useEffect(() => {
+    if (skipNextPageResetRef.current) {
+      skipNextPageResetRef.current = false;
+      return;
+    }
     setPage(1);
   }, [
     searchQuery,
+    companyFilter,
     sourceFilter,
     workplaceFilter,
     cityFilter,
@@ -544,17 +691,32 @@ export function DiscoverFeed() {
     }
   };
 
+  const salaryFmt = useMemo(() => {
+    try {
+      return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+    } catch {
+      return null;
+    }
+  }, []);
+  const fmtSal = (n: number, cur?: string | null) => {
+    if (salaryFmt && (!cur || cur.toUpperCase() === "USD")) return salaryFmt.format(n);
+    try {
+      return new Intl.NumberFormat(undefined, { style: "currency", currency: cur || "USD", maximumFractionDigits: 0 }).format(n);
+    } catch {
+      return `$${n.toLocaleString()}`;
+    }
+  };
+
   const formatSalary = (j: IngestedJobItem) => {
     if (!j.salaryMin && !j.salaryMax) return null;
-    const currency = j.salaryCurrency?.trim();
-    const suffix = currency ? ` ${currency}` : "";
+    const cur = j.salaryCurrency?.trim() || undefined;
     if (j.salaryMin && j.salaryMax) {
-      return `$${j.salaryMin.toLocaleString()} – $${j.salaryMax.toLocaleString()}${suffix}`;
+      return `${fmtSal(j.salaryMin, cur)} – ${fmtSal(j.salaryMax, cur)}`;
     }
     if (j.salaryMin) {
-      return `From $${j.salaryMin.toLocaleString()}${suffix}`;
+      return `From ${fmtSal(j.salaryMin, cur)}`;
     }
-    return `Up to $${j.salaryMax?.toLocaleString()}${suffix}`;
+    return `Up to ${fmtSal(j.salaryMax!, cur)}`;
   };
 
   return (
@@ -589,9 +751,6 @@ export function DiscoverFeed() {
               <Compass className="h-6 w-6" />
             </div>
             <div className="min-w-0 space-y-1">
-              <p className="font-mono text-xs font-semibold uppercase tracking-wider text-primary">
-                Find your next role
-              </p>
               <h2 className="text-2xl font-bold tracking-tight text-rf-cloud md:text-3xl">
                 Discovered Jobs
               </h2>
@@ -639,22 +798,27 @@ export function DiscoverFeed() {
 
         {/* Curated Company Quick-Filter Chips */}
         <div
-          className="flex flex-wrap items-center gap-2 rounded-xl border glass-bar px-4 py-2.5"
+          className="flex flex-nowrap overflow-x-auto sm:flex-wrap sm:overflow-visible items-center gap-2 rounded-xl border glass-bar px-3 py-2 sm:px-4 sm:py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           data-testid="curated-company-chips"
         >
-          <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground mr-1">
+          <span className="shrink-0 whitespace-nowrap text-xs font-mono uppercase tracking-wider text-muted-foreground mr-1">
             Featured Boards:
           </span>
           {CURATED_COMPANIES.map((company) => {
-            const isActive = searchQuery.toLowerCase() === company.query.toLowerCase();
+            const isActive =
+              company.query === ""
+                ? companyFilter === ""
+                : companyFilter.toLowerCase() === company.query.toLowerCase();
             return (
               <button
                 key={company.label}
                 type="button"
-                onClick={() => setSearchQuery(isActive && company.query !== "" ? "" : company.query)}
+                onClick={() =>
+                  setCompanyFilter(isActive && company.query !== "" ? "" : company.query)
+                }
                 aria-pressed={isActive}
                 data-testid={`curated-chip-${(company.query || "all").toLowerCase()}`}
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
                   isActive
                     ? "border border-primary/50 bg-primary/15 text-primary"
                     : "border border-hairline bg-inset text-text-secondary hover:border-control hover:text-foreground"
@@ -673,7 +837,7 @@ export function DiscoverFeed() {
               <label htmlFor="discover-search-input" className="sr-only">
                 Search company, role, or keywords
               </label>
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <input
                 id="discover-search-input"
                 type="search"
@@ -749,16 +913,27 @@ export function DiscoverFeed() {
               </label>
               <select
                 id="discover-sort-select"
-                value={sortOrder}
+                value={
+                  evidenceChecked && !hasEvidence && clientSkills.length === 0 && sortOrder === "blended"
+                    ? "newest"
+                    : sortOrder
+                }
                 onChange={(e) => setSortOrder(e.target.value)}
                 className={`${FILTER_CONTROL} min-w-0 w-full sm:w-auto cursor-pointer text-rf-meta`}
                 data-testid="discover-sort-select"
               >
-                {SORT_OPTIONS.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
+                {SORT_OPTIONS.map((s) => {
+                  const isDisabledBlended =
+                    s.value === "blended" &&
+                    evidenceChecked &&
+                    !hasEvidence &&
+                    clientSkills.length === 0;
+                  return (
+                    <option key={s.value} value={s.value} disabled={isDisabledBlended}>
+                      {isDisabledBlended ? "Blended Match (add evidence)" : s.label}
+                    </option>
+                  );
+                })}
               </select>
 
               <Popover>
@@ -787,7 +962,7 @@ export function DiscoverFeed() {
                 <PopoverContent
                   align="end"
                   sideOffset={8}
-                  className="w-[min(calc(100vw-2rem),22rem)] border-hairline bg-rf-panel p-4 text-rf-cloud shadow-xl"
+                  className="w-[min(calc(100vw-2rem),22rem)] border-hairline bg-elevated p-4 text-rf-cloud shadow-xl"
                 >
                   <div className="flex flex-col gap-3.5">
                     <div className="flex items-center justify-between border-b border-hairline pb-2.5">
@@ -920,6 +1095,18 @@ export function DiscoverFeed() {
                   </div>
                 </PopoverContent>
               </Popover>
+
+              {hasAnyActiveFilter && (
+                <button
+                  type="button"
+                  data-testid="discover-clear-filters-btn"
+                  onClick={handleClearAllFilters}
+                  className="col-span-2 sm:col-span-1 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-hairline bg-inset px-3 text-xs font-semibold text-foreground transition-colors hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <X className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                  <span>Clear filters</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -967,15 +1154,32 @@ export function DiscoverFeed() {
             <p className="max-w-sm text-sm text-muted-foreground">
               Try adjusting your city, radius, salary, or workplace filters, or click &quot;Sync Feeds Now&quot; to fetch new roles.
             </p>
-            <button
-              type="button"
-              onClick={handleSyncPublicFeeds}
-              disabled={isSyncing}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
-            >
-              {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              Sync Feeds Now
-            </button>
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+              {hasAnyActiveFilter && (
+                <button
+                  type="button"
+                  data-testid="discover-empty-clear-filters-btn"
+                  onClick={handleClearAllFilters}
+                  className="inline-flex min-h-11 sm:min-h-9 items-center gap-1.5 rounded-md bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                  Clear filters
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleSyncPublicFeeds}
+                disabled={isSyncing}
+                className={`inline-flex min-h-11 sm:min-h-9 items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
+                  hasAnyActiveFilter
+                    ? "border border-hairline bg-elevated text-foreground hover:bg-panel"
+                    : "bg-primary text-primary-foreground hover:opacity-90"
+                }`}
+              >
+                {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                Sync Feeds Now
+              </button>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -1015,7 +1219,14 @@ export function DiscoverFeed() {
                     </div>
 
                     <h3 className="break-words text-base font-bold leading-snug tracking-tight text-foreground">
-                      {j.title}
+                      <button
+                        type="button"
+                        data-testid={`preview-job-title-${j.id}`}
+                        onClick={() => setPreviewJob(j)}
+                        className="text-left transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                      >
+                        {j.title}
+                      </button>
                     </h3>
 
                     {/* Signal Badge Pill with Popover, Funding & H1B Sub-Badges */}
@@ -1071,7 +1282,7 @@ export function DiscoverFeed() {
 
                     <div className="mt-1 flex flex-col gap-1 font-mono text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5">
-                        <MapPin className="h-3 w-3 text-muted-foreground" />
+                        <MapPin className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
                         {j.location || "Remote / Canada"}
                         {j.workplaceType && j.workplaceType !== "UNSPECIFIED" ? (
                           <span className="rounded bg-inset border border-hairline px-1.5 py-0.2 text-xs text-text-secondary lowercase">
@@ -1081,16 +1292,16 @@ export function DiscoverFeed() {
                       </span>
 
                       {salaryStr ? (
-                        <span className="flex items-center gap-1.5 text-text-primary font-semibold">
-                          <DollarSign className="h-3 w-3 text-primary" />
+                        <span className="flex items-center gap-1.5 text-text-primary font-semibold tabular-nums">
+                          <DollarSign className="h-3 w-3 text-primary" aria-hidden="true" />
                           {salaryStr}
                         </span>
                       ) : null}
 
                       {j.postedAt ? (
-                        <span className="flex items-center gap-1.5 text-muted-foreground">
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                          {new Date(j.postedAt).toLocaleDateString()}
+                        <span className="flex items-center gap-1.5 text-muted-foreground tabular-nums">
+                          <Calendar className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
+                          {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(j.postedAt))}
                         </span>
                       ) : null}
                     </div>
@@ -1118,19 +1329,30 @@ export function DiscoverFeed() {
                   </div>
 
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline pt-3 text-xs">
-                    {isSafeHref(j.applyUrl) ? (
-                      <a
-                        href={j.applyUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 text-text-secondary transition-colors hover:text-foreground"
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        data-testid={`preview-job-btn-${j.id}`}
+                        onClick={() => setPreviewJob(j)}
+                        className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 font-medium text-text-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                       >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                        Apply Link
-                      </a>
-                    ) : (
-                      <span className="font-mono text-muted-foreground">No Link</span>
-                    )}
+                        <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                        Preview JD
+                      </button>
+                      {isSafeHref(j.applyUrl) ? (
+                        <a
+                          href={j.applyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 text-text-secondary transition-colors hover:text-foreground"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          Apply Link
+                        </a>
+                      ) : (
+                        <span className="font-mono text-muted-foreground">No Link</span>
+                      )}
+                    </div>
 
                     {isAlreadyTracked && trackedJobId ? (
                       <Link
@@ -1193,6 +1415,96 @@ export function DiscoverFeed() {
           </div>
         )}
       </div>
+
+      <Dialog
+        open={Boolean(previewJob)}
+        onOpenChange={(open) => {
+          if (!open) setPreviewJob(null);
+        }}
+      >
+        <DialogContent
+          data-testid="discover-job-preview-dialog"
+          className="max-w-2xl max-h-[85dvh] flex flex-col overflow-hidden p-5 sm:p-6"
+        >
+          {previewJob ? (
+            <>
+              <DialogHeader className="pr-8 text-left space-y-1.5 border-b border-hairline pb-4">
+                <DialogTitle className="text-xl font-bold text-foreground leading-snug">
+                  {previewJob.title}
+                </DialogTitle>
+                <DialogDescription className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-secondary">
+                  <span className="font-semibold text-foreground">{previewJob.companyName}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{previewJob.location || "Remote / Canada"}</span>
+                  {formatSalary(previewJob) ? (
+                    <>
+                      <span aria-hidden="true">·</span>
+                      <span className="font-mono text-xs text-primary">{formatSalary(previewJob)}</span>
+                    </>
+                  ) : null}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div
+                data-testid="discover-job-preview-body"
+                className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-hairline bg-inset p-4 text-sm leading-relaxed text-on-surface-variant whitespace-pre-wrap break-words"
+              >
+                {convertHtmlToCleanMarkdown(previewJob.description || previewJob.descriptionHtml || "") ||
+                  "No full description available in public feed."}
+              </div>
+
+              <DialogFooter className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline pt-3 sm:justify-between">
+                {isSafeHref(previewJob.applyUrl) ? (
+                  <a
+                    href={previewJob.applyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-outline bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-elevated"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                    Open Original Posting
+                  </a>
+                ) : (
+                  <span />
+                )}
+                {previewJob.trackedJob?.id ? (
+                  <Link
+                    href={`/tailor?jobId=${encodeURIComponent(previewJob.trackedJob.id)}`}
+                    onClick={() => setPreviewJob(null)}
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-signal/40 bg-signal/10 px-3.5 py-1.5 text-xs font-semibold text-status-success-soft hover:bg-signal/20"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    Open in Tailor
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={promotingId === previewJob.id}
+                    onClick={() => {
+                      const target = previewJob;
+                      void handlePromoteJob(target).then(() => {
+                        setPreviewJob((curr) =>
+                          curr && curr.id === target.id
+                            ? jobs.find((item) => item.id === target.id) ?? curr
+                            : curr
+                        );
+                      });
+                    }}
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-md bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {promotingId === previewJob.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                    Save to Tracker
+                  </button>
+                )}
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }

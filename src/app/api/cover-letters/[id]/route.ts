@@ -78,7 +78,12 @@ export async function PUT(
       );
     }
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON payload" }, { status: 400 });
+    }
     const validation = UpdateCoverLetterSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(

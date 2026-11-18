@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { ALL_QUESTIONS, COMPANY_LOGOS } from "../../lib/interview/questionDatabase";
 import { InterviewQuestion, InterviewTrack } from "../../lib/schema/interviewPrep";
 import {
@@ -13,6 +13,7 @@ import {
 } from "../ui/dialog";
 import { CompanyBadge, getCompanyLogo } from "./company-logos";
 import { BrandIcon, hasBrandIcon } from "../design-system/brand-icon";
+import { ChevronDown } from "lucide-react";
 
 export const TRACK_FILTERS: ReadonlyArray<{ id: InterviewTrack | "all"; label: string }> = [
   { id: "all", label: "All Tracks" },
@@ -68,7 +69,23 @@ export function InterviewHub({
   const [track, setTrack] = useState<InterviewTrack | "all">("all");
   const [difficulty, setDifficulty] = useState<"Easy" | "Medium" | "Hard" | "all">("all");
   const [company, setCompany] = useState<string | "all">("all");
+  const [showAllCompanies, setShowAllCompanies] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<InterviewQuestion | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const urlHydratedRef = useRef(false);
+
+  const VISIBLE_COMPANY_PILL_CAP = 8;
+  const visibleCompanies = showAllCompanies
+    ? COMPANY_LOGOS
+    : (() => {
+        const initial = COMPANY_LOGOS.slice(0, VISIBLE_COMPANY_PILL_CAP);
+        if (company !== "all" && !initial.some((c) => c.slug === company)) {
+          const active = COMPANY_LOGOS.find((c) => c.slug === company);
+          if (active) return [...initial, active];
+        }
+        return initial;
+      })();
+  const hiddenCompanyCount = Math.max(0, COMPANY_LOGOS.length - visibleCompanies.length);
 
   useEffect(() => {
     if (!targetCompany) {
@@ -90,11 +107,47 @@ export function InterviewHub({
     }
   }, [targetCompany]);
 
-  const filteredQuestions = filterInterviewQuestions(ALL_QUESTIONS, {
+  const filteredQuestions = useMemo(() => filterInterviewQuestions(ALL_QUESTIONS, {
     track,
     difficulty,
     company,
-  });
+  }), [track, difficulty, company]);
+
+  const logoMap = useMemo(() => {
+    const m = new Map<string, (typeof COMPANY_LOGOS)[number]>();
+    for (const c of COMPANY_LOGOS) m.set(c.slug, c);
+    return m;
+  }, []);
+
+  // Read initial filters from URL before syncing
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("track");
+    if (t && TRACK_FILTERS.some(f => f.id === t)) setTrack(t as InterviewTrack | "all");
+    const d = params.get("difficulty");
+    if (d && DIFFICULTY_FILTERS.includes(d as "all" | "Easy" | "Medium" | "Hard")) {
+      setDifficulty(d as "Easy" | "Medium" | "Hard" | "all");
+    }
+    const c = params.get("company");
+    if (c) setCompany(c);
+    urlHydratedRef.current = true;
+  }, []);
+
+  // Sync filter state to URL
+  useEffect(() => {
+    if (typeof window === "undefined" || !urlHydratedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (track !== "all") params.set("track", track);
+    else params.delete("track");
+    if (difficulty !== "all") params.set("difficulty", difficulty);
+    else params.delete("difficulty");
+    if (company !== "all") params.set("company", company);
+    else params.delete("company");
+    const qs = params.toString();
+    const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState(null, "", url);
+  }, [track, difficulty, company]);
 
   useEffect(() => {
     onFilteredCountChange?.(filteredQuestions.length, ALL_QUESTIONS.length);
@@ -114,8 +167,8 @@ export function InterviewHub({
       {/* Filter Controls */}
       <div className="space-y-3 p-4 bg-card border border-border rounded-[10px]">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Track Filters */}
-          <div className="flex flex-wrap gap-1.5">
+          {/* Track Filters - collapsed on <sm */}
+          <div className="hidden sm:flex flex-wrap gap-1.5">
             {TRACK_FILTERS.map(t => (
               <button
                 key={t.id}
@@ -133,8 +186,27 @@ export function InterviewHub({
             ))}
           </div>
 
+          {/* Compact Filters toggle on <sm */}
+          <div className="flex sm:hidden items-center justify-between w-full gap-2">
+            <button
+              type="button"
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen(v => !v)}
+              className="flex min-h-11 items-center gap-1.5 rounded-[6px] border border-hairline bg-inset px-3 text-xs font-semibold text-text-secondary"
+            >
+              Filters
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${filtersOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+            </button>
+            <span
+              aria-live="polite"
+              className="rounded-full border border-border bg-inset px-2.5 py-0.5 font-mono text-xs text-muted-foreground tabular-nums"
+            >
+              {formatQuestionCountText(filteredQuestions.length, ALL_QUESTIONS.length)}
+            </span>
+          </div>
+
           {/* Difficulty Filters */}
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="hidden sm:flex flex-wrap items-center gap-1.5">
             {DIFFICULTY_FILTERS.map(d => (
               <button
                 key={d}
@@ -160,9 +232,49 @@ export function InterviewHub({
           </div>
         </div>
 
+        {/* Collapsed mobile filter panel */}
+        {filtersOpen && (
+          <div className="flex flex-col gap-3 sm:hidden border-t border-border pt-3">
+            <div className="flex flex-wrap gap-1.5">
+              {TRACK_FILTERS.map(t => (
+                <button
+                  key={t.id}
+                  type="button"
+                  aria-pressed={track === t.id}
+                  onClick={() => setTrack(t.id)}
+                  className={`min-h-11 px-3 py-1.5 rounded-[6px] text-xs font-semibold transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                    track === t.id
+                      ? "bg-primary/15 border-primary/40 text-primary"
+                      : "border-border bg-elevated/60 hover:bg-elevated text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {DIFFICULTY_FILTERS.map(d => (
+                <button
+                  key={d}
+                  type="button"
+                  aria-pressed={difficulty === d}
+                  onClick={() => setDifficulty(d)}
+                  className={`min-h-11 px-2.5 py-1 rounded-[6px] text-xs font-semibold transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                    difficulty === d
+                      ? "bg-primary/15 border-primary/40 text-primary"
+                      : "border-border bg-elevated/60 hover:bg-elevated text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {d === "all" ? "All Levels" : d}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Company Filter Pills */}
-        <div className="pt-2 border-t border-border">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className={`${filtersOpen ? "block" : "hidden sm:block"} pt-2 border-t border-border`}>
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground flex-shrink-0">
               Company:
             </span>
@@ -178,7 +290,7 @@ export function InterviewHub({
             >
               All Companies
             </button>
-            {COMPANY_LOGOS.map(c => {
+            {visibleCompanies.map(c => {
               const isSelected = company === c.slug;
               return (
                 <button
@@ -197,11 +309,23 @@ export function InterviewHub({
                 </button>
               );
             })}
+            {COMPANY_LOGOS.length > VISIBLE_COMPANY_PILL_CAP && (
+              <button
+                type="button"
+                data-testid="toggle-more-companies-btn"
+                aria-expanded={showAllCompanies}
+                onClick={() => setShowAllCompanies((prev) => !prev)}
+                className="min-h-11 sm:min-h-0 px-2.5 py-1 rounded-[6px] text-xs font-medium transition-colors flex-shrink-0 border border-hairline bg-inset text-text-secondary hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                {showAllCompanies ? "Show fewer" : `+${hiddenCompanyCount} more`}
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Questions Grid */}
+      <h2 className="text-lg font-bold text-foreground">Practice Problems</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredQuestions.map(q => (
           <button
@@ -232,22 +356,27 @@ export function InterviewHub({
 
             <div className="pt-3 border-t border-border flex flex-wrap items-center justify-between gap-2 mt-auto">
               <div className="flex flex-wrap gap-1.5">
-                {q.companyTags.map(tag => {
-                  const comp = COMPANY_LOGOS.find(c => c.slug === tag);
+                {q.companyTags.slice(0, 3).map(tag => {
+                  const comp = logoMap.get(tag);
                   const logo = getCompanyLogo(tag, "w-3 h-3 flex-shrink-0 grayscale");
                   return (
                     <span 
                       key={tag} 
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-xs text-on-surface-variant"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted text-xs text-on-surface-variant"
                     >
                       {logo ?? (hasBrandIcon(tag) ? <BrandIcon name={tag} className="h-3 w-3 shrink-0" /> : null)}
                       <span>{comp?.name || tag}</span>
                     </span>
                   );
                 })}
+                {q.companyTags.length > 3 && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded bg-inset border border-hairline text-xs font-mono text-muted-foreground tabular-nums">
+                    +{q.companyTags.length - 3}
+                  </span>
+                )}
               </div>
               {q.timeComplexity && (
-                <span className="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">
                   {q.timeComplexity}
                 </span>
               )}
@@ -314,7 +443,7 @@ export function InterviewHub({
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Interviewed At</h4>
               <div className="flex flex-wrap gap-2">
                 {selectedQuestion.companyTags.map(tag => {
-                  const logo = COMPANY_LOGOS.find(c => c.slug === tag);
+                  const logo = logoMap.get(tag);
                   return (
                     <CompanyBadge key={tag} slug={tag} name={logo?.name} />
                   );

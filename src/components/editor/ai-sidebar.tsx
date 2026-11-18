@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useId } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { fetchDemoConfig, fetchSessionUser } from "@/components/auth/session-user";
@@ -88,6 +88,8 @@ interface AiSidebarProps {
   onDismissRepair?: () => void;
   /** Notify parent when Chat vs Tailor tab changes */
   onModeChange?: (mode: "chat" | "tailor") => void;
+  /** Request parent to expand AI sidebar/drawer (e.g. when seeded tailor feedback opens) */
+  onRequestExpand?: () => void;
 }
 
 interface PatchSuggestion {
@@ -126,11 +128,17 @@ export function AiSidebar({
   repairContext,
   onDismissRepair,
   onModeChange,
+  onRequestExpand,
 }: AiSidebarProps) {
+  const jdTextareaId = useId();
   const searchParams = useSearchParams();
   const urlJobId = searchParams ? searchParams.get("jobId") : null;
   const [resolvedJobId, setResolvedJobId] = useState<string | null>(urlJobId);
   const [mode, setMode] = useState<"chat" | "tailor">("chat");
+  const onModeChangeRef = useRef(onModeChange);
+  onModeChangeRef.current = onModeChange;
+  const onRequestExpandRef = useRef(onRequestExpand);
+  onRequestExpandRef.current = onRequestExpand;
 
   const handleModeChange = (next: "chat" | "tailor") => {
     setMode(next);
@@ -155,11 +163,13 @@ export function AiSidebar({
   const [demoBaseTypstSource, setDemoBaseTypstSource] = useState<string | null>(null);
   const tailorAbortRef = useRef<AbortController | null>(null);
   const repairAbortRef = useRef<AbortController | null>(null);
+  const applyAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     return () => {
       tailorAbortRef.current?.abort();
       repairAbortRef.current?.abort();
+      applyAbortRef.current?.abort();
     };
   }, []);
 
@@ -188,7 +198,12 @@ export function AiSidebar({
         const raw = sessionStorage.getItem(`resumeforge_tailor_feedback_${urlJobId}`);
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (parsed && parsed.jobId === urlJobId) setSeededFeedback(parsed);
+          if (parsed && parsed.jobId === urlJobId) {
+            setSeededFeedback(parsed);
+            setMode("tailor");
+            onModeChangeRef.current?.("tailor");
+            onRequestExpandRef.current?.();
+          }
         }
       } catch {
         // sessionStorage unavailable or invalid
@@ -199,7 +214,7 @@ export function AiSidebar({
 
   const handleDismissSeededFeedback = () => {
     setSeededFeedback(null);
-    if (urlJobId && typeof window === "undefined") return;
+    if (!urlJobId || typeof window === "undefined") return;
     try {
       sessionStorage.removeItem(`resumeforge_tailor_feedback_${urlJobId}`);
     } catch {
@@ -209,13 +224,14 @@ export function AiSidebar({
 
   // Preload active Tailor / URL job context and JD
   useEffect(() => {
+    const controller = new AbortController();
     let cancelled = false;
     (async () => {
       const [demoConfig, sessionUser] = await Promise.all([
         fetchDemoConfig(),
         fetchSessionUser(),
       ]);
-      if (cancelled) return;
+      if (cancelled || controller.signal.aborted) return;
       const resolved = resolveActiveTailorJobContext({
         propJobId: urlJobId,
         scope: {
@@ -224,10 +240,18 @@ export function AiSidebar({
           scopeResolved: true,
         },
       });
-      const targetJobId = urlJobId ?? resolved.activeJobId ?? null;
+      const targetJobId =
+        urlJobId ??
+        (resolved.activeJobId && !resolved.activeJobId.startsWith("demo-sample-")
+          ? resolved.activeJobId
+          : null);
       setResolvedJobId(targetJobId);
 
-      if (resolved.jobSummary?.rawDescription) {
+      if (
+        resolved.jobSummary?.jobId &&
+        (urlJobId || !resolved.jobSummary.jobId.startsWith("demo-sample-")) &&
+        resolved.jobSummary.rawDescription
+      ) {
         setJdText((prev) => prev || resolved.jobSummary!.rawDescription!);
         return;
       }
@@ -250,15 +274,18 @@ export function AiSidebar({
       }
 
       try {
-        const res = await fetch(`/api/jobs/${targetJobId}`);
+        const res = await fetch(`/api/jobs/${targetJobId}`, { signal: controller.signal });
         const json = await readJsonSafe<{ success?: boolean; data?: { rawDescription?: string } }>(res);
-        if (!cancelled && res.ok && json?.success && json.data?.rawDescription) {
+        if (!cancelled && !controller.signal.aborted && res.ok && json?.success && json.data?.rawDescription) {
           setJdText((prev) => prev || json.data!.rawDescription!);
         }
-      } catch {}
+      } catch (err) {
+        if ((err as Error)?.name === "AbortError") return;
+      }
     })();
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [urlJobId]);
 
@@ -557,6 +584,9 @@ export function AiSidebar({
 
     const acceptedList = suggestions.filter((s) => acceptedIds.has(s.id));
     if (acceptedList.length === 0) return;
+    applyAbortRef.current?.abort();
+    const controller = new AbortController();
+    applyAbortRef.current = controller;
     setIsGenerating(true);
     try {
       const reconstructed = applyPatchProposals(patchBatch.baseTypstSource, acceptedList);
@@ -564,16 +594,15 @@ export function AiSidebar({
       if (reconstructed.appliedIds.length !== acceptedPatchIds.length || acceptedPatchIds.some((id) => !reconstructed.appliedIds.includes(id))) {
         throw new Error("The server proposal set changed. Generate patches again before applying.");
       }
-      if (masterFacts) {
-        assertCanApplyPatches(source, masterFacts, acceptedList, { acknowledgedSkills: Array.from(acknowledgedSkills) });
-      }
       const preview = markDocumentAsPatched(reconstructed.typstSource);
       const { compileTypstToSvg } = await import("@/lib/typst/compiler");
       const compiled = await compileTypstToSvg(preview);
+      if (controller.signal.aborted) return;
       if (!compiled.success) throw new Error("The reconstructed resume does not compile. Review the accepted patches before applying.");
       const res = await fetch("/api/ai/apply-patches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           batchId: patchBatch.batchId,
           revisionToken: patchBatch.revisionToken,
@@ -588,15 +617,20 @@ export function AiSidebar({
         message?: string;
         data?: { typstContent: string };
       }>(res);
+      if (controller.signal.aborted) return;
       if (!res.ok || !json?.success || !json.data) {
         throw new Error(json?.message || json?.error || `Failed to save tailored variant (HTTP ${res.status}).`);
       }
       onApplyToBuffer(json.data.typstContent);
       setHasApplied(true);
     } catch (err) {
+      if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
       setError(err instanceof Error ? err.message : "Failed to apply patches.");
     } finally {
-      setIsGenerating(false);
+      if (applyAbortRef.current === controller) {
+        applyAbortRef.current = null;
+        setIsGenerating(false);
+      }
     }
   };
 
@@ -723,32 +757,34 @@ export function AiSidebar({
             <button
               type="button"
               onClick={onDismissRepair}
+              aria-label="Close Repair Assist Mode"
               className="p-0.5 rounded text-text-secondary hover:text-foreground hover:bg-elevated transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               title="Close Repair Assist Mode"
               data-testid="close-repair-mode-btn"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           )}
           <Link
             href="/settings"
             className="flex items-center gap-1 text-xs text-text-muted hover:text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
           >
-            <Settings className="h-3 w-3" />
+            <Settings className="h-3 w-3" aria-hidden="true" />
             Settings
           </Link>
           {onPopOut && (
             <button
               type="button"
               onClick={onPopOut}
+              aria-label={isPoppedOut ? "Dock AI Assistant to sidebar" : "Pop out AI Assistant into floating window"}
               className="p-0.5 rounded text-text-secondary hover:text-primary hover:bg-elevated transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               title={isPoppedOut ? "Dock back to sidebar" : "Pop out into floating window"}
               data-testid="popout-ai-window-btn"
             >
               {isPoppedOut ? (
-                <Dock className="h-3.5 w-3.5 text-status-warning" />
+                <Dock className="h-3.5 w-3.5 text-status-warning" aria-hidden="true" />
               ) : (
-                <ExternalLink className="h-3.5 w-3.5" />
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
               )}
             </button>
           )}
@@ -756,14 +792,15 @@ export function AiSidebar({
             <button
               type="button"
               onClick={onToggleCollapse}
-              className="p-1 rounded text-text-secondary hover:text-foreground hover:bg-elevated transition"
+              aria-label={isCollapsed ? "Expand AI Sidebar" : "Collapse AI Sidebar"}
+              className="p-1 rounded text-text-secondary hover:text-foreground hover:bg-elevated transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               title={isCollapsed ? "Expand AI Sidebar" : "Collapse AI Sidebar"}
               data-testid="toggle-ai-sidebar-btn"
             >
               {isCollapsed ? (
-                <PanelRightOpen className="h-3.5 w-3.5 text-status-warning" />
+                <PanelRightOpen className="h-3.5 w-3.5 text-status-warning" aria-hidden="true" />
               ) : (
-                <PanelRightClose className="h-3.5 w-3.5" />
+                <PanelRightClose className="h-3.5 w-3.5" aria-hidden="true" />
               )}
             </button>
           )}
@@ -872,7 +909,7 @@ export function AiSidebar({
                 ) : (
                   <Sparkles className="h-4 w-4 text-primary-foreground" />
                 )}
-                {isRepairing ? "Diagnosing & Generating Fix..." : "Generate AI Repair Proposal"}
+                {isRepairing ? "Diagnosing & Generating Fix…" : "Generate AI Repair Proposal"}
               </button>
             )}
 
@@ -933,7 +970,7 @@ export function AiSidebar({
                               type="checkbox"
                               checked={confirmLargeRepair}
                               onChange={(e) => setConfirmLargeRepair(e.target.checked)}
-                              className="mt-0.5 rounded border-status-warning bg-inset text-primary focus:ring-ring"
+                              className="mt-0.5 rounded border-status-warning bg-inset text-primary focus-visible:ring-ring"
                               data-testid="confirm-large-repair-checkbox"
                             />
                             <span>I confirm I want to replace &gt;25% of my document.</span>
@@ -1025,10 +1062,11 @@ export function AiSidebar({
 
         {/* JD Input */}
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          <label htmlFor={jdTextareaId} className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Job Description
           </label>
           <textarea
+            id={jdTextareaId}
             rows={6}
             value={jdText}
             onChange={(e) => {
@@ -1114,7 +1152,7 @@ export function AiSidebar({
                         checked={acknowledgedSkills.has(skill)}
                         onChange={() => toggleSkillAck(skill)}
                         data-testid={`ack-skill-checkbox-${skill}`}
-                        className="rounded border-status-warning bg-inset text-primary focus:ring-ring"
+                        className="rounded border-status-warning bg-inset text-primary focus-visible:ring-ring"
                       />
                       <span>I have real experience with <strong>{skill}</strong></span>
                     </label>
@@ -1162,7 +1200,7 @@ export function AiSidebar({
               return (
                 <div
                   key={s.id}
-                  className={`rounded-lg border p-3 space-y-2 text-xs transition-all ${
+                  className={`rounded-lg border p-3 space-y-2 text-xs transition-colors ${
                     isAccepted
                       ? "border-status-success/40 bg-status-success/15"
                       : isRejected

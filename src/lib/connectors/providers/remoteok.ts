@@ -2,6 +2,7 @@ import { safeFetch } from "../http";
 import { sanitizeJobPayload } from "../sanitize";
 import { filterInternshipListings } from "../internship-filter";
 import { ConnectorClient, RawJobListing } from "../types";
+import { sanitizeError } from "@/lib/ai/redact";
 
 const TECH_TAGS = new Set([
   "dev",
@@ -102,7 +103,7 @@ export class RemoteOkConnector implements ConnectorClient {
 
       return filterInternshipListings(listings, { includeAllRoles: params?.includeAllRoles });
     } catch (err) {
-      console.error("[RemoteOK] Fetch error:", err);
+      console.error("[RemoteOK] Fetch error:", sanitizeError(err));
       return [];
     }
   }

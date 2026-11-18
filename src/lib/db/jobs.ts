@@ -185,6 +185,7 @@ export async function updateJob(
     requirementsSource: reqState.requirementsSource,
     isPlaceholder,
     hasFullDescription: !isPlaceholder,
+    salaryLabel: extractSalaryFromNotes(updated.notes, updated.rawDescription),
   };
 }
 
@@ -248,6 +249,8 @@ function jobIncludeForViewer(viewerUserId?: string | null): Prisma.JobInclude {
 
 export type { WorkplaceFilter };
 
+export type JobListScope = "all" | "tracked";
+
 export interface JobListQuery {
   page?: number;
   limit?: number;
@@ -256,6 +259,7 @@ export interface JobListQuery {
   workplace?: WorkplaceFilter;
   status?: JobStatus | JobStatus[] | "ALL";
   postedWithin?: PostedWithin;
+  scope?: JobListScope;
   /** Viewer id — scopes nested variants/cover letters, not the job catalog. */
   userId?: string | null;
 }
@@ -263,8 +267,46 @@ export interface JobListQuery {
 export async function getJobsList(query: JobListQuery = {}) {
   const page = Math.max(1, query.page ?? 1);
   const limit = Math.min(100, Math.max(1, query.limit ?? 40));
+
+  if (query.scope === "tracked" && !query.userId) {
+    return {
+      data: [],
+      meta: {
+        page,
+        limit,
+        total: 0,
+        totalPages: 1,
+        counts: { applied: 0, interviewing: 0 },
+      },
+    };
+  }
+
   const where: Prisma.JobWhereInput = {
-    AND: [sharedOrSelfJobWhere(query.userId)],
+    AND: [
+      sharedOrSelfJobWhere(query.userId),
+      ...(query.scope === "tracked" && query.userId
+        ? [
+            {
+              OR: [
+                { userId: query.userId },
+                { applications: { some: { userId: query.userId } } },
+                { variants: { some: { masterResume: { userId: query.userId } } } },
+                {
+                  coverLetters: {
+                    some: {
+                      OR: [
+                        { userId: query.userId },
+                        { variant: { masterResume: { userId: query.userId } } },
+                      ],
+                    },
+                  },
+                },
+                { patchProposalBatches: { some: { userId: query.userId } } },
+              ],
+            } satisfies Prisma.JobWhereInput,
+          ]
+        : []),
+    ],
   };
 
   if (query.q?.trim()) {
@@ -351,7 +393,10 @@ export async function getJobsList(query: JobListQuery = {}) {
   const workplace = query.workplace ?? "all";
   const start = (page - 1) * limit;
   let cursor: string | undefined;
-  type RawJobRow = Prisma.JobGetPayload<{ include: typeof jobListInclude }> & {
+  type RawJobRow = Omit<
+    Prisma.JobGetPayload<{ include: typeof jobListInclude }>,
+    "normalized" | "formattedJd"
+  > & {
     patchProposalBatches?: { id: string }[];
   };
   type EligibleJobEntry = ReturnType<typeof withViewerOutcome<RawJobRow>> & {
@@ -368,6 +413,10 @@ export async function getJobsList(query: JobListQuery = {}) {
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       take: 500,
+      omit: {
+        normalized: true,
+        formattedJd: true,
+      },
       include: {
         ...jobIncludeForViewer(query.userId),
         patchProposalBatches: {
@@ -391,6 +440,7 @@ export async function getJobsList(query: JobListQuery = {}) {
       );
       const posted = extractPostingDateFromNotes(job.notes)?.trim() || null;
       const cleanedPosted = posted && !/^apply$/i.test(posted) ? posted : null;
+      if (query.scope === "tracked" && !hasPersonalHistory) continue;
       if (!hasPersonalHistory && !isBoardEligible(cleanedPosted, job.createdAt, now)) continue;
 
       const item = withViewerOutcome(job, query.userId);
@@ -430,7 +480,7 @@ export async function getJobsList(query: JobListQuery = {}) {
     }
   }
 
-  const data: Array<Omit<Prisma.JobGetPayload<{ include: typeof jobListInclude }>, "applications" | "extractedRequirements" | "status" | "rawDescription"> & {
+  const data: Array<Omit<Prisma.JobGetPayload<{ include: typeof jobListInclude }>, "applications" | "extractedRequirements" | "status" | "rawDescription" | "normalized" | "formattedJd"> & {
     status: JobStatus;
     appliedAt: Date | null;
     appliedVariantId: string | null;
@@ -443,16 +493,20 @@ export async function getJobsList(query: JobListQuery = {}) {
   }> = [];
 
   for (const entry of deduped.slice(start, start + limit)) {
-    // The scoped proposal lookup is internal and must not leak into board responses.
+    // The scoped proposal lookup and heavy JD JSON blobs must not leak into board list responses.
     const {
       patchProposalBatches: _internal,
       applications: _applications,
+      normalized: _normalized,
+      formattedJd: _formattedJd,
       rawDescription,
       extractedRequirements,
       ...visible
-    } = entry;
+    } = entry as EligibleJobEntry & { normalized?: unknown; formattedJd?: unknown };
     void _internal;
     void _applications;
+    void _normalized;
+    void _formattedJd;
     const reqState = parseRequirementsState(
       extractedRequirements,
       rawDescription,

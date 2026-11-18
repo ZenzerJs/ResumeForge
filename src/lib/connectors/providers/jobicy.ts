@@ -2,6 +2,7 @@ import { safeFetch } from "../http";
 import { sanitizeJobPayload } from "../sanitize";
 import { filterInternshipListings } from "../internship-filter";
 import { ConnectorClient, RawJobListing } from "../types";
+import { sanitizeError } from "@/lib/ai/redact";
 
 export class JobicyConnector implements ConnectorClient {
   readonly id = "jobicy" as const;
@@ -53,7 +54,7 @@ export class JobicyConnector implements ConnectorClient {
 
       return filterInternshipListings(listings, { includeAllRoles: params?.includeAllRoles });
     } catch (err) {
-      console.error("[Jobicy] Fetch error:", err);
+      console.error("[Jobicy] Fetch error:", sanitizeError(err));
       return [];
     }
   }

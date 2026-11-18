@@ -2,6 +2,7 @@ import { safeFetch } from "../http";
 import { sanitizeJobPayload } from "../sanitize";
 import { filterInternshipListings } from "../internship-filter";
 import { ConnectorClient, RawJobListing } from "../types";
+import { sanitizeError } from "@/lib/ai/redact";
 
 function isCanadianOrWorldwide(locationStr: string): boolean {
   const loc = (locationStr || "").toLowerCase();
@@ -59,7 +60,7 @@ export class RemotiveConnector implements ConnectorClient {
 
       return filterInternshipListings(listings, { includeAllRoles: params?.includeAllRoles });
     } catch (err) {
-      console.error("[Remotive] Fetch error:", err);
+      console.error("[Remotive] Fetch error:", sanitizeError(err));
       return [];
     }
   }
