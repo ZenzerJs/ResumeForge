@@ -53,7 +53,13 @@ import {
 import { AppShell } from "@/components/design-system/app-shell";
 import { clearDemoSamplesForPersonalResume, getDemoContextFromBrowser, initializeDemoSamples } from "@/lib/demo-client";
 import { fetchDemoConfig, fetchSessionPayload } from "@/components/auth/session-user";
+import {
+  hasPendingGuestDraftInStorage,
+  isCustomGuestDraftSource,
+} from "@/components/auth/guest-migration-modal";
 import { EditorWorkspaceSkeleton } from "@/components/editor/editor-workspace-skeleton";
+import { resolveDefaultEditorMode } from "@/components/editor/code-editor";
+import { createBlankResumeTypst } from "@/components/editor/resume-form-builder";
 import {
   buildLibraryHref,
   normalizeEditorModeParam,
@@ -93,6 +99,39 @@ export interface DocumentMetadata {
   type: DocumentType;
   title: string;
   id?: string;
+}
+
+export function getEditorBannerVisibility(params: {
+  docMetadata: DocumentMetadata;
+  source: string;
+  isConversionBannerDismissed: boolean;
+}): {
+  showConversionFallbackBanner: boolean;
+  showConversionAiBanner: boolean;
+  showSampleResumeBanner: boolean;
+} {
+  const { docMetadata, source, isConversionBannerDismissed } = params;
+  const isMaster = docMetadata.type === "MASTER_RESUME";
+  const showConversionFallbackBanner =
+    !isMaster &&
+    !isConversionBannerDismissed &&
+    source.includes("// @conversion-path: fallback");
+  const showConversionAiBanner =
+    !isMaster &&
+    !isConversionBannerDismissed &&
+    source.includes("// @conversion-path: ai");
+  const showSampleResumeBanner =
+    !isMaster &&
+    docMetadata.title !== "Blank Resume" &&
+    (docMetadata.title === "Starter Template" ||
+      source.includes("alex.morgan@example.com") ||
+      source.includes("// Synthetic sample. This is not a real person's resume or experience."));
+
+  return {
+    showConversionFallbackBanner,
+    showConversionAiBanner,
+    showSampleResumeBanner,
+  };
 }
 
 const WORKSPACE_PANEL_TABS = [
@@ -135,13 +174,19 @@ export function EditorWorkspace() {
   const [error, setError] = useState<{ message: string; line?: number; column?: number } | null>(null);
   const [isCompiling, setIsCompiling] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<WorkspacePanelTab>("editor");
-  const [editorMode, setEditorMode] = useState<"code" | "visual">(() =>
-    normalizeEditorModeParam(searchParams.get("mode")) === "visual" ? "visual" : "code"
-  );
   const modeParam = normalizeEditorModeParam(searchParams.get("mode"));
+  const hasExplicitModeRef = useRef<boolean>(modeParam !== null);
+  const [editorMode, setEditorMode] = useState<"code" | "visual">(() =>
+    modeParam === "code" ? "code" : "visual"
+  );
+  const handleEditorModeChange = useCallback((nextMode: "code" | "visual") => {
+    hasExplicitModeRef.current = true;
+    setEditorMode(nextMode);
+  }, []);
   useEffect(() => {
-    if (modeParam === "visual") {
-      setEditorMode("visual");
+    if (modeParam === "visual" || modeParam === "code") {
+      hasExplicitModeRef.current = true;
+      setEditorMode(modeParam);
     }
   }, [modeParam]);
   const tabRefs = useRef<Record<WorkspacePanelTab, HTMLButtonElement | null>>({
@@ -526,8 +571,8 @@ export function EditorWorkspace() {
           id: master.id,
         });
 
-        // Sync localStorage with DB master content so localStorage does NOT overwrite DB content
-        if (typeof window !== "undefined") {
+        // Sync localStorage with DB master content only when no un-migrated guest draft is pending
+        if (typeof window !== "undefined" && !hasPendingGuestDraftInStorage(localStorage)) {
           localStorage.setItem(STORAGE_KEY, master.typstSource);
           localStorage.setItem("resumeforge_draft_migrated", "true");
           localStorage.removeItem("resumeforge_has_guest_draft");
@@ -586,6 +631,21 @@ export function EditorWorkspace() {
     };
   }, [loadCanonicalDocument]);
 
+  useEffect(() => {
+    if (isLoadingDocument || !source || hasExplicitModeRef.current) return;
+    setEditorMode(resolveDefaultEditorMode(source, null));
+  }, [isLoadingDocument, source]);
+
+  useEffect(() => {
+    const onGuestDraftMigrated = () => {
+      void loadCanonicalDocument();
+    };
+    window.addEventListener("resumeforge:guest-draft-migrated", onGuestDraftMigrated);
+    return () => {
+      window.removeEventListener("resumeforge:guest-draft-migrated", onGuestDraftMigrated);
+    };
+  }, [loadCanonicalDocument]);
+
   const compileGeneration = useRef(0);
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const uiTimers = useRef<number[]>([]);
@@ -598,7 +658,17 @@ export function EditorWorkspace() {
   useEffect(() => {
     const timers = uiTimers.current;
     return () => {
-      if (persistTimer.current) clearTimeout(persistTimer.current);
+      if (persistTimer.current) {
+        clearTimeout(persistTimer.current);
+        persistTimer.current = null;
+        if (typeof window !== "undefined" && sourceRef.current) {
+          try {
+            localStorage.setItem(STORAGE_KEY, sourceRef.current);
+          } catch {
+            // Storage is optional.
+          }
+        }
+      }
       for (const id of timers) window.clearTimeout(id);
     };
   }, []);
@@ -667,14 +737,51 @@ export function EditorWorkspace() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleShortcutSave]);
 
-  const handleSourceChange = useCallback((newVal: string) => {
-    setSource(newVal);
-    if (typeof window === "undefined") return;
-    clearDemoSamplesForPersonalResume(newVal);
-    if (persistTimer.current) clearTimeout(persistTimer.current);
-    persistTimer.current = setTimeout(() => {
-      localStorage.setItem(STORAGE_KEY, newVal);
-    }, SOURCE_PERSIST_MS);
+  const handleSourceChange = useCallback(
+    (newVal: string) => {
+      setSource(newVal);
+      if (typeof window === "undefined") return;
+      clearDemoSamplesForPersonalResume(newVal);
+      if (!accountScope.demoMode && accountScope.scopeResolved && !accountScope.userId) {
+        if (isCustomGuestDraftSource(newVal)) {
+          localStorage.setItem("resumeforge_has_guest_draft", "true");
+          localStorage.removeItem("resumeforge_draft_migrated");
+          localStorage.removeItem("resumeforge_migration_dismissed");
+        }
+      }
+      if (persistTimer.current) clearTimeout(persistTimer.current);
+      persistTimer.current = setTimeout(() => {
+        persistTimer.current = null;
+        localStorage.setItem(STORAGE_KEY, newVal);
+      }, SOURCE_PERSIST_MS);
+    },
+    [accountScope.demoMode, accountScope.scopeResolved, accountScope.userId]
+  );
+
+  const handleStartBlankResume = useCallback(() => {
+    const blankSource = createBlankResumeTypst();
+    setHasAiPatchedBuffer(false);
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.removeItem("resumeforge_ai_patched_buffer");
+      } catch {
+        // ignore
+      }
+      if (persistTimer.current) {
+        clearTimeout(persistTimer.current);
+        persistTimer.current = null;
+      }
+      localStorage.setItem(STORAGE_KEY, blankSource);
+      localStorage.removeItem("resumeforge_has_guest_draft");
+    }
+    setDocMetadata({
+      type: "LOCAL_FALLBACK",
+      title: "Blank Resume",
+    });
+    setSource(blankSource);
+    setBaselineSource(blankSource);
+    setSvg(null);
+    setError(null);
   }, []);
 
   const handleTriggerRepair = useCallback(
@@ -740,6 +847,9 @@ export function EditorWorkspace() {
       }
     }
     const starter = await loadStarterTemplate();
+    if (docMetadata.type === "LOCAL_FALLBACK") {
+      setDocMetadata({ type: "LOCAL_FALLBACK", title: "Starter Template" });
+    }
     handleSourceChange(starter);
   };
 
@@ -916,6 +1026,16 @@ export function EditorWorkspace() {
       setIsUndoing(false);
     }
   };
+
+  const {
+    showConversionFallbackBanner,
+    showConversionAiBanner,
+    showSampleResumeBanner,
+  } = getEditorBannerVisibility({
+    docMetadata,
+    source,
+    isConversionBannerDismissed,
+  });
 
   const tailorReturnContext = useMemo(
     () =>
@@ -1116,9 +1236,9 @@ export function EditorWorkspace() {
       )}
 
       {(documentError ||
-        (!isConversionBannerDismissed &&
-          (source.includes("// @conversion-path: fallback") ||
-            source.includes("// @conversion-path: ai"))) ||
+        showSampleResumeBanner ||
+        showConversionFallbackBanner ||
+        showConversionAiBanner ||
         lastSnapshotId ||
         undoSuccess ||
         evidenceExtractToast) && (
@@ -1142,8 +1262,30 @@ export function EditorWorkspace() {
             </div>
           )}
 
-          {/* Task 9.1: PDF Conversion Status Banners */}
-          {!isConversionBannerDismissed && source.includes("// @conversion-path: fallback") && (
+          {showSampleResumeBanner && (
+            <div
+              data-testid="sample-resume-banner"
+              className="flex flex-wrap items-center justify-between gap-2 px-4 py-1.5 bg-primary/10 border-b border-primary/30 text-xs text-foreground"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                <span>
+                  <strong className="font-semibold text-primary">Sample Resume Loaded</strong> — This placeholder example uses fictional experience so you can explore the editor.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleStartBlankResume}
+                data-testid="start-blank-resume-btn"
+                className="shrink-0 rounded border border-primary/40 bg-elevated px-2.5 py-0.5 text-xs font-semibold text-foreground hover:bg-muted transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Start Blank Resume
+              </button>
+            </div>
+          )}
+
+          {/* Task 9.1: PDF Conversion Status Banners (suppressed on frozen Master Resume) */}
+          {showConversionFallbackBanner && (
             <div
               data-testid="pdf-conversion-fallback-banner"
               className="flex items-center justify-between gap-2 px-4 py-1.5 bg-primary/10 border-b border-primary/30 text-xs text-primary"
@@ -1164,7 +1306,7 @@ export function EditorWorkspace() {
             </div>
           )}
 
-          {!isConversionBannerDismissed && source.includes("// @conversion-path: ai") && (
+          {showConversionAiBanner && (
             <div
               data-testid="pdf-conversion-ai-banner"
               className="flex items-center justify-between gap-2 px-4 py-1.5 bg-status-success/15 border-b border-status-success/35 text-xs text-status-info"
@@ -1405,7 +1547,7 @@ export function EditorWorkspace() {
                   <button
                     type="button"
                     data-testid="mobile-orientation-visual-btn"
-                    onClick={() => setEditorMode("visual")}
+                    onClick={() => handleEditorModeChange("visual")}
                     className="inline-flex min-h-8 items-center rounded border border-outline/70 bg-elevated px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     Visual Form
@@ -1506,7 +1648,7 @@ export function EditorWorkspace() {
             value={source}
             onChange={handleSourceChange}
             mode={editorMode}
-            onModeChange={setEditorMode}
+            onModeChange={handleEditorModeChange}
           />,
           hosts.code
         )}

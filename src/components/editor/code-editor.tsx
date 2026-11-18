@@ -14,6 +14,7 @@ import {
 import { MessageSquarePlus, LayoutList, Code2, Plus, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { isResumeLayoutV2Enabled, parseManagedResume, renderResumeDocument } from "@/lib/typst/resume-document";
+import { isResumeSourceSafeForForm } from "./resume-form-builder";
 
 const ResumeFormBuilder = dynamic(
   () => import("./resume-form-builder").then((m) => m.ResumeFormBuilder),
@@ -214,6 +215,17 @@ export function insertReviewMarkerInView(
   return true;
 }
 
+export function resolveDefaultEditorMode(
+  value: string,
+  explicitModeParam?: string | null
+): "code" | "visual" {
+  if (explicitModeParam === "code") return "code";
+  if (explicitModeParam === "visual") return "visual";
+  return Boolean(parseManagedResume(value)) || isResumeSourceSafeForForm(value)
+    ? "visual"
+    : "code";
+}
+
 interface CodeEditorProps {
   value: string;
   onChange: (val: string) => void;
@@ -225,10 +237,19 @@ export function CodeEditor({ value, onChange, mode, onModeChange }: CodeEditorPr
   const editorRef = useRef<ReactCodeMirrorRef>(null);
   const reviewMarkerHelpId = useId();
   const [reviewMarkerCount, setReviewMarkerCount] = useState(0);
-  const [internalMode, setInternalMode] = useState<"code" | "visual">(mode ?? "code");
+  const hasExplicitModeRef = useRef<boolean>(mode !== undefined);
+  const [internalMode, setInternalMode] = useState<"code" | "visual">(() => {
+    if (mode !== undefined) return mode;
+    const urlParam =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("mode")
+        : null;
+    return resolveDefaultEditorMode(value, urlParam);
+  });
   const editorMode = mode ?? internalMode;
   const setEditorMode = useCallback(
     (nextMode: "code" | "visual") => {
+      hasExplicitModeRef.current = true;
       if (mode === undefined) {
         setInternalMode(nextMode);
       }
@@ -248,12 +269,19 @@ export function CodeEditor({ value, onChange, mode, onModeChange }: CodeEditorPr
   }, [value]);
 
   useEffect(() => {
-    if (mode !== undefined || typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("mode") === "visual") {
-      setInternalMode("visual");
+    if (mode !== undefined) return;
+    if (typeof window !== "undefined") {
+      const param = new URLSearchParams(window.location.search).get("mode");
+      if (param === "visual" || param === "code") {
+        hasExplicitModeRef.current = true;
+        setInternalMode(param);
+        return;
+      }
     }
-  }, [mode]);
+    if (!hasExplicitModeRef.current) {
+      setInternalMode(resolveDefaultEditorMode(value, null));
+    }
+  }, [mode, value]);
 
   const handleAddReviewMarker = useCallback(() => {
     const view = editorRef.current?.view;

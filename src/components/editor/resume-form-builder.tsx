@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useId } from "react";
+import React, { useState, useEffect, useId, useRef } from "react";
 import { buildResumeDocument, typstContent, typstString, type ResumeAssignment } from "@/lib/typst/resume-document";
 import {
   User,
@@ -49,6 +49,228 @@ function decodeTypstContent(value: string): string {
   return value.replace(/\\([\\#\[\]*_@$<>`~\/=+^.-])/g, "$1");
 }
 
+function unescapeTypstString(value: string): string {
+  return value
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\r")
+    .replace(/\\"/g, '"')
+    .replace(/\\\\/g, "\\");
+}
+
+interface TypstCallMatch {
+  fnName: string;
+  argsBody: string;
+  start: number;
+  end: number;
+}
+
+function extractBalancedCallArgs(source: string, fnNames: string[]): TypstCallMatch[] {
+  const results: TypstCallMatch[] = [];
+  const namePattern = fnNames.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const regex = new RegExp(`#(${namePattern})\\s*\\(`, "g");
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(source)) !== null) {
+    const start = match.index;
+    const openParenIdx = source.indexOf("(", start);
+    if (openParenIdx === -1) continue;
+
+    // Skip matches inside line comments
+    const lineStart = source.lastIndexOf("\n", start) + 1;
+    const linePrefix = source.slice(lineStart, start);
+    if (linePrefix.includes("//")) continue;
+
+    let i = openParenIdx + 1;
+    let parenDepth = 1;
+    let bracketDepth = 0;
+    let inString = false;
+    let escaped = false;
+
+    while (i < source.length && parenDepth > 0) {
+      const ch = source[i];
+      if (escaped) {
+        escaped = false;
+        i++;
+        continue;
+      }
+      if (inString) {
+        if (ch === "\\") {
+          escaped = true;
+        } else if (ch === '"') {
+          inString = false;
+        }
+        i++;
+        continue;
+      }
+      if (ch === '"') {
+        inString = true;
+      } else if (ch === "[") {
+        bracketDepth++;
+      } else if (ch === "]") {
+        if (bracketDepth > 0) bracketDepth--;
+      } else if (ch === "(" && bracketDepth === 0) {
+        parenDepth++;
+      } else if (ch === ")" && bracketDepth === 0) {
+        parenDepth--;
+        if (parenDepth === 0) break;
+      }
+      i++;
+    }
+
+    if (parenDepth === 0) {
+      results.push({
+        fnName: match[1],
+        argsBody: source.slice(openParenIdx + 1, i),
+        start,
+        end: i + 1,
+      });
+      regex.lastIndex = i + 1;
+    }
+  }
+
+  return results;
+}
+
+interface ParsedTypstArg {
+  raw: string;
+  kind: "string" | "block" | "bare";
+  value: string;
+}
+
+function parseNamedTypstArgs(argsBody: string): Record<string, ParsedTypstArg> {
+  const args: Record<string, ParsedTypstArg> = {};
+  let i = 0;
+  const len = argsBody.length;
+
+  while (i < len) {
+    while (i < len && /[\s,]/.test(argsBody[i])) i++;
+    if (i >= len) break;
+
+    if (argsBody.slice(i, i + 2) === "//") {
+      const nl = argsBody.indexOf("\n", i);
+      i = nl === -1 ? len : nl + 1;
+      continue;
+    }
+
+    const keyMatch = argsBody.slice(i).match(/^([a-zA-Z_][a-zA-Z0-9_-]*)\s*:/);
+    if (!keyMatch) {
+      i++;
+      continue;
+    }
+
+    const key = keyMatch[1];
+    i += keyMatch[0].length;
+    while (i < len && /\s/.test(argsBody[i])) i++;
+    if (i >= len) break;
+
+    const startCh = argsBody[i];
+    if (startCh === '"') {
+      const valStart = i + 1;
+      i++;
+      let escaped = false;
+      while (i < len) {
+        const ch = argsBody[i];
+        if (escaped) {
+          escaped = false;
+        } else if (ch === "\\") {
+          escaped = true;
+        } else if (ch === '"') {
+          break;
+        }
+        i++;
+      }
+      const raw = argsBody.slice(valStart, i);
+      if (i < len && argsBody[i] === '"') i++;
+      args[key] = { raw, kind: "string", value: unescapeTypstString(raw) };
+    } else if (startCh === "[") {
+      const valStart = i + 1;
+      i++;
+      let depth = 1;
+      let inStr = false;
+      let escaped = false;
+      while (i < len && depth > 0) {
+        const ch = argsBody[i];
+        if (escaped) {
+          escaped = false;
+        } else if (inStr) {
+          if (ch === "\\") escaped = true;
+          else if (ch === '"') inStr = false;
+        } else if (ch === '"') {
+          inStr = true;
+        } else if (ch === "[") {
+          depth++;
+        } else if (ch === "]") {
+          depth--;
+          if (depth === 0) break;
+        }
+        i++;
+      }
+      const raw = argsBody.slice(valStart, i);
+      if (i < len && argsBody[i] === "]") i++;
+      args[key] = { raw, kind: "block", value: decodeTypstContent(raw.trim()) };
+    } else {
+      const valStart = i;
+      let depth = 0;
+      let inStr = false;
+      let escaped = false;
+      while (i < len) {
+        const ch = argsBody[i];
+        if (escaped) {
+          escaped = false;
+        } else if (inStr) {
+          if (ch === "\\") escaped = true;
+          else if (ch === '"') inStr = false;
+        } else if (ch === '"') {
+          inStr = true;
+        } else if (ch === "(" || ch === "[") {
+          depth++;
+        } else if (ch === ")" || ch === "]") {
+          if (depth > 0) depth--;
+        } else if (ch === "," && depth === 0) {
+          break;
+        }
+        i++;
+      }
+      const raw = argsBody.slice(valStart, i).trim();
+      args[key] = { raw, kind: "bare", value: raw === "none" ? "" : decodeTypstContent(raw) };
+    }
+  }
+
+  return args;
+}
+
+function formatProjectLinks(linksArg?: ParsedTypstArg): string {
+  if (!linksArg) return "";
+  const raw = linksArg.raw.trim();
+  if (!raw || raw === "none") return "";
+  const linkMatches = Array.from(raw.matchAll(/#link\(\s*"((?:[^"\\]|\\.)*)"\s*\)\[([^\]]*)\]/g));
+  if (linkMatches.length > 0) {
+    return linkMatches
+      .map((m) => {
+        const url = unescapeTypstString(m[1]);
+        const label = decodeTypstContent(m[2].trim());
+        if (!label || label === url || url.endsWith(label)) return url;
+        return `${label}: ${url}`;
+      })
+      .join(" | ");
+  }
+  return decodeTypstContent(raw);
+}
+
+function extractBulletsFromDetails(detailsRaw: string): string[] {
+  const lines = detailsRaw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const bulletLines = lines.filter((l) => l.startsWith("- "));
+  if (bulletLines.length > 0) {
+    return bulletLines.map((l) => decodeTypstContent(l.replace(/^-\s+/, "").trim()));
+  }
+  return lines
+    .filter((l) => !l.startsWith("//"))
+    .map((l) => decodeTypstContent(l));
+}
+
 function makeId(prefix: string, idx: number): string {
   return `${prefix}-${idx}-${Math.random().toString(36).slice(2, 6)}`;
 }
@@ -79,13 +301,38 @@ export function parseTypstToStructuredModel(source: string): StructuredResumeMod
       ? source.slice(headerSearchOffset, headerSearchOffset + firstSectionMatch.index)
       : source.slice(headerSearchOffset);
 
-  // Name extraction
+  // Name extraction — use balanced call parsing so nested rgb(...) inside #text(...) works
+  // without spanning across #show heading rules
   let fullName = "";
-  const headerNameMatch =
-    headerBlock.match(/#text\([\s\S]*?size:\s*(?:1[4-9]|2[0-9])pt[\s\S]*?\)\s*\[([^\]]+)\]/) ||
-    headerBlock.match(/^=\s+(.+)$/m);
-  if (headerNameMatch?.[1]) {
-    fullName = decodeTypstContent(headerNameMatch[1].trim());
+  const textCalls = extractBalancedCallArgs(headerBlock, ["text"]);
+  for (const call of textCalls) {
+    if (!/size:\s*(?:1[4-9]|2[0-9])pt\b/.test(call.argsBody)) continue;
+    const afterParen = headerBlock.slice(call.end);
+    const wsMatch = afterParen.match(/^\s*/);
+    const bracketOffset = call.end + (wsMatch ? wsMatch[0].length : 0);
+    if (headerBlock[bracketOffset] !== "[") continue;
+    let depth = 1;
+    let idx = bracketOffset + 1;
+    while (idx < headerBlock.length && depth > 0) {
+      if (headerBlock[idx] === "\\") {
+        idx += 2;
+        continue;
+      }
+      if (headerBlock[idx] === "[") depth++;
+      else if (headerBlock[idx] === "]") depth--;
+      if (depth === 0) break;
+      idx++;
+    }
+    if (depth === 0) {
+      fullName = decodeTypstContent(headerBlock.slice(bracketOffset + 1, idx).trim());
+      break;
+    }
+  }
+  if (!fullName) {
+    const headingMatch = headerBlock.match(/^=\s+(.+)$/m);
+    if (headingMatch?.[1]) {
+      fullName = decodeTypstContent(headingMatch[1].trim());
+    }
   }
 
   const emailMatch = headerBlock.match(/mailto:([^\s"\]]+)/) || headerBlock.match(/([\w.+-]+@[\w-]+\.[\w.-]+)/);
@@ -132,32 +379,28 @@ export function parseTypstToStructuredModel(source: string): StructuredResumeMod
     }
   }
 
-  // Helper to split by #section("...") or == Section
+  // Helper to parse #entry, #resume-entry, #project-entry, or bold-pair entries
   const parseEntriesInBlock = (block: string, prefix: string): ResumeEntryItem[] => {
     const items: ResumeEntryItem[] = [];
-    const entryRegex = /#entry\(([\s\S]*?)\n\)/g;
-    let match: RegExpExecArray | null;
+    const calls = extractBalancedCallArgs(block, ["entry", "resume-entry", "project-entry"]);
     let idx = 0;
 
-    while ((match = entryRegex.exec(block)) !== null) {
-      const body = match[1];
-      const title =
-        body.match(/title:\s*"((?:[^"\\]|\\.)*)"/)?.[1]?.replace(/\\"/g, '"').replace(/\\\\/g, "\\") ?? "";
+    for (const call of calls) {
+      const args = parseNamedTypstArgs(call.argsBody);
+      const title = args.title?.value ?? "";
       const role =
-        body.match(/role:\s*"((?:[^"\\]|\\.)*)"/)?.[1]?.replace(/\\"/g, '"').replace(/\\\\/g, "\\") ?? "";
+        call.fnName === "project-entry"
+          ? args.stack?.value || args.role?.value || ""
+          : args.role?.value || args.subtitle?.value || "";
       const loc =
-        body.match(/location:\s*"((?:[^"\\]|\\.)*)"/)?.[1]?.replace(/\\"/g, '"').replace(/\\\\/g, "\\") ?? "";
-      const date =
-        body.match(/date:\s*"((?:[^"\\]|\\.)*)"/)?.[1]?.replace(/\\"/g, '"').replace(/\\\\/g, "\\") ?? "";
-      const detailsMatch = body.match(/details:\s*\[([\s\S]*)\]/);
-      const bulletsRaw = detailsMatch?.[1] ?? "";
-      const bullets = bulletsRaw
-        .split("\n")
-        .map((l) => l.trim())
-        .filter((l) => l.startsWith("- "))
-        .map((l) => decodeTypstContent(l.replace(/^-\s+/, "").trim()));
+        call.fnName === "project-entry"
+          ? args.location?.value || formatProjectLinks(args.links)
+          : args.location?.value ?? "";
+      const date = args.date?.value ?? "";
+      const detailsRaw = args.details?.raw ?? "";
+      const bullets = extractBulletsFromDetails(detailsRaw);
 
-      if (title || role || bullets.length > 0) {
+      if (title || role || loc || date || bullets.length > 0) {
         items.push({
           id: makeId(prefix, idx++),
           title,
@@ -188,7 +431,7 @@ export function parseTypstToStructuredModel(source: string): StructuredResumeMod
           continue;
         }
         if (current && line.startsWith("- ")) {
-          current.bullets.push(line.replace(/^-\s+/, "").trim());
+          current.bullets.push(decodeTypstContent(line.replace(/^-\s+/, "").trim()));
         }
       }
       if (current) {
@@ -200,6 +443,25 @@ export function parseTypstToStructuredModel(source: string): StructuredResumeMod
     return items;
   };
 
+  const parseSkillLineText = (clean: string, sIdx: number): ResumeSkillGroup => {
+    const catMatch =
+      clean.match(/^\*([^*]+)\*:\s*(.*)$/) ||
+      clean.match(/^\*([^*:]+):?\*\s*(.*)$/) ||
+      clean.match(/^([^:]+):\s*(.*)$/);
+    if (catMatch) {
+      return {
+        id: makeId("skill", sIdx),
+        category: decodeTypstContent(catMatch[1].replace(/^\*+|\*+$/g, "").replace(/:$/, "").trim()),
+        items: decodeTypstContent(catMatch[2].trim()),
+      };
+    }
+    return {
+      id: makeId("skill", sIdx),
+      category: "",
+      items: decodeTypstContent(clean),
+    };
+  };
+
   // Locate sections
   const sectionSplits = source.split(/#section\("([^"]+)"\)|^==\s+(.+)$/gm);
   let summary = "";
@@ -209,7 +471,9 @@ export function parseTypstToStructuredModel(source: string): StructuredResumeMod
   let skills: ResumeSkillGroup[] = [];
 
   for (let i = 1; i < sectionSplits.length; i += 3) {
-    const secName = (sectionSplits[i] || sectionSplits[i + 1] || "").trim().toLowerCase();
+    const secName = decodeTypstContent(sectionSplits[i] || sectionSplits[i + 1] || "")
+      .trim()
+      .toLowerCase();
     const secContent = sectionSplits[i + 2] || "";
 
     if (secName.includes("summary") || secName.includes("profile")) {
@@ -225,29 +489,49 @@ export function parseTypstToStructuredModel(source: string): StructuredResumeMod
     } else if (secName.includes("project")) {
       projects = parseEntriesInBlock(secContent, "proj");
     } else if (secName.includes("skill")) {
-      const skillLines = secContent
+      const skillCalls = extractBalancedCallArgs(secContent, ["skill-line"]);
+      if (skillCalls.length > 0) {
+        skills = skillCalls
+          .map((call, sIdx) => {
+            const args = parseNamedTypstArgs(call.argsBody);
+            return {
+              id: makeId("skill", sIdx),
+              category: (args.category?.value ?? "").trim(),
+              items: (args.items?.value ?? "").trim(),
+            };
+          })
+          .filter((s) => s.category || s.items);
+      }
+
+      const skillBulletLines = secContent
         .split("\n")
         .map((l) => l.trim())
         .filter((l) => l.startsWith("- "));
-      skills = skillLines.map((line, sIdx) => {
-        const clean = line.replace(/^-\s+/, "");
-        const catMatch =
-          clean.match(/^\*([^*]+)\*:\s*(.*)$/) ||
-          clean.match(/^\*([^*:]+):?\*\s*(.*)$/) ||
-          clean.match(/^([^:]+):\s*(.*)$/);
-        if (catMatch) {
-          return {
-            id: makeId("skill", sIdx),
-            category: decodeTypstContent(catMatch[1].replace(/^\*+|\*+$/g, "").replace(/:$/, "").trim()),
-            items: decodeTypstContent(catMatch[2].trim()),
-          };
-        }
-        return {
-          id: makeId("skill", sIdx),
-          category: "",
-          items: decodeTypstContent(clean),
-        };
-      });
+      if (skillBulletLines.length > 0) {
+        skills = [
+          ...skills,
+          ...skillBulletLines.map((line, sIdx) =>
+            parseSkillLineText(line.replace(/^-\s+/, ""), skills.length + sIdx)
+          ),
+        ];
+      }
+
+      if (skills.length === 0) {
+        const plainSkillLines = secContent
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(
+            (l) =>
+              Boolean(l) &&
+              !l.startsWith("//") &&
+              !l.startsWith("#") &&
+              !l.startsWith("details:") &&
+              l !== "[" &&
+              l !== "]" &&
+              l !== ")"
+          );
+        skills = plainSkillLines.map((line, sIdx) => parseSkillLineText(line, sIdx));
+      }
     }
   }
 
@@ -446,7 +730,50 @@ interface ResumeFormBuilderProps {
   onChange: (newTypst: string) => void;
 }
 
+export function createBlankResumeTypst(): string {
+  return serializeStructuredModelToTypst({
+    fontSize: "9pt",
+    marginPreset: "balanced",
+    fullName: "",
+    location: "",
+    email: "",
+    phone: "",
+    github: "",
+    linkedin: "",
+    summary: "",
+    experience: [],
+    education: [],
+    projects: [],
+    skills: [],
+  });
+}
+
+const ALLOWED_TEMPLATE_HELPERS = new Set([
+  "section",
+  "entry",
+  "resume-entry",
+  "project-entry",
+  "skill-line",
+]);
+
+function stripMatchedRanges(text: string, ranges: Array<{ start: number; end: number }>): string {
+  if (ranges.length === 0) return text;
+  const sorted = [...ranges].sort((a, b) => a.start - b.start);
+  let out = "";
+  let cursor = 0;
+  for (const r of sorted) {
+    if (r.start > cursor) out += text.slice(cursor, r.start);
+    if (r.end > cursor) cursor = r.end;
+  }
+  if (cursor < text.length) out += text.slice(cursor);
+  return out;
+}
+
 export function isResumeSourceSafeForForm(source: string): boolean {
+  if (!source || !source.trim()) return false;
+  if (/^\s*\/\/\s*@resumeforge-patched:/m.test(source)) return false;
+  if (source.includes("// ResumeForge layout v2")) return false;
+
   const normalizeForSafeCheck = (src: string) =>
     src
       .replace(
@@ -454,11 +781,117 @@ export function isResumeSourceSafeForForm(source: string): boolean {
         ""
       )
       .replace(/\\([/+-])/g, "$1")
+      .replace(/[ \t]+$/gm, "")
+      .replace(/[ \t]+\]/g, "]")
+      .replace(/\[[ \t]+/g, "[")
+      .replace(/[ \t]+#sym\.dot[ \t]+/g, " #sym.dot ")
+      .replace(/([^\\])[ \t]+"/g, '$1"')
       .trim();
 
-  return (
-    normalizeForSafeCheck(serializeStructuredModelToTypst(parseTypstToStructuredModel(source))) ===
+  const parsed = parseTypstToStructuredModel(source);
+
+  if (
+    normalizeForSafeCheck(serializeStructuredModelToTypst(parsed)) ===
     normalizeForSafeCheck(source)
+  ) {
+    return true;
+  }
+
+  // Path 2: Structural safety check for AI-converted (pdf-prompt) & `== Section` resumes
+  const letRegex = /(?:^|\n)\s*#let\s+([a-zA-Z_][a-zA-Z0-9_-]*)/g;
+  let letMatch: RegExpExecArray | null;
+  while ((letMatch = letRegex.exec(source)) !== null) {
+    if (!ALLOWED_TEMPLATE_HELPERS.has(letMatch[1])) {
+      return false;
+    }
+  }
+
+  if (/#(?:table|image|figure|columns|include|import|footnote|cite|bibliography|outline|raw)\b/.test(source)) {
+    return false;
+  }
+
+  const sectionSplits = source.split(/#section\("([^"]+)"\)|^==\s+(.+)$/gm);
+  if (sectionSplits.length < 4) {
+    return false;
+  }
+
+  if (!parsed.fullName.trim()) {
+    return false;
+  }
+
+  let hasAnyContent = Boolean(parsed.summary.trim());
+
+  for (let i = 1; i < sectionSplits.length; i += 3) {
+    const rawName = decodeTypstContent(sectionSplits[i] || sectionSplits[i + 1] || "")
+      .trim()
+      .toLowerCase();
+    const secContent = sectionSplits[i + 2] || "";
+    const nonCommentContent = secContent.replace(/\/\/.*$/gm, "").trim();
+
+    if (rawName.includes("summary") || rawName.includes("profile")) {
+      if (/#(?:grid|entry|resume-entry|project-entry|skill-line)\s*\(/.test(nonCommentContent)) {
+        return false;
+      }
+      continue;
+    }
+
+    if (
+      rawName.includes("experience") ||
+      rawName.includes("work") ||
+      rawName.includes("education") ||
+      rawName.includes("project")
+    ) {
+      if (/#grid\s*\(/.test(nonCommentContent)) return false;
+      const calls = extractBalancedCallArgs(secContent, ["entry", "resume-entry", "project-entry"]);
+      if (calls.length > 0) {
+        const leftover = stripMatchedRanges(secContent, calls)
+          .replace(/\/\/.*$/gm, "")
+          .trim();
+        if (leftover.length > 0) return false;
+        hasAnyContent = true;
+      } else if (nonCommentContent.length > 0) {
+        const lines = nonCommentContent.split("\n").map((l) => l.trim()).filter(Boolean);
+        let sawBoldPair = false;
+        for (const line of lines) {
+          if (/^\*([^*]+)\*\s*(?:--|—|-)\s*\*([^*]+)\*(?:\s*\(([^)]+)\))?/.test(line)) {
+            sawBoldPair = true;
+            continue;
+          }
+          if (sawBoldPair && line.startsWith("- ")) continue;
+          return false;
+        }
+        if (sawBoldPair) hasAnyContent = true;
+      }
+      continue;
+    }
+
+    if (rawName.includes("skill")) {
+      if (/#grid\s*\(/.test(nonCommentContent)) return false;
+      const calls = extractBalancedCallArgs(secContent, ["skill-line", "entry"]);
+      if (calls.length > 0) {
+        const leftover = stripMatchedRanges(secContent, calls)
+          .replace(/\/\/.*$/gm, "")
+          .trim();
+        if (leftover.length > 0) return false;
+        hasAnyContent = true;
+      } else if (nonCommentContent.length > 0) {
+        if (parsed.skills.length === 0) return false;
+        hasAnyContent = true;
+      }
+      continue;
+    }
+
+    // Unrecognized section would be dropped by StructuredResumeModel
+    return false;
+  }
+
+  return (
+    hasAnyContent &&
+    (parsed.summary.length > 0 ||
+      parsed.experience.length > 0 ||
+      parsed.education.length > 0 ||
+      parsed.projects.length > 0 ||
+      parsed.skills.length > 0)
   );
 }
 
@@ -470,10 +903,15 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
   const [activeSection, setActiveSection] = useState<
     "contact" | "experience" | "education" | "projects" | "skills"
   >("contact");
+  const lastCommittedValueRef = useRef<string | null>(null);
 
   // Re-sync if external source changes substantially (e.g. template reset or AI patch applied)
   useEffect(() => {
     if (!value) return;
+    if (lastCommittedValueRef.current !== null && lastCommittedValueRef.current === value) {
+      return;
+    }
+    lastCommittedValueRef.current = null;
     setModel((prev) => {
       const currentSerialized = serializeStructuredModelToTypst(prev);
       if (currentSerialized.trim() === value.trim()) return prev;
@@ -481,11 +919,15 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
     });
   }, [value]);
 
-  const safeToEdit = isResumeSourceSafeForForm(value);
+  const safeToEdit =
+    (lastCommittedValueRef.current !== null && lastCommittedValueRef.current === value) ||
+    isResumeSourceSafeForForm(value);
   const commitModel = (next: StructuredResumeModel) => {
     if (!safeToEdit) return;
+    const nextTypst = serializeStructuredModelToTypst(next);
+    lastCommittedValueRef.current = nextTypst;
     setModel(next);
-    onChange(serializeStructuredModelToTypst(next));
+    onChange(nextTypst);
   };
 
   const updateEntryField = (
