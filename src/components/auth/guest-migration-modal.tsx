@@ -14,6 +14,135 @@ import { CloudUpload, X, CheckCircle2, Loader2, FileText, AlertTriangle, Refresh
 
 export type ConflictStrategy = "IMPORT_AS_DRAFT" | "REPLACE_MASTER" | "DISCARD";
 
+export interface StorageReadOnlyLike {
+  getItem(key: string): string | null;
+}
+
+export interface StorageReadWriteLike extends StorageReadOnlyLike {
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+export function isCustomGuestDraftSource(source: string | null | undefined): boolean {
+  if (!source || source.trim().length <= 30) return false;
+  if (source.includes("// Starter Typst Resume")) return false;
+  if (source.includes("// Synthetic sample. This is not a real person's resume or experience.")) {
+    return false;
+  }
+  if (
+    source.includes("alex.morgan@example.com") &&
+    source.includes("TechCorp Systems") &&
+    source.includes("WebScale Labs")
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export function hasPendingGuestEvidence(rawEvidence: string | null | undefined): boolean {
+  if (!rawEvidence) return false;
+  try {
+    const parsed: unknown = JSON.parse(rawEvidence);
+    return Array.isArray(parsed) && parsed.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+export function hasPendingGuestDraftInStorage(storage: StorageReadOnlyLike | null | undefined): boolean {
+  if (!storage) return false;
+  const hasGuestDraftFlag = storage.getItem("resumeforge_has_guest_draft") === "true";
+  const stored = storage.getItem("resumeforge_typst_source");
+  const isCustomDraft = isCustomGuestDraftSource(stored);
+  const hasEvidence = hasPendingGuestEvidence(storage.getItem("resumeforge_guest_evidence"));
+  const isMigrated = storage.getItem("resumeforge_draft_migrated") === "true";
+  const isDismissed = storage.getItem("resumeforge_migration_dismissed") === "true";
+
+  if (hasGuestDraftFlag && isCustomDraft) return true;
+  if (hasEvidence) return true;
+  if (!isMigrated && !isDismissed && isCustomDraft) return true;
+  return false;
+}
+
+export function evaluateGuestMigrationState(
+  storage: StorageReadWriteLike | null | undefined,
+  opts: { isAuthUser: boolean; isGuest: boolean; demoMode: boolean }
+): {
+  shouldPrompt: boolean;
+  hasCustomResumeDraft: boolean;
+  hasGuestEvidence: boolean;
+  draftSource: string | null;
+} {
+  if (!storage || opts.demoMode) {
+    return {
+      shouldPrompt: false,
+      hasCustomResumeDraft: false,
+      hasGuestEvidence: false,
+      draftSource: null,
+    };
+  }
+
+  const stored = storage.getItem("resumeforge_typst_source");
+  const isCustomDraft = isCustomGuestDraftSource(stored);
+  const hasGuestEvidence = hasPendingGuestEvidence(storage.getItem("resumeforge_guest_evidence"));
+
+  if (opts.isGuest) {
+    if (isCustomDraft || hasGuestEvidence) {
+      storage.setItem("resumeforge_has_guest_draft", "true");
+      storage.removeItem("resumeforge_draft_migrated");
+    }
+    return {
+      shouldPrompt: false,
+      hasCustomResumeDraft: isCustomDraft,
+      hasGuestEvidence,
+      draftSource: null,
+    };
+  }
+
+  if (!opts.isAuthUser) {
+    return {
+      shouldPrompt: false,
+      hasCustomResumeDraft: false,
+      hasGuestEvidence: false,
+      draftSource: null,
+    };
+  }
+
+  const isDismissed = storage.getItem("resumeforge_migration_dismissed") === "true";
+  if (isDismissed) {
+    return {
+      shouldPrompt: false,
+      hasCustomResumeDraft: false,
+      hasGuestEvidence: false,
+      draftSource: null,
+    };
+  }
+
+  const isMigrated = storage.getItem("resumeforge_draft_migrated") === "true";
+  const hasGuestDraftFlag = storage.getItem("resumeforge_has_guest_draft") === "true";
+  const hasPendingCustomDraft =
+    (hasGuestDraftFlag && isCustomDraft) || (!isMigrated && isCustomDraft);
+
+  if (hasPendingCustomDraft || hasGuestEvidence) {
+    return {
+      shouldPrompt: true,
+      hasCustomResumeDraft: hasPendingCustomDraft,
+      hasGuestEvidence,
+      draftSource:
+        stored && stored.trim().length > 0 && isCustomDraft
+          ? stored
+          : "// Imported Guest Workspace\n= Resume Draft\n",
+    };
+  }
+
+  return {
+    shouldPrompt: false,
+    hasCustomResumeDraft: false,
+    hasGuestEvidence: false,
+    draftSource: null,
+  };
+}
+
 export interface GuestMigrationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -145,8 +274,12 @@ export function GuestMigrationModal({
           localStorage.removeItem("resumeforge_has_guest_draft");
           localStorage.removeItem("resumeforge_guest_evidence");
           localStorage.removeItem("resumeforge_migration_id");
+          localStorage.removeItem("resumeforge_migration_dismissed");
           localStorage.removeItem(lockKey);
           localStorage.setItem("resumeforge_draft_migrated", "true");
+          window.dispatchEvent(
+            new CustomEvent("resumeforge:guest-draft-migrated", { detail: { strategy } })
+          );
         }
         onSuccess?.();
         onClose();

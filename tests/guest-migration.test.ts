@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
-import { GuestMigrationModal } from "@/components/auth/guest-migration-modal";
+import {
+  evaluateGuestMigrationState,
+  GuestMigrationModal,
+  hasPendingGuestDraftInStorage,
+  isCustomGuestDraftSource,
+} from "@/components/auth/guest-migration-modal";
 
 describe("Guest-to-Account Draft Migration (Release Hardening)", () => {
   beforeEach(() => {
@@ -115,5 +120,78 @@ describe("Guest-to-Account Draft Migration (Release Hardening)", () => {
     expect(mockStorage["resumeforge_migration_id"]).toBeUndefined();
     expect(mockStorage["resumeforge_migration_lock"]).toBeUndefined();
     expect(mockStorage["resumeforge_draft_migrated"]).toBe("true");
+  });
+
+  it("evaluates guest draft migration across routes without letting stale migrated flags or editor loads clobber pending drafts", () => {
+    const createMemoryStorage = (initial: Record<string, string> = {}) => {
+      const store = new Map<string, string>(Object.entries(initial));
+      return {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => {
+          store.set(k, v);
+        },
+        removeItem: (k: string) => {
+          store.delete(k);
+        },
+      };
+    };
+
+    const customDraft = "= Priya Nair\n== EXPERIENCE\n*CloudScale* -- Senior Engineer\n- Scaled APIs.";
+    const untouchedStarter =
+      "// ResumeForge Canonical Resume Template (Typst)\nalex.morgan@example.com TechCorp Systems WebScale Labs";
+
+    expect(isCustomGuestDraftSource(untouchedStarter)).toBe(false);
+    expect(isCustomGuestDraftSource(customDraft)).toBe(true);
+
+    // 1. Guest session marks draft as pending and clears stale migrated flag
+    const guestStorage = createMemoryStorage({
+      resumeforge_typst_source: customDraft,
+      resumeforge_draft_migrated: "true",
+    });
+    evaluateGuestMigrationState(guestStorage, {
+      isAuthUser: false,
+      isGuest: true,
+      demoMode: false,
+    });
+    expect(guestStorage.getItem("resumeforge_has_guest_draft")).toBe("true");
+    expect(guestStorage.getItem("resumeforge_draft_migrated")).toBeNull();
+    expect(hasPendingGuestDraftInStorage(guestStorage)).toBe(true);
+
+    // 2. Signed-in user on ANY AppShell route triggers GuestMigrationModal even if an earlier session left resumeforge_draft_migrated="true"
+    const signedInWithStaleFlag = createMemoryStorage({
+      resumeforge_typst_source: customDraft,
+      resumeforge_has_guest_draft: "true",
+      resumeforge_draft_migrated: "true",
+    });
+    expect(hasPendingGuestDraftInStorage(signedInWithStaleFlag)).toBe(true);
+    const evalResult = evaluateGuestMigrationState(signedInWithStaleFlag, {
+      isAuthUser: true,
+      isGuest: false,
+      demoMode: false,
+    });
+    expect(evalResult.shouldPrompt).toBe(true);
+    expect(evalResult.hasCustomResumeDraft).toBe(true);
+    expect(evalResult.draftSource).toBe(customDraft);
+
+    // 3. Dismissed or demo mode suppresses prompt
+    const dismissedStorage = createMemoryStorage({
+      resumeforge_typst_source: customDraft,
+      resumeforge_has_guest_draft: "true",
+      resumeforge_migration_dismissed: "true",
+    });
+    expect(
+      evaluateGuestMigrationState(dismissedStorage, {
+        isAuthUser: true,
+        isGuest: false,
+        demoMode: false,
+      }).shouldPrompt
+    ).toBe(false);
+    expect(
+      evaluateGuestMigrationState(signedInWithStaleFlag, {
+        isAuthUser: true,
+        isGuest: false,
+        demoMode: true,
+      }).shouldPrompt
+    ).toBe(false);
   });
 });
