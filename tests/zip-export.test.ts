@@ -307,4 +307,89 @@ jane.doe@example.com | San Francisco, CA
     expect(cleaned).toContain("TechCorp Systems");
     expect(cleaned).toContain("University of California, Berkeley");
   });
+
+  it("extracts full text from #resume-entry, #project-entry, #skill-line, and unknown #func(...) content blocks", () => {
+    const aiConvertedTypst = `
+#set page(paper: "us-letter", margin: (x: 1.25cm, y: 1.1cm))
+#let section(title) = { v(0.4em); text(size: 10pt, weight: "bold")[#upper(title)] }
+#let entry(title: "", role: "", location: "", date: "", details: []) = { block[#title #role #location #date #details] }
+#let resume-entry(title: "", location: "", subtitle: "", date: "", details: []) = entry(title: title, role: subtitle, location: location, date: date, details: details)
+#let project-entry(title: "", links: none, date: "", stack: "", details: []) = { block[#title #links #date #stack #details] }
+#let skill-line(category: "", items: "") = block[*#category:* #items]
+
+#align(center)[
+  #text(size: 18pt, weight: "bold", fill: rgb("#111827"))[Priya Nair] \\
+  #v(2pt)
+  #text(size: 9pt, fill: rgb("#475569"))[
+    Seattle, WA #sym.dot #link("mailto:priya@example.com")[priya\\@example.com] #sym.dot #link("https://github.com/priyanair")[github.com/priyanair]
+  ]
+]
+
+#section("Experience")
+#resume-entry(
+  title: "Cascade Cloud",
+  location: "Seattle, WA",
+  subtitle: "Backend Software Engineer",
+  date: "2023 – Present",
+  details: [
+    - Built TypeScript and Go ingestion services handling 50k events/sec.
+    - Cut PostgreSQL p95 query latency by 38% via partial indexes.
+  ]
+)
+
+#section("Projects")
+#project-entry(
+  title: "QueryPulse",
+  links: [#link("https://github.com/priyanair/querypulse")[GitHub]],
+  date: "2024",
+  stack: "TypeScript, PostgreSQL, Docker",
+  details: [
+    - Built an automated query plan analyzer supporting C\\# and SQL workloads.
+  ]
+)
+
+#section("Skills")
+#skill-line(category: "Languages", items: "TypeScript, Go, SQL, Python")
+#skill-line(category: "Infrastructure", items: "Docker, PostgreSQL, Redis")
+
+#section("Honors")
+#custom-award(year: "2024", details: [
+  - Dean's List and Systems Capstone Winner.
+])
+#grid(columns: (1fr, auto), [Distributed Systems Award], [2024])
+`;
+
+    const cleaned = cleanTypstToText(aiConvertedTypst);
+    expect(cleaned.length).toBeGreaterThan(500);
+    expect(cleaned).toContain("Priya Nair");
+    expect(cleaned).toContain("priya@example.com (mailto:priya@example.com)");
+    expect(cleaned).toContain("Cascade Cloud -- Backend Software Engineer | Seattle, WA | 2023 – Present");
+    expect(cleaned).toContain("Built TypeScript and Go ingestion services handling 50k events/sec.");
+    expect(cleaned).toContain("QueryPulse | GitHub (https://github.com/priyanair/querypulse) | TypeScript, PostgreSQL, Docker | 2024");
+    expect(cleaned).toContain("C# and SQL workloads");
+    expect(cleaned).toContain("Languages: TypeScript, Go, SQL, Python");
+    expect(cleaned).toContain("Infrastructure: Docker, PostgreSQL, Redis");
+    expect(cleaned).toContain("Dean's List and Systems Capstone Winner.");
+    expect(cleaned).toContain("Distributed Systems Award");
+    expect(cleaned.replace(/C#/g, "")).not.toContain("#");
+  });
+
+  it("cleans guest/non-managed Typst sources without leaking raw Typst syntax", () => {
+    const guestTypst = `
+// Guest draft resume
+#show: doc => doc
+= Jordan Example
+#link("mailto:jordan@example.invalid")[jordan\\@example.invalid] #sym.bullet #link("https://example.invalid")[example.invalid]
+#resume-section("Projects")
+- Built a deterministic parser in TypeScript.
+`;
+    const cleaned = cleanTypstToText(guestTypst);
+    expect(cleaned).toContain("=== Jordan Example ===");
+    expect(cleaned).toContain("--- Projects ---");
+    expect(cleaned).toContain("jordan@example.invalid (mailto:jordan@example.invalid) • example.invalid (https://example.invalid)");
+    expect(cleaned).not.toContain("#show");
+    expect(cleaned).not.toContain("#resume-section");
+    expect(cleaned).not.toContain("#sym");
+    expect(cleaned).not.toContain("=>");
+  });
 });
