@@ -386,7 +386,7 @@ export const AiAssistantWindow = React.memo(function AiAssistantWindow({
           : undefined
       }
       className={cn(
-        "flex flex-col border border-hairline bg-panel text-foreground shadow-2xl transition-all",
+        "flex flex-col border border-hairline bg-panel text-foreground shadow-2xl transition-colors",
         mode === "docked" &&
           "fixed inset-y-0 right-0 z-50 w-full max-w-lg border-l border-hairline duration-200 animate-in slide-in-from-right",
         mode === "floating" &&

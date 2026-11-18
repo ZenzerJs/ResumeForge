@@ -357,8 +357,8 @@ export function SetupChecklist({
             className="w-32 bg-inset h-2 rounded-full overflow-hidden"
           >
             <div
-              className="ombre-bar h-full rounded-full transition-all duration-300"
-              style={{ width: `${progressPct}%` }}
+              className="ombre-bar h-full w-full origin-left rounded-full transition-transform duration-300"
+              style={{ transform: `scaleX(${progressPct / 100})` }}
             />
           </div>
           <button
@@ -585,6 +585,12 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [sessionUser, setSessionUser] = useState<SessionUser | null | undefined>(undefined);
   const [savedRole, setSavedRole] = useState<SavedRoleEntry | null>(null);
+  const [hasLocalResume, setHasLocalResume] = useState(false);
+  const [guestEvidence, setGuestEvidence] = useState<GuestEvidenceSummary>(EMPTY_GUEST_EVIDENCE);
+  const [guestJobs, setGuestJobs] = useState<GuestJobsSummary>(EMPTY_GUEST_JOBS);
+  const [hasAiKey, setHasAiKey] = useState(false);
+  const [aiKeyless, setAiKeyless] = useState(false);
+  const [checklistDismissed, setChecklistDismissed] = useState(false);
 
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const cancelClearBtnRef = useRef<HTMLButtonElement>(null);
@@ -618,6 +624,19 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
           rawGuestJobs
         )
       );
+
+      const typstSource = localStorage.getItem("resumeforge_typst_source");
+      setHasLocalResume(hasLocalPersonalResume(typstSource));
+      setGuestEvidence(parseGuestEvidenceSummary(localStorage.getItem("resumeforge_guest_evidence")));
+      setGuestJobs(parseGuestJobsSummary(rawGuestJobs));
+      setChecklistDismissed(localStorage.getItem("resumeforge_checklist_dismissed") === "true");
+
+      const provider = localStorage.getItem("resumeforge_ai_provider");
+      const key = localStorage.getItem("resumeforge_api_key");
+      const customUrl = localStorage.getItem("resumeforge_custom_ai_url");
+      const isKeyless = provider === "ollama" || (provider === "custom" && !key);
+      setAiKeyless(isKeyless);
+      setHasAiKey(Boolean(key || (isKeyless && customUrl) || provider === "ollama"));
     };
 
     refreshLocalState();
@@ -779,7 +798,7 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
       } catch {
         const message =
           res.status === 413
-            ? "PDF upload exceeds the hosted 4.5 MB request size limit."
+            ? "PDF upload exceeds the hosted 4.5\u00A0MB request size limit."
             : `PDF upload failed (HTTP ${res.status || 500}). Please try again.`;
         setNotification({ type: "error", message });
         return;
@@ -854,13 +873,25 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
         stats.variantsCount > 0 ||
         stats.coverLettersCount > 0));
 
+  const checklistState = computeOnboardingChecklistState({
+    stats,
+    hasLocalResume,
+    guestEvidence,
+    guestJobs,
+    hasAiKey,
+    aiKeyless,
+  });
+
+  const isGuestViewer = (stats as { isGuest?: boolean }).isGuest ?? !isSignedInViewer;
+  const showChecklist = (!isGuestViewer || hasLocalResume) && !checklistDismissed && checklistState.completedCount < 4;
+
   return (
     <div className="bg-canvas text-foreground font-body-regular min-h-dvh min-w-0 flex flex-col overflow-x-hidden antialiased selection:bg-primary/25 selection:text-primary leading-[1.6] relative">
       <LandingAtmosphere />
 
       <TopNav />
 
-      <main id="main-content" className="flex-grow min-w-0 pt-[calc(6rem+env(safe-area-inset-top))] pb-16 flex flex-col relative z-10 overflow-visible">
+      <main id="main-content" tabIndex={-1} className="flex-grow min-w-0 scroll-mt-16 outline-none pt-[calc(6rem+env(safe-area-inset-top))] pb-16 flex flex-col relative z-10 overflow-visible">
         {/* Notification Toast */}
         {notification ? (
           <div
@@ -874,9 +905,9 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
           >
             <div className="flex items-center gap-2">
               {notification.type === "success" ? (
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success-soft" />
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success-soft" aria-hidden="true" />
               ) : (
-                <AlertCircle className="h-4 w-4 shrink-0 text-status-danger" />
+                <AlertCircle className="h-4 w-4 shrink-0 text-status-danger" aria-hidden="true" />
               )}
               <span>{notification.message}</span>
             </div>
@@ -888,6 +919,28 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
             >
               <X className="h-4 w-4" aria-hidden />
             </button>
+          </div>
+        ) : null}
+
+        {showChecklist ? (
+          <div className="mx-auto w-full max-w-7xl px-6 pt-2 pb-6 md:px-12 z-20">
+            <SetupChecklist
+              stats={stats}
+              hasLocalResume={hasLocalResume}
+              guestEvidence={guestEvidence}
+              guestJobs={guestJobs}
+              hasAiKey={hasAiKey}
+              aiKeyless={aiKeyless}
+              demoMode={demoMode}
+              savedRole={savedRole}
+              onUploadPdf={() => pdfInputRef.current?.click()}
+              onDismiss={() => {
+                setChecklistDismissed(true);
+                try {
+                  localStorage.setItem("resumeforge_checklist_dismissed", "true");
+                } catch {}
+              }}
+            />
           </div>
         ) : null}
 

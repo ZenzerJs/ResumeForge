@@ -50,7 +50,7 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
   experimental: {
-    optimizePackageImports: ["lucide-react"],
+    optimizePackageImports: ["lucide-react", "simple-icons"],
   },
   webpack: (config) => {
     config.experiments = {

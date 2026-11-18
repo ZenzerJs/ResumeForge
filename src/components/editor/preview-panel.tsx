@@ -508,16 +508,19 @@ export function PreviewPanel({
     );
   }, [extractedRequirements, hasHydratedSource, showDockedGrade, showGrade, source, v2]);
 
-  const canDirectExport = useMemo(() => {
+  const [canDirectExport, setCanDirectExport] = useState(false);
+
+  const evaluateCanDirectExport = useCallback(() => {
     try {
-      assertCanExport(source, masterFacts, { allowUnfrozenMasterSelfExport });
-      return true;
+      assertCanExport(sourceRef.current, masterFacts, { allowUnfrozenMasterSelfExport });
+      setCanDirectExport(true);
     } catch {
-      return false;
+      setCanDirectExport(false);
     }
-  }, [source, masterFacts, allowUnfrozenMasterSelfExport]);
+  }, [masterFacts, allowUnfrozenMasterSelfExport]);
 
   const handleExportPdf = async () => {
+    evaluateCanDirectExport();
     try {
       setIsExporting(true);
       setExportError(null);
@@ -532,6 +535,7 @@ export function PreviewPanel({
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
       downloadBlob(blob, "resume.pdf");
     } catch (err) {
+      evaluateCanDirectExport();
       setExportError(err instanceof Error ? err.message : "Failed to export PDF");
     } finally {
       setIsExporting(false);
@@ -539,6 +543,7 @@ export function PreviewPanel({
   };
 
   const handleExportDocx = async () => {
+    evaluateCanDirectExport();
     try {
       setIsExporting(true);
       setExportError(null);
@@ -553,6 +558,7 @@ export function PreviewPanel({
       });
       downloadBlob(blob, "resume.docx");
     } catch (err) {
+      evaluateCanDirectExport();
       setExportError(err instanceof Error ? err.message : "Failed to export DOCX");
     } finally {
       setIsExporting(false);
@@ -606,6 +612,7 @@ export function PreviewPanel({
   };
 
   const handleExportZip = async () => {
+    evaluateCanDirectExport();
     try {
       setIsExporting(true);
       setExportError(null);
@@ -635,6 +642,7 @@ export function PreviewPanel({
       });
       downloadBlob(blob, sanitizeZipFilename("Target_Company", roleTitle || "Resume"));
     } catch (err) {
+      evaluateCanDirectExport();
       setExportError(
         err instanceof Error
           ? err.message
@@ -776,7 +784,7 @@ export function PreviewPanel({
             {showGrade ? "Close Grade" : "Grade"}
           </button>
 
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={(open) => { if (open) evaluateCanDirectExport(); }}>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
@@ -845,7 +853,7 @@ export function PreviewPanel({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={(open) => { if (open) evaluateCanDirectExport(); }}>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
@@ -1039,6 +1047,8 @@ export function PreviewPanel({
                   <img
                     src={renderedImage || BLANK_PAGE_PLACEHOLDER}
                     alt={`Resume page ${pageNumber}`}
+                    width={816}
+                    height={1056}
                     data-page-number={pageNumber}
                     data-page-rendered={renderedImage ? "true" : "false"}
                     className={renderedImage ? "block h-auto w-full" : "block h-auto w-full aspect-[8.5/11]"}
@@ -1071,7 +1081,7 @@ export function PreviewPanel({
           ) : (
             <div className="flex flex-col items-center justify-center h-64 text-text-muted">
               <Loader2 className="h-6 w-6 animate-spin mb-2 text-primary" />
-              <p className="text-xs">Verifying SVG preview...</p>
+              <p className="text-xs">Verifying SVG preview…</p>
             </div>
           )
         ) : error ? (
@@ -1087,7 +1097,7 @@ export function PreviewPanel({
         ) : (
           <div className="flex flex-col items-center justify-center h-64 text-text-muted">
             <Loader2 className="h-8 w-8 animate-spin mb-2 text-primary" />
-            <p className="text-xs">Initializing Typst WASM compiler...</p>
+            <p className="text-xs">Initializing Typst WASM compiler…</p>
           </div>
         )}
         </div>
@@ -1230,7 +1240,7 @@ export function PreviewPanel({
               </>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Waiting for resume source...
+                Waiting for resume source…
               </p>
             )}
           </aside>

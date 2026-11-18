@@ -15,6 +15,7 @@ import {
   Code2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BrandMark } from "@/components/design-system/brand-mark";
 import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
 import {
   Sheet,
@@ -356,19 +357,7 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
           className="flex min-w-0 items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-[6px]"
           aria-label="ResumeForge home"
         >
-          <span
-            aria-hidden="true"
-            className={`shrink-0 rounded-[8px] flex items-center justify-center font-bold text-primary-foreground ${compact ? "w-7 h-7 text-base" : "w-8 h-8 text-lg"}`}
-            style={{
-              background: "linear-gradient(135deg, rgb(var(--accent-action)), rgb(var(--accent-secondary)))",
-              boxShadow: "0 0 0 1px rgb(255 255 255 / 0.12) inset, 0 6px 20px rgb(var(--accent-action) / 0.35)",
-            }}
-          >
-            R
-          </span>
-          <span className="truncate font-bold text-xl text-foreground tracking-[-0.04em]">
-            ResumeForge
-          </span>
+          <BrandMark compact={compact} />
         </Link>
 
         {badge ? (
@@ -425,19 +414,18 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
           compact={compact}
         />
         {user ? (
-          <>
-            <Link
-              href="/settings"
+          <div className="hidden lg:flex items-center gap-1.5 pl-1.5 border-l border-hairline">
+            <span
               title={user.username}
-              className="hidden lg:inline-flex max-w-[10rem] items-center gap-2 rounded-[6px] px-2 py-1 font-mono-data text-mono-data text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="inline-flex max-w-[10rem] items-center gap-2 rounded-[6px] px-2 py-1 font-mono-data text-mono-data text-foreground"
             >
-              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-outline bg-elevated font-bold text-primary">
+              <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-outline bg-elevated font-bold text-primary">
                 {usernameInitial(user.username)}
               </span>
               <span className="truncate">@{user.username}</span>
-            </Link>
-            <SignOutButton className="hidden lg:inline-flex" />
-          </>
+            </span>
+            <SignOutButton className={cn("inline-flex", compact ? "lg:min-h-8" : "lg:min-h-9")} />
+          </div>
         ) : isGuest ? (
           <GuestAuthLinks signupEnabled={signupEnabled} />
         ) : null}

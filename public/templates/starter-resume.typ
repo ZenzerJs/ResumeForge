@@ -21,7 +21,7 @@
   v(0.4em)
   text(size: 10pt, weight: "bold", tracking: 0.05em, upper(title))
   v(-0.4em)
-  line(length: 100%, stroke: 0.5pt + rgb("#9CA3AF"))
+  line(length: 100%, stroke: 0.5pt + rgb("#d8d0c5"))
   v(0.15em)
 }
 

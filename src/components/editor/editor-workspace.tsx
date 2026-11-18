@@ -58,8 +58,7 @@ import {
   isCustomGuestDraftSource,
 } from "@/components/auth/guest-migration-modal";
 import { EditorWorkspaceSkeleton } from "@/components/editor/editor-workspace-skeleton";
-import { resolveDefaultEditorMode } from "@/components/editor/code-editor";
-import { createBlankResumeTypst } from "@/components/editor/resume-form-builder";
+import { resolveDefaultEditorMode, createBlankResumeTypst } from "@/lib/editor/mode-utils";
 import {
   buildLibraryHref,
   normalizeEditorModeParam,
@@ -424,7 +423,7 @@ export function EditorWorkspace() {
         const text = await res.text();
         if (process.env.NEXT_PUBLIC_RESUME_LAYOUT_V2 === "true") {
           const [{ parseTypstToStructuredModel, legacyFormToResumeDocument }, { renderResumeDocument }] = await Promise.all([
-            import("./resume-form-builder"), import("@/lib/typst/resume-document"),
+            import("@/lib/editor/mode-utils"), import("@/lib/typst/resume-document"),
           ]);
           return renderResumeDocument(legacyFormToResumeDocument(parseTypstToStructuredModel(text)));
         }
@@ -445,7 +444,7 @@ export function EditorWorkspace() {
    */
   const loadGeneration = useRef(0);
 
-  const loadFrozenMasterSnapshot = useCallback(async () => {
+  const loadFrozenMasterSnapshot = useCallback(async (prefetchedResumesJson?: unknown) => {
     try {
       const demoConfig = await fetchDemoConfig();
       setIsDemoMode(Boolean(demoConfig?.demoMode));
@@ -454,15 +453,20 @@ export function EditorWorkspace() {
         setMasterFacts(rawSnapshot ? JSON.parse(rawSnapshot) as ResumeFacts : null);
         return;
       }
-      const [resumesRes, evidRes] = await Promise.all([
-        fetch("/api/resumes").catch(() => null),
-        fetch("/api/evidence").catch(() => null),
-      ]);
-      const resumesJson = resumesRes && resumesRes.ok ? await resumesRes.json().catch(() => null) : null;
+
+      let resumesJson = prefetchedResumesJson ?? null;
+      const evidResPromise = fetch("/api/evidence").catch(() => null);
+
+      if (!resumesJson) {
+        const resumesRes = await fetch("/api/resumes").catch(() => null);
+        resumesJson = resumesRes && resumesRes.ok ? await resumesRes.json().catch(() => null) : null;
+      }
+
+      const evidRes = await evidResPromise;
       const evidJson = evidRes && evidRes.ok ? await evidRes.json().catch(() => null) : null;
 
-      const resumesList = Array.isArray(resumesJson?.data) ? resumesJson.data : [];
-      const frozenMaster = resumesList.find((r: { isMaster?: boolean; typstSource?: string }) => r.isMaster && r.typstSource);
+      const resumesList = Array.isArray((resumesJson as { data?: unknown[] })?.data) ? (resumesJson as { data: Array<{ isMaster?: boolean; typstSource?: string }> }).data : [];
+      const frozenMaster = resumesList.find((r) => r.isMaster && r.typstSource);
       const verifiedEvidence = Array.isArray(evidJson?.data) ? evidJson.data : [];
 
       if (frozenMaster?.typstSource) {
@@ -515,9 +519,9 @@ export function EditorWorkspace() {
         }
         return;
       }
-      void loadFrozenMasterSnapshot();
       // Priority 1: variantId param
       if (variantIdParam && variantIdParam.trim().length > 0) {
+        void loadFrozenMasterSnapshot();
         const res = await fetch(`/api/variants/${variantIdParam.trim()}`);
         const json = await res.json();
         if (res.ok && json.success && json.data) {
@@ -540,6 +544,7 @@ export function EditorWorkspace() {
 
       // Priority 2: resumeId param
       if (resumeIdParam && resumeIdParam.trim().length > 0) {
+        void loadFrozenMasterSnapshot();
         const res = await fetch(`/api/resumes/${resumeIdParam.trim()}`);
         const json = await res.json();
         if (res.ok && json.success && json.data) {
@@ -563,6 +568,8 @@ export function EditorWorkspace() {
       // Priority 3: No param -> fetch canonical PostgreSQL master resume
       const res = await fetch("/api/resumes");
       const json = await res.json();
+      // Share the response with loadFrozenMasterSnapshot to avoid a duplicate fetch
+      void loadFrozenMasterSnapshot(json && Array.isArray(json.data) ? json : { data: [] });
       if (res.ok && json.success && Array.isArray(json.data) && json.data.length > 0) {
         if (!current()) return;
         const master = json.data.find((r: { isMaster: boolean }) => r.isMaster) || json.data[0];
@@ -806,17 +813,21 @@ export function EditorWorkspace() {
     setError(null);
   }, []);
 
+  const handleExpandAiPanel = useCallback(() => {
+    if (isXlDesktopRef.current && isAiCollapsedRef.current && !isAiPoppedOutRef.current) {
+      setDockCollapsed(false, false);
+    } else if (isDesktopRef.current && !isXlDesktopRef.current) {
+      setIsAiSheetOpen(true);
+    }
+    setActiveTab("ai");
+  }, [setDockCollapsed]);
+
   const handleTriggerRepair = useCallback(
     (context: { compileError: string; line?: number; column?: number; sourceExcerpt?: string }) => {
       setRepairContext(context);
-      if (isXlDesktopRef.current && isAiCollapsedRef.current && !isAiPoppedOutRef.current) {
-        setDockCollapsed(false, false);
-      } else if (isDesktopRef.current && !isXlDesktopRef.current) {
-        setIsAiSheetOpen(true);
-      }
-      setActiveTab("ai");
+      handleExpandAiPanel();
     },
-    [setDockCollapsed]
+    [handleExpandAiPanel]
   );
 
   const handleTabListKeyDown = useCallback(
@@ -859,7 +870,14 @@ export function EditorWorkspace() {
     [runCompile, handleSourceChange]
   );
 
-  const handleResetTemplate = async () => {
+  const [pendingResetTemplate, setPendingResetTemplate] = useState<boolean>(false);
+
+  const handleResetTemplate = () => {
+    setPendingResetTemplate(true);
+  };
+
+  const performResetTemplate = async () => {
+    setPendingResetTemplate(false);
     setHasAiPatchedBuffer(false);
     if (typeof window !== "undefined") {
       try {
@@ -1147,7 +1165,7 @@ export function EditorWorkspace() {
               <div
                 data-testid="shortcut-save-toast"
                 className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-0.5 bg-elevated border text-foreground text-xs font-semibold rounded transition-all",
+                  "flex items-center gap-1.5 px-2.5 py-0.5 bg-elevated border text-foreground text-xs font-semibold rounded transition-colors",
                   error ? "border-status-warning/60" : "border-status-success/60"
                 )}
               >
@@ -1260,6 +1278,7 @@ export function EditorWorkspace() {
       >
 
       {/* Task B1: Explicit Loading & Recoverable Error States */}
+      <h1 className="sr-only">Resume Editor</h1>
       {isLoadingDocument && (
         <div
           data-testid="editor-loading-state"
@@ -1745,6 +1764,7 @@ export function EditorWorkspace() {
             repairContext={repairContext}
             onDismissRepair={() => setRepairContext(null)}
             onModeChange={setAiMode}
+            onRequestExpand={handleExpandAiPanel}
           />,
           hosts.ai
         )}
@@ -1768,6 +1788,21 @@ export function EditorWorkspace() {
         onConfirm={() =>
           performRevertToMaster(pendingRevertDoc?.id ?? null)
         }
+      />
+
+      <ConfirmDialog
+        open={pendingResetTemplate}
+        onOpenChange={(open) => {
+          if (!open) setPendingResetTemplate(false);
+        }}
+        title="Reset Template"
+        description="Reset to the starter template? Your current edits will be replaced."
+        confirmLabel="Reset Template"
+        tone="destructive"
+        dialogTestId="reset-template-confirm-modal"
+        confirmTestId="confirm-reset-template-btn"
+        cancelTestId="cancel-reset-template-btn"
+        onConfirm={() => void performResetTemplate()}
       />
     </AppShell>
   );

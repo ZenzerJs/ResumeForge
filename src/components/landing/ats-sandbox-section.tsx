@@ -418,14 +418,14 @@ export function AtsSandboxSection() {
                   <span className="text-on-surface-variant font-normal">
                     Core Stack (50% weight):
                   </span>
-                  <span className="font-semibold text-signal">
+                  <span className="font-semibold tabular-nums text-signal">
                     {scoreResult.breakdown.coreStackScore}%
                   </span>
                 </div>
                 <div className="h-2.5 rounded-full bg-inset border border-outline/70 overflow-hidden">
                   <div
-                    className="h-full bg-signal transition-all duration-500"
-                    style={{ width: `${scoreResult.breakdown.coreStackScore}%` }}
+                    className="h-full w-full origin-left bg-signal transition-transform duration-500"
+                    style={{ transform: `scaleX(${scoreResult.breakdown.coreStackScore / 100})` }}
                   />
                 </div>
               </div>
@@ -436,14 +436,14 @@ export function AtsSandboxSection() {
                   <span className="text-on-surface-variant font-normal">
                     Seniority (20% weight):
                   </span>
-                  <span className="font-semibold text-primary">
+                  <span className="font-semibold tabular-nums text-primary">
                     {scoreResult.breakdown.seniorityScore}%
                   </span>
                 </div>
                 <div className="h-2.5 rounded-full bg-inset border border-outline/70 overflow-hidden">
                   <div
-                    className="h-full bg-primary transition-all duration-500"
-                    style={{ width: `${scoreResult.breakdown.seniorityScore}%` }}
+                    className="h-full w-full origin-left bg-primary transition-transform duration-500"
+                    style={{ transform: `scaleX(${scoreResult.breakdown.seniorityScore / 100})` }}
                   />
                 </div>
               </div>
@@ -454,14 +454,14 @@ export function AtsSandboxSection() {
                   <span className="text-on-surface-variant font-normal">
                     Tools &amp; Infra (15% weight):
                   </span>
-                  <span className="font-semibold text-ember">
+                  <span className="font-semibold tabular-nums text-ember">
                     {scoreResult.breakdown.toolsScore}%
                   </span>
                 </div>
                 <div className="h-2.5 rounded-full bg-inset border border-outline/70 overflow-hidden">
                   <div
-                    className="h-full bg-ember transition-all duration-500"
-                    style={{ width: `${scoreResult.breakdown.toolsScore}%` }}
+                    className="h-full w-full origin-left bg-ember transition-transform duration-500"
+                    style={{ transform: `scaleX(${scoreResult.breakdown.toolsScore / 100})` }}
                   />
                 </div>
               </div>
@@ -472,14 +472,14 @@ export function AtsSandboxSection() {
                   <span className="text-on-surface-variant font-normal">
                     Evidence Bank Coverage (15% weight):
                   </span>
-                  <span className="font-semibold text-foreground">
+                  <span className="font-semibold tabular-nums text-foreground">
                     {scoreResult.breakdown.evidenceCoverageScore}%
                   </span>
                 </div>
                 <div className="h-2.5 rounded-full bg-inset border border-outline/70 overflow-hidden">
                   <div
-                    className="h-full ombre-bar transition-all duration-500"
-                    style={{ width: `${scoreResult.breakdown.evidenceCoverageScore}%` }}
+                    className="h-full w-full origin-left ombre-bar transition-transform duration-500"
+                    style={{ transform: `scaleX(${scoreResult.breakdown.evidenceCoverageScore / 100})` }}
                   />
                 </div>
               </div>
@@ -600,7 +600,7 @@ export function AtsSandboxSection() {
               <div className="flex items-center gap-2">
                 {isCompiling ? (
                   <span className="text-xs font-mono text-primary flex items-center gap-1.5">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Compiling...
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Compiling…
                   </span>
                 ) : (
                   <span className="text-xs font-mono text-signal flex items-center gap-1.5">
@@ -620,7 +620,7 @@ export function AtsSandboxSection() {
                   {isCompiling && !svgOutput ? (
                     <div className="flex flex-col items-center gap-3 text-muted-foreground text-xs md:text-sm font-mono">
                       <Loader2 className="h-7 w-7 animate-spin text-primary" />
-                      <span>Initializing Typst WASM compiler...</span>
+                      <span>Initializing Typst WASM compiler…</span>
                     </div>
                   ) : compileError ? (
                     <div className="text-xs md:text-sm text-status-danger font-mono p-4 border border-status-danger/40 rounded-[8px] bg-status-danger/10">
@@ -644,7 +644,7 @@ export function AtsSandboxSection() {
                     ) : (
                       <div className="flex flex-col items-center gap-3 text-muted-foreground text-xs md:text-sm font-mono">
                         <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                        <span>Verifying SVG preview...</span>
+                        <span>Verifying SVG preview…</span>
                       </div>
                     )
                   ) : (
@@ -693,13 +693,17 @@ export function AtsSandboxSection() {
                       spellCheck={false}
                     />
                   ) : (
-                    <pre
+                    <button
+                      type="button"
                       onClick={() => setIsEditingSnippet(true)}
                       title="Click to edit snippet"
-                      className="flex-1 p-4 md:p-6 bg-inset border border-outline/70 rounded-[8px] font-mono text-xs md:text-sm text-on-surface-variant leading-relaxed overflow-auto max-h-[620px] whitespace-pre-wrap selection:bg-primary/30 cursor-pointer hover:border-outline transition-colors"
+                      aria-label="Edit resume snippet"
+                      className="flex-1 p-4 md:p-6 bg-inset border border-outline/70 rounded-[8px] font-mono text-xs md:text-sm text-on-surface-variant text-left leading-relaxed overflow-auto max-h-[620px] whitespace-pre-wrap selection:bg-primary/30 cursor-pointer hover:border-outline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     >
-                      {customSnippet}
-                    </pre>
+                      <pre className="font-mono text-inherit whitespace-pre-wrap">
+                        {customSnippet}
+                      </pre>
+                    </button>
                   )}
                 </div>
               )}
