@@ -205,6 +205,11 @@ async function readJsonSafe(res: Response): Promise<Record<string, unknown> | nu
   }
 }
 
+function normalizeListingKey(job: Pick<IngestedJobItem, "companyName" | "title" | "location">): string {
+  const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  return `${norm(job.companyName)}||${norm(job.title)}||${norm(job.location)}`;
+}
+
 export function DiscoverFeed() {
   const [jobs, setJobs] = useState<IngestedJobItem[]>([]);
   const [totalJobs, setTotalJobs] = useState(0);
@@ -263,6 +268,58 @@ export function DiscoverFeed() {
     setPostedWithin("all");
     setPage(1);
   }, []);
+
+  const urlHydratedRef = useRef(false);
+  const skipNextPageResetRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q") ?? params.get("search");
+    if (q) {
+      skipNextPageResetRef.current = true;
+      setSearchQuery(q);
+      setDebouncedSearch(q.trim());
+    }
+    const c = params.get("company");
+    if (c) {
+      skipNextPageResetRef.current = true;
+      setCompanyFilter(c);
+    }
+    const w = params.get("workplace");
+    if (w && WORKPLACE_OPTIONS.some((o) => o.value === w)) {
+      skipNextPageResetRef.current = true;
+      setWorkplaceFilter(w);
+    }
+    const s = params.get("sort");
+    if (s && SORT_OPTIONS.some((o) => o.value === s)) {
+      skipNextPageResetRef.current = true;
+      setSortOrder(s);
+    }
+    const p = Number(params.get("page"));
+    if (Number.isInteger(p) && p > 0) {
+      skipNextPageResetRef.current = true;
+      setPage(p);
+    }
+    urlHydratedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !urlHydratedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const setOrDel = (k: string, v: string, def = "") => {
+      if (v && v !== def) params.set(k, v);
+      else params.delete(k);
+    };
+    setOrDel("q", debouncedSearch);
+    setOrDel("company", companyFilter);
+    setOrDel("workplace", workplaceFilter, "ALL");
+    setOrDel("sort", sortOrder, "blended");
+    setOrDel("page", String(page), "1");
+    const qs = params.toString();
+    const nextUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState(null, "", nextUrl);
+  }, [debouncedSearch, companyFilter, workplaceFilter, sortOrder, page]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchQuery.trim()), 250);
@@ -348,6 +405,14 @@ export function DiscoverFeed() {
       if (!controller.signal.aborted && res.ok && json?.success) {
         const meta = json.meta as { total?: number; totalPages?: number } | undefined;
         const rawData = ((json.data as IngestedJobItem[]) || []);
+        const seenKeys = new Set<string>();
+        const dedupedData = rawData.filter((item) => {
+          const key = normalizeListingKey(item);
+          if (seenKeys.has(key)) return false;
+          seenKeys.add(key);
+          return true;
+        });
+        const dupCount = rawData.length - dedupedData.length;
         const apiHasEvidence = Boolean(json.hasEvidence);
         setHasEvidence(apiHasEvidence);
         setEvidenceChecked(true);
@@ -355,7 +420,7 @@ export function DiscoverFeed() {
           setSortOrder("newest");
         }
         if (companyFilter) {
-          const companyMatched = rawData.filter((item) =>
+          const companyMatched = dedupedData.filter((item) =>
             matchesCuratedCompany(item.companyName, companyFilter)
           );
           const pageSize = 30;
@@ -366,8 +431,10 @@ export function DiscoverFeed() {
           setTotalJobs(computedTotal);
           setTotalPages(computedPages);
         } else {
-          setJobs(rawData);
-          setTotalJobs(meta?.total ?? 0);
+          setJobs(dedupedData);
+          setTotalJobs(
+            meta?.total !== undefined ? Math.max(dedupedData.length, meta.total - dupCount) : dedupedData.length
+          );
           setTotalPages(meta?.totalPages ?? 1);
         }
       } else if (!controller.signal.aborted && (!res.ok || !json?.success)) {
@@ -451,6 +518,10 @@ export function DiscoverFeed() {
 
   // Reset to page 1 on filter changes
   useEffect(() => {
+    if (skipNextPageResetRef.current) {
+      skipNextPageResetRef.current = false;
+      return;
+    }
     setPage(1);
   }, [
     searchQuery,
@@ -620,17 +691,32 @@ export function DiscoverFeed() {
     }
   };
 
+  const salaryFmt = useMemo(() => {
+    try {
+      return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+    } catch {
+      return null;
+    }
+  }, []);
+  const fmtSal = (n: number, cur?: string | null) => {
+    if (salaryFmt && (!cur || cur.toUpperCase() === "USD")) return salaryFmt.format(n);
+    try {
+      return new Intl.NumberFormat(undefined, { style: "currency", currency: cur || "USD", maximumFractionDigits: 0 }).format(n);
+    } catch {
+      return `$${n.toLocaleString()}`;
+    }
+  };
+
   const formatSalary = (j: IngestedJobItem) => {
     if (!j.salaryMin && !j.salaryMax) return null;
-    const currency = j.salaryCurrency?.trim();
-    const suffix = currency ? ` ${currency}` : "";
+    const cur = j.salaryCurrency?.trim() || undefined;
     if (j.salaryMin && j.salaryMax) {
-      return `$${j.salaryMin.toLocaleString()} – $${j.salaryMax.toLocaleString()}${suffix}`;
+      return `${fmtSal(j.salaryMin, cur)} – ${fmtSal(j.salaryMax, cur)}`;
     }
     if (j.salaryMin) {
-      return `From $${j.salaryMin.toLocaleString()}${suffix}`;
+      return `From ${fmtSal(j.salaryMin, cur)}`;
     }
-    return `Up to $${j.salaryMax?.toLocaleString()}${suffix}`;
+    return `Up to ${fmtSal(j.salaryMax!, cur)}`;
   };
 
   return (
@@ -712,10 +798,10 @@ export function DiscoverFeed() {
 
         {/* Curated Company Quick-Filter Chips */}
         <div
-          className="flex flex-wrap items-center gap-2 rounded-xl border glass-bar px-4 py-2.5"
+          className="flex flex-nowrap overflow-x-auto sm:flex-wrap sm:overflow-visible items-center gap-2 rounded-xl border glass-bar px-3 py-2 sm:px-4 sm:py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           data-testid="curated-company-chips"
         >
-          <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground mr-1">
+          <span className="shrink-0 whitespace-nowrap text-xs font-mono uppercase tracking-wider text-muted-foreground mr-1">
             Featured Boards:
           </span>
           {CURATED_COMPANIES.map((company) => {
@@ -732,7 +818,7 @@ export function DiscoverFeed() {
                 }
                 aria-pressed={isActive}
                 data-testid={`curated-chip-${(company.query || "all").toLowerCase()}`}
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
                   isActive
                     ? "border border-primary/50 bg-primary/15 text-primary"
                     : "border border-hairline bg-inset text-text-secondary hover:border-control hover:text-foreground"
@@ -751,7 +837,7 @@ export function DiscoverFeed() {
               <label htmlFor="discover-search-input" className="sr-only">
                 Search company, role, or keywords
               </label>
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <input
                 id="discover-search-input"
                 type="search"
@@ -876,7 +962,7 @@ export function DiscoverFeed() {
                 <PopoverContent
                   align="end"
                   sideOffset={8}
-                  className="w-[min(calc(100vw-2rem),22rem)] border-hairline bg-rf-panel p-4 text-rf-cloud shadow-xl"
+                  className="w-[min(calc(100vw-2rem),22rem)] border-hairline bg-elevated p-4 text-rf-cloud shadow-xl"
                 >
                   <div className="flex flex-col gap-3.5">
                     <div className="flex items-center justify-between border-b border-hairline pb-2.5">
@@ -1196,7 +1282,7 @@ export function DiscoverFeed() {
 
                     <div className="mt-1 flex flex-col gap-1 font-mono text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5">
-                        <MapPin className="h-3 w-3 text-muted-foreground" />
+                        <MapPin className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
                         {j.location || "Remote / Canada"}
                         {j.workplaceType && j.workplaceType !== "UNSPECIFIED" ? (
                           <span className="rounded bg-inset border border-hairline px-1.5 py-0.2 text-xs text-text-secondary lowercase">
@@ -1206,16 +1292,16 @@ export function DiscoverFeed() {
                       </span>
 
                       {salaryStr ? (
-                        <span className="flex items-center gap-1.5 text-text-primary font-semibold">
-                          <DollarSign className="h-3 w-3 text-primary" />
+                        <span className="flex items-center gap-1.5 text-text-primary font-semibold tabular-nums">
+                          <DollarSign className="h-3 w-3 text-primary" aria-hidden="true" />
                           {salaryStr}
                         </span>
                       ) : null}
 
                       {j.postedAt ? (
-                        <span className="flex items-center gap-1.5 text-muted-foreground">
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                          {new Date(j.postedAt).toLocaleDateString()}
+                        <span className="flex items-center gap-1.5 text-muted-foreground tabular-nums">
+                          <Calendar className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
+                          {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(j.postedAt))}
                         </span>
                       ) : null}
                     </div>

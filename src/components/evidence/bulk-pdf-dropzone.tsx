@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useRef, useEffect, DragEvent, ChangeEvent } from "react";
+import React, { useState, useRef, DragEvent, ChangeEvent } from "react";
 import { Upload, FileText, ChevronDown, ChevronRight, CheckCircle2 } from "lucide-react";
-import { extractPdfEvidence, extractTechnologies, ExtractedPdfEvidence } from "../../lib/evidence/pdfExtractor";
+import type { ExtractedPdfEvidence } from "../../lib/evidence/pdfExtractor";
+import { extractTechnologies } from "@/lib/evidence/tech-extractor";
 import { convertExtractedPdfToEvidenceItems, type CreateEvidencePayload } from "@/lib/evidence/evidence-transform";
 
 export function buildSelectedPdfEvidence(
@@ -99,12 +100,6 @@ export function BulkPdfDropzone({ onComplete }: Props) {
     }
   };
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      fetch("/workers/pdf.worker.min.mjs", { cache: "force-cache" }).catch(() => {});
-    }
-  }, []);
-
   const processFiles = async (newFiles: FileList | File[]) => {
     const currentFiles = Array.from(newFiles);
     const initialStates: FileState[] = currentFiles.map((f) => ({
@@ -118,6 +113,8 @@ export function BulkPdfDropzone({ onComplete }: Props) {
     }));
 
     setFiles((prev) => [...prev, ...initialStates]);
+
+    const { extractPdfEvidence } = await import("@/lib/evidence/pdfExtractor");
 
     for (let i = 0; i < currentFiles.length; i++) {
       const file = currentFiles[i];
@@ -180,29 +177,35 @@ export function BulkPdfDropzone({ onComplete }: Props) {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onClick={() => inputRef.current?.click()}
-        className={`group rounded-xl border-2 border-dashed glass-bar p-8 text-center cursor-pointer transition-all ${
+        className={`group rounded-xl border-2 border-dashed glass-bar transition-all ${
           isDragOver
             ? "border-primary bg-primary/[0.08] shadow-[var(--shadow-2)]"
             : "border-primary/40 hover:border-primary/75"
         }`}
       >
-        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-primary/25 bg-inset/80 text-primary group-hover:scale-105 transition-transform">
-          <Upload className="h-5 w-5" />
-        </div>
-        <p className="text-sm font-semibold text-foreground">
-          Drag and drop resume PDFs here, or click to select files
-        </p>
-        <p className="mt-1 text-xs font-mono text-muted-foreground">
-          Client-side PDF parsing · Extracts roles, projects &amp; impact bullets into your Evidence Bank
-        </p>
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="w-full rounded-xl p-8 text-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-primary/25 bg-inset/80 text-primary group-hover:scale-105 transition-transform">
+            <Upload className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <p className="text-sm font-semibold text-foreground">
+            Drag and drop resume PDFs here, or click to select files
+          </p>
+          <p className="mt-1 text-xs font-mono text-muted-foreground">
+            Client-side PDF parsing · Extracts roles, projects &amp; impact bullets into your Evidence Bank
+          </p>
+        </button>
         <input
           type="file"
           multiple
           accept=".pdf"
+          aria-label="Upload resume PDF files"
           ref={inputRef}
           onChange={handleChange}
-          className="hidden"
+          className="sr-only"
         />
       </div>
 
@@ -232,7 +235,7 @@ export function BulkPdfDropzone({ onComplete }: Props) {
               >
                 <div className="flex flex-wrap justify-between items-center gap-2 mb-2.5">
                   <div className="flex items-center gap-2 min-w-0">
-                    <FileText className="h-4 w-4 text-primary shrink-0" />
+                    <FileText className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
                     <span className="font-mono text-xs font-semibold text-foreground truncate">
                       {file.name}
                     </span>
@@ -244,9 +247,9 @@ export function BulkPdfDropzone({ onComplete }: Props) {
                         className="ml-1 inline-flex items-center gap-1 rounded bg-elevated px-2 py-0.5 text-xs font-mono text-text-secondary hover:text-foreground transition"
                       >
                         {isExpanded ? (
-                          <ChevronDown className="h-3 w-3" />
+                          <ChevronDown className="h-3 w-3" aria-hidden="true" />
                         ) : (
-                          <ChevronRight className="h-3 w-3" />
+                          <ChevronRight className="h-3 w-3" aria-hidden="true" />
                         )}
                         Preview ({totalBullets} bullets)
                       </button>
@@ -258,10 +261,10 @@ export function BulkPdfDropzone({ onComplete }: Props) {
                   >
                     {file.status === "Saved" ? (
                       <span className="flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3" />
+                        <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                         <span>Indexed · Added to Bank</span>
                         {file.savedCount ? (
-                          <span className="font-mono">({file.savedCount} items)</span>
+                          <span className="font-mono tabular-nums">({file.savedCount} items)</span>
                         ) : null}
                       </span>
                     ) : (
@@ -271,8 +274,8 @@ export function BulkPdfDropzone({ onComplete }: Props) {
                 </div>
                 <div className="w-full bg-inset rounded-full h-1.5 overflow-hidden">
                   <div
-                    className="bg-primary h-1.5 rounded-full transition-all duration-300"
-                    style={{ width: `${file.progress}%` }}
+                    className="bg-primary h-1.5 rounded-full origin-left transition-transform duration-300 motion-reduce:transition-none"
+                    style={{ transform: `scaleX(${Math.max(0, Math.min(1, file.progress / 100))})` }}
                   />
                 </div>
                 {file.error && <p role="alert" className="text-status-danger text-xs mt-2">{file.error}</p>}

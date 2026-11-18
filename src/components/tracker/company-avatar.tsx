@@ -16,7 +16,7 @@ export function CompanyAvatar({ company, className }: { company?: string | null;
       {showLogo ? (
         // Local curated icons have fixed dimensions and do not require image optimization.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={logo!} alt="" className={cn("h-full w-full object-contain", logo!.endsWith("/apple.ico") ? "bg-elevated" : "bg-white")} onError={() => setFailedLogo(logo)} />
+        <img src={logo!} alt="" width={36} height={36} loading="lazy" className={cn("h-full w-full object-contain", logo!.endsWith("/apple.ico") ? "bg-elevated" : "bg-white")} onError={() => setFailedLogo(logo)} />
       ) : !logo && hasBrandIcon(company) ? (
         <BrandIcon name={company} className="h-4 w-4 text-text-secondary" />
       ) : initial}

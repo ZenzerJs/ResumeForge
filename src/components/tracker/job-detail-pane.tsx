@@ -103,6 +103,8 @@ interface JobDetailPaneProps {
   tier2Notice?: string;
   showNotes: boolean;
   isSheet?: boolean;
+  evidence?: EvidenceItemWithBullets[];
+  masterTypst?: string;
   onClose?: () => void;
   onSheetCloseAutoFocus?: (event: Event) => void;
   onStatusChange: (jobId: string, status: JobStatus) => void;
@@ -123,6 +125,8 @@ export function JobDetailPane({
   tier2Notice,
   showNotes,
   isSheet = false,
+  evidence: evidenceProp,
+  masterTypst: masterTypstProp,
   onClose,
   onSheetCloseAutoFocus,
   onStatusChange,
@@ -132,7 +136,8 @@ export function JobDetailPane({
   onFetchFullText,
   onJobLoaded,
 }: JobDetailPaneProps) {
-  const [evidence, setEvidence] = useState<EvidenceItemWithBullets[]>([]);
+  const [localEvidence, setLocalEvidence] = useState<EvidenceItemWithBullets[]>([]);
+  const evidence = evidenceProp !== undefined ? evidenceProp : localEvidence;
   const [demoMode, setDemoMode] = useState(false);
   const [detailJob, setDetailJob] = useState<JobItem>(() => job);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
@@ -300,6 +305,7 @@ export function JobDetailPane({
   ]);
 
   useEffect(() => {
+    if (evidenceProp !== undefined) return;
     const controller = new AbortController();
     (async () => {
       try {
@@ -311,7 +317,7 @@ export function JobDetailPane({
           const raw = localStorage.getItem("resumeforge_guest_evidence");
           const parsed = raw ? JSON.parse(raw) : [];
           if (!controller.signal.aborted && Array.isArray(parsed)) {
-            setEvidence(parsed as EvidenceItemWithBullets[]);
+            setLocalEvidence(parsed as EvidenceItemWithBullets[]);
           }
           return;
         }
@@ -322,10 +328,10 @@ export function JobDetailPane({
             const raw = localStorage.getItem("resumeforge_guest_evidence");
             const parsed = raw ? JSON.parse(raw) : [];
             if (Array.isArray(parsed)) {
-              setEvidence(parsed as EvidenceItemWithBullets[]);
+              setLocalEvidence(parsed as EvidenceItemWithBullets[]);
             }
           } else if (Array.isArray(json.data)) {
-            setEvidence(json.data as EvidenceItemWithBullets[]);
+            setLocalEvidence(json.data as EvidenceItemWithBullets[]);
           }
         }
       } catch {
@@ -335,11 +341,13 @@ export function JobDetailPane({
     return () => {
       controller.abort();
     };
-  }, []);
+  }, [evidenceProp]);
 
-  const [masterTypst, setMasterTypst] = useState<string>("");
+  const [localMasterTypst, setLocalMasterTypst] = useState<string>("");
+  const masterTypst = masterTypstProp !== undefined ? masterTypstProp : localMasterTypst;
 
   useEffect(() => {
+    if (masterTypstProp !== undefined) return;
     let cancelled = false;
     (async () => {
       try {
@@ -347,7 +355,7 @@ export function JobDetailPane({
         if (cancelled) return;
         if (config?.demoMode === true) {
           const localSource = localStorage.getItem("resumeforge_typst_source");
-          if (localSource) setMasterTypst(localSource);
+          if (localSource) setLocalMasterTypst(localSource);
           return;
         }
         const res = await fetch("/api/resumes");
@@ -355,7 +363,7 @@ export function JobDetailPane({
         if (!cancelled && res.ok && json.success && Array.isArray(json.data) && json.data.length > 0) {
           const master = json.data.find((r: { isMaster?: boolean }) => r.isMaster) || json.data[0];
           if (master?.typstSource) {
-            setMasterTypst(master.typstSource);
+            setLocalMasterTypst(master.typstSource);
             return;
           }
         }
@@ -363,14 +371,14 @@ export function JobDetailPane({
       if (typeof window !== "undefined") {
         const localSource = localStorage.getItem("resumeforge_typst_source");
         if (!cancelled && localSource) {
-          setMasterTypst(localSource);
+          setLocalMasterTypst(localSource);
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [masterTypstProp]);
 
   const masterFacts = useMemo(() => {
     if (!masterTypst) return null;
@@ -465,9 +473,9 @@ export function JobDetailPane({
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
               <CompanyAvatar company={job.company} className="h-14 w-14 sm:h-16 sm:w-16 text-2xl sm:text-3xl shrink-0" />
               <div className="min-w-0 flex-1">
-                <h1 className="font-page-title-mobile text-xl sm:text-2xl md:text-3xl text-on-surface mb-2 tracking-tighter font-bold break-words">
+                <h2 className="font-page-title-mobile text-xl sm:text-2xl md:text-3xl text-on-surface mb-2 tracking-tighter font-bold break-words">
                   {job.roleTitle || "Untitled Role"}
-                </h1>
+                </h2>
                 <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm font-body-dense text-on-surface-variant mb-4">
                   <span className="flex items-center gap-1">
                     <Building2 className="h-4 w-4 shrink-0" aria-hidden />
