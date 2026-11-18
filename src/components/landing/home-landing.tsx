@@ -20,7 +20,7 @@ import { ProductProofCard } from "@/components/landing/product-proof-card";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { AtsSandboxSection } from "@/components/landing/ats-sandbox-section";
 import { CompetitiveMatrixSection } from "@/components/landing/competitive-matrix-section";
-import { getActiveConfig, resolveClientProviderConfig } from "@/lib/byok-vault";
+import { resolveClientProviderConfig } from "@/lib/byok-vault";
 import type { DashboardStats } from "@/lib/db/stats";
 import { clearDemoSamplesForPersonalResume } from "@/lib/demo-client";
 import { fetchSessionUser, type SessionUser } from "@/components/auth/session-user";
@@ -583,14 +583,8 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
   const [isClearingMaster, setIsClearingMaster] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
-  const [hasAiKey, setHasAiKey] = useState(false);
-  const [aiKeyless, setAiKeyless] = useState(false);
-  const [hasLocalResume, setHasLocalResume] = useState(false);
-  const [guestEvidence, setGuestEvidence] = useState<GuestEvidenceSummary>(EMPTY_GUEST_EVIDENCE);
-  const [guestJobs, setGuestJobs] = useState<GuestJobsSummary>(EMPTY_GUEST_JOBS);
   const [sessionUser, setSessionUser] = useState<SessionUser | null | undefined>(undefined);
   const [savedRole, setSavedRole] = useState<SavedRoleEntry | null>(null);
-  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const cancelClearBtnRef = useRef<HTMLButtonElement>(null);
@@ -611,20 +605,9 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    let cancelled = false;
 
     const refreshLocalState = () => {
-      if (localStorage.getItem("rf_onboarding_dismissed") === "true") {
-        setOnboardingDismissed(true);
-      }
-      setHasLocalResume(
-        hasLocalPersonalResume(localStorage.getItem("resumeforge_typst_source"))
-      );
-      setGuestEvidence(
-        parseGuestEvidenceSummary(localStorage.getItem("resumeforge_guest_evidence"))
-      );
       const rawGuestJobs = localStorage.getItem("resumeforge_guest_jobs");
-      setGuestJobs(parseGuestJobsSummary(rawGuestJobs));
       setSavedRole(
         resolveHomeSavedRole(
           {
@@ -635,12 +618,6 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
           rawGuestJobs
         )
       );
-      void getActiveConfig().then((cfg) => {
-        if (cancelled) return;
-        const unsupportedInDemo = demoMode && (cfg.provider === "ollama" || cfg.provider === "custom");
-        setHasAiKey(cfg.hasKey && !unsupportedInDemo);
-        setAiKeyless(cfg.keyless && !demoMode);
-      });
     };
 
     refreshLocalState();
@@ -650,7 +627,6 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
     window.addEventListener("resumeforge:application-context-changed", refreshLocalState);
 
     return () => {
-      cancelled = true;
       window.removeEventListener("focus", refreshLocalState);
       window.removeEventListener("storage", refreshLocalState);
       window.removeEventListener("resumeforge:evidence-changed", refreshLocalState);
@@ -810,7 +786,7 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-hairline bg-inset/80 w-fit">
                 <span className="h-2 w-2 rounded-full bg-signal shadow-[0_0_0_3px_rgb(var(--accent-contrast)/0.2)]" aria-hidden />
                 <KeyRound className="h-3.5 w-3.5 text-primary" aria-hidden />
-                <span className="font-mono text-xs text-text-secondary">Guest drafts stay in your browser · BYOK</span>
+                <span className="font-mono text-xs text-text-secondary">Guest drafts stay in your browser · Use your own AI key</span>
               </div>
 
               <h1 className="text-4xl md:text-5xl lg:text-6xl text-foreground leading-tight font-bold tracking-[-0.04em] text-pretty">
@@ -905,32 +881,6 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
             <ProductProofCard />
           </div>
         </section>
-
-        {/* Consumer First-Run Getting Started Checklist */}
-        {!onboardingDismissed && (
-          <section
-            data-testid="consumer-onboarding-checklist"
-            className="max-w-7xl mx-auto w-full px-6 md:px-12 pb-12 z-10"
-          >
-            <SetupChecklist
-              stats={stats}
-              hasLocalResume={hasLocalResume}
-              guestEvidence={guestEvidence}
-              guestJobs={guestJobs}
-              hasAiKey={hasAiKey}
-              aiKeyless={aiKeyless}
-              demoMode={demoMode}
-              savedRole={savedRole}
-              onUploadPdf={() => pdfInputRef.current?.click()}
-              onDismiss={() => {
-                setOnboardingDismissed(true);
-                if (typeof window !== "undefined") {
-                  localStorage.setItem("rf_onboarding_dismissed", "true");
-                }
-              }}
-            />
-          </section>
-        )}
 
         <div className="relative overflow-hidden" data-testid="landing-lower-atmosphere-stage">
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-px ombre-divider" />

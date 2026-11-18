@@ -3,6 +3,7 @@ import { convertExtractedPdfToEvidenceItems } from "@/lib/evidence/evidence-tran
 import { buildSelectedPdfEvidence } from "@/components/evidence/bulk-pdf-dropzone";
 import {
   archiveEvidenceItemsLocally,
+  createInitialEvidenceFormData,
   restoreEvidenceItemsLocally,
   verifyEvidenceItemsLocally,
   type EvidenceItem,
@@ -524,5 +525,29 @@ describe("Evidence Bank Selection, Bulk Actions & Lifecycle", () => {
       "alex_resume.pdf:experience:2": true,
     });
     expect(convertExtractedPdfToEvidenceItems(noneSelected)).toEqual([]);
+  });
+
+  it("defaults new manual evidence items to draft status while preserving existing item status when editing", () => {
+    const newForm = createInitialEvidenceFormData();
+    expect(newForm.status).toBe("draft");
+    expect(newForm.type).toBe("experience");
+    expect(newForm.bulletsInput).toEqual([""]);
+
+    const verifiedItem: EvidenceItem = {
+      id: "evi-1",
+      type: "project",
+      title: "ResumeForge",
+      organization: "Open Source",
+      dates: "2026",
+      verifiedSummary: "Built deterministic resume tailoring.",
+      tags: ["TypeScript"],
+      status: "verified",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      bullets: [{ id: "b-1", text: "Shipped Zod validation", verified: true }],
+    };
+    const editForm = createInitialEvidenceFormData(verifiedItem);
+    expect(editForm.status).toBe("verified");
+    expect(editForm.title).toBe("ResumeForge");
+    expect(editForm.bulletsInput).toEqual(["Shipped Zod validation"]);
   });
 });

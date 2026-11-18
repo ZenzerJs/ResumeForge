@@ -275,6 +275,46 @@ export function isLocalEvidenceId(id: string): boolean {
   return id.startsWith("guest-") || id.startsWith("demo-sample-");
 }
 
+export interface EvidenceFormData {
+  type: string;
+  title: string;
+  organization: string;
+  dates: string;
+  verifiedSummary: string;
+  tagsInput: string;
+  status: string;
+  bulletsInput: string[];
+}
+
+/**
+ * Builds initial modal form state. New manual entries default to `"draft"` so
+ * verification remains a deliberate user action; editing preserves `item.status`.
+ */
+export function createInitialEvidenceFormData(item?: EvidenceItem | null): EvidenceFormData {
+  if (item) {
+    return {
+      type: item.type,
+      title: item.title,
+      organization: item.organization || "",
+      dates: item.dates || "",
+      verifiedSummary: item.verifiedSummary,
+      tagsInput: (item.tags || []).join(", "),
+      status: item.status,
+      bulletsInput: (item.bullets || []).map((b) => b.text),
+    };
+  }
+  return {
+    type: "experience",
+    title: "",
+    organization: "",
+    dates: "",
+    verifiedSummary: "",
+    tagsInput: "",
+    status: "draft",
+    bulletsInput: [""],
+  };
+}
+
 function readGuestEvidenceFromStorage(): EvidenceItem[] {
   if (typeof window === "undefined") return [];
   try {
@@ -360,16 +400,9 @@ export function LibraryWorkspace() {
   }, [isModalOpen]);
 
   // Form State
-  const [formData, setFormData] = useState({
-    type: "experience",
-    title: "",
-    organization: "",
-    dates: "",
-    verifiedSummary: "",
-    tagsInput: "",
-    status: "verified",
-    bulletsInput: [""],
-  });
+  const [formData, setFormData] = useState<EvidenceFormData>(() =>
+    createInitialEvidenceFormData()
+  );
 
   const fetchAbortRef = useRef<AbortController | null>(null);
 
@@ -630,16 +663,7 @@ export function LibraryWorkspace() {
           ? document.activeElement
           : null;
     setEditingItem(null);
-    setFormData({
-      type: "experience",
-      title: "",
-      organization: "",
-      dates: "",
-      verifiedSummary: "",
-      tagsInput: "",
-      status: "verified",
-      bulletsInput: [""],
-    });
+    setFormData(createInitialEvidenceFormData());
     setIsModalOpen(true);
   };
 
@@ -651,16 +675,7 @@ export function LibraryWorkspace() {
           ? document.activeElement
           : null;
     setEditingItem(item);
-    setFormData({
-      type: item.type,
-      title: item.title,
-      organization: item.organization || "",
-      dates: item.dates || "",
-      verifiedSummary: item.verifiedSummary,
-      tagsInput: (item.tags || []).join(", "),
-      status: item.status,
-      bulletsInput: (item.bullets || []).map((b) => b.text),
-    });
+    setFormData(createInitialEvidenceFormData(item));
     setIsModalOpen(true);
   };
 
@@ -2708,8 +2723,8 @@ export function LibraryWorkspace() {
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                   className="min-h-10 sm:min-h-0 w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
                 >
-                  <option value="verified">Verified</option>
                   <option value="draft">Draft</option>
+                  <option value="verified">Verified</option>
                   <option value="archived">Archived</option>
                 </select>
               </div>

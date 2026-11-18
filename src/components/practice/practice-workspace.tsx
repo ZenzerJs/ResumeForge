@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Briefcase, Sparkles } from "lucide-react";
@@ -146,6 +146,15 @@ export function describePracticeQuestionScope(
   };
 }
 
+export function formatPracticeQuestionCountLabel(
+  filteredCount: number,
+  totalCount: number
+): string {
+  return filteredCount === totalCount
+    ? `${totalCount} questions`
+    : `${filteredCount} of ${totalCount} questions`;
+}
+
 export function PracticeWorkspace() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -158,6 +167,11 @@ export function PracticeWorkspace() {
   const [mainTab, setMainTab] = useState<"questions" | "runner">(initialTab);
   const [trackedJobs, setTrackedJobs] = useState<TrackedJobOption[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string>("");
+  const [filteredQuestionCount, setFilteredQuestionCount] = useState<number>(ALL_QUESTIONS.length);
+
+  const handleFilteredCountChange = useCallback((filteredCount: number) => {
+    setFilteredQuestionCount(filteredCount);
+  }, []);
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -268,8 +282,13 @@ export function PracticeWorkspace() {
             <PageHeader
               eyebrow="Technical interview"
               title="Interview Prep"
-              description="NeetCode-style questions, system design, and online assessments. Open a problem in the code runner when you want to write it."
-              statusBadge={<StatusPill status="slate" label={`${ALL_QUESTIONS.length} questions`} />}
+              description="Core algorithmic patterns, system design, and online assessments. Open a problem in the code runner when you want to write it."
+              statusBadge={
+                <StatusPill
+                  status="slate"
+                  label={formatPracticeQuestionCountLabel(filteredQuestionCount, ALL_QUESTIONS.length)}
+                />
+              }
             />
 
             {/* Contextual Tracked Job Selector */}
@@ -398,6 +417,7 @@ export function PracticeWorkspace() {
           <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8">
             <InterviewHub
               targetCompany={selectedJob?.company}
+              onFilteredCountChange={handleFilteredCountChange}
               onSolveInRunner={(slug) => {
                 const params = new URLSearchParams(searchParams.toString());
                 params.set("tab", "runner");
