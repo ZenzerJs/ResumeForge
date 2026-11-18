@@ -154,6 +154,8 @@ describe("Settings provider onboarding helpers", () => {
     expect(isKeyRejectionFailure("Gemini API returned status 400: API key not valid. Please pass a valid API key.")).toBe(true);
     expect(isKeyRejectionFailure("OpenAI API returned status 401: Incorrect API key provided")).toBe(true);
     expect(isKeyRejectionFailure("API key is required to test a connection before signing in.")).toBe(true);
+    expect(isKeyRejectionFailure("Synthetic provider auth failed")).toBe(true);
+    expect(isKeyRejectionFailure("Unauthorized")).toBe(true);
 
     expect(isKeyRejectionFailure("Only HTTPS URLs are allowed (rejected http://localhost:11434)")).toBe(false);
     expect(isKeyRejectionFailure("Network error testing connection.")).toBe(false);

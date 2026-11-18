@@ -83,7 +83,7 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
     await expect.poll(async () => preview.getByRole("img", { name: "Resume page 1" }).getAttribute("src"), { timeout: 90000 }).not.toBe(original);
     await expect(preview.getByRole("button", { name: "Review suggestion 1, pending" })).toBeVisible({ timeout: 90000 });
     await expect(preview.getByRole("button", { name: "Review suggestion 2, pending" })).toBeAttached({ timeout: 90000 });
-    await expect(preview.getByText(/1 suggestion\(s\) have no verified location/)).toBeVisible({ timeout: 90000 });
+    await expect(preview.getByText(/no verified location/)).toHaveCount(0);
     const countAfterFirstSuggested = await page.evaluate(() => (window as unknown as { __pdfCompileCount: number }).__pdfCompileCount);
     expect(countAfterFirstSuggested).toBe(6);
 

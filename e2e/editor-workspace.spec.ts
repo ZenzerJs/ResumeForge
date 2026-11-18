@@ -54,8 +54,10 @@ test.describe("Typst Live-Preview Workspace E2E Tests", () => {
 
     await page.waitForSelector(".typst-preview-svg svg", { timeout: 15000 });
 
-    // Click editor content (using first visible desktop editor)
+    // Switch to Typst Source mode and click editor content (using first visible desktop editor)
+    await page.getByTestId("editor-mode-code").first().click();
     const cmContent = page.locator(".cm-content").first();
+    await expect(cmContent).toBeVisible();
     await cmContent.click();
     await page.keyboard.press("Control+Home");
     await page.keyboard.type("// Test Comment Added\n");
@@ -76,8 +78,10 @@ test.describe("Typst Live-Preview Workspace E2E Tests", () => {
     const validSvgBefore = await page.locator(".typst-preview-svg").innerHTML();
     expect(validSvgBefore.length).toBeGreaterThan(100);
 
-    // Type invalid syntax at end of editor
+    // Switch to Typst Source mode and type invalid syntax at end of editor
+    await page.getByTestId("editor-mode-code").first().click();
     const cmContent = page.locator(".cm-content").first();
+    await expect(cmContent).toBeVisible();
     await cmContent.click();
     await page.keyboard.press("Control+End");
     await page.keyboard.type("\n\n#invalid_function_call_test_xyz()");
@@ -99,7 +103,9 @@ test.describe("Typst Live-Preview Workspace E2E Tests", () => {
   test("4. Export PDF downloads valid PDF file with extractable text", async ({ page }) => {
     await page.waitForSelector(".typst-preview-svg svg", { timeout: 15000 });
 
+    await page.getByTestId("editor-mode-code").first().click();
     const editor = page.locator(".cm-content").first();
+    await expect(editor).toBeVisible();
     await editor.click();
     await page.keyboard.press("Control+A");
     await page.keyboard.type("= ResumeForge Export Probe\n\nAlex Morgan · Backend Developer\n");

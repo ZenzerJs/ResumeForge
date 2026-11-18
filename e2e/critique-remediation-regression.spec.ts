@@ -542,6 +542,7 @@ test.describe("Critique Remediation E2E Regression Suite", () => {
       await expect(page.getByTestId("document-type-badge")).toBeVisible();
       if (vp.width === 390) {
         await page.getByTestId("editor-tab-editor").click();
+        await page.getByTestId("editor-mode-code").first().click();
         await expect(page.getByTestId("mobile-editor-orientation-bar")).toBeVisible();
         await expect(page.getByTestId("mobile-orientation-visual-btn")).toBeVisible();
         await page.getByTestId("mobile-orientation-preview-btn").click();
@@ -864,6 +865,8 @@ test.describe("Critique Remediation E2E Regression Suite", () => {
       expect(sgHydrate).toBe(0);
 
       await sgPage.goto("/settings", { waitUntil: "networkidle" });
+      await expect(sgPage.locator("#test-connection-btn")).toBeEnabled();
+      await sgPage.selectOption("#provider-select", "ollama");
       await expect(sgPage.getByTestId("settings-signin-to-test-link")).toBeVisible();
       await expect(sgPage.locator("#test-connection-btn")).toHaveCount(0);
     } finally {
@@ -1043,6 +1046,7 @@ test.describe("Critique Remediation E2E Regression Suite", () => {
       await edPage.setViewportSize({ width: 390, height: 844 });
       await edPage.goto("/editor");
       await expect(edPage.getByTestId("document-type-badge")).toBeVisible({ timeout: 15000 });
+      await edPage.getByTestId("editor-mode-code").first().click();
       await expect(edPage.getByTestId("mobile-editor-orientation-bar")).toBeVisible();
       await assertNoHorizontalOverflow(edPage, "/editor-orientation@390x844");
 

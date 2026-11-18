@@ -55,12 +55,9 @@ export function hasPendingGuestDraftInStorage(storage: StorageReadOnlyLike | nul
   const stored = storage.getItem("resumeforge_typst_source");
   const isCustomDraft = isCustomGuestDraftSource(stored);
   const hasEvidence = hasPendingGuestEvidence(storage.getItem("resumeforge_guest_evidence"));
-  const isMigrated = storage.getItem("resumeforge_draft_migrated") === "true";
-  const isDismissed = storage.getItem("resumeforge_migration_dismissed") === "true";
 
   if (hasGuestDraftFlag && isCustomDraft) return true;
   if (hasEvidence) return true;
-  if (!isMigrated && !isDismissed && isCustomDraft) return true;
   return false;
 }
 
@@ -118,10 +115,8 @@ export function evaluateGuestMigrationState(
     };
   }
 
-  const isMigrated = storage.getItem("resumeforge_draft_migrated") === "true";
   const hasGuestDraftFlag = storage.getItem("resumeforge_has_guest_draft") === "true";
-  const hasPendingCustomDraft =
-    (hasGuestDraftFlag && isCustomDraft) || (!isMigrated && isCustomDraft);
+  const hasPendingCustomDraft = hasGuestDraftFlag && isCustomDraft;
 
   if (hasPendingCustomDraft || hasGuestEvidence) {
     return {

@@ -193,5 +193,19 @@ describe("Guest-to-Account Draft Migration (Release Hardening)", () => {
         demoMode: true,
       }).shouldPrompt
     ).toBe(false);
+
+    // 4. Custom resumeforge_typst_source WITHOUT resumeforge_has_guest_draft="true" in an authenticated session does NOT trigger prompt
+    const authOwnedSourceOnly = createMemoryStorage({
+      resumeforge_typst_source: customDraft,
+    });
+    expect(hasPendingGuestDraftInStorage(authOwnedSourceOnly)).toBe(false);
+    const authOwnedEval = evaluateGuestMigrationState(authOwnedSourceOnly, {
+      isAuthUser: true,
+      isGuest: false,
+      demoMode: false,
+    });
+    expect(authOwnedEval.shouldPrompt).toBe(false);
+    expect(authOwnedEval.hasCustomResumeDraft).toBe(false);
+    expect(authOwnedEval.hasGuestEvidence).toBe(false);
   });
 });

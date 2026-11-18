@@ -287,6 +287,7 @@ interface Props {
   validBatch: boolean;
   localStorageSourceKey?: string;
   patches: PatchProposal[];
+  externalExcludedCount?: number;
   decisions: Record<string, Decision>;
   selected: string | null;
   onSelect: (id: string) => void;
@@ -301,6 +302,7 @@ export function SuggestionPreview({
   validBatch,
   localStorageSourceKey,
   patches,
+  externalExcludedCount = 0,
   decisions,
   selected,
   onSelect,
@@ -432,6 +434,7 @@ export function SuggestionPreview({
   const active = key && result?.key === key ? result : null;
   const selectedPatch = patches.find((patch) => patch.id === selected);
   const excludedIds = new Set(candidate.excluded);
+  const excludedCount = candidate.excluded.length + (externalExcludedCount ?? 0);
   const unlocatedCount = active
     ? patches.filter(
         (patch) => !excludedIds.has(patch.id) && !active.locations[patch.id]?.length
@@ -463,9 +466,9 @@ export function SuggestionPreview({
           ))}
         </div>
       </div>
-      {candidate.excluded.length ? (
+      {excludedCount > 0 ? (
         <p role="status" className="text-sm text-status-warning">
-          {formatExcludedSuggestionsMessage(candidate.excluded.length)}
+          {formatExcludedSuggestionsMessage(excludedCount)}
         </p>
       ) : null}
       {!active || active.pages === null ? (

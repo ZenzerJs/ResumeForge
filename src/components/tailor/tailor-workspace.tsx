@@ -2700,6 +2700,7 @@ export function TailorWorkspace() {
                       }
                       localStorageSourceKey={masterResumeId === "demo-local" ? "resumeforge_typst_source" : undefined}
                       patches={actionablePreviewPatches}
+                      externalExcludedCount={Math.max(0, patchVerified.length - actionablePreviewPatches.length)}
                       decisions={patchDecisions}
                       selected={selectedPatchId}
                       onSelect={setSelectedPatchId}

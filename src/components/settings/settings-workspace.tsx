@@ -132,7 +132,7 @@ export function isKeyRejectionFailure(message: string): boolean {
   ) {
     return false;
   }
-  return /api key is missing|api key is required|api_key_invalid|api key not valid|invalid api key|incorrect api key|invalid x-api-key|invalid_api_key|authentication_error|rejected key|returned status 401|test failed \(401\)|invalid authentication/i.test(
+  return /api key is missing|api key is required|api_key_invalid|api key not valid|invalid api key|incorrect api key|invalid x-api-key|invalid_api_key|authentication_error|rejected key|returned status 401|test failed \(401\)|invalid authentication|auth failed|unauthorized/i.test(
     text
   );
 }
