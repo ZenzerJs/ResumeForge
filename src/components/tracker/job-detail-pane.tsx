@@ -34,7 +34,10 @@ import {
   buildEvidenceMatchChecklist,
   type EvidenceMatchChecklist,
 } from "@/lib/jobs/evidence-match-checklist";
-import type { EvidenceItemWithBullets } from "@/lib/matching/matcher";
+import {
+  hasUnverifiedMarker,
+  type EvidenceItemWithBullets,
+} from "@/lib/matching/matcher";
 import type { JobItem } from "@/components/tracker/job-types";
 import { isSafeHref } from "@/lib/security/safe-url";
 import { JobDescriptionMarkdown } from "@/components/tracker/job-description-markdown";
@@ -252,6 +255,12 @@ export function JobDetailPane({
   const requiredSkills = parsedRequirements?.requiredSkills ?? [];
   const preferredSkills = parsedRequirements?.preferredSkills ?? [];
   const domainTerms = parsedRequirements?.domainTerms ?? [];
+  const requiredSkillKeys = new Set(requiredSkills.map((skill) => skill.toLowerCase()));
+  const requiredEvidence = checklist.items.filter((item) => requiredSkillKeys.has(item.label.toLowerCase()));
+  const requiredMatched = requiredEvidence.filter((item) => item.status === "verified").length;
+  const requiredCoveragePercent = requiredEvidence.length
+    ? Math.round((requiredMatched / requiredEvidence.length) * 100)
+    : 0;
   const totalRequirements =
     requiredSkills.length + preferredSkills.length + domainTerms.length;
 
@@ -309,7 +318,15 @@ export function JobDetailPane({
         const res = await fetch("/api/evidence", { signal: controller.signal });
         const json = await res.json();
         if (!controller.signal.aborted && res.ok && json.success) {
-          setEvidence(json.data as EvidenceItemWithBullets[]);
+          if (json.guest) {
+            const raw = localStorage.getItem("resumeforge_guest_evidence");
+            const parsed = raw ? JSON.parse(raw) : [];
+            if (Array.isArray(parsed)) {
+              setEvidence(parsed as EvidenceItemWithBullets[]);
+            }
+          } else if (Array.isArray(json.data)) {
+            setEvidence(json.data as EvidenceItemWithBullets[]);
+          }
         }
       } catch {
         // non-blocking
@@ -400,6 +417,25 @@ export function JobDetailPane({
       controller.abort();
     };
   }, [detailJob.id, detailJob.company]);
+
+  const verifiedHighlights = useMemo(
+    () =>
+      evidence
+        .filter(
+          (e) =>
+            e.status === "verified" &&
+            !hasUnverifiedMarker(e.title) &&
+            !hasUnverifiedMarker(e.verifiedSummary) &&
+            !e.tags.some((t) => hasUnverifiedMarker(t)),
+        )
+        .flatMap((e) =>
+          e.bullets
+            .filter((b) => b.verified && !hasUnverifiedMarker(b.text))
+            .map((b) => b.text),
+        )
+        .slice(0, 5),
+    [evidence],
+  );
 
   const hasVariant = (detailJob.variants?.length ?? 0) > 0;
   const hasCoverLetter = (detailJob.coverLetters?.length ?? 0) > 0;
@@ -592,21 +628,25 @@ export function JobDetailPane({
                     </p>
                   ) : (
                     <>
-                      <div className="flex items-center gap-3 mb-4">
+                      {requiredEvidence.length > 0 ? (
+                      <div className="flex items-center gap-3 mb-4" data-testid="tracker-required-evidence-coverage">
                         <div className="w-10 h-10 rounded-full border-2 border-status-success/40 flex items-center justify-center font-bold text-xs tabular-nums text-status-success bg-status-success/10 shrink-0">
-                          {checklist.percent}%
+                          {requiredCoveragePercent}%
                         </div>
                         <div className="text-sm font-body-dense text-on-surface-variant">
                           <span className="text-on-surface font-bold">
-                            {checklist.percent >= 70
+                            {requiredCoveragePercent >= 70
                               ? "High match"
-                              : checklist.percent >= 40
+                              : requiredCoveragePercent >= 40
                               ? "Partial match"
                               : "Low match"}
                           </span>{" "}
-                          — <span className="tabular-nums">{checklist.matched}</span> of <span className="tabular-nums">{checklist.total}</span> requirements backed by verified evidence.
+                          — <span className="tabular-nums">{requiredMatched}</span> of <span className="tabular-nums">{requiredEvidence.length}</span> required skills backed by verified evidence.
                         </div>
                       </div>
+                      ) : (
+                        <p className="mb-4 text-sm text-on-surface-variant">No required skills listed. See other matches below.</p>
+                      )}
                       {checklist.needsVerification > 0 && (
                         <p className="mb-3 rounded-[6px] border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-sm text-primary" data-testid="needs-verification-summary">
                           <span className="tabular-nums font-semibold">{checklist.needsVerification}</span>{" "}
@@ -685,7 +725,8 @@ export function JobDetailPane({
 
                   <div className="flex flex-col sm:flex-row gap-2 mt-2">
                     <Link
-                      href={`/practice?company=${encodeURIComponent(detailJob.company || "")}`}
+                      href={`/practice?jobId=${encodeURIComponent(detailJob.id)}&company=${encodeURIComponent(detailJob.company || "")}&role=${encodeURIComponent(detailJob.roleTitle || "")}`}
+                      data-testid="job-detail-practice-link"
                       className="flex-1 py-2 px-3 rounded-[6px] bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-semibold flex items-center justify-center gap-1.5 transition text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     >
                       <Code2 className="w-3.5 h-3.5" />
@@ -945,7 +986,7 @@ export function JobDetailPane({
                 requirements: parsedRequirements,
               }}
               coverLetter={null}
-              matchedHighlights={evidence.flatMap((e) => e.bullets.map((b) => b.text)).slice(0, 5)}
+              matchedHighlights={verifiedHighlights}
               evidenceItems={evidence}
               candidateInfo={candidateInfo}
             />

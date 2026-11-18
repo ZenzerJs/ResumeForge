@@ -16,6 +16,13 @@ import {
 import { JobStatus, type WorkplaceFilter } from "@/lib/db/jobs";
 import { AppShell } from "@/components/design-system/app-shell";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   TrackerSubNav,
@@ -43,8 +50,11 @@ import {
 } from "@/lib/jobs/posting-identity";
 import { fetchDemoConfig, fetchSessionUser } from "@/components/auth/session-user";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
+import { DEMO_JOB } from "@/lib/demo-samples";
+import { buildTailorNewJobHref } from "@/lib/tailor/application-context";
 import {
   HydratedJobDetailSchema,
+  JobRequirementsSchema,
   type HydratedJobDetail,
 } from "@/lib/jd-parser/types";
 
@@ -60,6 +70,7 @@ export {
 };
 
 const PAGE_SIZE = 40;
+const NEW_JOB_HREF = buildTailorNewJobHref({ tab: "job-info" });
 
 const STATUS_LABELS: Record<JobStatus, string> = {
   SAVED: "Saved",
@@ -205,6 +216,196 @@ function formatApiError(res: Response, json: ApiPayload | null, fallback: string
   return json?.message || json?.error || `${fallback} (HTTP ${res.status}).`;
 }
 
+export type RefreshSourceMode = "sync-discover" | "import-tracker";
+
+export interface RefreshSourceOutcome {
+  notice: string;
+  syncSucceeded: boolean;
+  shouldReloadJobs: boolean;
+}
+
+function formatDiscoverSyncSummary(
+  syncRes: PromiseSettledResult<Response>,
+  syncJson: ApiPayload<{
+    summary?: { totalInserted: number; totalFound: number; providerCount: number };
+    results?: Array<{ source: string; skipped?: boolean; success?: boolean }>;
+  }> | null
+): { part: string; ok: boolean } {
+  if (syncRes.status !== "fulfilled") {
+    return { part: "Discover feed: sync failed.", ok: false };
+  }
+  const summary = syncJson?.data?.summary;
+  const results = syncJson?.data?.results ?? [];
+  const skipped = results.filter((result) => result.skipped);
+  if (syncRes.value.ok && syncJson?.success && summary) {
+    const ran = Math.max(0, summary.providerCount - skipped.length);
+    let part = `Discover feed: ${summary.totalInserted} new of ${summary.totalFound} from ${ran} sources.`;
+    if (skipped.length > 0) {
+      part += ` Skipped: ${skipped.map((result) => result.source).join(", ")}.`;
+    }
+    return { part, ok: true };
+  }
+  return {
+    part: `Discover feed: ${formatApiError(syncRes.value, syncJson, "sync failed")}`,
+    ok: false,
+  };
+}
+
+/**
+ * Executes either a Discover-only connector sync or a confirmed Tracker bulk-import + sync.
+ * Never calls /api/jobs/bulk-import when mode is "sync-discover".
+ */
+export async function executeRefreshFromSource(
+  mode: RefreshSourceMode,
+  fetcher: typeof fetch = fetch
+): Promise<RefreshSourceOutcome> {
+  if (mode === "sync-discover") {
+    const [syncRes] = await Promise.allSettled([
+      fetcher("/api/connectors/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      }),
+    ]);
+    const syncJson =
+      syncRes.status === "fulfilled"
+        ? await readJsonSafe<{
+            summary?: { totalInserted: number; totalFound: number; providerCount: number };
+            results?: Array<{ source: string; skipped?: boolean; success?: boolean }>;
+          }>(syncRes.value)
+        : null;
+    const { part, ok } = formatDiscoverSyncSummary(syncRes, syncJson);
+    return {
+      notice: `${part} Tracker unchanged.`,
+      syncSucceeded: ok,
+      shouldReloadJobs: false,
+    };
+  }
+
+  const [bulkRes, syncRes] = await Promise.allSettled([
+    fetcher("/api/jobs/bulk-import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }),
+    fetcher("/api/connectors/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }),
+  ]);
+
+  let trackerPart = "Tracker: import failed.";
+  let importOk = false;
+  if (bulkRes.status === "fulfilled") {
+    const bulkJson = await readJsonSafe(bulkRes.value);
+    if (bulkRes.value.ok && bulkJson?.success) {
+      importOk = true;
+      trackerPart = `Tracker: ${bulkJson.createdCount ?? 0} new (${bulkJson.skippedCount ?? 0} already saved).`;
+    } else {
+      trackerPart = `Tracker: ${formatApiError(bulkRes.value, bulkJson, "import failed")}`;
+    }
+  }
+
+  const syncJson =
+    syncRes.status === "fulfilled"
+      ? await readJsonSafe<{
+          summary?: { totalInserted: number; totalFound: number; providerCount: number };
+          results?: Array<{ source: string; skipped?: boolean; success?: boolean }>;
+        }>(syncRes.value)
+      : null;
+  const { part: feedPart, ok: syncOk } = formatDiscoverSyncSummary(syncRes, syncJson);
+
+  return {
+    notice: `${trackerPart} ${feedPart}`,
+    syncSucceeded: syncOk,
+    shouldReloadJobs: importOk,
+  };
+}
+
+export function RefreshFromSourceDialog({
+  open,
+  onOpenChange,
+  isBusy = false,
+  onSelectMode,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  isBusy?: boolean;
+  onSelectMode: (mode: RefreshSourceMode) => void | Promise<void>;
+}) {
+  const cancelBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (isBusy && !nextOpen) return;
+        onOpenChange(nextOpen);
+      }}
+    >
+      <DialogContent
+        hideCloseButton
+        data-testid="refresh-from-source-dialog"
+        className="max-w-lg border-hairline bg-panel p-6 text-foreground shadow-2xl"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          cancelBtnRef.current?.focus();
+        }}
+      >
+        <DialogHeader className="text-left">
+          <DialogTitle className="text-base font-bold text-foreground">
+            Refresh Jobs from Source
+          </DialogTitle>
+          <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+            Choose whether to refresh the public Discover feed only, or also bulk-import public
+            internship listings (~1,200+ Simplify entries) into your personal Tracker.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="rounded-[8px] border border-hairline bg-inset p-3 text-xs leading-relaxed text-text-secondary space-y-1.5">
+          <p>
+            <span className="font-semibold text-foreground">Sync Discover Feed Only:</span> Updates
+            public job boards in Discover / Feed without adding entries to your Tracker.
+          </p>
+          <p>
+            <span className="font-semibold text-foreground">Import Listings to Tracker:</span> Syncs
+            the Discover feed and imports all public internship source listings into your Tracker.
+          </p>
+        </div>
+
+        <div className="mt-2 flex flex-wrap justify-end gap-2">
+          <button
+            ref={cancelBtnRef}
+            type="button"
+            disabled={isBusy}
+            data-testid="refresh-cancel-btn"
+            onClick={() => onOpenChange(false)}
+            className="rounded-[6px] border border-control/70 bg-inset px-3.5 py-2 text-xs font-medium text-foreground transition hover:bg-elevated disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={isBusy}
+            data-testid="refresh-sync-discover-btn"
+            onClick={() => void onSelectMode("sync-discover")}
+            className="rounded-[6px] border border-primary/40 bg-elevated px-3.5 py-2 text-xs font-semibold text-foreground transition hover:bg-primary/15 hover:text-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+          >
+            Sync Discover Feed Only
+          </button>
+          <button
+            type="button"
+            disabled={isBusy}
+            data-testid="refresh-import-tracker-btn"
+            onClick={() => void onSelectMode("import-tracker")}
+            className="rounded-[6px] bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+          >
+            Import Listings to Tracker
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 interface TrackerFeedProps {
   filterStatuses?: JobStatus[];
 }
@@ -244,6 +445,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const [hydratingIds, setHydratingIds] = useState<Record<string, boolean>>({});
   const [tier2Notice, setTier2Notice] = useState<Record<string, string>>({});
   const [isImporting, setIsImporting] = useState(false);
+  const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
   const [importNotice, setImportNotice] = useState<string | null>(null);
   const [hydrateProgress, setHydrateProgress] = useState<{ done: number; total: number } | null>(null);
   const [viewMode, setViewMode] = useState<"split" | "kanban">("split");
@@ -315,7 +517,8 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           if (Array.isArray(parsed)) {
             localJobs = parsed.map((job) => {
               const isPlaceholder = isPlaceholderDescription(job.rawDescription);
-              const existingReqs = job.extractedRequirements || {
+              const storedReqs = JobRequirementsSchema.safeParse(job.requirements);
+              const existingReqs = storedReqs.data ?? job.extractedRequirements ?? {
                 requiredSkills: [],
                 preferredSkills: [],
                 domainTerms: [],
@@ -330,9 +533,10 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
                 !hasAnyReq &&
                 job.requirementsSource !== "manual" &&
                 (!job.requirementsStatus || job.requirementsStatus === "unparsed");
-              const extractedRequirements = shouldParse
-                ? parseJobDescription(job.rawDescription || "")
-                : existingReqs;
+              const extractedRequirements =
+                job.id === DEMO_JOB.id && job.rawDescription === DEMO_JOB.rawDescription && job.requirementsSource !== "manual"
+                  ? DEMO_JOB.requirements
+                  : shouldParse ? parseJobDescription(job.rawDescription || "") : existingReqs;
               return {
                 ...job,
                 source: job.source || "pasted",
@@ -905,53 +1109,27 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
       scheduleNoticeClear();
       return;
     }
+    setRefreshConfirmOpen(true);
+  };
+
+  const handleConfirmRefresh = async (mode: RefreshSourceMode) => {
+    setRefreshConfirmOpen(false);
     try {
       setIsImporting(true);
-      setImportNotice("Syncing live feeds from public connectors & source listings…");
+      setImportNotice(
+        mode === "sync-discover"
+          ? "Syncing Discover feed from public connectors…"
+          : "Importing public internship listings to Tracker & syncing Discover feed…"
+      );
 
-      const [bulkRes, syncRes] = await Promise.allSettled([
-        fetch("/api/jobs/bulk-import", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        }),
-        fetch("/api/connectors/sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        }),
-      ]);
-
-      let trackerPart = "Tracker: import failed.";
-      if (bulkRes.status === "fulfilled") {
-        const bulkJson = await readJsonSafe(bulkRes.value);
-        if (bulkRes.value.ok && bulkJson?.success) {
-          trackerPart = `Tracker: ${bulkJson.createdCount} new (${bulkJson.skippedCount} already saved).`;
-        } else {
-          trackerPart = `Tracker: ${formatApiError(bulkRes.value, bulkJson, "import failed")}`;
-        }
+      const outcome = await executeRefreshFromSource(mode);
+      setImportNotice(outcome.notice);
+      if (outcome.syncSucceeded) {
+        setLastSyncAt(new Date().toISOString());
       }
-
-      let feedPart = "Discover feed: sync failed.";
-      if (syncRes.status === "fulfilled") {
-        const syncJson = await readJsonSafe<{
-          summary?: { totalInserted: number; totalFound: number; providerCount: number };
-          results?: Array<{ source: string; skipped?: boolean; success?: boolean }>;
-        }>(syncRes.value);
-        const summary = syncJson?.data?.summary;
-        const results = syncJson?.data?.results ?? [];
-        const skipped = results.filter((result) => result.skipped);
-        if (syncRes.value.ok && syncJson?.success && summary) {
-          const ran = Math.max(0, summary.providerCount - skipped.length);
-          feedPart = `Discover feed: ${summary.totalInserted} new of ${summary.totalFound} from ${ran} sources.`;
-          if (skipped.length > 0) {
-            feedPart += ` Skipped: ${skipped.map((result) => result.source).join(", ")}.`;
-          }
-        } else {
-          feedPart = `Discover feed: ${formatApiError(syncRes.value, syncJson, "sync failed")}`;
-        }
+      if (outcome.shouldReloadJobs) {
+        fetchJobs();
       }
-
-      setImportNotice(`${trackerPart} ${feedPart}`);
-      fetchJobs();
       scheduleNoticeClear();
     } catch (err) {
       console.error("Failed to refresh jobs from source:", err);
@@ -973,6 +1151,27 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   const pageJobs = jobs;
   const disambiguatorById = useMemo(() => buildTrackerDisambiguators(pageJobs), [pageJobs]);
   const selectedJob = activeJobId ? jobs.find((j) => j.id === activeJobId) ?? null : null;
+
+  const hasActiveFilters = Boolean(
+    searchQuery.trim() ||
+      locationQuery.trim() ||
+      workplace !== "all" ||
+      statusFilter !== "ALL" ||
+      postedWithin !== "all" ||
+      minSalary !== "0"
+  );
+
+  const clearAllFilters = () => {
+    setSearchQuery("");
+    setDebouncedSearch("");
+    setLocationQuery("");
+    setDebouncedLocation("");
+    setWorkplace("all");
+    setStatusFilter("ALL");
+    setPostedWithin("all");
+    setMinSalary("0");
+    setPage(1);
+  };
 
   const pipelineApplied = pipelineCounts.applied;
   const pipelineInterviewing = pipelineCounts.interviewing;
@@ -1286,7 +1485,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             Interviewing <span className="text-status-success">{pipelineInterviewing}</span>
           </span>
           <Link
-            href="/tailor"
+            href={NEW_JOB_HREF}
             className="inline-flex min-h-11 items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary/90"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -1452,20 +1651,70 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             {!isLoading && pageJobs.length === 0 && (
               <div className="flex flex-col items-center justify-center gap-4 px-4 py-20 text-center">
                 <Briefcase className="h-12 w-12 text-muted-foreground/50" />
-                <div>
-                  <p className="font-medium text-rf-meta">No jobs found</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {searchQuery || locationQuery
-                      ? "Try adjusting search or location filters."
-                      : "Go to the Tailor workspace to paste a job posting."}
-                  </p>
-                </div>
-                <Link
-                  href="/tailor"
-                  className="mt-2 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary/90"
-                >
-                  Add Your First Job
-                </Link>
+                {hasActiveFilters ? (
+                  <>
+                    <div>
+                      <p className="font-medium text-rf-meta">No matching jobs</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        No tracked jobs match your current filters. Clear filters to view all saved jobs, or add a new posting in Tailor.
+                      </p>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        data-testid="tracker-clear-filters-btn"
+                        onClick={clearAllFilters}
+                        className="min-h-11 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        Clear filters
+                      </button>
+                      <Link
+                        href={NEW_JOB_HREF}
+                        className="inline-flex min-h-11 items-center rounded-lg border border-hairline bg-inset px-4 py-2 text-xs font-semibold text-foreground transition-colors duration-150 hover:bg-elevated"
+                      >
+                        Add Job in Tailor
+                      </Link>
+                    </div>
+                  </>
+                ) : filterStatuses?.length ? (
+                  <>
+                    <div>
+                      <p className="font-medium text-rf-meta">No jobs in this stage yet.</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Update a tracked posting’s stage or add a new job in Tailor.
+                      </p>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                      <Link
+                        href="/tracker"
+                        className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary/90"
+                      >
+                        View All Jobs
+                      </Link>
+                      <Link
+                        href={NEW_JOB_HREF}
+                        className="inline-flex min-h-11 items-center rounded-lg border border-hairline bg-inset px-4 py-2 text-xs font-semibold text-foreground transition-colors duration-150 hover:bg-elevated"
+                      >
+                        Add Job in Tailor
+                      </Link>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <p className="font-medium text-rf-meta">No jobs found</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Go to the Tailor workspace to paste a job posting.
+                      </p>
+                    </div>
+                    <Link
+                      href={NEW_JOB_HREF}
+                      className="mt-2 inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary/90"
+                    >
+                      Add Your First Job
+                    </Link>
+                  </>
+                )}
               </div>
             )}
 
@@ -1580,6 +1829,13 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           />
         </div>
       )}
+
+      <RefreshFromSourceDialog
+        open={refreshConfirmOpen}
+        onOpenChange={setRefreshConfirmOpen}
+        isBusy={isImporting}
+        onSelectMode={handleConfirmRefresh}
+      />
 
       <ConfirmDialog
         open={Boolean(pendingDeleteJob)}

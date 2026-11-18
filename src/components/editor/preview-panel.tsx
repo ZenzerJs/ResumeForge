@@ -364,7 +364,13 @@ export function PreviewPanel({
         return measured.pageCount;
       });
       if (sourceRef.current !== source) throw new Error("The document changed while fitting. Try again.");
-      if (result.status === "fit") onApplyLayout(result.source);
+      if (result.status === "fit") {
+        const cleanedSource = result.source.replace(
+          /^\/\/ @layout-two-pages-approved: [a-f0-9]{64}\r?\n/gm,
+          ""
+        );
+        onApplyLayout(cleanedSource);
+      }
       else if (result.status === "no-fit") throw new Error("This resume does not fit on one page with the readable profiles. Review content or use two pages.");
       else if (result.status === "unmanaged") throw new Error("This source has custom settings and cannot be fitted automatically.");
       else throw new Error("Could not compile and measure the layout profiles.");

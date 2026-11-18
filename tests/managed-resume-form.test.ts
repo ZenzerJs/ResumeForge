@@ -27,6 +27,8 @@ import {
 } from "@/lib/tailor/application-context";
 import { renderLegacyResumeDocument } from "@/lib/typst/resume-document-v2-legacy";
 import { renderPreviousResumeDocument } from "@/lib/typst/resume-document-v2-previous";
+import { resolveDefaultEditorMode } from "@/components/editor/code-editor";
+import { getEditorBannerVisibility } from "@/components/editor/editor-workspace";
 
 function buildAnnotatedSample() {
   const rows = [
@@ -390,5 +392,54 @@ describe("managed resume form safety", () => {
         storage,
       })
     ).toBeNull();
+  });
+
+  it("defaults editor mode to visual for safe managed or structured resumes and respects explicit overrides", () => {
+    const { doc, links } = buildAnnotatedSample();
+    const v2Source = renderResumeDocument(doc, "balanced", links);
+    const legacyTypst = serializeStructuredModelToTypst(
+      parseTypstToStructuredModel(
+        `= Alex Rivera\n#text(size: 9pt)[Austin, TX]\n== Experience\n#resume-entry(title: "Acme", subtitle: "Engineer", location: "Austin", date: "2023", details: [- Built APIs])`
+      )
+    );
+
+    expect(resolveDefaultEditorMode(v2Source)).toBe("visual");
+    expect(resolveDefaultEditorMode(legacyTypst)).toBe("visual");
+    expect(resolveDefaultEditorMode("= Raw Custom Resume\n- Bullet")).toBe("code");
+    expect(resolveDefaultEditorMode(v2Source, "code")).toBe("code");
+    expect(resolveDefaultEditorMode("= Raw Custom Resume\n- Bullet", "visual")).toBe("visual");
+  });
+
+  it("suppresses AI/fallback draft banners on Master Resumes and shows Sample Resume Loaded notice only for starter samples", () => {
+    const aiMaster = getEditorBannerVisibility({
+      docMetadata: { type: "MASTER_RESUME", title: "Master Resume", id: "res-1" },
+      source: "// @conversion-path: ai\n// @conversion-path: fallback\n= Jane Doe",
+      isConversionBannerDismissed: false,
+    });
+    expect(aiMaster.showConversionAiBanner).toBe(false);
+    expect(aiMaster.showConversionFallbackBanner).toBe(false);
+    expect(aiMaster.showSampleResumeBanner).toBe(false);
+
+    const aiDraft = getEditorBannerVisibility({
+      docMetadata: { type: "LOCAL_FALLBACK", title: "Local Draft" },
+      source: "// @conversion-path: ai\n= Jane Doe",
+      isConversionBannerDismissed: false,
+    });
+    expect(aiDraft.showConversionAiBanner).toBe(true);
+    expect(aiDraft.showSampleResumeBanner).toBe(false);
+
+    const sampleStarter = getEditorBannerVisibility({
+      docMetadata: { type: "LOCAL_FALLBACK", title: "Starter Template" },
+      source: "alex.morgan@example.com",
+      isConversionBannerDismissed: false,
+    });
+    expect(sampleStarter.showSampleResumeBanner).toBe(true);
+
+    const blankDraft = getEditorBannerVisibility({
+      docMetadata: { type: "LOCAL_FALLBACK", title: "Blank Resume" },
+      source: "= Blank",
+      isConversionBannerDismissed: false,
+    });
+    expect(blankDraft.showSampleResumeBanner).toBe(false);
   });
 });

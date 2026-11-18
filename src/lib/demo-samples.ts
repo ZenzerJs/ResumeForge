@@ -37,5 +37,12 @@ export const DEMO_JOB = {
   company: "Example Lab (fictional)",
   roleTitle: "Sample Software Engineer",
   rawDescription: "Synthetic sample job description for a fictional Sample Software Engineer role at Example Lab. Required skills: TypeScript and PostgreSQL. Preferred skills: AWS. Domain: product analytics. This fictional role is for exploring the tailoring workflow only.",
+  requirements: {
+    requiredSkills: ["TypeScript", "PostgreSQL"],
+    preferredSkills: ["AWS"],
+    domainTerms: ["product analytics"],
+    roleTitle: "Sample Software Engineer",
+    company: "Example Lab (fictional)",
+  },
   status: "SAVED",
 };

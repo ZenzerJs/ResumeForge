@@ -1,9 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { LoginForm, resolvePostLoginRedirect } from "@/components/auth/login-form";
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/login",
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+    back: vi.fn(),
+  }),
+}));
+
+import {
+  LoginForm,
+  resolvePostLoginRedirect,
+  validateSignupPasswords,
+} from "@/components/auth/login-form";
 import { CompetitiveMatrixSection } from "@/components/landing/competitive-matrix-section";
 import { AtsSandboxSection } from "@/components/landing/ats-sandbox-section";
+import { LandingFooter } from "@/components/landing/landing-footer";
+import PrivacyPage from "@/app/privacy/page";
 
 describe("Sign In & Landing Page Polish Unit Tests", () => {
   beforeEach(() => {
@@ -79,18 +97,60 @@ describe("Sign In & Landing Page Polish Unit Tests", () => {
       expect(elementSignup.props.initialMode).toBe("signup");
       expect(elementSignup.props.redirectTo).toBe("/editor");
     });
+
+    it("renders Confirm Password on signup mode and account recovery notice on signin mode", () => {
+      const signinHtml = renderToStaticMarkup(
+        React.createElement(LoginForm, { initialMode: "signin" })
+      );
+      expect(signinHtml).toContain('data-testid="login-recovery-notice"');
+      expect(signinHtml).toContain("Forgot your password?");
+      expect(signinHtml).not.toContain('data-testid="login-confirm-password-input"');
+
+      const signupHtml = renderToStaticMarkup(
+        React.createElement(LoginForm, { initialMode: "signup" })
+      );
+      expect(signupHtml).toContain("Confirm Password");
+      expect(signupHtml).toContain('data-testid="login-confirm-password-input"');
+      expect(signupHtml).not.toContain('data-testid="login-recovery-notice"');
+
+      expect(validateSignupPasswords("short", "short")).toBe(
+        "Password must be at least 8 characters."
+      );
+      expect(validateSignupPasswords("Password123!", "Password456!")).toBe(
+        "Passwords do not match."
+      );
+      expect(validateSignupPasswords("Password123!", "Password123!")).toBeNull();
+    });
   });
 
   describe("CompetitiveMatrixSection Typography & Product Facts", () => {
-    it("renders factual product architecture columns without competitor brands or strawman claims", () => {
+    it("renders factual product architecture columns without competitor brands or BYOK jargon", () => {
       expect(typeof CompetitiveMatrixSection).toBe("function");
       const html = renderToStaticMarkup(React.createElement(CompetitiveMatrixSection, { demoMode: true }));
       expect(html).toContain("Capability");
       expect(html).toContain("ResumeForge");
       expect(html).toContain("ResumeForge architecture table");
       expect(html).toContain("Demo drafts stay in browser storage. Account signup is disabled.");
+      expect(html).toContain("AI API key you provide");
+      expect(html).not.toContain("BYOK");
       expect(html).not.toContain("Competitors");
       expect(html).not.toMatch(/\b(Teal|Simplify|Jobright)\b/i);
+    });
+  });
+
+  describe("LandingFooter & PrivacyPage Open-Source Provenance", () => {
+    it("includes verified GitHub repository, issue links, and WLU student attribution without BYOK jargon", () => {
+      const footerHtml = renderToStaticMarkup(React.createElement(LandingFooter));
+      expect(footerHtml).toContain("https://github.com/ZenzerJs/ResumeForge");
+      expect(footerHtml).toContain("https://github.com/ZenzerJs/ResumeForge/issues");
+      expect(footerHtml).toContain("Wilfrid Laurier University CS student");
+
+      const privacyHtml = renderToStaticMarkup(React.createElement(PrivacyPage));
+      expect(privacyHtml).toContain("https://github.com/ZenzerJs/ResumeForge");
+      expect(privacyHtml).toContain("https://github.com/ZenzerJs/ResumeForge/issues");
+      expect(privacyHtml).toContain("Wilfrid Laurier University CS student");
+      expect(privacyHtml).toContain("AI keys you provide");
+      expect(privacyHtml).not.toContain("BYOK");
     });
   });
 

@@ -818,13 +818,13 @@ export function PatchDiffReview({
         )}
       </div>
 
-      {renderInlinePreview && verified.length > 0 && (
+      {renderInlinePreview && actionablePatches.length > 0 && (
         <SuggestionPreview
           base={localOnly ? localBaseTypstSource : batch?.baseTypstSource}
           current={masterTypstSource}
           validBatch={localOnly || Boolean(batch && batch.jobId === jobId)}
           localStorageSourceKey={localOnly ? localStorageSourceKey : undefined}
-          patches={verified}
+          patches={actionablePatches}
           decisions={decisions}
           selected={selectedPatch}
           onSelect={setSelectedPatch}

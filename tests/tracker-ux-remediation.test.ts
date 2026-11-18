@@ -23,8 +23,15 @@ import {
 } from "@/lib/jobs/posting-identity";
 import {
   canAutoHydrateTrackerJobs,
+  executeRefreshFromSource,
   type JobItem,
 } from "@/components/tracker/tracker-feed";
+import { computeLocalOutcomePayload } from "@/components/tracker/outcomes-panel";
+import {
+  describePracticeQuestionScope,
+  formatPracticeJobOptionLabel,
+  resolvePracticeJobSelection,
+} from "@/components/practice/practice-workspace";
 import { JobListRow } from "@/components/tracker/job-list-row";
 import { TrackerSubNav } from "@/components/tracker/tracker-sub-nav";
 
@@ -509,6 +516,225 @@ describe("Tracker UX Remediation & Deduplication", () => {
         },
       ];
       expect(collapseDuplicateIngestedJobs(genericRows)).toHaveLength(2);
+    });
+  });
+
+  describe("4. Practice job handoff, picker disambiguation, question scope & local outcomes", () => {
+    it("selects the exact jobId or strict company+role without falling back to a sibling role at the same company", () => {
+      const jobs = [
+        {
+          id: "job-frontend",
+          company: "Fictional Review Lab",
+          roleTitle: "Frontend Engineering Intern",
+          source: "pasted",
+          notes: "Location: Toronto, ON | Apply Link: https://boards.greenhouse.io/frl/jobs/101",
+        },
+        {
+          id: "job-backend",
+          company: "Fictional Review Lab",
+          roleTitle: "Backend Engineering Intern",
+          source: "pasted",
+          notes: "Location: Waterloo, ON | Apply Link: https://boards.greenhouse.io/frl/jobs/202",
+        },
+      ];
+
+      const exactById = resolvePracticeJobSelection(jobs, {
+        jobId: "job-backend",
+        company: "Fictional Review Lab",
+        role: "Backend Engineering Intern",
+      });
+      expect(exactById.selectedJobId).toBe("job-backend");
+
+      // Missing jobId with company + role synthesizes the exact requested role rather than picking Frontend
+      const missingIdWithRole = resolvePracticeJobSelection(jobs, {
+        jobId: "job-ml",
+        company: "Fictional Review Lab",
+        role: "ML Engineering Intern",
+      });
+      expect(missingIdWithRole.selectedJobId).toBe("job-ml");
+      expect(missingIdWithRole.jobs[0]).toMatchObject({
+        id: "job-ml",
+        company: "Fictional Review Lab",
+        roleTitle: "ML Engineering Intern",
+      });
+
+      // Company + role without jobId never falls back to a different role at the same company
+      const strictRoleNoMatch = resolvePracticeJobSelection(jobs, {
+        company: "Fictional Review Lab",
+        role: "Data Engineering Intern",
+      });
+      expect(strictRoleNoMatch.selectedJobId).toBe("");
+
+      // Company-only param still resolves when role is omitted
+      const companyOnly = resolvePracticeJobSelection(jobs, {
+        company: "Fictional Review Lab",
+      });
+      expect(companyOnly.selectedJobId).toBe("job-frontend");
+
+      // Duplicate req rows retain explicit jobId if requested
+      const dupJobs = [
+        {
+          id: "dup-a",
+          company: "Stripe",
+          roleTitle: "Backend Intern",
+          source: "greenhouse",
+          notes: "Location: Toronto, ON | Apply Link: https://boards.greenhouse.io/stripe/jobs/909",
+        },
+        {
+          id: "dup-b",
+          company: "Stripe",
+          roleTitle: "Backend Intern",
+          source: "greenhouse",
+          notes: "Location: Toronto, ON | Apply Link: https://boards.greenhouse.io/stripe/jobs/909?gh_src=feed",
+        },
+      ];
+      const exactDup = resolvePracticeJobSelection(dupJobs, { jobId: "dup-b" });
+      expect(exactDup.selectedJobId).toBe("dup-b");
+      expect(exactDup.jobs.some((j) => j.id === "dup-b")).toBe(true);
+    });
+
+    it("formats distinct picker labels using location and requisition disambiguators", () => {
+      const jobA = {
+        id: "stripe-1",
+        company: "Stripe",
+        roleTitle: "Software Engineer Intern",
+        notes: "Location: Toronto, ON | Apply Link: https://boards.greenhouse.io/stripe/jobs/111",
+      };
+      const jobB = {
+        id: "stripe-2",
+        company: "Stripe",
+        roleTitle: "Software Engineer Intern",
+        notes: "Location: Toronto, ON | Apply Link: https://boards.greenhouse.io/stripe/jobs/222",
+      };
+      const disambig = buildTrackerDisambiguators([jobA, jobB]);
+      expect(formatPracticeJobOptionLabel(jobA, disambig.get(jobA.id))).toBe(
+        "Stripe — Software Engineer Intern (Toronto, ON · Req #111)"
+      );
+      expect(formatPracticeJobOptionLabel(jobB, disambig.get(jobB.id))).toBe(
+        "Stripe — Software Engineer Intern (Toronto, ON · Req #222)"
+      );
+    });
+
+    it("distinguishes company-tagged banks from general question banks and tallies local outcomes", () => {
+      const unmapped = describePracticeQuestionScope({
+        company: "Fictional Review Lab",
+        roleTitle: "Backend Engineering Intern",
+      });
+      expect(unmapped.kind).toBe("general");
+      expect(unmapped.message).toContain("general question bank");
+      expect(unmapped.message).toContain("Backend Engineering Intern");
+
+      const mapped = describePracticeQuestionScope({
+        company: "Google",
+        roleTitle: "Backend Engineering Intern",
+      });
+      expect(mapped.kind).toBe("company");
+      expect(mapped.count).toBeGreaterThan(0);
+      expect(mapped.message).toContain("company-wide bank");
+      expect(mapped.message).toContain("not tailored to Backend Engineering Intern");
+
+      const outcomes = computeLocalOutcomePayload([
+        { status: "SAVED" },
+        { status: "APPLIED" },
+        { status: "INTERVIEWING" },
+        { status: "OFFER" },
+        { status: "REJECTED" },
+      ]);
+      expect(outcomes.funnel).toEqual({
+        SAVED: 1,
+        APPLIED: 1,
+        INTERVIEWING: 1,
+        OFFER: 1,
+        REJECTED: 1,
+      });
+      // (1 interviewing + 1 offer) / (1 applied + 1 interviewing + 1 offer + 1 rejected) = 0.5
+      expect(outcomes.interviewRate).toBe(0.5);
+    });
+  });
+
+  describe("5. Refresh from Source confirmation guard & Discover-only vs Tracker import", () => {
+    it("opens confirmation dialog on Refresh click without calling bulk-import directly", () => {
+      const src = readProjectFile("src/components/tracker/tracker-feed.tsx");
+      expect(src).toContain("setRefreshConfirmOpen(true)");
+      expect(src).toContain("RefreshFromSourceDialog");
+      expect(src).toContain('data-testid="refresh-from-source-dialog"');
+      expect(src).toContain('data-testid="refresh-sync-discover-btn"');
+      expect(src).toContain('data-testid="refresh-import-tracker-btn"');
+      expect(src).toContain("Sync Discover Feed Only");
+      expect(src).toContain("Import Listings to Tracker");
+
+      // Ensure handleRefreshFromSource itself only opens the dialog instead of calling bulk-import
+      const handlerMatch = src.match(
+        /const handleRefreshFromSource = async \(\) => \{([\s\S]*?)\n  \};/,
+      );
+      expect(handlerMatch).not.toBeNull();
+      expect(handlerMatch![1]).not.toContain("/api/jobs/bulk-import");
+      expect(handlerMatch![1]).not.toContain("/api/connectors/sync");
+      expect(handlerMatch![1]).toContain("setRefreshConfirmOpen(true)");
+    });
+
+    it("executes Discover-only sync without calling /api/jobs/bulk-import and reports exact counts", async () => {
+      const calledUrls: string[] = [];
+      const mockFetch = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        calledUrls.push(url);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              summary: { totalInserted: 14, totalFound: 120, providerCount: 4 },
+              results: [{ source: "greenhouse", success: true }],
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }) as unknown as typeof fetch;
+
+      const outcome = await executeRefreshFromSource("sync-discover", mockFetch);
+
+      expect(calledUrls).toEqual(["/api/connectors/sync"]);
+      expect(outcome.syncSucceeded).toBe(true);
+      expect(outcome.shouldReloadJobs).toBe(false);
+      expect(outcome.notice).toBe(
+        "Discover feed: 14 new of 120 from 4 sources. Tracker unchanged.",
+      );
+    });
+
+    it("executes Tracker bulk-import + Discover sync when confirmed and reports exact counts", async () => {
+      const calledUrls: string[] = [];
+      const mockFetch = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        calledUrls.push(url);
+        if (url === "/api/jobs/bulk-import") {
+          return new Response(
+            JSON.stringify({
+              success: true,
+              createdCount: 25,
+              skippedCount: 1175,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              summary: { totalInserted: 8, totalFound: 95, providerCount: 3 },
+              results: [],
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }) as unknown as typeof fetch;
+
+      const outcome = await executeRefreshFromSource("import-tracker", mockFetch);
+
+      expect(calledUrls).toEqual(["/api/jobs/bulk-import", "/api/connectors/sync"]);
+      expect(outcome.syncSucceeded).toBe(true);
+      expect(outcome.shouldReloadJobs).toBe(true);
+      expect(outcome.notice).toBe(
+        "Tracker: 25 new (1175 already saved). Discover feed: 8 new of 95 from 3 sources.",
+      );
     });
   });
 });

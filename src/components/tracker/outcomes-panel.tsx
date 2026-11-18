@@ -4,8 +4,9 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/design-system/app-shell";
 import { TrackerSubNav } from "@/components/tracker/tracker-sub-nav";
+import { fetchDemoConfig } from "@/components/auth/session-user";
 
-interface OutcomePayload {
+export interface OutcomePayload {
   funnel: Record<string, number>;
   interviewRate: number;
   medianResponseDays: number | null;
@@ -23,6 +24,33 @@ interface OutcomePayload {
 
 const FUNNEL = ["SAVED", "APPLIED", "INTERVIEWING", "OFFER", "REJECTED"] as const;
 
+export function computeLocalOutcomePayload(
+  jobs: Array<{ status?: string | null }>
+): OutcomePayload {
+  const funnel: Record<string, number> = {
+    SAVED: 0,
+    APPLIED: 0,
+    INTERVIEWING: 0,
+    OFFER: 0,
+    REJECTED: 0,
+  };
+  for (const job of jobs) {
+    const status = (job.status || "SAVED").toUpperCase();
+    if (status in funnel) {
+      funnel[status] += 1;
+    }
+  }
+  const appliedTotal =
+    funnel.APPLIED + funnel.INTERVIEWING + funnel.OFFER + funnel.REJECTED;
+  const interviewsTotal = funnel.INTERVIEWING + funnel.OFFER;
+  return {
+    funnel,
+    interviewRate: appliedTotal > 0 ? interviewsTotal / appliedTotal : 0,
+    medianResponseDays: null,
+    variants: [],
+  };
+}
+
 const STAGE_TOP_RULE: Record<(typeof FUNNEL)[number], string> = {
   SAVED: "border-t-2 border-t-text-muted/70",
   APPLIED: "border-t-2 border-t-ember",
@@ -33,16 +61,37 @@ const STAGE_TOP_RULE: Record<(typeof FUNNEL)[number], string> = {
 
 export function OutcomesPanel() {
   const [guest, setGuest] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
   const [data, setData] = useState<OutcomePayload | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch("/api/stats/outcomes", { signal: controller.signal })
-      .then((res) => res.json())
-      .then((json) => {
-        if (!controller.signal.aborted && json.success) {
-          setGuest(Boolean(json.guest));
-          setData(json.data);
+    void Promise.all([
+      fetch("/api/stats/outcomes", { signal: controller.signal }).then((res) =>
+        res.json()
+      ),
+      fetchDemoConfig().catch(() => ({ demoMode: false })),
+    ])
+      .then(([json, demoConfig]) => {
+        if (controller.signal.aborted) return;
+        const isDemo = Boolean(demoConfig?.demoMode);
+        setDemoMode(isDemo);
+        if (json?.success) {
+          const isGuest = Boolean(json.guest);
+          setGuest(isGuest);
+          if (isGuest) {
+            let localJobs: Array<{ status?: string | null }> = [];
+            try {
+              const raw = localStorage.getItem("resumeforge_guest_jobs");
+              const parsed = raw ? JSON.parse(raw) : [];
+              if (Array.isArray(parsed)) localJobs = parsed;
+            } catch {
+              localJobs = [];
+            }
+            setData(computeLocalOutcomePayload(localJobs));
+          } else {
+            setData(json.data);
+          }
         }
       })
       .catch(() => {
@@ -63,13 +112,45 @@ export function OutcomesPanel() {
           <p className="text-sm text-muted-foreground">Counts are yours only. Shared job listings stay SAVED for everyone else.</p>
         </div>
 
-        {guest && (
-          <p className="rounded-lg surface-raised px-4 py-3 text-sm text-text-secondary">
-            <Link href="/login" className="text-primary underline">Sign in</Link> to see which resume variants get interviews.
-          </p>
+        {guest && demoMode && (
+          <div
+            data-testid="outcomes-demo-mode-notice"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg surface-raised px-4 py-3 text-sm text-text-secondary"
+          >
+            <span>
+              Public demo mode: pipeline stage counts reflect jobs saved in this browser. Account-backed variant interview rates and response-time analytics require a self-hosted account (public signup is disabled in the demo).
+            </span>
+            <Link
+              href="/tracker"
+              className="shrink-0 font-semibold text-primary underline underline-offset-2"
+            >
+              Open Job Tracker
+            </Link>
+          </div>
         )}
 
-        {!guest && data && totalTracked === 0 && (
+        {guest && !demoMode && (
+          <div
+            data-testid="outcomes-guest-mode-notice"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg surface-raised px-4 py-3 text-sm text-text-secondary"
+          >
+            <span>
+              Guest session: pipeline stage counts reflect jobs saved in this browser.{" "}
+              <Link href="/login" className="font-semibold text-primary underline underline-offset-2">
+                Sign in
+              </Link>{" "}
+              to see which resume variants get interviews.
+            </span>
+            <Link
+              href="/tracker"
+              className="shrink-0 font-semibold text-primary underline underline-offset-2"
+            >
+              Open Job Tracker
+            </Link>
+          </div>
+        )}
+
+        {data && totalTracked === 0 && (
           <p className="rounded-lg surface-raised px-4 py-3 text-sm text-muted-foreground">No applications yet. Mark a job Applied in the tracker.</p>
         )}
 
@@ -115,30 +196,32 @@ export function OutcomesPanel() {
               </p>
             </section>
 
-            <section className="overflow-x-auto rounded-xl surface-raised p-4" data-testid="outcome-variants">
-              <table className="w-full min-w-[460px] text-left text-xs text-on-surface-variant">
-                <thead className="text-muted-foreground">
-                  <tr>
-                    <th className="py-2 pr-3 whitespace-nowrap">Variant</th>
-                    <th className="py-2 pr-3 whitespace-nowrap">Job</th>
-                    <th className="py-2 pr-3 whitespace-nowrap">Sent</th>
-                    <th className="py-2 pr-3 whitespace-nowrap">Interviews</th>
-                    <th className="py-2 whitespace-nowrap">Rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.variants.map((row) => (
-                    <tr key={row.variantId ?? "none"} className="border-t border-border">
-                      <td className="py-2 pr-3">{row.variantTitle}</td>
-                      <td className="py-2 pr-3">{[row.roleTitle, row.company].filter(Boolean).join(" · ") || "—"}</td>
-                      <td className="py-2 pr-3 tabular-nums">{row.applications}</td>
-                      <td className="py-2 pr-3 tabular-nums">{row.interviews}</td>
-                      <td className="py-2 tabular-nums">{(row.interviewRate * 100).toFixed(0)}%</td>
+            {(!guest || data.variants.length > 0) && (
+              <section className="overflow-x-auto rounded-xl surface-raised p-4" data-testid="outcome-variants">
+                <table className="w-full min-w-[460px] text-left text-xs text-on-surface-variant">
+                  <thead className="text-muted-foreground">
+                    <tr>
+                      <th className="py-2 pr-3 whitespace-nowrap">Variant</th>
+                      <th className="py-2 pr-3 whitespace-nowrap">Job</th>
+                      <th className="py-2 pr-3 whitespace-nowrap">Sent</th>
+                      <th className="py-2 pr-3 whitespace-nowrap">Interviews</th>
+                      <th className="py-2 whitespace-nowrap">Rate</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
+                  </thead>
+                  <tbody>
+                    {data.variants.map((row) => (
+                      <tr key={row.variantId ?? "none"} className="border-t border-border">
+                        <td className="py-2 pr-3">{row.variantTitle}</td>
+                        <td className="py-2 pr-3">{[row.roleTitle, row.company].filter(Boolean).join(" · ") || "—"}</td>
+                        <td className="py-2 pr-3 tabular-nums">{row.applications}</td>
+                        <td className="py-2 pr-3 tabular-nums">{row.interviews}</td>
+                        <td className="py-2 tabular-nums">{(row.interviewRate * 100).toFixed(0)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+            )}
           </>
         )}
       </div>

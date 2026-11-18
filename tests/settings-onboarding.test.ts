@@ -8,10 +8,13 @@ import {
   hasNonDefaultAdvancedConfig,
   isCloudProvider,
   getConnectionTestState,
+  isKeyRejectionFailure,
   SettingsWorkspace,
 } from "@/components/settings/settings-workspace";
 import { POST as testConnectionPOST } from "@/app/api/ai/test-connection/route";
 import * as aiGateway from "@/lib/ai/gateway";
+import { assertSafePublicUrl, UnsafeUrlError } from "@/lib/security/safe-url";
+import { BYOK_UPDATED_EVENT } from "@/lib/byok-vault";
 import { authedRequest, createTestUser } from "./helpers/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -60,7 +63,7 @@ describe("Settings provider onboarding helpers", () => {
     expect(html).toContain("workspace-atmosphere");
   });
 
-  it("gates connection test readiness on resolved session & demoMode and offers sign-in for self-hosted guests", () => {
+  it("gates connection test readiness on resolved session & demoMode: ready for cloud BYOK guests, sign-in-required for local/custom guests", () => {
     const mockUser = { id: "u-1", email: "u@example.com", username: "u1" };
 
     expect(
@@ -83,15 +86,31 @@ describe("Settings provider onboarding helpers", () => {
       })
     ).toBe("loading");
 
-    expect(
-      getConnectionTestState({
-        isHydrated: true,
-        isSessionLoaded: true,
-        isDemoLoaded: true,
-        sessionUser: null,
-        demoMode: false,
-      })
-    ).toBe("sign-in-required");
+    for (const cloudProvider of ["gemini", "openai", "anthropic", "groq"] as const) {
+      expect(
+        getConnectionTestState({
+          isHydrated: true,
+          isSessionLoaded: true,
+          isDemoLoaded: true,
+          sessionUser: null,
+          demoMode: false,
+          provider: cloudProvider,
+        })
+      ).toBe("ready");
+    }
+
+    for (const localProvider of ["ollama", "custom"] as const) {
+      expect(
+        getConnectionTestState({
+          isHydrated: true,
+          isSessionLoaded: true,
+          isDemoLoaded: true,
+          sessionUser: null,
+          demoMode: false,
+          provider: localProvider,
+        })
+      ).toBe("sign-in-required");
+    }
 
     expect(
       getConnectionTestState({
@@ -121,6 +140,38 @@ describe("Settings provider onboarding helpers", () => {
     expect(src).toContain("Sign in to test connection");
     expect(src).toContain("parseTailorReturnContext");
     expect(src).toContain("clearActiveApplicationContext");
+    expect(src).toContain("AIzaSy... or AQ....");
+
+    const topNavSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/navigation/top-nav.tsx"),
+      "utf8"
+    );
+    expect(topNavSrc).toContain("BYOK_UPDATED_EVENT");
+    expect(BYOK_UPDATED_EVENT).toBe("resumeforge:byok-updated");
+  });
+
+  it("classifies key rejections vs endpoint/network failures for aria-invalid and reports rejected scheme/host in UnsafeUrlError", () => {
+    expect(isKeyRejectionFailure("Gemini API returned status 400: API key not valid. Please pass a valid API key.")).toBe(true);
+    expect(isKeyRejectionFailure("OpenAI API returned status 401: Incorrect API key provided")).toBe(true);
+    expect(isKeyRejectionFailure("API key is required to test a connection before signing in.")).toBe(true);
+    expect(isKeyRejectionFailure("Synthetic provider auth failed")).toBe(true);
+    expect(isKeyRejectionFailure("Unauthorized")).toBe(true);
+
+    expect(isKeyRejectionFailure("Only HTTPS URLs are allowed (rejected http://localhost:11434)")).toBe(false);
+    expect(isKeyRejectionFailure("Network error testing connection.")).toBe(false);
+    expect(isKeyRejectionFailure("Connection failed: fetch failed")).toBe(false);
+    expect(isKeyRejectionFailure("Gemini API returned status 503: Service Unavailable")).toBe(false);
+
+    let caught: unknown;
+    try {
+      assertSafePublicUrl("http://localhost:11434/v1/models");
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(UnsafeUrlError);
+    expect((caught as Error).message).toBe(
+      "Only HTTPS URLs are allowed (rejected http://localhost:11434)"
+    );
   });
 });
 
@@ -234,5 +285,110 @@ describe("Settings /api/ai/test-connection auth + fixture provider", () => {
       provider: "gemini",
       message: "Demo fixture connected",
     });
+  });
+
+  it("allows origin-verified guest requests for cloud BYOK providers with explicit key (including AQ. Gemini keys)", async () => {
+    vi.stubEnv("DEMO_MODE", "false");
+    const spy = vi.spyOn(aiGateway, "testProviderConnection").mockResolvedValueOnce({
+      success: true,
+      provider: "gemini",
+      message: "Connected to Gemini",
+      modelCount: 5,
+      latencyMs: 31,
+    });
+
+    const req = new Request("http://localhost:3000/api/ai/test-connection", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        origin: "http://localhost:3000",
+        host: "localhost:3000",
+      },
+      body: JSON.stringify({
+        provider: "gemini",
+        apiKey: "AQ.Ab8RN6J2kLmNoPqRsTuVwXyZ0123456789",
+      }),
+    });
+    const res = await testConnectionPOST(req);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      provider: "gemini",
+      message: "Connected to Gemini",
+    });
+    expect(spy).toHaveBeenCalledWith({
+      provider: "gemini",
+      apiKey: "AQ.Ab8RN6J2kLmNoPqRsTuVwXyZ0123456789",
+      model: undefined,
+    });
+  });
+
+  it("blocks guest requests that omit apiKey, target local/custom providers, supply baseUrl, or come from cross-origin", async () => {
+    vi.stubEnv("DEMO_MODE", "false");
+    const spy = vi.spyOn(aiGateway, "testProviderConnection");
+
+    // Cross-origin guest request -> 403
+    const crossOriginRes = await testConnectionPOST(
+      new Request("http://localhost:3000/api/ai/test-connection", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          origin: "https://evil.example",
+          host: "localhost:3000",
+        },
+        body: JSON.stringify({ provider: "gemini", apiKey: "AQ.Ab8RN6J2kLmNoPqRsTuVwXyZ0123456789" }),
+      })
+    );
+    expect(crossOriginRes.status).toBe(403);
+
+    // Missing explicit apiKey -> 400 (never falls back to server env)
+    const missingKeyRes = await testConnectionPOST(
+      new Request("http://localhost:3000/api/ai/test-connection", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          origin: "http://localhost:3000",
+          host: "localhost:3000",
+        },
+        body: JSON.stringify({ provider: "openai" }),
+      })
+    );
+    expect(missingKeyRes.status).toBe(400);
+
+    // Local/ollama/custom providers -> 401 for guests
+    for (const localProvider of ["ollama", "custom"] as const) {
+      const localRes = await testConnectionPOST(
+        new Request("http://localhost:3000/api/ai/test-connection", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            origin: "http://localhost:3000",
+            host: "localhost:3000",
+          },
+          body: JSON.stringify({ provider: localProvider, apiKey: "sk-local-test" }),
+        })
+      );
+      expect(localRes.status).toBe(401);
+    }
+
+    // Custom baseUrl on cloud provider -> 403 for guests
+    const customUrlRes = await testConnectionPOST(
+      new Request("http://localhost:3000/api/ai/test-connection", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          origin: "http://localhost:3000",
+          host: "localhost:3000",
+        },
+        body: JSON.stringify({
+          provider: "openai",
+          apiKey: "sk-guest-test",
+          baseUrl: "http://169.254.169.254/latest",
+        }),
+      })
+    );
+    expect(customUrlRes.status).toBe(403);
+
+    expect(spy).not.toHaveBeenCalled();
   });
 });

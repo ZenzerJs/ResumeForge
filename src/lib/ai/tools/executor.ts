@@ -193,6 +193,7 @@ export async function executeServerTool(
               status: j.applications[0]?.status ?? j.status,
               createdAt: j.createdAt,
               hasAnalysis: Boolean(j.extractedRequirements),
+              ...(j.extractedRequirements ? { extractedRequirements: j.extractedRequirements } : {}),
             })),
             count: jobs.length,
           },

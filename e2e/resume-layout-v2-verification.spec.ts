@@ -121,8 +121,12 @@ async function previewAndExport(page: Page, source: string | null, name: string,
 
   await preview.screenshot({ path: path.join(artifacts, `${name}.png`) });
 
-  if (beforeExport) await page.getByTestId("editor-mode-code").first().click();
-  const currentSource = await page.locator(".cm-content").first().textContent();
+  if (await page.getByTestId("editor-mode-code").first().isVisible()) {
+    await page.getByTestId("editor-mode-code").first().click();
+  }
+  const cmContent = page.locator(".cm-content").first();
+  await expect(cmContent).toBeVisible({ timeout: 10000 });
+  const currentSource = await cmContent.textContent();
   if (currentSource?.includes("// @layout-v2-review-required")) {
 
     await page.locator('[data-testid="export-dropdown-btn"]:visible').first().click();

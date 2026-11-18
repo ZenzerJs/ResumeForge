@@ -4,7 +4,10 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { TopNav } from "@/components/navigation/top-nav";
 import { WorkspaceAtmosphere } from "@/components/design-system/workspace-atmosphere";
-import { GuestMigrationModal } from "@/components/auth/guest-migration-modal";
+import {
+  evaluateGuestMigrationState,
+  GuestMigrationModal,
+} from "@/components/auth/guest-migration-modal";
 import { fetchDemoConfig, fetchSessionPayload } from "@/components/auth/session-user";
 import { cn } from "@/lib/utils";
 import { initializeDemoSamples } from "@/lib/demo-client";
@@ -104,6 +107,7 @@ export function AppShell({
 
   const [showMigrationModal, setShowMigrationModal] = useState(false);
   const [guestDraft, setGuestDraft] = useState<string | null>(null);
+  const [hasExistingMaster, setHasExistingMaster] = useState<boolean>(true);
   const [isDesktopLg, setIsDesktopLg] = useState(true);
 
   useEffect(() => {
@@ -126,49 +130,30 @@ export function AppShell({
       return config;
     });
 
-    const isDismissed = localStorage.getItem("resumeforge_migration_dismissed") === "true";
-    const isMigrated = localStorage.getItem("resumeforge_draft_migrated") === "true";
-    if (isDismissed || isMigrated) {
-      return () => {
-        cancelled = true;
-      };
-    }
+    const checkGuestMigration = () => {
+      Promise.all([fetchSessionPayload(), demoPromise])
+        .then(async ([json, demoConfig]) => {
+          if (cancelled) return;
+          const isAuthUser = Boolean(json?.data && !json.guest);
+          const isGuest = Boolean(json?.guest);
+          const evaluation = evaluateGuestMigrationState(localStorage, {
+            isAuthUser,
+            isGuest,
+            demoMode: Boolean(demoConfig.demoMode),
+          });
+          if (!evaluation.shouldPrompt || !evaluation.draftSource) return;
 
-    Promise.all([fetchSessionPayload(), demoPromise])
-      .then(async ([json, demoConfig]) => {
-        if (cancelled || demoConfig.demoMode) return;
-        const isAuthUser = json?.data && !json.guest;
-        if (isAuthUser) {
-          const hasGuestDraft = localStorage.getItem("resumeforge_has_guest_draft") === "true";
-          const stored = localStorage.getItem("resumeforge_typst_source");
-          const storedEvidenceRaw = localStorage.getItem("resumeforge_guest_evidence");
-          let hasGuestEvidence = false;
+          let existingMaster = false;
           try {
-            const parsedEvidence = storedEvidenceRaw ? JSON.parse(storedEvidenceRaw) : [];
-            hasGuestEvidence = Array.isArray(parsedEvidence) && parsedEvidence.length > 0;
-          } catch {
-            hasGuestEvidence = false;
-          }
-
-          const hasCustomResumeDraft =
-            hasGuestDraft &&
-            Boolean(stored) &&
-            stored!.trim().length > 30 &&
-            !stored!.includes("// Starter Typst Resume");
-
-          if (hasCustomResumeDraft || hasGuestEvidence) {
-            try {
-              const res = await fetch("/api/resumes");
-              const resJson = await res.json();
-              if (cancelled) return;
-              if (
-                hasCustomResumeDraft &&
-                !hasGuestEvidence &&
-                resJson.success &&
-                Array.isArray(resJson.data)
-              ) {
+            const res = await fetch("/api/resumes");
+            const resJson = await res.json();
+            if (cancelled) return;
+            if (resJson.success && Array.isArray(resJson.data)) {
+              existingMaster = resJson.data.some((r: { isMaster?: boolean }) => Boolean(r.isMaster));
+              const stored = localStorage.getItem("resumeforge_typst_source");
+              if (evaluation.hasCustomResumeDraft && !evaluation.hasGuestEvidence && stored) {
                 const alreadyExists = resJson.data.some(
-                  (r: { typstSource: string }) => r.typstSource?.trim() === stored!.trim()
+                  (r: { typstSource: string }) => r.typstSource?.trim() === stored.trim()
                 );
                 if (alreadyExists) {
                   localStorage.removeItem("resumeforge_has_guest_draft");
@@ -176,34 +161,27 @@ export function AppShell({
                   return;
                 }
               }
-            } catch {
-              // ignore
             }
-            if (cancelled) return;
-            setGuestDraft(
-              stored && stored.trim().length > 0
-                ? stored
-                : `// Imported Guest Workspace\n= Resume Draft\n`
-            );
-            setShowMigrationModal(true);
+          } catch {
+            // Keep modal usable even if /api/resumes check fails
+            existingMaster = true;
           }
-        } else if (json?.guest) {
-          const stored = localStorage.getItem("resumeforge_typst_source");
-          if (
-            stored &&
-            stored.trim().length > 30 &&
-            !stored.includes("// Starter Typst Resume")
-          ) {
-            localStorage.setItem("resumeforge_has_guest_draft", "true");
-          }
-        }
-      })
-      .catch(() => {
-        // ignore
-      });
 
+          if (cancelled) return;
+          setHasExistingMaster(existingMaster);
+          setGuestDraft(evaluation.draftSource);
+          setShowMigrationModal(true);
+        })
+        .catch(() => {
+          // ignore
+        });
+    };
+
+    checkGuestMigration();
+    window.addEventListener("resumeforge:session-updated", checkGuestMigration);
     return () => {
       cancelled = true;
+      window.removeEventListener("resumeforge:session-updated", checkGuestMigration);
     };
   }, []);
 
@@ -269,6 +247,7 @@ export function AppShell({
           isOpen={showMigrationModal}
           onClose={() => setShowMigrationModal(false)}
           draftSource={guestDraft}
+          hasExistingMaster={hasExistingMaster}
           onSuccess={() => setShowMigrationModal(false)}
         />
       )}

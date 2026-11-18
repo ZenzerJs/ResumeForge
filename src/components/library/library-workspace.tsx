@@ -36,8 +36,7 @@ import {
 import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { ExtractedPdfEvidence } from "@/lib/evidence/pdfExtractor";
-import { convertExtractedPdfToEvidenceItems } from "@/lib/evidence/evidence-transform";
+import type { PdfEvidenceSaveItem } from "@/components/evidence/bulk-pdf-dropzone";
 import { initializeDemoSamples } from "@/lib/demo-client";
 import { parseApiError, readApiResponse } from "@/lib/api-error";
 import {
@@ -276,6 +275,46 @@ export function isLocalEvidenceId(id: string): boolean {
   return id.startsWith("guest-") || id.startsWith("demo-sample-");
 }
 
+export interface EvidenceFormData {
+  type: string;
+  title: string;
+  organization: string;
+  dates: string;
+  verifiedSummary: string;
+  tagsInput: string;
+  status: string;
+  bulletsInput: string[];
+}
+
+/**
+ * Builds initial modal form state. New manual entries default to `"draft"` so
+ * verification remains a deliberate user action; editing preserves `item.status`.
+ */
+export function createInitialEvidenceFormData(item?: EvidenceItem | null): EvidenceFormData {
+  if (item) {
+    return {
+      type: item.type,
+      title: item.title,
+      organization: item.organization || "",
+      dates: item.dates || "",
+      verifiedSummary: item.verifiedSummary,
+      tagsInput: (item.tags || []).join(", "),
+      status: item.status,
+      bulletsInput: (item.bullets || []).map((b) => b.text),
+    };
+  }
+  return {
+    type: "experience",
+    title: "",
+    organization: "",
+    dates: "",
+    verifiedSummary: "",
+    tagsInput: "",
+    status: "draft",
+    bulletsInput: [""],
+  };
+}
+
 function readGuestEvidenceFromStorage(): EvidenceItem[] {
   if (typeof window === "undefined") return [];
   try {
@@ -335,6 +374,7 @@ export function LibraryWorkspace() {
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const addEvidenceBtnRef = useRef<HTMLButtonElement | null>(null);
   const modalOpenerRef = useRef<HTMLElement | null>(null);
   const tabListRef = useRef<HTMLDivElement>(null);
   const bulkSubmittingRef = useRef<boolean>(false);
@@ -342,19 +382,27 @@ export function LibraryWorkspace() {
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const wasModalOpenRef = useRef<boolean>(false);
   const [editingItem, setEditingItem] = useState<EvidenceItem | null>(null);
 
+  useEffect(() => {
+    const wasOpen = wasModalOpenRef.current;
+    wasModalOpenRef.current = isModalOpen;
+    if (wasOpen && !isModalOpen) {
+      const target =
+        modalOpenerRef.current && modalOpenerRef.current.isConnected
+          ? modalOpenerRef.current
+          : addEvidenceBtnRef.current;
+      if (target && target.isConnected) {
+        target.focus({ preventScroll: true });
+      }
+    }
+  }, [isModalOpen]);
+
   // Form State
-  const [formData, setFormData] = useState({
-    type: "experience",
-    title: "",
-    organization: "",
-    dates: "",
-    verifiedSummary: "",
-    tagsInput: "",
-    status: "verified",
-    bulletsInput: [""],
-  });
+  const [formData, setFormData] = useState<EvidenceFormData>(() =>
+    createInitialEvidenceFormData()
+  );
 
   const fetchAbortRef = useRef<AbortController | null>(null);
 
@@ -615,16 +663,7 @@ export function LibraryWorkspace() {
           ? document.activeElement
           : null;
     setEditingItem(null);
-    setFormData({
-      type: "experience",
-      title: "",
-      organization: "",
-      dates: "",
-      verifiedSummary: "",
-      tagsInput: "",
-      status: "verified",
-      bulletsInput: [""],
-    });
+    setFormData(createInitialEvidenceFormData());
     setIsModalOpen(true);
   };
 
@@ -636,16 +675,7 @@ export function LibraryWorkspace() {
           ? document.activeElement
           : null;
     setEditingItem(item);
-    setFormData({
-      type: item.type,
-      title: item.title,
-      organization: item.organization || "",
-      dates: item.dates || "",
-      verifiedSummary: item.verifiedSummary,
-      tagsInput: (item.tags || []).join(", "),
-      status: item.status,
-      bulletsInput: (item.bullets || []).map((b) => b.text),
-    });
+    setFormData(createInitialEvidenceFormData(item));
     setIsModalOpen(true);
   };
 
@@ -1509,82 +1539,61 @@ export function LibraryWorkspace() {
     }
   };
 
-  const handlePdfIngestComplete = async (extractedItems: ExtractedPdfEvidence[]) => {
-    let createdCount = 0;
-    const guestItemsToAdd: EvidenceItem[] = [];
-    const demoConfig = await fetchDemoConfig();
+  const handlePdfIngestComplete = async (items: PdfEvidenceSaveItem[]) => {
+    setNotification(null);
+    const { demoMode } = await fetchDemoConfig();
+    const failed: PdfEvidenceSaveItem[] = [];
 
-    for (const extracted of extractedItems) {
-      const itemsToCreate = convertExtractedPdfToEvidenceItems(extracted);
-
-      for (const itemPayload of itemsToCreate) {
-        const toGuestItem = (): EvidenceItem => ({
-          id: `guest-evi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          userId: "guest",
-          type: itemPayload.type,
-          title: itemPayload.title,
-          organization: itemPayload.organization || null,
-          dates: itemPayload.dates || null,
-          verifiedSummary: itemPayload.verifiedSummary,
-          tags: itemPayload.tags || [],
-          status: itemPayload.status || "verified",
-          bullets: (itemPayload.bullets || []).map((b, idx) => ({
-            id: `b-${idx}-${Date.now()}`,
-            evidenceItemId: "",
-            text: b.text,
-            technologies: [],
-            roleAffinity: [],
-            verified: b.verified ?? true,
-            orderIndex: idx,
-          })),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-
-        if (demoConfig.demoMode) {
-          guestItemsToAdd.push(toGuestItem());
-          continue;
-        }
-
-        try {
-          const res = await fetch("/api/evidence", {
+    for (const item of items) {
+      try {
+        if (!demoMode) {
+          const response = await fetch("/api/evidence", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(itemPayload),
+            body: JSON.stringify(item),
           });
-
-          if (res.ok) {
-            createdCount++;
-          } else {
-            guestItemsToAdd.push(toGuestItem());
+          const { ok, data } = await readApiResponse<{ success?: boolean }>(response);
+          if (ok && data?.success) continue;
+          if (response.status !== 401 || accountScope.userId || accountScope.scopeResolved === false) {
+            failed.push(item);
+            continue;
           }
-        } catch (err) {
-          console.error("Failed to save extracted evidence item:", err);
         }
+
+        const stored = JSON.parse(localStorage.getItem("resumeforge_guest_evidence") ?? "[]");
+        if (!Array.isArray(stored)) throw new Error("Invalid local evidence storage.");
+        const { importId, ...payload } = item;
+        const id = `guest-evi-${importId}`;
+        if (stored.some((entry) => entry?.id === id)) continue;
+        const now = new Date().toISOString();
+        const guestItem = {
+          ...payload,
+          id,
+          userId: "guest",
+          createdAt: now,
+          updatedAt: now,
+          bullets: item.bullets.map((bullet, index) => ({
+            ...bullet,
+            id: `${id}-bullet-${index}`,
+            orderIndex: index,
+          })),
+        };
+        localStorage.setItem("resumeforge_guest_evidence", JSON.stringify([guestItem, ...stored]));
+      } catch {
+        failed.push(item);
       }
     }
 
-    if (guestItemsToAdd.length > 0) {
-      writeGuestEvidenceToStorage([...guestItemsToAdd, ...readGuestEvidenceFromStorage()]);
-      setItems((prev) => [...guestItemsToAdd, ...prev]);
-      createdCount += guestItemsToAdd.length;
-    }
-
-    await fetchItems();
-
-    if (createdCount > 0) {
+    const savedCount = items.length - failed.length;
+    if (savedCount > 0) await fetchItems();
+    if (failed.length === 0 && savedCount > 0) {
       setNotification({
         type: "success",
-        message: `Successfully indexed and added ${createdCount} evidence item${createdCount === 1 ? "" : "s"} to Evidence Bank.`,
-      });
-    } else {
-      setNotification({
-        type: "error",
-        message: "No evidence items could be extracted from the uploaded document.",
+        message: `Added ${savedCount} evidence item${savedCount === 1 ? "" : "s"} to Evidence Bank.`,
       });
     }
 
-    return createdCount;
+    return failed;
   };
 
   const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1755,7 +1764,9 @@ export function LibraryWorkspace() {
                   Import JSON
                 </button>
                 <button
+                  ref={addEvidenceBtnRef}
                   type="button"
+                  data-testid="add-evidence-item-btn"
                   onClick={(e) => openCreateModal(e.currentTarget)}
                   className="flex min-h-11 sm:min-h-9 items-center gap-1.5 rounded-[6px] border border-primary/40 bg-primary/10 px-3.5 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
@@ -2656,11 +2667,19 @@ export function LibraryWorkspace() {
         <DialogContent
           className="max-w-lg max-h-[90dvh] overflow-y-auto overscroll-contain border-hairline bg-panel p-4 sm:p-6"
           onCloseAutoFocus={(event) => {
-            const opener = modalOpenerRef.current;
+            const target =
+              modalOpenerRef.current && modalOpenerRef.current.isConnected
+                ? modalOpenerRef.current
+                : addEvidenceBtnRef.current;
             modalOpenerRef.current = null;
-            if (opener && opener.isConnected) {
+            if (target && target.isConnected) {
               event.preventDefault();
-              opener.focus();
+              target.focus({ preventScroll: true });
+              requestAnimationFrame(() => {
+                if (target.isConnected) {
+                  target.focus({ preventScroll: true });
+                }
+              });
             }
           }}
         >
@@ -2704,8 +2723,8 @@ export function LibraryWorkspace() {
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                   className="min-h-10 sm:min-h-0 w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
                 >
-                  <option value="verified">Verified</option>
                   <option value="draft">Draft</option>
+                  <option value="verified">Verified</option>
                   <option value="archived">Archived</option>
                 </select>
               </div>

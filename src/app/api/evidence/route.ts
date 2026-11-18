@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createEvidenceItem, getEvidenceItems } from "@/lib/db/evidence";
+import { Prisma } from "@prisma/client";
+import { createEvidenceItem, getEvidenceItemById, getEvidenceItems } from "@/lib/db/evidence";
 import { sanitizeError } from "@/lib/ai/redact";
 import { getRequestUserId, requireUserId } from "@/lib/security/auth-request";
 
@@ -13,6 +14,7 @@ const BulletSchema = z.object({
 });
 
 const CreateEvidenceSchema = z.object({
+  importId: z.string().regex(/^pdf-import-[a-f0-9]{32}-[0-9]{1,8}$/).optional(),
   type: z.enum(["experience", "project", "skill", "education", "award", "metric"]),
   title: z.string().min(1, "Title is required"),
   organization: z.string().optional(),
@@ -61,8 +63,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const newItem = await createEvidenceItem({ ...validation.data, userId });
-    return NextResponse.json({ success: true, data: newItem }, { status: 201 });
+    const { importId, ...payload } = validation.data;
+    try {
+      const newItem = await createEvidenceItem({ ...payload, ...(importId ? { id: importId } : {}), userId });
+      return NextResponse.json({ success: true, data: newItem }, { status: 201 });
+    } catch (error) {
+      if (importId && error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        const existing = await getEvidenceItemById(importId, userId);
+        if (existing) return NextResponse.json({ success: true, data: existing });
+        return NextResponse.json({ success: false, error: "Evidence import could not be saved." }, { status: 409 });
+      }
+      throw error;
+    }
   } catch (err) {
     return NextResponse.json(
       { success: false, error: "Failed to create evidence item", message: sanitizeError(err) },

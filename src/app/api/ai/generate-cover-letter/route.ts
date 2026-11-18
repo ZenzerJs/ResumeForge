@@ -5,6 +5,7 @@ import { verifyCoverLetterGrounding } from "@/lib/ai/cover-letter-verifier";
 import { extractJsonObject, normalizeCoverLetterPayload } from "@/lib/ai/json-response";
 import { getEvidenceItems } from "@/lib/db/evidence";
 import { getMasterResume } from "@/lib/db/resumes";
+import { extractCandidateNameFromTypst, replacePlaceholderSignature } from "@/lib/export/resume-text";
 import { sanitizeError } from "@/lib/ai/redact";
 import { requireUserId } from "@/lib/security/auth-request";
 
@@ -67,11 +68,16 @@ export async function POST(request: Request) {
     }
 
     const master = await getMasterResume(userId);
+    const providedName = input.candidateName?.trim() || "";
+    const resolvedCandidateName =
+      providedName && providedName.toLowerCase() !== "candidate"
+        ? providedName
+        : extractCandidateNameFromTypst(master?.typstSource) || "Candidate";
 
     // Invoke BYOK AI Gateway
     const gatewayResult = await generateCoverLetter(
       resolvedConfig,
-      input,
+      { ...input, candidateName: resolvedCandidateName },
       activeEvidenceItems,
       master?.typstSource
     );
@@ -101,7 +107,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const normalized = normalizeCoverLetterPayload(parsedResponse, input.candidateName);
+    const normalized = normalizeCoverLetterPayload(parsedResponse, resolvedCandidateName);
+    if (normalized && typeof normalized === "object" && "fullMarkdown" in normalized) {
+      const record = normalized as Record<string, unknown>;
+      if (typeof record.fullMarkdown === "string") {
+        record.fullMarkdown = replacePlaceholderSignature(record.fullMarkdown, resolvedCandidateName);
+      }
+    }
     const schemaValidation = CoverLetterResponseSchema.safeParse(normalized);
     if (!schemaValidation.success) {
       return NextResponse.json(

@@ -253,16 +253,115 @@ function stripTypstDirectives(source: string): string {
   return result;
 }
 
+function extractTypstNamedArgs(body: string): Record<string, string> {
+  const args: Record<string, string> = {};
+  let i = 0;
+  while (i < body.length) {
+    while (i < body.length && /[\s,]/.test(body[i])) i++;
+    if (i >= body.length) break;
+
+    const keyMatch = body.slice(i).match(/^([a-zA-Z_][\w-]*)\s*:/);
+    if (!keyMatch) {
+      if (body[i] === '"') {
+        i++;
+        while (i < body.length) {
+          if (body[i] === "\\" && i + 1 < body.length) { i += 2; continue; }
+          if (body[i] === '"') { i++; break; }
+          i++;
+        }
+      } else if (body[i] === "(" || body[i] === "[" || body[i] === "{") {
+        const close = findMatchingDelimiter(body, i, body[i], body[i] === "(" ? ")" : body[i] === "[" ? "]" : "}");
+        i = close >= 0 ? close + 1 : i + 1;
+      } else {
+        i++;
+      }
+      continue;
+    }
+
+    const key = keyMatch[1];
+    i += keyMatch[0].length;
+    while (i < body.length && /\s/.test(body[i])) i++;
+
+    let value = "";
+    if (body[i] === '"') {
+      let j = i + 1;
+      let raw = "";
+      while (j < body.length) {
+        if (body[j] === "\\" && j + 1 < body.length) {
+          const next = body[j + 1];
+          if (next === "n") raw += "\n";
+          else if (next === "t") raw += "\t";
+          else raw += next;
+          j += 2;
+          continue;
+        }
+        if (body[j] === '"') {
+          j++;
+          break;
+        }
+        raw += body[j];
+        j++;
+      }
+      value = raw.trim();
+      i = j;
+    } else if (body[i] === "[") {
+      const closeBracket = findMatchingDelimiter(body, i, "[", "]");
+      if (closeBracket >= 0) {
+        value = body.slice(i + 1, closeBracket).trim();
+        i = closeBracket + 1;
+      } else {
+        value = body.slice(i + 1).trim();
+        i = body.length;
+      }
+    } else {
+      let j = i;
+      let parenDepth = 0;
+      let bracketDepth = 0;
+      let braceDepth = 0;
+      let inString = false;
+      while (j < body.length) {
+        const ch = body[j];
+        if (ch === "\\" && j + 1 < body.length) { j += 2; continue; }
+        if (ch === '"') { inString = !inString; j++; continue; }
+        if (!inString) {
+          if (ch === "(") parenDepth++;
+          else if (ch === ")") parenDepth = Math.max(0, parenDepth - 1);
+          else if (ch === "[") bracketDepth++;
+          else if (ch === "]") bracketDepth = Math.max(0, bracketDepth - 1);
+          else if (ch === "{") braceDepth++;
+          else if (ch === "}") braceDepth = Math.max(0, braceDepth - 1);
+          else if (ch === "," && parenDepth === 0 && bracketDepth === 0 && braceDepth === 0) break;
+        }
+        j++;
+      }
+      const raw = body.slice(i, j).trim();
+      value = raw === "none" ? "" : raw;
+      i = j;
+    }
+
+    args[key] = value;
+  }
+  return args;
+}
+
 function formatTypstEntries(source: string): string {
   let result = "";
   let i = 0;
   while (i < source.length) {
-    if (!source.startsWith("#entry(", i)) {
+    if (i > 0 && source[i - 1] === "\\") {
       result += source[i];
       i++;
       continue;
     }
-    const openParen = i + "#entry".length;
+    const callMatch = source.slice(i).match(/^#(entry|resume-entry|project-entry|skill-line)\s*\(/);
+    if (!callMatch) {
+      result += source[i];
+      i++;
+      continue;
+    }
+
+    const fnName = callMatch[1];
+    const openParen = i + callMatch[0].length - 1;
     const closeParen = findMatchingDelimiter(source, openParen, "(", ")");
     if (closeParen < 0) {
       result += source[i];
@@ -271,33 +370,73 @@ function formatTypstEntries(source: string): string {
     }
 
     const body = source.slice(openParen + 1, closeParen);
-    const extractField = (key: string): string => {
-      const m = body.match(new RegExp(`\\b${key}\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`));
-      return m ? m[1].replace(/\\"/g, '"') : "";
-    };
-    const title = extractField("title");
-    const role = extractField("role");
-    const location = extractField("location");
-    const date = extractField("date");
+    const args = extractTypstNamedArgs(body);
 
-    let details = "";
-    const detailsMatch = body.match(/\bdetails\s*:\s*\[/);
-    if (detailsMatch && detailsMatch.index !== undefined) {
-      const openBracket = detailsMatch.index + detailsMatch[0].length - 1;
-      const closeBracket = findMatchingDelimiter(body, openBracket, "[", "]");
-      if (closeBracket > openBracket) {
-        details = body.slice(openBracket + 1, closeBracket).trim();
-      }
+    let formatted = "";
+    if (fnName === "entry" || fnName === "resume-entry") {
+      const title = args.title || "";
+      const role = args.role || args.subtitle || "";
+      const location = args.location || "";
+      const date = args.date || "";
+      const details = args.details || "";
+      const left = [title, role].filter(Boolean).join(" -- ");
+      const right = [location, date].filter(Boolean).join(" | ");
+      const header = [left, right].filter(Boolean).join(" | ");
+      formatted = [header, details].filter(Boolean).join("\n");
+    } else if (fnName === "project-entry") {
+      const title = args.title || "";
+      const links = args.links || "";
+      const stack = args.stack || "";
+      const date = args.date || "";
+      const details = args.details || "";
+      const titlePart = [title, links].filter(Boolean).join(" | ");
+      const header = [titlePart, stack, date].filter(Boolean).join(" | ");
+      formatted = [header, details].filter(Boolean).join("\n");
+    } else if (fnName === "skill-line") {
+      const category = args.category || "";
+      const items = args.items || "";
+      formatted = category && items ? `${category}: ${items}` : [category, items].filter(Boolean).join(" ");
     }
 
-    const left = [title, role].filter(Boolean).join(" -- ");
-    const right = [location, date].filter(Boolean).join(" | ");
-    const header = [left, right].filter(Boolean).join(" | ");
-    const formatted = [header, details].filter(Boolean).join("\n");
     result += formatted ? `${formatted}\n` : "";
     i = closeParen + 1;
   }
   return result;
+}
+
+function formatTypstLinks(source: string): string {
+  let out = "";
+  let i = 0;
+  while (i < source.length) {
+    if (i > 0 && source[i - 1] === "\\") {
+      out += source[i];
+      i++;
+      continue;
+    }
+    const match = source.slice(i).match(/^#link\(\s*"((?:\\.|[^"\\])*)"\s*\)/);
+    if (!match) {
+      out += source[i];
+      i++;
+      continue;
+    }
+    const url = match[1].replace(/\\"/g, '"');
+    let cursor = i + match[0].length;
+    while (cursor < source.length && (source[cursor] === " " || source[cursor] === "\t")) {
+      cursor++;
+    }
+    if (source[cursor] === "[") {
+      const closeBracket = findMatchingDelimiter(source, cursor, "[", "]");
+      if (closeBracket >= 0) {
+        const label = source.slice(cursor + 1, closeBracket).trim();
+        out += !label || label === url ? url : `${label} (${url})`;
+        i = closeBracket + 1;
+        continue;
+      }
+    }
+    out += url;
+    i += match[0].length;
+  }
+  return out;
 }
 
 function unwrapTypstCallsWithBody(source: string): string {
@@ -307,6 +446,11 @@ function unwrapTypstCallsWithBody(source: string): string {
     let out = "";
     let i = 0;
     while (i < current.length) {
+      if (i > 0 && current[i - 1] === "\\") {
+        out += current[i];
+        i++;
+        continue;
+      }
       const match = current.slice(i).match(/^#([a-zA-Z_][\w.-]*)/);
       if (!match || match[1] === "link") {
         out += current[i];
@@ -347,10 +491,59 @@ function unwrapTypstCallsWithBody(source: string): string {
   return current;
 }
 
+function extractContentFromUnknownCallArgs(argBody: string): string {
+  const blocks: string[] = [];
+  let j = 0;
+  while (j < argBody.length) {
+    if (argBody[j] === '"') {
+      const prefix = argBody.slice(0, j);
+      const isDetailsString = /\bdetails\s*:\s*$/.test(prefix);
+      let k = j + 1;
+      let strVal = "";
+      while (k < argBody.length) {
+        if (argBody[k] === "\\" && k + 1 < argBody.length) {
+          strVal += argBody[k + 1] === "n" ? "\n" : argBody[k + 1];
+          k += 2;
+          continue;
+        }
+        if (argBody[k] === '"') {
+          k++;
+          break;
+        }
+        strVal += argBody[k];
+        k++;
+      }
+      if (isDetailsString && strVal.trim()) {
+        blocks.push(strVal.trim());
+      }
+      j = k;
+      continue;
+    }
+    if (argBody[j] === "[") {
+      const closeBracket = findMatchingDelimiter(argBody, j, "[", "]");
+      if (closeBracket >= 0) {
+        const inner = argBody.slice(j + 1, closeBracket).trim();
+        if (inner) blocks.push(inner);
+        j = closeBracket + 1;
+        continue;
+      }
+    }
+    j++;
+  }
+  if (blocks.length === 0) return "";
+  const joined = blocks.join(blocks.some((b) => b.includes("\n")) || blocks.length > 1 ? "\n" : " ");
+  return stripRemainingTypstCalls(formatTypstLinks(unwrapTypstCallsWithBody(joined)));
+}
+
 function stripRemainingTypstCalls(source: string): string {
   let out = "";
   let i = 0;
   while (i < source.length) {
+    if (i > 0 && source[i - 1] === "\\") {
+      out += source[i];
+      i++;
+      continue;
+    }
     const match = source.slice(i).match(/^#([a-zA-Z_][\w.-]*)/);
     if (!match) {
       out += source[i];
@@ -364,6 +557,10 @@ function stripRemainingTypstCalls(source: string): string {
       }
       const closeParen = findMatchingDelimiter(source, cursor, "(", ")");
       if (closeParen >= 0) {
+        const preserved = extractContentFromUnknownCallArgs(source.slice(cursor + 1, closeParen));
+        if (preserved) {
+          out += `${preserved}\n`;
+        }
         i = closeParen + 1;
         continue;
       }
@@ -396,20 +593,24 @@ export function cleanTypstToText(source: string): string {
   text = formatTypstEntries(text);
 
   text = text
-    .replace(/#section\(\s*"([^"]*)"\s*\)/g, "\n--- $1 ---\n")
-    .replace(/==+\s*(.*?)\n/g, "\n--- $1 ---\n")
-    .replace(/=+\s*(.*?)\n/g, "\n=== $1 ===\n")
-    .replace(/#link\("([^"]+)"\)\[([^\]]+)\]/g, "$2 ($1)")
-    .replace(/#link\("([^"]+)"\)/g, "$1")
-    .replace(/#sym\.dot\b/g, "·");
+    .replace(/#(?:resume-)?section\(\s*"([^"]*)"\s*\)/g, "\n--- $1 ---\n")
+    .replace(/#(?:resume-)?section\s*\[([^\]]*)\]/g, "\n--- $1 ---\n")
+    .replace(/^==+\s*(.+?)$/gm, "\n--- $1 ---\n")
+    .replace(/^=+\s*(.+?)$/gm, "\n=== $1 ===\n")
+    .replace(/#sym\.dot\b/g, "·")
+    .replace(/#sym\.bullet\b/g, "•")
+    .replace(/#sym\.dash\.en\b/g, "–")
+    .replace(/#sym\.dash\.em\b/g, "—")
+    .replace(/#sym\.arrow\.r\b/g, "->");
 
   text = unwrapTypstCallsWithBody(text);
+  text = formatTypstLinks(text);
   text = stripRemainingTypstCalls(text);
 
   return text
     .replace(/\[|\]/g, "")
     .replace(/\*+/g, "")
-    .replace(/_+/g, "")
+    .replace(/(?<![a-zA-Z0-9/])_+|_+(?![a-zA-Z0-9])/g, "")
     .replace(/\\/g, "")
     .replace(/^[ \t]+|[ \t]+$/gm, "")
     .replace(/\n{3,}/g, "\n\n")

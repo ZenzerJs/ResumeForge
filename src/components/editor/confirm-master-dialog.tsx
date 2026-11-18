@@ -39,6 +39,7 @@ export interface ConfirmMasterDialogProps {
   draftEvidence: boolean;
   onDraftEvidenceChange: (next: boolean) => void;
   showDraftEvidence?: boolean;
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
 }
 
 export function ConfirmMasterDialog({
@@ -52,18 +53,42 @@ export function ConfirmMasterDialog({
   draftEvidence,
   onDraftEvidenceChange,
   showDraftEvidence = true,
+  returnFocusRef,
 }: ConfirmMasterDialogProps) {
   const [confirmed, setConfirmed] = useState(false);
   const [activeTab, setActiveTab] = useState<"facts" | "diff">("facts");
   const confirmingRef = React.useRef(false);
+  const wasOpenRef = React.useRef(false);
   const [localSaving, setLocalSaving] = useState(false);
 
+  const restoreMasterTriggerFocus = React.useCallback(() => {
+    const target =
+      returnFocusRef?.current ??
+      (typeof document !== "undefined"
+        ? document.querySelector<HTMLElement>('[data-testid="save-as-master-btn"]')
+        : null);
+    if (!target || !target.isConnected) return;
+    target.focus({ preventScroll: true });
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        if (target.isConnected) {
+          target.focus({ preventScroll: true });
+        }
+      });
+    }
+  }, [returnFocusRef]);
+
   React.useEffect(() => {
+    const wasOpen = wasOpenRef.current;
+    wasOpenRef.current = open;
     if (!open) {
       confirmingRef.current = false;
       setLocalSaving(false);
+      if (wasOpen) {
+        restoreMasterTriggerFocus();
+      }
     }
-  }, [open]);
+  }, [open, restoreMasterTriggerFocus]);
 
   const facts = useMemo(() => {
     if (!typstSource) return null;
@@ -98,6 +123,10 @@ export function ConfirmMasterDialog({
       <DialogContent
         data-testid="save-master-confirm-modal"
         className="max-w-2xl bg-panel border-hairline text-foreground shadow-2xl"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          restoreMasterTriggerFocus();
+        }}
       >
         <DialogHeader>
           <div className="flex items-center gap-2 text-status-warning">

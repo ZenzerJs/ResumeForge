@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
 import { verifyCoverLetterGrounding } from "@/lib/ai/cover-letter-verifier";
+import {
+  buildCoverLetterSystemPrompt,
+  buildCoverLetterUserPrompt,
+} from "@/lib/ai/cover-letter-prompt";
+import {
+  extractCandidateNameFromTypst,
+  replacePlaceholderSignature,
+} from "@/lib/export/resume-text";
+import { buildResumeDocument, renderResumeDocument } from "@/lib/typst/resume-document";
+import { classifyPdfTextFallback } from "@/lib/pdf/parser";
 
 describe("Cover Letter Evidence Grounding Verifier (Fail-First Protocol)", () => {
   const activeEvidenceIds = [
@@ -57,5 +68,67 @@ describe("Cover Letter Evidence Grounding Verifier (Fail-First Protocol)", () =>
     const result = verifyCoverLetterGrounding(genericLetter, activeEvidenceIds);
     expect(result.verified).toBe(false);
     expect(result.reason).toMatch(/at least one Evidence Bank ID/i);
+  });
+
+  it("4. cover letter prompt removes claim-seeding examples and distinguishes experience vs project framing", () => {
+    const systemPrompt = buildCoverLetterSystemPrompt();
+    expect(systemPrompt).not.toContain("containerized microservice deployments");
+    expect(systemPrompt).not.toContain("Acme Platform");
+    expect(systemPrompt).not.toContain("cutting p95 query latency by 40%");
+    expect(systemPrompt).not.toMatch(/Sincerely,\\nCandidate["\s]/);
+    expect(systemPrompt).toContain("[Type: experience]");
+    expect(systemPrompt).toContain("in professional settings");
+    expect(systemPrompt).toContain("in past roles");
+
+    const userPrompt = buildCoverLetterUserPrompt(
+      {
+        jobId: "job-1",
+        company: "Northwind",
+        roleTitle: "Software Engineer",
+        rawDescription: "Build web applications with TypeScript and PostgreSQL.",
+        candidateName: "Alex Morgan",
+        activeRoleProfile: "Full-stack",
+      },
+      [
+        {
+          id: "proj-1",
+          type: "project",
+          title: "Campus Transit Tracker",
+          organization: "UC Berkeley",
+          dates: "2025",
+          verifiedSummary: "Built a transit delay dashboard for campus buses.",
+          tags: ["TypeScript"],
+          status: "verified",
+          bullets: [{ id: "b-1", text: "Built TypeScript frontend views.", technologies: ["TypeScript"], verified: true }],
+        },
+      ]
+    );
+    expect(userPrompt).toContain("[Type: project]");
+    expect(userPrompt).toContain("Alex Morgan");
+  });
+
+  it("5. extracts real candidate name from managed and unmanaged Typst sources and replaces Candidate signature", () => {
+    const raw = "Morgan Sample\nmorgan@example.com\nExperience\nNorthwind Health Systems\nIT Operations May 2026 - Present\n- Supported systems";
+    const managedSource = renderResumeDocument(
+      buildResumeDocument(raw, classifyPdfTextFallback(raw)),
+      "comfortable"
+    );
+    expect(extractCandidateNameFromTypst(managedSource)).toBe("Morgan Sample");
+
+    const starter = readFileSync("public/templates/starter-resume.typ", "utf8");
+    expect(extractCandidateNameFromTypst(starter)).toBe("Alex Morgan");
+
+    const headingTypst = `= Jordan Example\njordan@example.com\n== Experience\n- Built API`;
+    expect(extractCandidateNameFromTypst(headingTypst)).toBe("Jordan Example");
+
+    const placeholderTypst = `#align(center)[#text(size: 18pt, weight: "bold")[CANDIDATE NAME]]`;
+    expect(extractCandidateNameFromTypst(placeholderTypst)).toBeNull();
+
+    const signed = replacePlaceholderSignature(
+      "# Cover Letter\n\nDear Team,\n\nBody.\n\nSincerely,\nCandidate",
+      "Alex Morgan"
+    );
+    expect(signed).toContain("Sincerely,\nAlex Morgan");
+    expect(signed).not.toContain("Sincerely,\nCandidate");
   });
 });

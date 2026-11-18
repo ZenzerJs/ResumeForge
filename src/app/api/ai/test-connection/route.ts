@@ -2,22 +2,40 @@ import { NextResponse } from "next/server";
 import { ProviderConfigSchema } from "@/lib/ai/types";
 import { testProviderConnection } from "@/lib/ai/gateway";
 import { sanitizeError } from "@/lib/ai/redact";
-import { requireUserId } from "@/lib/security/auth-request";
+import { getRequestUserId, guestSaveResponse } from "@/lib/security/auth-request";
 import { isDemoMode } from "@/lib/demo-mode";
 import { originAllowed } from "@/lib/security/session";
 
+const CLOUD_BYOK_PROVIDERS = new Set(["gemini", "openai", "anthropic", "groq"]);
+
 export async function POST(request: Request) {
-  if (isDemoMode()) {
-    const hasOrigin = Boolean(request.headers.get("origin") || request.headers.get("referer"));
+  const demoMode = isDemoMode();
+  const hasOrigin = Boolean(request.headers.get("origin") || request.headers.get("referer"));
+  let isGuestRequest = false;
+
+  if (demoMode) {
     if (!hasOrigin || !originAllowed(request)) {
       return NextResponse.json(
         { success: false, provider: "unknown", error: "Invalid request origin", message: "Invalid request origin" },
         { status: 403 }
       );
     }
+    const userId = await getRequestUserId(request);
+    isGuestRequest = !userId;
   } else {
-    const auth = await requireUserId(request);
-    if (auth instanceof Response) return auth;
+    const userId = await getRequestUserId(request);
+    if (!userId) {
+      if (!hasOrigin) {
+        return guestSaveResponse();
+      }
+      if (!originAllowed(request)) {
+        return NextResponse.json(
+          { success: false, provider: "unknown", error: "Invalid request origin", message: "Invalid request origin" },
+          { status: 403 }
+        );
+      }
+      isGuestRequest = true;
+    }
   }
 
   try {
@@ -48,7 +66,47 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await testProviderConnection(parseResult.data);
+    let configToTest = parseResult.data;
+    if (isGuestRequest) {
+      if (!CLOUD_BYOK_PROVIDERS.has(configToTest.provider)) {
+        return NextResponse.json(
+          {
+            success: false,
+            provider: configToTest.provider,
+            message: "Sign in to test local or custom AI endpoints.",
+          },
+          { status: 401 }
+        );
+      }
+      if (configToTest.baseUrl?.trim()) {
+        return NextResponse.json(
+          {
+            success: false,
+            provider: configToTest.provider,
+            message: "Sign in to use a custom endpoint base URL.",
+          },
+          { status: 403 }
+        );
+      }
+      const explicitApiKey = configToTest.apiKey?.trim();
+      if (!explicitApiKey) {
+        return NextResponse.json(
+          {
+            success: false,
+            provider: configToTest.provider,
+            message: "API key is required to test a connection before signing in.",
+          },
+          { status: 400 }
+        );
+      }
+      configToTest = {
+        provider: configToTest.provider,
+        apiKey: explicitApiKey,
+        model: configToTest.model,
+      };
+    }
+
+    const result = await testProviderConnection(configToTest);
 
     // Explicit security guarantee: return only sanitized non-sensitive fields
     return NextResponse.json({

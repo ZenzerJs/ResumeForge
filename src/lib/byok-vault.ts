@@ -16,6 +16,23 @@ const LEGACY_VAULT_MASTER_KEY_STORAGE = "rf_vault_master_key";
 const LEGACY_VAULT_KEY_PREFIX = "rf_byok_key_";
 const SETTINGS_STORAGE_KEY = "resumeforge_ai_settings";
 
+export const BYOK_UPDATED_EVENT = "resumeforge:byok-updated";
+
+const PROVIDERS_WITH_BASE_URL = new Set<string>(["openai", "ollama", "custom"]);
+
+export function providerSupportsBaseUrl(provider: string): boolean {
+  return PROVIDERS_WITH_BASE_URL.has(provider.trim().toLowerCase());
+}
+
+export interface StoredAiSettings {
+  provider?: string;
+  model?: string;
+  baseUrl?: string;
+  baseUrls?: Record<string, string>;
+  verifiedProviders?: Record<string, boolean>;
+  apiKey?: string;
+}
+
 const KNOWN_PROVIDERS: readonly ByokProvider[] = [
   "gemini",
   "openai",
@@ -86,6 +103,78 @@ function getLocalStorage(): Storage | null {
   } catch {
     return null;
   }
+}
+
+export function notifyByokUpdated(): void {
+  if (
+    typeof window !== "undefined" &&
+    typeof window.dispatchEvent === "function" &&
+    typeof CustomEvent === "function"
+  ) {
+    window.dispatchEvent(new CustomEvent(BYOK_UPDATED_EVENT));
+  }
+}
+
+export function readStoredAiSettings(): StoredAiSettings {
+  const storage = getLocalStorage();
+  if (!storage) return {};
+  try {
+    const raw = storage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as StoredAiSettings) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Persists per-provider verification state (`verifiedProviders`) in localStorage
+ * and dispatches `resumeforge:byok-updated` so navigation and workspace badges sync live.
+ */
+export function markProviderConnectionStatus(provider: string, ok: boolean | null): void {
+  const storage = getLocalStorage();
+  if (!storage) {
+    notifyByokUpdated();
+    return;
+  }
+  const normalized = provider.trim().toLowerCase();
+  if (!normalized) return;
+
+  const current = readStoredAiSettings();
+  const nextVerified: Record<string, boolean> =
+    current.verifiedProviders && typeof current.verifiedProviders === "object"
+      ? { ...current.verifiedProviders }
+      : {};
+
+  if (ok === null) {
+    delete nextVerified[normalized];
+  } else {
+    nextVerified[normalized] = ok;
+  }
+
+  try {
+    storage.setItem(
+      SETTINGS_STORAGE_KEY,
+      JSON.stringify({
+        ...current,
+        verifiedProviders: nextVerified,
+      })
+    );
+  } catch {
+    // Ignore storage write errors
+  }
+  notifyByokUpdated();
+}
+
+function clearVerificationIfPresent(provider: string): void {
+  const normalized = provider.trim().toLowerCase();
+  const current = readStoredAiSettings();
+  if (current.verifiedProviders && normalized in current.verifiedProviders) {
+    markProviderConnectionStatus(normalized, null);
+    return;
+  }
+  notifyByokUpdated();
 }
 
 function uint8ArrayToBase64(bytes: Uint8Array): string {
@@ -467,7 +556,7 @@ export async function saveKey(
     return;
   }
 
-  return enqueueVaultOp(async () => {
+  await enqueueVaultOp(async () => {
     const { mode, db, masterKey } = await ensureVaultReady();
     const payload = await encryptWithKey(masterKey, trimmed);
 
@@ -483,6 +572,8 @@ export async function saveKey(
       memorySecrets.set(provider, payload);
     }
   });
+
+  clearVerificationIfPresent(provider);
 }
 
 /**
@@ -522,7 +613,7 @@ export async function getKey(provider: string): Promise<string | null> {
 export async function removeKey(provider: string): Promise<void> {
   if (!isBrowser()) return;
 
-  return enqueueVaultOp(async () => {
+  await enqueueVaultOp(async () => {
     const { mode, db } = await ensureVaultReady();
 
     if (mode === "idb" && db) {
@@ -556,44 +647,54 @@ export async function removeKey(provider: string): Promise<void> {
       }
     }
   });
+
+  clearVerificationIfPresent(provider);
 }
 
 /**
- * Returns the currently active provider configuration and key status.
+ * Returns the currently active provider configuration and truthful verification status.
  */
 export async function getActiveConfig(): Promise<{
   provider: string;
   model: string;
   hasKey: boolean;
   keyless: boolean;
+  verified: boolean;
 }> {
   let provider = "gemini";
   let model = DEFAULT_MODELS.gemini;
+  let verificationStatus: boolean | undefined = undefined;
 
-  const storage = getLocalStorage();
-  if (storage) {
-    try {
-      const settingsRaw = storage.getItem(SETTINGS_STORAGE_KEY);
-      if (settingsRaw) {
-        const parsed = JSON.parse(settingsRaw);
-        if (parsed.provider) provider = parsed.provider;
-        if (parsed.model?.trim()) model = parsed.model.trim();
-      }
-    } catch {
-      // Use defaults
+  const parsed = readStoredAiSettings();
+  if (typeof parsed.provider === "string" && parsed.provider.trim()) {
+    provider = parsed.provider.trim().toLowerCase();
+  }
+  if (typeof parsed.model === "string" && parsed.model.trim()) {
+    model = parsed.model.trim();
+  }
+  if (parsed.verifiedProviders && typeof parsed.verifiedProviders === "object") {
+    const entry = parsed.verifiedProviders[provider];
+    if (typeof entry === "boolean") {
+      verificationStatus = entry;
     }
   }
 
-  if (!model || model === DEFAULT_MODELS.gemini) {
+  if (!model || (provider !== "gemini" && model === DEFAULT_MODELS.gemini)) {
     model = DEFAULT_MODELS[provider] || DEFAULT_MODELS.gemini;
   }
 
   const key = await getKey(provider);
   const hasStoredKey = Boolean(key && key.trim().length > 0);
-  const keyless = (provider === "ollama" || provider === "custom") && !hasStoredKey;
-  const hasKey = provider === "ollama" ? true : hasStoredKey;
+  const isLocalOrCustom = provider === "ollama" || provider === "custom";
+  const isVerified = verificationStatus === true;
 
-  return { provider, model, hasKey, keyless };
+  // Untested ollama/custom or providers whose last test/call failed must not report hasKey: true.
+  const hasKey = isLocalOrCustom
+    ? isVerified
+    : hasStoredKey && verificationStatus !== false;
+  const keyless = isLocalOrCustom ? !isVerified : false;
+
+  return { provider, model, hasKey, keyless, verified: isVerified };
 }
 
 export interface ClientProviderConfig {
@@ -615,18 +716,26 @@ export async function resolveClientProviderConfig(): Promise<ClientProviderConfi
   let model = "";
   let baseUrl = "";
 
-  const storage = getLocalStorage();
-  if (storage) {
-    try {
-      const raw = storage.getItem(SETTINGS_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed.provider) provider = parsed.provider;
-        if (typeof parsed.model === "string") model = parsed.model.trim();
-        if (typeof parsed.baseUrl === "string") baseUrl = parsed.baseUrl.trim();
+  const parsed = readStoredAiSettings();
+  if (typeof parsed.provider === "string" && parsed.provider.trim()) {
+    provider = parsed.provider.trim().toLowerCase() as ByokProvider;
+  }
+  if (typeof parsed.model === "string") {
+    model = parsed.model.trim();
+  }
+
+  if (providerSupportsBaseUrl(provider)) {
+    const perProviderUrl =
+      parsed.baseUrls && typeof parsed.baseUrls === "object"
+        ? parsed.baseUrls[provider]
+        : undefined;
+    if (typeof perProviderUrl === "string" && perProviderUrl.trim()) {
+      baseUrl = perProviderUrl.trim();
+    } else if (typeof parsed.baseUrl === "string" && parsed.baseUrl.trim()) {
+      const legacyUrl = parsed.baseUrl.trim();
+      if (!(provider === "custom" && legacyUrl === "http://localhost:11434")) {
+        baseUrl = legacyUrl;
       }
-    } catch {
-      // Ignore parse errors
     }
   }
 
@@ -649,7 +758,7 @@ export async function resolveClientProviderConfig(): Promise<ClientProviderConfi
   return {
     provider,
     apiKey: apiKey || undefined,
-    baseUrl: baseUrl || undefined,
+    baseUrl: providerSupportsBaseUrl(provider) ? baseUrl || undefined : undefined,
     model: resolvedModel || undefined,
   };
 }

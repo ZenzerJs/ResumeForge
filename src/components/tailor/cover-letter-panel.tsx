@@ -18,6 +18,7 @@ import { resolveClientProviderConfig } from "@/lib/byok-vault";
 import { getDemoContextFromBrowser } from "@/lib/demo-client";
 import { fetchDemoConfig } from "@/components/auth/session-user";
 import { downloadBlob } from "@/lib/utils";
+import { extractCandidateNameFromTypst, replacePlaceholderSignature } from "@/lib/export/resume-text";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface CoverLetterPanelProps {
@@ -28,8 +29,18 @@ interface CoverLetterPanelProps {
   rawDescription: string;
   extractedRequirements?: Record<string, unknown>;
   activeRoleProfile?: string;
+  candidateName?: string;
+  masterTypstSource?: string;
   draftCoverLetter?: CoverLetterResponse | null;
   onDraftCoverLetterChange?: (draft: CoverLetterResponse | null) => void;
+}
+
+function resolveSignatureName(fullMarkdown: string, fallbackName?: string | null): string {
+  const parsed = fullMarkdown.match(/Sincerely,\s*\n([^\n]+)/i)?.[1]?.trim();
+  if (parsed && parsed.toLowerCase() !== "candidate") return parsed;
+  const cleanFallback = fallbackName?.trim();
+  if (cleanFallback && cleanFallback.toLowerCase() !== "candidate") return cleanFallback;
+  return parsed || "Candidate";
 }
 
 export function CoverLetterPanel({
@@ -40,6 +51,8 @@ export function CoverLetterPanel({
   rawDescription,
   extractedRequirements,
   activeRoleProfile = "Full-stack",
+  candidateName,
+  masterTypstSource,
   draftCoverLetter,
   onDraftCoverLetterChange,
 }: CoverLetterPanelProps) {
@@ -53,6 +66,11 @@ export function CoverLetterPanel({
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
+  const [resolvedCandidateName, setResolvedCandidateName] = useState<string | null>(() => {
+    const provided = candidateName?.trim();
+    if (provided && provided.toLowerCase() !== "candidate") return provided;
+    return extractCandidateNameFromTypst(masterTypstSource);
+  });
   const [pendingRegenerateJob, setPendingRegenerateJob] = useState<{
     jobId: string;
     label: string;
@@ -83,6 +101,29 @@ export function CoverLetterPanel({
         const config = await fetchDemoConfig();
         if (cancelled) return;
         setDemoMode(config.demoMode === true);
+        if (config.demoMode) {
+          const demoCtx = getDemoContextFromBrowser();
+          const demoName = extractCandidateNameFromTypst(demoCtx?.masterTypst);
+          if (demoName) setResolvedCandidateName(demoName);
+        } else if (!candidateName?.trim() || candidateName.trim().toLowerCase() === "candidate") {
+          const fromProp = extractCandidateNameFromTypst(masterTypstSource);
+          if (fromProp) {
+            setResolvedCandidateName(fromProp);
+          } else {
+            try {
+              const resumesRes = await fetch("/api/resumes");
+              if (!cancelled && resumesRes.ok) {
+                const resumesJson = await resumesRes.json();
+                const resumes = Array.isArray(resumesJson?.data) ? resumesJson.data : [];
+                const master = resumes.find((r: { isMaster?: boolean }) => r?.isMaster) ?? resumes[0];
+                const extracted = extractCandidateNameFromTypst(master?.typstSource);
+                if (extracted) setResolvedCandidateName(extracted);
+              }
+            } catch {
+              // Non-fatal
+            }
+          }
+        }
         if (!jobChanged && draftCoverLetterRef.current) return;
         if (config.demoMode) {
           const local = localStorage.getItem(`resumeforge_demo_cover_letter_${jobId}`);
@@ -136,6 +177,13 @@ export function CoverLetterPanel({
         return;
       }
 
+      const effectiveCandidateName =
+        resolvedCandidateName ||
+        extractCandidateNameFromTypst(demoContext?.masterTypst || masterTypstSource);
+      if (effectiveCandidateName && !resolvedCandidateName) {
+        setResolvedCandidateName(effectiveCandidateName);
+      }
+
       const res = await fetch(demoConfig.demoMode ? "/api/demo/generate-cover-letter" : "/api/ai/generate-cover-letter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -147,6 +195,7 @@ export function CoverLetterPanel({
           rawDescription,
           extractedRequirements: extractedRequirements || undefined,
           activeRoleProfile,
+          ...(effectiveCandidateName ? { candidateName: effectiveCandidateName } : {}),
           providerConfig,
           ...(demoConfig.demoMode ? { masterTypst: demoContext?.masterTypst, evidenceItems: demoContext?.evidenceItems } : {}),
         }),
@@ -159,8 +208,12 @@ export function CoverLetterPanel({
         return;
       }
 
-      setCoverLetter(json.data);
-      if (demoConfig.demoMode) localStorage.setItem(`resumeforge_demo_cover_letter_${jobId}`, JSON.stringify(json.data));
+      const generatedDraft: CoverLetterResponse = {
+        ...json.data,
+        fullMarkdown: replacePlaceholderSignature(json.data.fullMarkdown, effectiveCandidateName),
+      };
+      setCoverLetter(generatedDraft);
+      if (demoConfig.demoMode) localStorage.setItem(`resumeforge_demo_cover_letter_${jobId}`, JSON.stringify(generatedDraft));
     } catch (err) {
       setGenerateError(`Generation error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -182,10 +235,11 @@ export function CoverLetterPanel({
 
   const getFullContent = () => {
     if (!coverLetter) return "";
-    if (activeFormat === "markdown") return coverLetter.fullMarkdown;
+    if (activeFormat === "markdown") {
+      return replacePlaceholderSignature(coverLetter.fullMarkdown, resolvedCandidateName);
+    }
 
-    const name =
-      coverLetter.fullMarkdown.match(/Sincerely,\s*\n([^\n]+)/i)?.[1]?.trim() || "Candidate";
+    const name = resolveSignatureName(coverLetter.fullMarkdown, resolvedCandidateName);
 
     return `${coverLetter.salutation}\n\n${coverLetter.openingParagraph}\n\n${coverLetter.bodyParagraphs.join(
       "\n\n"
@@ -231,7 +285,7 @@ export function CoverLetterPanel({
           openingParagraph: coverLetter.openingParagraph,
           bodyParagraphs: coverLetter.bodyParagraphs,
           closingParagraph: coverLetter.closingParagraph,
-          fullMarkdown: coverLetter.fullMarkdown,
+          fullMarkdown: replacePlaceholderSignature(coverLetter.fullMarkdown, resolvedCandidateName),
           evidenceCitations: coverLetter.evidenceCitations,
           status: "DRAFT",
         }),
@@ -405,7 +459,7 @@ export function CoverLetterPanel({
               data-testid="cover-letter-markdown-view"
               className="bg-inset border border-hairline rounded-xl p-5 text-sm text-foreground leading-relaxed whitespace-pre-wrap font-sans"
             >
-              {coverLetter.fullMarkdown}
+              {replacePlaceholderSignature(coverLetter.fullMarkdown, resolvedCandidateName)}
             </div>
           ) : (
             <div className="space-y-3" data-testid="cover-letter-plain-view">
@@ -432,9 +486,7 @@ export function CoverLetterPanel({
                 </span>
                 <p className="text-sm text-text-secondary leading-relaxed font-sans">{coverLetter.closingParagraph}</p>
                 <p className="text-sm text-muted-foreground font-medium whitespace-pre-line">
-                  {`Sincerely,\n${
-                    coverLetter.fullMarkdown.match(/Sincerely,\s*\n([^\n]+)/i)?.[1]?.trim() || "Candidate"
-                  }`}
+                  {`Sincerely,\n${resolveSignatureName(coverLetter.fullMarkdown, resolvedCandidateName)}`}
                 </p>
               </div>
             </div>

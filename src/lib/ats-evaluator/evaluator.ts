@@ -175,6 +175,70 @@ export function evaluateAtsScore(
   };
 }
 
+function stripTypstCommentsAndPreamble(source: string): string {
+  const withoutComments = source
+    .replace(/^\s*\/\/.*$/gm, "")
+    .replace(/(?<!:)\s+\/\/.*$/gm, "");
+
+  let result = "";
+  let i = 0;
+  while (i < withoutComments.length) {
+    const atLineStart = i === 0 || /\s/.test(withoutComments[i - 1]);
+    const match = atLineStart
+      ? withoutComments.slice(i).match(/^#(let|set|show|import)\b/)
+      : null;
+    if (!match) {
+      result += withoutComments[i];
+      i++;
+      continue;
+    }
+
+    let j = i + match[0].length;
+    let parenDepth = 0;
+    let bracketDepth = 0;
+    let braceDepth = 0;
+    let inString = false;
+
+    while (j < withoutComments.length) {
+      const ch = withoutComments[j];
+      if (ch === "\\" && j + 1 < withoutComments.length) {
+        j += 2;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        j++;
+        continue;
+      }
+      if (!inString) {
+        if (ch === "(") parenDepth++;
+        else if (ch === ")") parenDepth = Math.max(0, parenDepth - 1);
+        else if (ch === "[") bracketDepth++;
+        else if (ch === "]") bracketDepth = Math.max(0, bracketDepth - 1);
+        else if (ch === "{") braceDepth++;
+        else if (ch === "}") braceDepth = Math.max(0, braceDepth - 1);
+        else if (ch === "\n" && parenDepth === 0 && bracketDepth === 0 && braceDepth === 0) {
+          const sliceTrimmed = withoutComments.slice(i, j).trimEnd();
+          const prevNonWs = sliceTrimmed.slice(-1);
+          if (
+            prevNonWs !== "=" &&
+            prevNonWs !== ":" &&
+            prevNonWs !== "," &&
+            !sliceTrimmed.endsWith("=>")
+          ) {
+            j++;
+            break;
+          }
+        }
+      }
+      j++;
+    }
+    i = j;
+  }
+
+  return result.trim();
+}
+
 function evaluateBaseHealth(
   fullContent: string,
   bodyText: string,
@@ -183,10 +247,11 @@ function evaluateBaseHealth(
   let score = 0;
   const maxScore = 30;
   const findings: string[] = [];
+  const cleanContent = stripTypstCommentsAndPreamble(fullContent);
 
   // Sub-check A: ATS Readability & Page Fit (8 pts)
   let readabilityPts = 0;
-  const charLength = fullContent.length;
+  const charLength = cleanContent.length;
   if (charLength > 100 && charLength <= 4000) {
     readabilityPts += 4;
     findings.push("✓ Standard one-page length constraints satisfied.");
@@ -198,7 +263,7 @@ function evaluateBaseHealth(
   }
 
   if (
-    /experience|work history|projects|education|skills/i.test(fullContent)
+    /experience|work history|projects|education|skills/i.test(cleanContent)
   ) {
     readabilityPts += 4;
     findings.push("✓ Standard ATS section headers detected.");
@@ -209,7 +274,7 @@ function evaluateBaseHealth(
 
   // Sub-check B: Evidence Quality Signals (8 pts)
   let qualityPts = 0;
-  if (/http:\/\/|https:\/\/|github\.com|link\(/i.test(fullContent)) {
+  if (/http:\/\/|https:\/\/|github\.com|link\(/i.test(cleanContent)) {
     qualityPts += 4;
     findings.push("✓ Working project/portfolio links present.");
   } else {
@@ -217,7 +282,7 @@ function evaluateBaseHealth(
   }
 
   // Quantitative metrics check (digits followed by %, $, x, ms, users, etc.)
-  if (/\d+%\s*|\$\d+|\d+\s*ms|\d+\s*users|\d+x/i.test(fullContent)) {
+  if (/\d+%\s*|\$\d+|\d+\s*ms|\d+\s*users|\d+x/i.test(cleanContent)) {
     qualityPts += 4;
     findings.push("✓ Quantitative impact metrics present in accomplishments.");
   } else {
@@ -269,8 +334,8 @@ function evaluateBaseHealth(
   let consistencyPts = 6;
   // Detect anti-gaming / hidden text patterns (e.g., text(fill: white) or white hex codes)
   if (
-    /text\(\s*fill:\s*(white|rgb\(#ffffff\)|"#ffffff")/i.test(fullContent) ||
-    /color:\s*white/i.test(fullContent)
+    /text\(\s*fill:\s*(white|rgb\(#ffffff\)|"#ffffff")/i.test(cleanContent) ||
+    /color:\s*white/i.test(cleanContent)
   ) {
     consistencyPts = 0;
     findings.push(

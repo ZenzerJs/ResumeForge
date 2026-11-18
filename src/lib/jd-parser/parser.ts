@@ -10,7 +10,7 @@ export function parseJobDescription(rawText: string): JobRequirements {
     });
   }
 
-  const lines = rawText.split(/\r?\n/);
+  const lines = rawText.split(/\r?\n|(?<=[.;])\s+(?=(?:required|preferred) skills\s*:)/i);
   const requiredSkillsSet = new Set<string>();
   const preferredSkillsSet = new Set<string>();
   const domainTermsSet = new Set<string>();
@@ -41,9 +41,9 @@ export function parseJobDescription(rawText: string): JobRequirements {
     if (!trimmed) continue;
 
     // Check if line is a section header
-    if (preferredHeaderRegex.test(trimmed) && trimmed.length < 80) {
+    if (/^preferred skills\s*:/i.test(trimmed) || (preferredHeaderRegex.test(trimmed) && trimmed.length < 80)) {
       currentSection = "preferred";
-    } else if (requiredHeaderRegex.test(trimmed) && trimmed.length < 80) {
+    } else if (/^required skills\s*:/i.test(trimmed) || (requiredHeaderRegex.test(trimmed) && trimmed.length < 80)) {
       currentSection = "required";
     }
 

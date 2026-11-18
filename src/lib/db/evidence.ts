@@ -56,6 +56,7 @@ export interface BulletInput {
 }
 
 export interface CreateEvidenceItemInput {
+  id?: string;
   type: string; // experience | project | skill | education | award | metric
   title: string;
   organization?: string;
@@ -173,6 +174,7 @@ export async function createEvidenceItem(input: CreateEvidenceItemInput) {
 
   const item = await prisma.evidenceItem.create({
     data: {
+      ...(input.id ? { id: input.id } : {}),
       type: input.type,
       title: input.title,
       organization: input.organization || null,

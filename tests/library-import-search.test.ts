@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { convertExtractedPdfToEvidenceItems } from "@/lib/evidence/evidence-transform";
+import { buildSelectedPdfEvidence } from "@/components/evidence/bulk-pdf-dropzone";
 import {
   archiveEvidenceItemsLocally,
+  createInitialEvidenceFormData,
   restoreEvidenceItemsLocally,
   verifyEvidenceItemsLocally,
   type EvidenceItem,
@@ -474,5 +476,78 @@ describe("Evidence Bank Selection, Bulk Actions & Lifecycle", () => {
     });
     expect(preserved?.verifiedSummary).toBe("Newer edited summary");
     expect(preserved?.status).toBe("archived");
+  });
+
+  it("buildSelectedPdfEvidence excludes unchecked bullets and prevents fallback to raw page lines", () => {
+    const extracted = {
+      sourceDoc: "alex_resume.pdf",
+      pages: [
+        {
+          pageNumber: 1,
+          text: "Experience\nNorthwind Labs — Backend Engineer (2023 - Present)\n- Kept distributed PostgreSQL pipeline.\n- Excluded legacy XML bullet with Go.",
+        },
+      ],
+      sections: {
+        experience: [
+          "Northwind Labs — Backend Engineer (2023 - Present)",
+          "- Kept distributed PostgreSQL pipeline.",
+          "- Excluded legacy XML bullet with Go.",
+        ],
+        projects: [],
+        education: [],
+        certifications: [],
+        skills: [],
+        uncategorized: [],
+      },
+      extractedTechnologies: ["PostgreSQL", "Go"],
+      impactMetrics: [],
+    };
+
+    const selected = buildSelectedPdfEvidence("alex_resume.pdf", extracted, {
+      "alex_resume.pdf:experience:2": true,
+    });
+    expect(selected.pages).toEqual([]);
+    expect(selected.extractedTechnologies).toContain("PostgreSQL");
+    expect(selected.extractedTechnologies).not.toContain("Go");
+
+    const converted = convertExtractedPdfToEvidenceItems(selected);
+    const allTexts = converted.flatMap((item) => [
+      item.verifiedSummary,
+      ...item.bullets.map((b) => b.text),
+    ]);
+    expect(allTexts.some((t) => t.includes("Kept distributed PostgreSQL pipeline"))).toBe(true);
+    expect(allTexts.some((t) => t.includes("Excluded legacy XML bullet"))).toBe(false);
+
+    // Unchecking every bullet yields zero shell or raw-page-fallback items
+    const noneSelected = buildSelectedPdfEvidence("alex_resume.pdf", extracted, {
+      "alex_resume.pdf:experience:0": true,
+      "alex_resume.pdf:experience:1": true,
+      "alex_resume.pdf:experience:2": true,
+    });
+    expect(convertExtractedPdfToEvidenceItems(noneSelected)).toEqual([]);
+  });
+
+  it("defaults new manual evidence items to draft status while preserving existing item status when editing", () => {
+    const newForm = createInitialEvidenceFormData();
+    expect(newForm.status).toBe("draft");
+    expect(newForm.type).toBe("experience");
+    expect(newForm.bulletsInput).toEqual([""]);
+
+    const verifiedItem: EvidenceItem = {
+      id: "evi-1",
+      type: "project",
+      title: "ResumeForge",
+      organization: "Open Source",
+      dates: "2026",
+      verifiedSummary: "Built deterministic resume tailoring.",
+      tags: ["TypeScript"],
+      status: "verified",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      bullets: [{ id: "b-1", text: "Shipped Zod validation", verified: true }],
+    };
+    const editForm = createInitialEvidenceFormData(verifiedItem);
+    expect(editForm.status).toBe("verified");
+    expect(editForm.title).toBe("ResumeForge");
+    expect(editForm.bulletsInput).toEqual(["Shipped Zod validation"]);
   });
 });

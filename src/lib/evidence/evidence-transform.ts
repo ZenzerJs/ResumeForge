@@ -361,6 +361,7 @@ function parseEvidenceBankItems(
 
     const linesToAssemble = explicitBullets.length > 0 ? explicitBullets : bulletCandidates;
     const bullets = assembleBullets(linesToAssemble);
+    if (bullets.length === 0) continue;
     const itemFullText = [title, organization, ...bullets].join(" ");
     const itemTags = extractTechnologies(itemFullText);
     const finalTags =
@@ -464,6 +465,7 @@ function parseStandardResumeJobs(
   for (const job of rawJobs) {
     const { title, organization, dates } = parseJobHeader(job.headerLines, baseName);
     const bullets = assembleBullets(job.bulletLines);
+    if (bullets.length === 0) continue;
     const itemFullText = [title, organization, ...bullets].join(" ");
     const tags = extractTechnologies(itemFullText);
     const finalTags =
@@ -569,6 +571,7 @@ function parseStandardResumeProjects(
       proj.headerLines
     );
     const bullets = assembleBullets(proj.bulletLines);
+    if (bullets.length === 0) continue;
     const itemFullText = [title, organization, ...bullets].join(" ");
     const tags = Array.from(
       new Set([...stackTags, ...extractTechnologies(itemFullText)])

@@ -4,6 +4,9 @@ import {
   getKey,
   removeKey,
   getActiveConfig,
+  resolveClientProviderConfig,
+  markProviderConnectionStatus,
+  BYOK_UPDATED_EVENT,
   __resetByokVaultForTests,
 } from "@/lib/byok-vault";
 import { callByokModel } from "@/lib/ai-provider";
@@ -276,7 +279,7 @@ describe("BYOK Vault & Router (WS6)", () => {
       expect(persistedSettings.apiKey).toBeUndefined();
     });
 
-    it("reports active config and hasKey accurately", async () => {
+    it("reports active config and hasKey accurately and truthfully", async () => {
       const defaultConfig = await getActiveConfig();
       expect(defaultConfig.provider).toBe("gemini");
       expect(defaultConfig.model).toBe("gemini-2.5-flash");
@@ -288,11 +291,35 @@ describe("BYOK Vault & Router (WS6)", () => {
       expect(configured.hasKey).toBe(true);
       expect(configured.keyless).toBe(false);
 
+      // Failed test/call clears active status for cloud provider
+      markProviderConnectionStatus("gemini", false);
+      const failedCloud = await getActiveConfig();
+      expect(failedCloud.hasKey).toBe(false);
+      expect(failedCloud.verified).toBe(false);
+
+      // Saving a new key clears stale failure state
+      await saveKey("gemini", "AQ.NewValidKey123456789012345");
+      const replacedCloud = await getActiveConfig();
+      expect(replacedCloud.hasKey).toBe(true);
+
+      // Untested ollama/custom must not report hasKey: true
       store["resumeforge_ai_settings"] = JSON.stringify({ provider: "ollama" });
       const ollamaConfig = await getActiveConfig();
       expect(ollamaConfig.provider).toBe("ollama");
-      expect(ollamaConfig.hasKey).toBe(true);
+      expect(ollamaConfig.hasKey).toBe(false);
       expect(ollamaConfig.keyless).toBe(true);
+      expect(ollamaConfig.verified).toBe(false);
+
+      markProviderConnectionStatus("ollama", true);
+      const verifiedOllama = await getActiveConfig();
+      expect(verifiedOllama.hasKey).toBe(true);
+      expect(verifiedOllama.keyless).toBe(false);
+      expect(verifiedOllama.verified).toBe(true);
+
+      markProviderConnectionStatus("ollama", false);
+      const failedOllama = await getActiveConfig();
+      expect(failedOllama.hasKey).toBe(false);
+      expect(failedOllama.keyless).toBe(true);
 
       store["resumeforge_ai_settings"] = JSON.stringify({ provider: "custom" });
       const customKeylessConfig = await getActiveConfig();
@@ -301,10 +328,71 @@ describe("BYOK Vault & Router (WS6)", () => {
       expect(customKeylessConfig.keyless).toBe(true);
 
       await saveKey("custom", "custom-bearer-token");
-      const customKeyedConfig = await getActiveConfig();
-      expect(customKeyedConfig.provider).toBe("custom");
-      expect(customKeyedConfig.hasKey).toBe(true);
-      expect(customKeyedConfig.keyless).toBe(false);
+      const customKeyedUntested = await getActiveConfig();
+      expect(customKeyedUntested.provider).toBe("custom");
+      expect(customKeyedUntested.hasKey).toBe(false);
+      expect(customKeyedUntested.keyless).toBe(true);
+
+      markProviderConnectionStatus("custom", true);
+      const customVerified = await getActiveConfig();
+      expect(customVerified.hasKey).toBe(true);
+      expect(customVerified.keyless).toBe(false);
+      expect(customVerified.verified).toBe(true);
+    });
+
+    it("isolates baseUrl per provider and never passes ollama localhost URL to gemini or custom", async () => {
+      await saveKey("gemini", "AQ.TestGeminiKey1234567890123");
+      store["resumeforge_ai_settings"] = JSON.stringify({
+        provider: "gemini",
+        model: "gemini-2.5-flash",
+        baseUrl: "http://localhost:11434",
+        baseUrls: {
+          ollama: "http://localhost:11434",
+          openai: "https://proxy.example.com/v1",
+        },
+      });
+
+      const geminiConfig = await resolveClientProviderConfig();
+      expect(geminiConfig).toEqual({
+        provider: "gemini",
+        apiKey: "AQ.TestGeminiKey1234567890123",
+        baseUrl: undefined,
+        model: "gemini-2.5-flash",
+      });
+
+      store["resumeforge_ai_settings"] = JSON.stringify({
+        provider: "custom",
+        baseUrl: "http://localhost:11434",
+      });
+      const customConfig = await resolveClientProviderConfig();
+      expect(customConfig?.baseUrl).toBeUndefined();
+
+      await saveKey("openai", "sk-openai-test");
+      store["resumeforge_ai_settings"] = JSON.stringify({
+        provider: "openai",
+        baseUrls: {
+          ollama: "http://localhost:11434",
+          openai: "https://proxy.example.com/v1",
+        },
+      });
+      const openaiConfig = await resolveClientProviderConfig();
+      expect(openaiConfig?.baseUrl).toBe("https://proxy.example.com/v1");
+    });
+
+    it("dispatches resumeforge:byok-updated when connection status or keys change", async () => {
+      const dispatchEvent = vi.fn();
+      vi.stubGlobal("window", { localStorage: globalThis.localStorage, dispatchEvent });
+
+      await saveKey("gemini", "AIzaSyEventTestKey");
+      markProviderConnectionStatus("gemini", true);
+      await removeKey("gemini");
+
+      const eventNames = dispatchEvent.mock.calls.map((call) => call[0]?.type);
+      expect(eventNames).toEqual([
+        BYOK_UPDATED_EVENT,
+        BYOK_UPDATED_EVENT,
+        BYOK_UPDATED_EVENT,
+      ]);
     });
   });
 

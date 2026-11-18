@@ -27,15 +27,14 @@ test.describe("T5 Browser Smoke Check", () => {
     }
   });
 
-  test("1. Landing page (/) renders onboarding checklist", async ({ page }) => {
+  test("1. Landing page (/) renders public hero and workspace tools without onboarding checklist", async ({ page }) => {
     setupConsoleListener(page, "/");
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
-    const checklist = page.getByTestId("consumer-onboarding-checklist");
-    await expect(checklist).toBeVisible({ timeout: 10000 });
-    await expect(page.getByTestId("onboarding-step-1")).toBeVisible();
-    await expect(page.getByTestId("onboarding-progress-badge")).toBeVisible();
+    await expect(page.getByTestId("hero-start-tailoring-btn")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("capability-grid-section")).toBeVisible();
+    await expect(page.getByTestId("consumer-onboarding-checklist")).toHaveCount(0);
   });
 
   test("2. /editor Visual <-> Source toggle and round-trip without loss", async ({ page }) => {

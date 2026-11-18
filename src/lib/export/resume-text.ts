@@ -146,3 +146,167 @@ export function managedResumeExport(source: string): { text: string; sections: E
   const parts = [textFor(document.header), ...document.sections.map((section) => textFor([section.heading, ...section.blocks])), ...extraLinks];
   return { text: parts.filter(Boolean).join("\n"), sections };
 }
+
+const PLACEHOLDER_CANDIDATE_NAMES = new Set([
+  "candidate",
+  "candidate resume",
+  "candidate name",
+  "your name",
+]);
+
+function isValidExtractedCandidateName(candidate: string): boolean {
+  const clean = candidate.replace(/\\+/g, "").trim();
+  if (clean.length < 2 || clean.length > 60) return false;
+  if (PLACEHOLDER_CANDIDATE_NAMES.has(clean.toLowerCase())) return false;
+  if (/@|https?:\/\/|mailto:|\d{3}[-.)]\s*\d{3}|[|·•]/.test(clean)) return false;
+  if (/^(experience|work history|education|projects|skills|technical skills|summary|certifications|awards)$/i.test(clean)) {
+    return false;
+  }
+  return true;
+}
+
+function findBalancedEnd(source: string, openIdx: number, openCh: string, closeCh: string): number {
+  let depth = 0;
+  let inString = false;
+  for (let i = openIdx; i < source.length; i++) {
+    const ch = source[i];
+    if (ch === "\\" && i + 1 < source.length) {
+      i++;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === openCh) depth++;
+    else if (ch === closeCh && --depth === 0) return i;
+  }
+  return -1;
+}
+
+function extractProminentTextCall(line: string): string | null {
+  let idx = 0;
+  while ((idx = line.indexOf("#text(", idx)) >= 0) {
+    const openParen = idx + "#text".length;
+    const closeParen = findBalancedEnd(line, openParen, "(", ")");
+    if (closeParen < 0) break;
+    const args = line.slice(openParen + 1, closeParen);
+    const isProminent =
+      /weight\s*:\s*"bold"/.test(args) || /size\s*:\s*(?:1[4-9]|[23]\d)pt/.test(args);
+    let cursor = closeParen + 1;
+    while (cursor < line.length && (line[cursor] === " " || line[cursor] === "\t")) cursor++;
+    if (isProminent && line[cursor] === "[") {
+      const closeBracket = findBalancedEnd(line, cursor, "[", "]");
+      if (closeBracket > cursor) {
+        return line.slice(cursor + 1, closeBracket);
+      }
+    }
+    idx = closeParen + 1;
+  }
+  return null;
+}
+
+function stripInlineTypstForName(raw: string): string {
+  return raw
+    .replace(/#(?:strong|emph|box|upper|lower)\s*\[([^\]]*)\]/g, "$1")
+    .replace(/#text\([^)]*\)\s*\[([^\]]*)\]/g, "$1")
+    .replace(/[*_`\\]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Extracts the candidate's display name from a managed or unmanaged Typst resume source.
+ * Returns null when only placeholders or non-name headings are present.
+ */
+export function extractCandidateNameFromTypst(typstSource?: string | null): string | null {
+  if (!typstSource || !typstSource.trim()) return null;
+
+  try {
+    const managed = managedResumeExport(typstSource);
+    if (managed?.sections.candidateName && isValidExtractedCandidateName(managed.sections.candidateName)) {
+      return managed.sections.candidateName.trim();
+    }
+  } catch {
+    // Fall through to unmanaged Typst header parsing
+  }
+
+  const lines = typstSource
+    .replace(/^\s*\/\/.*$/gm, "")
+    .replace(/(?<!:)\s+\/\/.*$/gm, "")
+    .split(/\r?\n/);
+
+  let inPreambleBlock = false;
+  let preambleDepth = 0;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    if (inPreambleBlock) {
+      for (const ch of line) {
+        if (ch === "(" || ch === "[" || ch === "{") preambleDepth++;
+        else if (ch === ")" || ch === "]" || ch === "}") preambleDepth = Math.max(0, preambleDepth - 1);
+      }
+      if (preambleDepth === 0) inPreambleBlock = false;
+      continue;
+    }
+
+    if (/^#(let|set|show|import)\b/.test(line)) {
+      for (const ch of line) {
+        if (ch === "(" || ch === "[" || ch === "{") preambleDepth++;
+        else if (ch === ")" || ch === "]" || ch === "}") preambleDepth = Math.max(0, preambleDepth - 1);
+      }
+      if (preambleDepth > 0) inPreambleBlock = true;
+      continue;
+    }
+
+    const headerMacroMatch = line.match(/^#resume-header\b.*\bname\s*:\s*(?:"([^"]+)"|\[([^\]]+)\])/);
+    if (headerMacroMatch) {
+      const candidate = stripInlineTypstForName(headerMacroMatch[1] || headerMacroMatch[2] || "");
+      if (isValidExtractedCandidateName(candidate)) return candidate;
+    }
+
+    const prominentText = extractProminentTextCall(line);
+    if (prominentText) {
+      const candidate = stripInlineTypstForName(prominentText);
+      if (isValidExtractedCandidateName(candidate)) return candidate;
+    }
+
+    const h1Match = line.match(/^=\s+(.+)$/);
+    if (h1Match) {
+      const candidate = stripInlineTypstForName(h1Match[1]);
+      if (isValidExtractedCandidateName(candidate)) return candidate;
+    }
+
+    const headingMatch = line.match(/^#heading(?:\([^)]*\))?\s*\[([^\]]+)\]$/);
+    if (headingMatch) {
+      const candidate = stripInlineTypstForName(headingMatch[1]);
+      if (isValidExtractedCandidateName(candidate)) return candidate;
+    }
+
+    if (/^(==+|#(?:resume-)?section\b)/.test(line)) {
+      break;
+    }
+
+    if (!line.startsWith("#")) {
+      const candidate = stripInlineTypstForName(line);
+      if (isValidExtractedCandidateName(candidate)) return candidate;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Replaces a trailing placeholder "Candidate" signature with the resolved candidate name.
+ */
+export function replacePlaceholderSignature(text: string, candidateName?: string | null): string {
+  const cleanName = candidateName?.trim();
+  if (!cleanName || cleanName.toLowerCase() === "candidate") return text;
+  return text.replace(
+    /((?:^|\n)\s*(?:Sincerely|Best regards|Regards|Warm regards|Respectfully),?\s*\n)Candidate\b/gi,
+    `$1${cleanName}`
+  );
+}

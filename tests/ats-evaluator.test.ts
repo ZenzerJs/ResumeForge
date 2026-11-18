@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { evaluateAtsScore } from "@/lib/ats-evaluator/evaluator";
 import { inferRoleProfile } from "@/lib/ats-evaluator/profile-inference";
 import { JobRequirements } from "@/lib/jd-parser/types";
+import { getAtsDisplayState } from "@/components/tailor/ats-score-panel";
 
 const SAMPLE_TYPST_RESUME = `
 #let resume-section(title) = [ === #title ]
@@ -169,5 +170,55 @@ Languages & Tools: GraphQL, Redis
     expect(res.requiredMatch.score).toBe(res.requiredMatch.maxScore);
     expect(res.preferredMatch.percentage).toBe(100);
     expect(res.preferredMatch.score).toBe(res.preferredMatch.maxScore);
+  });
+
+  it("ignores // metadata comments and #set/#let preamble when checking one-page length", () => {
+    const preamble = `#set page(paper: "us-letter", margin: (x: 0.65in, y: 0.6in))
+#set text(font: "Libertinus Serif", size: 10.5pt)
+#let section(title) = block(sticky: true)[#title]
+#let entry(title: [], role: [], location: [], date: []) = block[#title #role]
+`;
+    const fakeBase64Metadata = `// @resume-links-v2 ${"A".repeat(400)}\n// @resume-document-v2 ${"B".repeat(5000)}\n`;
+    const normalOnePageWithMetadata = `${preamble}\n${SAMPLE_TYPST_RESUME}\n${fakeBase64Metadata}`;
+
+    expect(normalOnePageWithMetadata.length).toBeGreaterThan(4000);
+    const res = evaluateAtsScore(normalOnePageWithMetadata, SAMPLE_REQUIREMENTS, "Backend");
+    expect(res.baseHealth.findings).toContain("✓ Standard one-page length constraints satisfied.");
+    expect(res.baseHealth.findings).not.toContain("Warning: Document length may exceed a single page.");
+
+    const genuinelyLongBody = `${SAMPLE_TYPST_RESUME}\n${"- Delivered measurable improvements across distributed services.\n".repeat(70)}`;
+    const longRes = evaluateAtsScore(genuinelyLongBody, SAMPLE_REQUIREMENTS, "Backend");
+    expect(longRes.baseHealth.findings).toContain("Warning: Document length may exceed a single page.");
+  });
+
+  it("marks AtsScorePanel display state as No job loaded / unscored when requirements are empty", () => {
+    const emptyReqs: JobRequirements = {
+      requiredSkills: [],
+      preferredSkills: [],
+      domainTerms: [],
+    };
+    const res = evaluateAtsScore(SAMPLE_TYPST_RESUME, emptyReqs, "Backend");
+    const display = getAtsDisplayState(res, emptyReqs);
+
+    expect(display.hasJobRequirements).toBe(false);
+    expect(display.overallRingText).toBe("—");
+    expect(display.overallRingPct).toBe(0);
+    expect(display.overallMatchLabel).toContain("No job loaded");
+    expect(display.overallScorePrimary).toBe("No job loaded");
+    expect(display.requiredMatchLabel).toBe("No job loaded");
+    expect(display.requiredMatchPct).toBe(0);
+    expect(display.preferredMatchLabel).toBe("No job loaded");
+    expect(display.preferredMatchPct).toBe(0);
+    expect(display.requiredMatchLabel).not.toContain("40 / 40");
+    expect(display.requiredMatchLabel).not.toContain("100%");
+
+    const loadedDisplay = getAtsDisplayState(
+      evaluateAtsScore(SAMPLE_TYPST_RESUME, SAMPLE_REQUIREMENTS, "Backend"),
+      SAMPLE_REQUIREMENTS,
+      "Backend Engineer"
+    );
+    expect(loadedDisplay.hasJobRequirements).toBe(true);
+    expect(loadedDisplay.requiredMatchLabel).toContain("/ 40 pts");
+    expect(loadedDisplay.overallMatchLabel).not.toContain("No job loaded");
   });
 });
