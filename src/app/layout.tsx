@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { Analytics } from "@vercel/analytics/next";
 import { KeyboardShortcutsModal } from "@/components/ui/keyboard-shortcuts-modal";
 import { SkipLink } from "@/components/navigation/skip-link";
 import "./globals.css";
@@ -90,6 +91,7 @@ export default function RootLayout({
         <SkipLink />
         {children}
         <KeyboardShortcutsModal />
+        <Analytics />
       </body>
     </html>
   );
