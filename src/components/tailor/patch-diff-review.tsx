@@ -1391,6 +1391,7 @@ export function PatchDiffReview({
         <div className="space-y-3">
           {unverifiedSkillsForAccepted.length > 0 && (
             <div
+              role="alert"
               data-testid="unverified-skills-ack-box"
               className="p-3.5 bg-status-warning/15 border border-status-warning/40 rounded-xl space-y-2 text-xs text-status-warning"
             >

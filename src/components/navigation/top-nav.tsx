@@ -32,7 +32,9 @@ import {
 } from "@/components/auth/session-user";
 import { BYOK_UPDATED_EVENT, getActiveConfig } from "@/lib/byok-vault";
 import {
+  buildSettingsHref,
   clearActiveApplicationContext,
+  resolveGlobalTailorContext,
   resolveGlobalTailorHref,
   type ApplicationAccountScope,
 } from "@/lib/tailor/application-context";
@@ -148,11 +150,13 @@ function useAiStatus(pathname: string) {
 
 function AiStatusPill({
   aiStatus,
+  settingsHref = "/settings",
   testId,
   className,
   onClick,
 }: {
   aiStatus: { provider: string; hasKey: boolean; keyless: boolean };
+  settingsHref?: string;
   testId?: string;
   className?: string;
   onClick?: () => void;
@@ -161,7 +165,7 @@ function AiStatusPill({
 
   return (
     <Link
-      href="/settings"
+      href={settingsHref}
       data-testid={testId}
       onClick={onClick}
       title={
@@ -199,16 +203,24 @@ function AiStatusPill({
 
 function NavUtilities({
   aiStatus,
+  aiSettingsHref,
   isSettingsActive,
   compact,
 }: {
   aiStatus: { provider: string; hasKey: boolean; keyless: boolean } | null;
+  aiSettingsHref: string;
   isSettingsActive: boolean;
   compact: boolean;
 }) {
   return (
     <div className="hidden lg:flex items-center gap-1.5">
-      {aiStatus && <AiStatusPill aiStatus={aiStatus} testId="nav-ai-status-pill" />}
+      {aiStatus && (
+        <AiStatusPill
+          aiStatus={aiStatus}
+          settingsHref={aiSettingsHref}
+          testId="nav-ai-status-pill"
+        />
+      )}
       <Link
         href={SETTINGS_NAV_LINK.href}
         aria-label={SETTINGS_NAV_LINK.label}
@@ -237,6 +249,10 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
   const [demoMode, setDemoMode] = useState<boolean | undefined>(undefined);
   const [signupEnabled, setSignupEnabled] = useState(true);
   const [tailorHref, setTailorHref] = useState<string>("/tailor");
+  const isOnTailor = currentPath === "/tailor" || currentPath.startsWith("/tailor/");
+  const [aiSettingsHref, setAiSettingsHref] = useState<string>(
+    isOnTailor ? "/settings?from=tailor&tab=job-info" : "/settings"
+  );
   const aiStatus = useAiStatus(pathname);
   const menuId = useId();
   const mobileMenuTriggerRef = React.useRef<HTMLButtonElement>(null);
@@ -271,6 +287,25 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
     };
     const refreshTailorHref = () => {
       setTailorHref(resolveGlobalTailorHref(scope));
+      const resolved = resolveGlobalTailorContext(scope);
+      if (currentPath === "/tailor" || currentPath.startsWith("/tailor/")) {
+        const sp =
+          typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+        const urlJobId = sp?.get("jobId") ?? resolved.activeContext?.jobId ?? null;
+        const urlTab = sp?.get("tab") ?? resolved.activeContext?.tab ?? "job-info";
+        setAiSettingsHref(
+          buildSettingsHref({
+            from: "tailor",
+            jobId: urlJobId,
+            tab: urlTab,
+            variantId: sp?.get("variantId") ?? resolved.activeContext?.variantId ?? null,
+            resumeId: sp?.get("resumeId") ?? resolved.activeContext?.resumeId ?? null,
+            mode: sp?.get("mode") ?? resolved.activeContext?.mode ?? null,
+          })
+        );
+      } else {
+        setAiSettingsHref("/settings");
+      }
     };
     refreshTailorHref();
     if (typeof window === "undefined") return;
@@ -282,7 +317,7 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
       window.removeEventListener("storage", refreshTailorHref);
       window.removeEventListener("resumeforge:application-context-changed", refreshTailorHref);
     };
-  }, [user, demoMode, pathname]);
+  }, [user, demoMode, pathname, currentPath]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -321,7 +356,8 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
           className="flex min-w-0 items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-[6px]"
           aria-label="ResumeForge home"
         >
-          <div
+          <span
+            aria-hidden="true"
             className={`shrink-0 rounded-[8px] flex items-center justify-center font-bold text-primary-foreground ${compact ? "w-7 h-7 text-base" : "w-8 h-8 text-lg"}`}
             style={{
               background: "linear-gradient(135deg, rgb(var(--accent-action)), rgb(var(--accent-secondary)))",
@@ -329,7 +365,7 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
             }}
           >
             R
-          </div>
+          </span>
           <span className="truncate font-bold text-xl text-foreground tracking-[-0.04em]">
             ResumeForge
           </span>
@@ -382,7 +418,12 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
         {actions ? <div className="hidden lg:flex items-center gap-2">{actions}</div> : null}
-        <NavUtilities aiStatus={aiStatus} isSettingsActive={isSettingsActive} compact={compact} />
+        <NavUtilities
+          aiStatus={aiStatus}
+          aiSettingsHref={aiSettingsHref}
+          isSettingsActive={isSettingsActive}
+          compact={compact}
+        />
         {user ? (
           <>
             <Link
@@ -439,11 +480,13 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
                   aria-current={isActive ? "page" : undefined}
                   onClick={() => setMobileOpen(false)}
                   className={`text-body-dense ${cn(
-                    "flex min-h-11 items-center gap-3 rounded-[6px] px-3 py-2 font-body-dense border border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                    isActive ? "bg-primary/10 text-primary border-primary/30 font-semibold" : "text-on-surface-variant hover:bg-elevated"
+                    "flex min-h-11 items-center gap-3 rounded-[6px] px-3 py-2 font-body-dense border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    isActive
+                      ? "bg-elevated text-foreground border-hairline shadow-[inset_2px_0_0_rgb(var(--accent-action))] font-semibold"
+                      : "border-transparent text-on-surface-variant hover:bg-elevated"
                   )}`}
                 >
-                  <Icon className="h-4 w-4" aria-hidden />
+                  <Icon className={cn("h-4 w-4", isActive && "text-primary")} aria-hidden />
                   {label}
                 </Link>
               );
@@ -452,8 +495,9 @@ export function TopNav({ actions, badge, compact = false }: TopNavProps) {
               <div className="mt-3 border-t border-hairline pt-3">
                 <AiStatusPill
                   aiStatus={aiStatus}
+                  settingsHref={aiSettingsHref}
                   testId="mobile-nav-ai-status-pill"
-                  className="min-h-11 w-full justify-start rounded-[6px] px-3 py-2"
+                  className="min-h-11 w-full justify-start rounded-full px-3.5 py-2"
                   onClick={() => setMobileOpen(false)}
                 />
               </div>

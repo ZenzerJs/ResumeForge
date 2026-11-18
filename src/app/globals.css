@@ -457,9 +457,9 @@
     background: linear-gradient(
       110deg,
       transparent 15%,
-      rgba(245, 166, 35, 0.12) 38%,
-      rgba(255, 255, 255, 0.16) 50%,
-      rgba(76, 141, 255, 0.14) 64%,
+      rgb(var(--accent-action) / 0.12) 38%,
+      rgb(var(--paper-sheet) / 0.16) 50%,
+      rgb(var(--accent-contrast) / 0.14) 64%,
       transparent 85%
     );
     animation: skeleton-glint-sweep 2.15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
