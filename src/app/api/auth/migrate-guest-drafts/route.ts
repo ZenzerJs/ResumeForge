@@ -99,10 +99,12 @@ export async function POST(request: Request) {
       );
     }
 
+    const trimmedSource = typstSource.trim();
+
     // 3. IDEMPOTENCY / REPLAY SAFETY
     if (migrationId) {
       const existingMatch = await prisma.resume.findFirst({
-        where: { userId, typstSource: typstSource.trim() },
+        where: { userId, typstSource: trimmedSource },
       });
       if (existingMatch) {
         return NextResponse.json({
@@ -156,22 +158,7 @@ export async function POST(request: Request) {
         }
       }
 
-      const factSnapshot = targetIsMaster
-        ? (extractResumeFacts(typstSource) as unknown as Prisma.InputJsonValue)
-        : undefined;
-
-      const createdResume = await tx.resume.create({
-        data: {
-          userId,
-          title: resumeTitle,
-          typstSource,
-          isMaster: targetIsMaster,
-          isProtected: targetIsMaster,
-          factSnapshot,
-        },
-      });
-
-      // Migrate any provided evidenceItems, deduplicating against existing titles for this user
+      // Migrate any provided evidenceItems first so factSnapshot includes their verified IDs, skills, and metrics
       let evidenceCount = 0;
       let skippedDuplicateCount = 0;
 
@@ -218,6 +205,33 @@ export async function POST(request: Request) {
           evidenceCount++;
         }
       }
+
+      const allVerifiedEvidence = targetIsMaster
+        ? await tx.evidenceItem.findMany({
+            where: { userId, status: "verified" },
+            include: {
+              bullets: {
+                where: { verified: true },
+                orderBy: { orderIndex: "asc" },
+              },
+            },
+          })
+        : [];
+
+      const factSnapshot = targetIsMaster
+        ? (extractResumeFacts(trimmedSource, allVerifiedEvidence) as unknown as Prisma.InputJsonValue)
+        : undefined;
+
+      const createdResume = await tx.resume.create({
+        data: {
+          userId,
+          title: resumeTitle,
+          typstSource: trimmedSource,
+          isMaster: targetIsMaster,
+          isProtected: targetIsMaster,
+          factSnapshot,
+        },
+      });
 
       return {
         resumeId: createdResume.id,

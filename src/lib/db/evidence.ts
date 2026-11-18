@@ -265,18 +265,22 @@ export async function updateEvidenceItem(
       );
 
       const reuseCount = Math.min(existingBullets.length, input.bullets.length);
-      for (let i = 0; i < reuseCount; i++) {
-        const b = input.bullets[i];
-        await tx.bullet.update({
-          where: { id: existingBullets[i].id },
-          data: {
-            text: b.text,
-            technologies: JSON.stringify(b.technologies || []),
-            roleAffinity: JSON.stringify(b.roleAffinity || []),
-            verified: b.verified ?? true,
-            orderIndex: b.orderIndex ?? i,
-          },
-        });
+      if (reuseCount > 0) {
+        await Promise.all(
+          Array.from({ length: reuseCount }, (_, i) => {
+            const b = input.bullets![i];
+            return tx.bullet.update({
+              where: { id: existingBullets[i].id },
+              data: {
+                text: b.text,
+                technologies: JSON.stringify(b.technologies || []),
+                roleAffinity: JSON.stringify(b.roleAffinity || []),
+                verified: b.verified ?? true,
+                orderIndex: b.orderIndex ?? i,
+              },
+            });
+          })
+        );
       }
 
       if (input.bullets.length > existingBullets.length) {
@@ -485,7 +489,16 @@ export async function bulkEvidenceAction(
     blocked: 0,
   };
 
-  let mutatedAny = false;
+  const verifyCandidates: Array<{ id: string; title: string; previousStatus: string }> = [];
+  const archiveCandidates: Array<{ id: string; title: string; previousStatus: string }> = [];
+  const restoreCandidates: Array<{
+    id: string;
+    title: string;
+    previousStatus: string;
+    targetStatus: "verified" | "draft";
+  }> = [];
+  const deleteCandidates: Array<{ id: string; title: string }> = [];
+  const resultIndexById = new Map<string, number>();
 
   for (const id of input.ids) {
     const item = ownedMap.get(id);
@@ -569,27 +582,15 @@ export async function bulkEvidenceAction(
         continue;
       }
 
-      const updated = await prisma.$transaction(async (tx) => {
-        const nextItem = await tx.evidenceItem.update({
-          where: { id },
-          data: { status: "verified" },
-        });
-        await tx.bullet.updateMany({
-          where: { evidenceId: id, verified: false },
-          data: { verified: true },
-        });
-        return nextItem;
-      });
-      mutatedAny = true;
-      summary.succeeded += 1;
+      resultIndexById.set(id, results.length);
       results.push({
         id,
         title: item.title,
         outcome: "succeeded",
-        status: updated.status,
+        status: "verified",
         previousStatus: item.status,
-        updatedAt: normalizeIsoTimestamp(updated.updatedAt) ?? undefined,
       });
+      verifyCandidates.push({ id, title: item.title, previousStatus: item.status });
       continue;
     }
 
@@ -607,20 +608,15 @@ export async function bulkEvidenceAction(
         continue;
       }
 
-      const updated = await prisma.evidenceItem.update({
-        where: { id },
-        data: { status: "archived" },
-      });
-      mutatedAny = true;
-      summary.succeeded += 1;
+      resultIndexById.set(id, results.length);
       results.push({
         id,
         title: item.title,
         outcome: "succeeded",
-        status: updated.status,
+        status: "archived",
         previousStatus: item.status,
-        updatedAt: normalizeIsoTimestamp(updated.updatedAt) ?? undefined,
       });
+      archiveCandidates.push({ id, title: item.title, previousStatus: item.status });
       continue;
     }
 
@@ -638,19 +634,19 @@ export async function bulkEvidenceAction(
         continue;
       }
       const targetStatus = directive?.restoreStatus ?? "draft";
-      const updated = await prisma.evidenceItem.update({
-        where: { id },
-        data: { status: targetStatus },
-      });
-      mutatedAny = true;
-      summary.succeeded += 1;
+      resultIndexById.set(id, results.length);
       results.push({
         id,
         title: item.title,
         outcome: "succeeded",
-        status: updated.status,
+        status: targetStatus,
         previousStatus: item.status,
-        updatedAt: normalizeIsoTimestamp(updated.updatedAt) ?? undefined,
+      });
+      restoreCandidates.push({
+        id,
+        title: item.title,
+        previousStatus: item.status,
+        targetStatus,
       });
       continue;
     }
@@ -670,37 +666,108 @@ export async function bulkEvidenceAction(
         continue;
       }
 
-      try {
-        await prisma.evidenceItem.delete({
-          where: { id },
-        });
-        mutatedAny = true;
-        summary.succeeded += 1;
-        results.push({
-          id,
-          title: item.title,
-          outcome: "succeeded",
-        });
-      } catch (err) {
-        if (isForeignKeyRestrictionError(err)) {
-          summary.blocked += 1;
-          results.push({
-            id,
-            title: item.title,
-            outcome: "blocked",
-            code: "EVIDENCE_CITATION_RESTRICTED",
-            reason:
-              "Cited by a saved resume patch and cannot be permanently deleted. Archive it instead.",
-          });
-        } else {
-          throw err;
-        }
-      }
+      resultIndexById.set(id, results.length);
+      results.push({
+        id,
+        title: item.title,
+        outcome: "succeeded",
+      });
+      deleteCandidates.push({ id, title: item.title });
     }
   }
 
-  if (mutatedAny) {
+  const hasMutations =
+    verifyCandidates.length > 0 ||
+    archiveCandidates.length > 0 ||
+    restoreCandidates.length > 0 ||
+    deleteCandidates.length > 0;
+
+  if (hasMutations) {
+    const batchNow = new Date();
+    const batchNowIso = batchNow.toISOString();
+
     await prisma.$transaction(async (tx) => {
+      if (verifyCandidates.length > 0) {
+        const ids = verifyCandidates.map((c) => c.id);
+        await tx.evidenceItem.updateMany({
+          where: { id: { in: ids }, userId },
+          data: { status: "verified", updatedAt: batchNow },
+        });
+        await tx.bullet.updateMany({
+          where: { evidenceId: { in: ids }, verified: false },
+          data: { verified: true, updatedAt: batchNow },
+        });
+        for (const c of verifyCandidates) {
+          const idx = resultIndexById.get(c.id);
+          if (idx !== undefined) results[idx].updatedAt = batchNowIso;
+          summary.succeeded += 1;
+        }
+      }
+
+      if (archiveCandidates.length > 0) {
+        const ids = archiveCandidates.map((c) => c.id);
+        await tx.evidenceItem.updateMany({
+          where: { id: { in: ids }, userId },
+          data: { status: "archived", updatedAt: batchNow },
+        });
+        for (const c of archiveCandidates) {
+          const idx = resultIndexById.get(c.id);
+          if (idx !== undefined) results[idx].updatedAt = batchNowIso;
+          summary.succeeded += 1;
+        }
+      }
+
+      if (restoreCandidates.length > 0) {
+        const toDraft = restoreCandidates.filter((c) => c.targetStatus === "draft").map((c) => c.id);
+        const toVerified = restoreCandidates.filter((c) => c.targetStatus === "verified").map((c) => c.id);
+        if (toDraft.length > 0) {
+          await tx.evidenceItem.updateMany({
+            where: { id: { in: toDraft }, userId },
+            data: { status: "draft", updatedAt: batchNow },
+          });
+        }
+        if (toVerified.length > 0) {
+          await tx.evidenceItem.updateMany({
+            where: { id: { in: toVerified }, userId },
+            data: { status: "verified", updatedAt: batchNow },
+          });
+        }
+        for (const c of restoreCandidates) {
+          const idx = resultIndexById.get(c.id);
+          if (idx !== undefined) results[idx].updatedAt = batchNowIso;
+          summary.succeeded += 1;
+        }
+      }
+
+      if (deleteCandidates.length > 0) {
+        const ids = deleteCandidates.map((c) => c.id);
+        try {
+          await tx.evidenceItem.deleteMany({
+            where: { id: { in: ids }, userId },
+          });
+          summary.succeeded += deleteCandidates.length;
+        } catch (err) {
+          if (isForeignKeyRestrictionError(err)) {
+            for (const c of deleteCandidates) {
+              const idx = resultIndexById.get(c.id);
+              if (idx !== undefined) {
+                results[idx] = {
+                  id: c.id,
+                  title: c.title,
+                  outcome: "blocked",
+                  code: "EVIDENCE_CITATION_RESTRICTED",
+                  reason:
+                    "Cited by a saved resume patch and cannot be permanently deleted. Archive it instead.",
+                };
+              }
+              summary.blocked += 1;
+            }
+          } else {
+            throw err;
+          }
+        }
+      }
+
       await invalidateOpenProposalBatches(tx, userId);
     });
   }

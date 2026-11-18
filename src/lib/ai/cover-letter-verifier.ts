@@ -8,7 +8,42 @@
 import { CoverLetterResponseSchema, type CoverLetterResponse } from "./cover-letter-schema";
 import { extractJsonObject, normalizeCoverLetterPayload } from "./json-response";
 import { sanitizeError } from "./redact";
-import { replacePlaceholderSignature } from "../export/resume-text";
+import { extractCandidateNameFromTypst, replacePlaceholderSignature } from "../export/resume-text";
+
+export function buildCoverLetterEvidenceContext<
+  T extends { id: string; status: string; bullets?: Array<{ id: string }> }
+>(
+  evidenceItems: T[],
+  masterTypstSource?: string | null,
+  providedCandidateName?: unknown
+): {
+  activeEvidenceItems: T[];
+  activeEvidenceIds: string[];
+  resolvedCandidateName: string;
+} {
+  const activeEvidenceItems = evidenceItems.filter((e) => e.status !== "archived");
+  const activeEvidenceIds: string[] = [];
+  for (const item of activeEvidenceItems) {
+    activeEvidenceIds.push(item.id);
+    if (Array.isArray(item.bullets)) {
+      for (const bullet of item.bullets) {
+        activeEvidenceIds.push(bullet.id);
+      }
+    }
+  }
+  const providedName =
+    typeof providedCandidateName === "string" ? providedCandidateName.trim() : "";
+  const resolvedCandidateName =
+    providedName && providedName.toLowerCase() !== "candidate"
+      ? providedName
+      : extractCandidateNameFromTypst(masterTypstSource) || "Candidate";
+
+  return {
+    activeEvidenceItems,
+    activeEvidenceIds,
+    resolvedCandidateName,
+  };
+}
 
 export interface CoverLetterPayload {
   salutation?: string;
