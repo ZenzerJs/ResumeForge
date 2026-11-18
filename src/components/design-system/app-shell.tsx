@@ -210,7 +210,7 @@ export function AppShell({
         id="main-content"
         tabIndex={-1}
         className={cn(
-          "relative z-10 flex min-h-0 flex-1 flex-col outline-none",
+          "relative z-10 flex min-h-0 flex-1 flex-col outline-none scroll-mt-16",
           !hideNav &&
             (variant === "editor"
               ? "pt-[calc(3rem+env(safe-area-inset-top))]"

@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { FileText, ArrowRight } from "lucide-react";
+import { BrandMark } from "@/components/design-system/brand-mark";
 
 export function LandingFooter() {
   return (
@@ -9,19 +10,7 @@ export function LandingFooter() {
       className="relative z-20 mt-auto w-full min-w-0 shrink-0 border-t border-outline/70 bg-panel py-10 px-4 md:px-8 text-muted-foreground"
     >
       <div className="mx-auto flex w-full max-w-5xl min-w-0 flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-        <div className="flex items-center justify-center sm:justify-start gap-2.5">
-          <div
-            aria-hidden="true"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-sm font-bold text-primary-foreground"
-            style={{
-              background: "linear-gradient(135deg, rgb(var(--accent-action)), rgb(var(--accent-secondary)))",
-              boxShadow: "0 0 0 1px rgb(255 255 255 / 0.12) inset, 0 6px 20px rgb(var(--accent-action) / 0.35)",
-            }}
-          >
-            R
-          </div>
-          <span className="text-foreground font-bold tracking-tight text-sm">ResumeForge</span>
-        </div>
+        <BrandMark compact />
 
         <nav
           aria-label="Footer"

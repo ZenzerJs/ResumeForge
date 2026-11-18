@@ -17,7 +17,7 @@ export default function PrivacyPage() {
       <main
         id="main-content"
         tabIndex={-1}
-        className="relative z-10 mx-auto w-full max-w-3xl px-4 pb-16 pt-[calc(6rem+env(safe-area-inset-top))] outline-none md:px-8"
+        className="relative z-10 mx-auto w-full max-w-3xl px-4 pb-16 pt-[calc(6rem+env(safe-area-inset-top))] outline-none scroll-mt-16 md:px-8"
       >
         <p className="font-mono text-sm uppercase tracking-[0.2em] text-primary">Legal</p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">Privacy Policy</h1>

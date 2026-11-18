@@ -14,7 +14,7 @@ import {
 import { MessageSquarePlus, LayoutList, Code2, Plus, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { isResumeLayoutV2Enabled, parseManagedResume, renderResumeDocument } from "@/lib/typst/resume-document";
-import { isResumeSourceSafeForForm } from "./resume-form-builder";
+import { resolveDefaultEditorMode } from "@/lib/editor/mode-utils";
 
 const ResumeFormBuilder = dynamic(
   () => import("./resume-form-builder").then((m) => m.ResumeFormBuilder),
@@ -215,16 +215,8 @@ export function insertReviewMarkerInView(
   return true;
 }
 
-export function resolveDefaultEditorMode(
-  value: string,
-  explicitModeParam?: string | null
-): "code" | "visual" {
-  if (explicitModeParam === "code") return "code";
-  if (explicitModeParam === "visual") return "visual";
-  return Boolean(parseManagedResume(value)) || isResumeSourceSafeForForm(value)
-    ? "visual"
-    : "code";
-}
+// Re-export for backward compatibility — canonical source is @/lib/editor/mode-utils
+export { resolveDefaultEditorMode } from "@/lib/editor/mode-utils";
 
 interface CodeEditorProps {
   value: string;
@@ -397,7 +389,7 @@ export function CodeEditor({ value, onChange, mode, onModeChange }: CodeEditorPr
         parseTypstToStructuredModel,
         serializeStructuredModelToTypst,
         legacyFormToResumeDocument,
-      } = await import("./resume-form-builder");
+      } = await import("@/lib/editor/mode-utils");
       const model = parseTypstToStructuredModel(snapshot);
       const canonical = serializeStructuredModelToTypst(model).trim() === snapshot.trim();
       if (!response.ok || (snapshot.trim() !== starter.trim() && !canonical)) {
@@ -449,7 +441,7 @@ export function CodeEditor({ value, onChange, mode, onModeChange }: CodeEditorPr
             aria-selected={editorMode === "visual"}
             onClick={() => setEditorMode("visual")}
             data-testid="editor-mode-visual"
-            className={`flex min-h-11 md:min-h-0 whitespace-nowrap items-center gap-1 rounded-[4px] px-2.5 py-0.5 text-xs font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`flex min-h-11 md:min-h-0 whitespace-nowrap items-center gap-1 rounded-[4px] px-2.5 py-0.5 text-xs font-mono font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               editorMode === "visual"
                 ? "bg-elevated text-foreground shadow-xs"
                 : "text-text-secondary hover:text-foreground"
@@ -464,7 +456,7 @@ export function CodeEditor({ value, onChange, mode, onModeChange }: CodeEditorPr
             aria-selected={editorMode === "code"}
             onClick={() => setEditorMode("code")}
             data-testid="editor-mode-code"
-            className={`flex min-h-11 md:min-h-0 whitespace-nowrap items-center gap-1 rounded-[4px] px-2.5 py-0.5 text-xs font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`flex min-h-11 md:min-h-0 whitespace-nowrap items-center gap-1 rounded-[4px] px-2.5 py-0.5 text-xs font-mono font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               editorMode === "code"
                 ? "bg-elevated text-foreground shadow-xs"
                 : "text-text-secondary hover:text-foreground"
@@ -487,7 +479,7 @@ export function CodeEditor({ value, onChange, mode, onModeChange }: CodeEditorPr
                 onClick={handleInsertEntrySnippet}
                 data-testid="insert-entry-snippet-btn"
                 title="Insert a new Experience/Project entry block"
-                className="flex min-h-11 md:min-h-0 shrink-0 whitespace-nowrap items-center gap-1 px-2 py-0.5 rounded bg-elevated hover:bg-muted border border-outline/70 text-foreground text-xs font-mono font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex min-h-11 md:min-h-0 shrink-0 whitespace-nowrap items-center gap-1 px-2 py-0.5 rounded bg-elevated hover:bg-muted border border-outline/70 text-foreground text-xs font-mono font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Plus className="h-3 w-3 text-primary" />
                 Entry
@@ -506,7 +498,7 @@ export function CodeEditor({ value, onChange, mode, onModeChange }: CodeEditorPr
                 data-testid="add-review-marker-btn"
                 title={REVIEW_MARKER_HELP_TEXT}
                 aria-describedby={reviewMarkerHelpId}
-                className="flex min-h-11 md:min-h-0 shrink-0 whitespace-nowrap items-center gap-1 px-2 py-0.5 rounded bg-elevated hover:bg-muted border border-outline/70 text-foreground text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex min-h-11 md:min-h-0 shrink-0 whitespace-nowrap items-center gap-1 px-2 py-0.5 rounded bg-elevated hover:bg-muted border border-outline/70 text-foreground text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <MessageSquarePlus className="h-3 w-3 text-text-secondary" aria-hidden="true" />
                 Add review marker

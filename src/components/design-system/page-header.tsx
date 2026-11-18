@@ -35,7 +35,7 @@ export function PageHeader({
           </div>
         ) : null}
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
-          <h1 className="min-w-0 break-words text-xl font-bold tracking-tight text-rf-cloud md:text-2xl">
+          <h1 className="min-w-0 break-words text-balance text-xl font-bold tracking-tight text-rf-cloud md:text-2xl">
             {title}
           </h1>
           {statusBadge ? <div className="max-w-full shrink-0">{statusBadge}</div> : null}

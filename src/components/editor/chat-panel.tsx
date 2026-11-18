@@ -600,11 +600,43 @@ export function ChatPanel({ typstSource, resumeTitle, jobId }: ChatPanelProps) {
     }
   };
 
-  const resizeTextarea = () => {
+  const resizeRafRef = useRef<number | null>(null);
+  const lastTextareaHeightRef = useRef<number | null>(null);
+  const lastInputLengthRef = useRef<number>(0);
+
+  useEffect(() => {
+    return () => {
+      if (resizeRafRef.current !== null) {
+        cancelAnimationFrame(resizeRafRef.current);
+      }
+    };
+  }, []);
+
+  const resizeTextarea = (nextLength: number) => {
     const el = textareaRef.current;
+    const isShrinking = nextLength < lastInputLengthRef.current;
+    lastInputLengthRef.current = nextLength;
     if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 96)}px`;
+    // Skip layout read/write when text fits without overflow and is not shrinking from multi-line
+    if (
+      lastTextareaHeightRef.current !== null &&
+      !isShrinking &&
+      el.scrollHeight <= el.clientHeight
+    ) {
+      return;
+    }
+    if (resizeRafRef.current !== null) {
+      cancelAnimationFrame(resizeRafRef.current);
+    }
+    resizeRafRef.current = requestAnimationFrame(() => {
+      resizeRafRef.current = null;
+      const target = textareaRef.current;
+      if (!target) return;
+      target.style.height = "auto";
+      const nextHeight = Math.min(target.scrollHeight, 96);
+      target.style.height = `${nextHeight}px`;
+      lastTextareaHeightRef.current = nextHeight;
+    });
   };
 
   return (
@@ -736,7 +768,7 @@ export function ChatPanel({ typstSource, resumeTitle, jobId }: ChatPanelProps) {
           onChange={(e) => {
             setInput(e.target.value);
             setError(null);
-            resizeTextarea();
+            resizeTextarea(e.target.value.length);
           }}
           onKeyDown={onKeyDown}
           placeholder="Ask about your resume, evidence, or a job…"

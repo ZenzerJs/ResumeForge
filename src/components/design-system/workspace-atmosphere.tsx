@@ -148,8 +148,7 @@ export function WorkspaceAtmosphere({ variant }: WorkspaceAtmosphereProps) {
       {/* 7 pure CSS roaming Ember Ink & Electric Blue orbs */}
       <AmbientColorBlobs testId="ambient-floating-blobs" variant={variant} />
 
-      {/* 1px ombre motif hairline under the 64px top nav */}
-      <div className="ombre-divider absolute inset-x-0 top-16 h-px" />
+      {/* Ombre divider: TopNav provides the primary ombre-divider at its boundary; unconditional top-16 divider removed */}
     </div>
   );
 }
