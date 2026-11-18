@@ -487,6 +487,8 @@ export function SuggestionPreview({
               <img
                 src={page}
                 alt={`Resume page ${pageIndex + 1}`}
+                width={612}
+                height={792}
                 className="block h-auto w-full"
               />
               {patches.flatMap((patch, patchIndex) =>

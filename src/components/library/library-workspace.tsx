@@ -39,6 +39,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { PdfEvidenceSaveItem } from "@/components/evidence/bulk-pdf-dropzone";
 import { initializeDemoSamples } from "@/lib/demo-client";
 import { parseApiError, readApiResponse } from "@/lib/api-error";
+import { useRovingTablist } from "@/lib/hooks/use-roving-tablist";
 import {
   Dialog,
   DialogContent,
@@ -383,7 +384,9 @@ export function LibraryWorkspace() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addEvidenceBtnRef = useRef<HTMLButtonElement | null>(null);
   const modalOpenerRef = useRef<HTMLElement | null>(null);
-  const tabListRef = useRef<HTMLDivElement>(null);
+  const { tablistRef: tabListRef, getTabProps: getLibraryTabProps } = useRovingTablist(
+    activeTab === "library" ? 0 : 1
+  );
   const bulkSubmittingRef = useRef<boolean>(false);
   const [tabIndicator, setTabIndicator] = useState<{ left: number; width: number } | null>(null);
 
@@ -488,17 +491,15 @@ export function LibraryWorkspace() {
         }
       } catch {}
 
-      const annotated = loadedItems.map((item, idx) => {
+      const earlierByKey = new Map<string, EvidenceItem>();
+      const annotated = loadedItems.map((item) => {
+        const key = `${item.title.trim().toLowerCase()}||${(item.organization || "").trim().toLowerCase()}`;
+        const earlierMatch = earlierByKey.get(key);
+        if (!earlierMatch) {
+          earlierByKey.set(key, item);
+        }
         if (reviewedSet.has(item.id)) return item;
         if (item.needsReview) return item;
-        const normTitle = item.title.trim().toLowerCase();
-        const earlierMatch = loadedItems.slice(0, idx).find((prev) => {
-          const prevTitle = prev.title.trim().toLowerCase();
-          return (
-            prevTitle === normTitle &&
-            (prev.organization || "").trim().toLowerCase() === (item.organization || "").trim().toLowerCase()
-          );
-        });
         if (earlierMatch) {
           return {
             ...item,
@@ -553,7 +554,7 @@ export function LibraryWorkspace() {
     const activeEl = container.querySelector<HTMLElement>('[aria-selected="true"]');
     if (!activeEl) return;
     setTabIndicator({ left: activeEl.offsetLeft, width: activeEl.offsetWidth });
-  }, [activeTab, items]);
+  }, [activeTab, items, tabListRef]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -1857,6 +1858,7 @@ export function LibraryWorkspace() {
           <button
             type="button"
             role="tab"
+            {...getLibraryTabProps(0)}
             aria-selected={activeTab === "library"}
             onClick={() => handleTabChange("library")}
             className={`min-h-11 px-4 py-2 text-sm font-semibold transition-colors ${activeTab === "library" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
@@ -1866,6 +1868,7 @@ export function LibraryWorkspace() {
           <button
             type="button"
             role="tab"
+            {...getLibraryTabProps(1)}
             aria-selected={activeTab === "review"}
             onClick={() => handleTabChange("review")}
             className={`min-h-11 px-4 py-2 text-sm font-semibold transition-colors ${activeTab === "review" ? "text-primary" : "text-muted-foreground hover:text-foreground"} flex items-center gap-2`}
@@ -2035,8 +2038,8 @@ export function LibraryWorkspace() {
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="rounded-xl border-dashed surface-raised p-12 text-center">
-            <FileJson className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-            <h3 className="text-sm font-semibold text-foreground">No evidence items found</h3>
+            <FileJson className="mx-auto h-8 w-8 text-muted-foreground mb-2" aria-hidden="true" />
+            <h2 className="text-sm font-semibold text-foreground">No evidence items found</h2>
             <p className="mt-1 text-sm text-muted-foreground max-w-sm mx-auto">
               {searchQuery
                 ? `No evidence items matching search "${searchQuery}".`
@@ -2071,7 +2074,7 @@ export function LibraryWorkspace() {
                   data-testid="evidence-item-card"
                   className={`rounded-xl surface-raised card-lift ${typeEdgeClass} ${
                     isSelected ? "ring-1 ring-primary/60" : ""
-                  } ${isArchived ? "opacity-85" : ""} p-5 overflow-visible transition-colors duration-150 ease-out motion-reduce:transition-none`}
+                  } ${isArchived ? "opacity-85" : ""} p-5 overflow-visible transition-colors duration-150 ease-out motion-reduce:transition-none [content-visibility:auto] [contain-intrinsic-size:auto_180px]`}
                 >
                   {/* Card Header Row */}
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
@@ -2224,15 +2227,7 @@ export function LibraryWorkspace() {
                               <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
                               Restore to Draft
                             </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem
-                              onSelect={() => void handleArchiveItem(item.id)}
-                              className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-xs text-foreground focus:bg-elevated focus:text-foreground"
-                            >
-                              <Archive className="h-3.5 w-3.5" aria-hidden="true" />
-                              Archive
-                            </DropdownMenuItem>
-                          )}
+                          ) : null}
                           <DropdownMenuItem
                             data-testid={`item-delete-permanently-${item.id}`}
                             onSelect={() => void handleRequestPermanentDelete([item])}

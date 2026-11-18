@@ -218,6 +218,7 @@ export function SettingsWorkspace() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [clearedKeyUndo, setClearedKeyUndo] = useState<{ provider: ProviderType; key: string } | null>(null);
 
   // Load saved settings and vault key on mount
   useEffect(() => {
@@ -432,11 +433,26 @@ export function SettingsWorkspace() {
   };
 
   const handleClearKey = async () => {
+    const previousKey = apiKey;
     setApiKey("");
     setHasVaultKey(false);
     setTestResult(null);
     setVerificationStatus("untested");
     await removeKey(provider);
+    if (previousKey.trim()) {
+      setClearedKeyUndo({ provider, key: previousKey });
+    }
+  };
+
+  const handleUndoClearKey = async () => {
+    if (!clearedKeyUndo || clearedKeyUndo.provider !== provider) return;
+    const restoredKey = clearedKeyUndo.key;
+    setClearedKeyUndo(null);
+    setApiKey(restoredKey);
+    await saveKey(provider as ByokProvider, restoredKey);
+    setHasVaultKey(true);
+    setTestResult(null);
+    setVerificationStatus("untested");
   };
 
   const connectionTestState = getConnectionTestState({
@@ -562,6 +578,9 @@ export function SettingsWorkspace() {
                 </div>
                 <input
                   id="base-url-input"
+                  name="base-url"
+                  autoComplete="url"
+                  spellCheck={false}
                   data-testid="ollama-endpoint"
                   type="url"
                   value={baseUrl}
@@ -631,10 +650,10 @@ export function SettingsWorkspace() {
                         <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                       </a>
                     </div>
-                    <p className="text-sm text-foreground leading-relaxed">
+                    <p className="max-w-2xl text-sm text-foreground leading-relaxed">
                       {cloudHelp.whatIsNeeded}
                     </p>
-                    <p className="text-xs text-text-secondary leading-relaxed">
+                    <p className="max-w-2xl text-xs text-text-secondary leading-relaxed">
                       <span className="font-semibold text-foreground">Account &amp; billing: </span>
                       {cloudHelp.prerequisites}
                     </p>
@@ -646,7 +665,7 @@ export function SettingsWorkspace() {
                     <label htmlFor="api-key-input" className="block font-mono text-xs font-semibold text-text-secondary uppercase tracking-wider">
                       API Key {provider === "custom" ? "(Optional)" : ""}
                     </label>
-                    {apiKey && (
+                    {apiKey ? (
                       <button
                         type="button"
                         id="clear-key-btn"
@@ -654,14 +673,26 @@ export function SettingsWorkspace() {
                         onClick={handleClearKey}
                         className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 text-xs text-status-danger hover:text-status-danger/80 transition-colors"
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-3 w-3" aria-hidden="true" />
                         Clear Key
                       </button>
-                    )}
+                    ) : clearedKeyUndo?.provider === provider ? (
+                      <button
+                        type="button"
+                        data-testid="undo-clear-key-btn"
+                        onClick={() => void handleUndoClearKey()}
+                        className="inline-flex min-h-11 sm:min-h-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
+                      >
+                        Undo clear key
+                      </button>
+                    ) : null}
                   </div>
                   <div className="relative">
                     <input
                       id="api-key-input"
+                      name="api-key"
+                      autoComplete="off"
+                      spellCheck={false}
                       data-testid="api-key-input"
                       type={showApiKey ? "text" : "password"}
                       value={apiKey}
@@ -759,6 +790,9 @@ export function SettingsWorkspace() {
                     </label>
                     <input
                       id="base-url-input"
+                      name="openai-base-url"
+                      autoComplete="url"
+                      spellCheck={false}
                       data-testid="ollama-endpoint"
                       type="url"
                       value={baseUrl}
@@ -775,6 +809,9 @@ export function SettingsWorkspace() {
                   </label>
                   <input
                     id="model-input"
+                    name="model"
+                    autoComplete="off"
+                    spellCheck={false}
                     type="text"
                     value={model}
                     onChange={handleModelChange}
@@ -813,14 +850,14 @@ export function SettingsWorkspace() {
                   className="inline-flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50 transition-colors"
                 >
                   {isTesting ? (
-                    <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                    <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden="true" />
                   ) : (
-                    <Server className="h-4 w-4 shrink-0" />
+                    <Server className="h-4 w-4 shrink-0" aria-hidden="true" />
                   )}
                   {isTesting
-                    ? "Testing Connection..."
+                    ? "Testing Connection…"
                     : connectionTestState === "loading"
-                      ? "Checking session..."
+                      ? "Checking session…"
                       : "Test Connection"}
                 </button>
               )}
@@ -855,7 +892,7 @@ export function SettingsWorkspace() {
                     </div>
                     <p className="text-sm opacity-90">{testResult.message}</p>
                     {testResult.latencyMs !== undefined && (
-                      <div className="text-xs opacity-75">
+                      <div className="text-xs opacity-75 tabular-nums">
                         Latency: {testResult.latencyMs}ms
                       </div>
                     )}
@@ -894,6 +931,9 @@ export function SettingsWorkspace() {
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <input
                         id="settings-username"
+                        name="username"
+                        autoComplete="username"
+                        spellCheck={false}
                         value={usernameDraft}
                         onChange={(event) => setUsernameDraft(event.target.value)}
                         className="h-11 w-full rounded-md border border-hairline bg-inset px-3.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"

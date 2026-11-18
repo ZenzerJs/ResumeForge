@@ -7,9 +7,8 @@ import { Briefcase, Sparkles } from "lucide-react";
 import { ALL_QUESTIONS, COMPANY_LOGOS } from "@/lib/interview/questionDatabase";
 import { AppShell } from "@/components/design-system/app-shell";
 import { PageHeader } from "@/components/design-system/page-header";
-import { StatusPill } from "@/components/design-system/status-pill";
 import { BrandIcon, hasBrandIcon } from "@/components/design-system/brand-icon";
-import { InterviewHub, formatQuestionCountText } from "@/components/interview/interview-hub";
+import { InterviewHub } from "@/components/interview/interview-hub";
 import { extractLocationFromNotes } from "@/lib/ingestion/helpers";
 import {
   buildTrackerDisambiguators,
@@ -167,11 +166,8 @@ export function PracticeWorkspace() {
   const [mainTab, setMainTab] = useState<"questions" | "runner">(initialTab);
   const [trackedJobs, setTrackedJobs] = useState<TrackedJobOption[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string>("");
-  const [filteredQuestionCount, setFilteredQuestionCount] = useState<number>(ALL_QUESTIONS.length);
 
-  const handleFilteredCountChange = useCallback((filteredCount: number) => {
-    setFilteredQuestionCount(filteredCount);
-  }, []);
+  const handleFilteredCountChange = useCallback((_filteredCount: number) => {}, []);
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -282,12 +278,6 @@ export function PracticeWorkspace() {
             <PageHeader
               title="Interview Prep"
               description="Core algorithmic patterns, system design, and online assessments. Open a problem in the code runner when you want to write it."
-              statusBadge={
-                <StatusPill
-                  status="slate"
-                  label={formatQuestionCountText(filteredQuestionCount, ALL_QUESTIONS.length)}
-                />
-              }
             />
 
             {/* Contextual Tracked Job Selector */}

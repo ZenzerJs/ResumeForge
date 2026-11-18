@@ -41,8 +41,32 @@ import {
   type EvidenceItemWithBullets,
 } from "@/lib/matching/matcher";
 import dynamic from "next/dynamic";
-import { PatchDiffReview, preflightPatchProposal } from "./patch-diff-review";
-import { AtsScorePanel } from "./ats-score-panel";
+import { preflightPatchProposal, type PatchPreflightResult } from "./patch-preflight";
+import { useRovingTablist } from "@/lib/hooks/use-roving-tablist";
+
+const PatchDiffReview = dynamic(
+  () => import("./patch-diff-review").then((mod) => mod.PatchDiffReview),
+  {
+    loading: () => (
+      <div className="p-6 flex items-center justify-center text-muted-foreground font-mono text-xs">
+        <Loader2 className="h-4 w-4 animate-spin mr-2" aria-hidden="true" /> Loading Patch Review...
+      </div>
+    ),
+    ssr: false,
+  }
+);
+
+const AtsScorePanel = dynamic(
+  () => import("./ats-score-panel").then((mod) => mod.AtsScorePanel),
+  {
+    loading: () => (
+      <div className="p-6 flex items-center justify-center text-muted-foreground font-mono text-xs">
+        <Loader2 className="h-4 w-4 animate-spin mr-2" aria-hidden="true" /> Loading ATS Score...
+      </div>
+    ),
+    ssr: false,
+  }
+);
 
 const CoverLetterPanel = dynamic(
   () => import("./cover-letter-panel").then((mod) => mod.CoverLetterPanel),
@@ -156,6 +180,21 @@ interface RankedMatch {
     matchedRequirements: string[];
   }[];
 }
+
+const SAMPLE_INTERN_JD = `Software Engineering Intern — Nova Labs
+
+We are looking for a Software Engineering Intern to join our product engineering team.
+You will collaborate with senior engineers to build reliable backend APIs and responsive web interfaces using TypeScript, Python, and PostgreSQL.
+
+Requirements:
+- Currently pursuing a BS/MS in Computer Science or related technical field.
+- Experience with TypeScript, Python, or Go.
+- Familiarity with React, RESTful APIs, and SQL/PostgreSQL.
+- Comfort with Git and writing automated unit or integration tests.
+
+Preferred:
+- Experience with Docker or cloud platforms (AWS/GCP).
+- Coursework or projects in distributed systems or full-stack web apps.`;
 
 const SAMPLE_BACKEND_JD = `Senior Backend Engineer — Nova Labs
 
@@ -437,6 +476,7 @@ export function TailorWorkspace() {
   const isExplicitNewEntry =
     newParam === "1" || newParam === "true" || actionParam === "new";
   const isFrontendSampleEntry = sampleParam === "frontend";
+  const isBackendSampleEntry = sampleParam === "backend";
   const isExplicitSampleEntry = Boolean(sampleParam);
   const hasExplicitEntryOverride = Boolean(
     jobIdParam || isExplicitNewEntry || isExplicitSampleEntry || variantIdParam || searchParams.get("resumeId")
@@ -455,14 +495,18 @@ export function TailorWorkspace() {
       ? ""
       : isFrontendSampleEntry
         ? "Frontend Engineer"
-        : "Senior Backend Engineer"
+        : isBackendSampleEntry
+          ? "Senior Backend Engineer"
+          : "Software Engineering Intern"
   );
   const [rawDescription, setRawDescription] = useState(
     jobIdParam || isExplicitNewEntry
       ? ""
       : isFrontendSampleEntry
         ? SAMPLE_FRONTEND_JD
-        : SAMPLE_BACKEND_JD
+        : isBackendSampleEntry
+          ? SAMPLE_BACKEND_JD
+          : SAMPLE_INTERN_JD
   );
 
   const [extractedRequirements, setExtractedRequirements] = useState<JobRequirements | null>(
@@ -470,13 +514,21 @@ export function TailorWorkspace() {
       ? null
       : isFrontendSampleEntry
         ? parseJobDescription(SAMPLE_FRONTEND_JD)
-        : {
-            requiredSkills: ["Go", "Python", "Kubernetes", "Docker", "RESTful APIs", "PostgreSQL"],
-            preferredSkills: ["AWS/GCP", "GraphQL"],
-            domainTerms: ["Distributed Systems", "Microservices"],
-            roleTitle: "Senior Backend Engineer",
-            company: "Nova Labs",
-          }
+        : isBackendSampleEntry
+          ? {
+              requiredSkills: ["Go", "Python", "Kubernetes", "Docker", "RESTful APIs", "PostgreSQL"],
+              preferredSkills: ["AWS/GCP", "GraphQL"],
+              domainTerms: ["Distributed Systems", "Microservices"],
+              roleTitle: "Senior Backend Engineer",
+              company: "Nova Labs",
+            }
+          : {
+              requiredSkills: ["TypeScript", "Python", "React", "RESTful APIs", "PostgreSQL", "Git"],
+              preferredSkills: ["Docker", "AWS/GCP"],
+              domainTerms: ["Product Engineering", "Full-Stack Web Apps"],
+              roleTitle: "Software Engineering Intern",
+              company: "Nova Labs",
+            }
   );
 
   const [selectedRoleProfile, setSelectedRoleProfile] = useState<RoleProfile>(
@@ -625,11 +677,18 @@ export function TailorWorkspace() {
     message: string;
   } | null>(null);
   const userEditedRef = useRef(false);
+  const [isJdDirty, setIsJdDirty] = useState(false);
+  const generatePatchesAbortRef = useRef<AbortController | null>(null);
   const saveQueueRef = useRef(Promise.resolve());
   const roleTitleRef = useRef(roleTitle);
   const scanGenerationRef = useRef(0);
   roleTitleRef.current = roleTitle;
-  const tabListRef = useRef<HTMLDivElement>(null);
+  const { tablistRef: tabListRef, getTabProps: getPrimaryTabProps } = useRovingTablist(
+    activeTab === "3-pane" ? 1 : 0
+  );
+  const { tablistRef: jobSubTablistRef, getTabProps: getJobSubTabProps } = useRovingTablist(
+    jobInfoSubTab === "original" ? 0 : 1
+  );
   const [tabIndicator, setTabIndicator] = useState<{
     left: number;
     top: number;
@@ -647,6 +706,27 @@ export function TailorWorkspace() {
     checked: boolean;
     ready: boolean;
   }>({ checked: false, ready: false });
+
+  useEffect(() => {
+    return () => {
+      generatePatchesAbortRef.current?.abort();
+    };
+  }, []);
+
+  const hasUnsavedWork =
+    isJdDirty ||
+    Object.values(patchDecisions).some((d) => d !== "pending") ||
+    Boolean(coverLetterDraft);
+
+  useEffect(() => {
+    if (!hasUnsavedWork) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedWork]);
 
   const refreshProviderStatus = useCallback(async () => {
     try {
@@ -1002,6 +1082,7 @@ export function TailorWorkspace() {
       if (!opts?.silent) {
         setSaveStatus("Job saved to local workspace.");
       }
+      setIsJdDirty(false);
       return localId;
     };
 
@@ -1039,6 +1120,7 @@ export function TailorWorkspace() {
             if (!opts?.silent) {
               setSaveStatus("Job posting saved to database.");
             }
+            setIsJdDirty(false);
             return existingId;
           }
           if (updateStatus === 404) {
@@ -1093,6 +1175,7 @@ export function TailorWorkspace() {
         if (!opts?.silent) {
           setSaveStatus("Job posting saved to database.");
         }
+        setIsJdDirty(false);
         return saveJson.data.id;
       }
       if (saveStatusCode === 401 || saveJson?.code === "GUEST_READ_ONLY") {
@@ -1140,6 +1223,10 @@ export function TailorWorkspace() {
       return;
     }
 
+    generatePatchesAbortRef.current?.abort();
+    const controller = new AbortController();
+    generatePatchesAbortRef.current = controller;
+
     setIsGeneratingPatches(true);
     setPatchStage("connecting");
     setPatchError(null);
@@ -1157,6 +1244,7 @@ export function TailorWorkspace() {
 
     try {
       const demoConfig = await fetchDemoConfig();
+      if (controller.signal.aborted) return;
       const isDemo = demoConfig?.demoMode === true;
       let jobId: string | null = null;
       let demoContext: ReturnType<typeof getDemoContextFromBrowser>;
@@ -1169,6 +1257,7 @@ export function TailorWorkspace() {
         setDemoPatchBaseSource(currentSource);
       } else {
         jobId = await ensureJobSaved({ forceUpdate: false, silent: true });
+        if (controller.signal.aborted) return;
         if (!jobId) throw new Error("Failed to save job posting before patch generation.");
       }
 
@@ -1176,6 +1265,7 @@ export function TailorWorkspace() {
       const res = await fetch(isDemo ? "/api/demo/generate-patches" : "/api/ai/generate-patches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           providerConfig: {
             provider: aiSettings.provider,
@@ -1216,6 +1306,7 @@ export function TailorWorkspace() {
           demo?: boolean;
         };
       }>(res, "Failed to generate patches.");
+      if (controller.signal.aborted) return;
 
       if (!patchOk || !json?.success || !json.data) {
         const message = json?.error || patchApiError || "Failed to generate patches.";
@@ -1264,6 +1355,7 @@ export function TailorWorkspace() {
       void loadEvidenceMetadata(isDemo);
       setPatchStage("done");
     } catch (err) {
+      if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) return;
       const errMessage = err instanceof Error ? err.message : String(err);
       if (isProviderFailureForStatus(0, errMessage)) {
         markProviderConnectionStatus(aiSettings.provider, false);
@@ -1272,7 +1364,9 @@ export function TailorWorkspace() {
       setPatchError(`Error: ${errMessage}`);
       setPatchStage("error");
     } finally {
-      setIsGeneratingPatches(false);
+      if (!controller.signal.aborted) {
+        setIsGeneratingPatches(false);
+      }
     }
   };
 
@@ -1422,6 +1516,7 @@ export function TailorWorkspace() {
     setIsLoadingJob(true);
     setJobLoadError(null);
     userEditedRef.current = false;
+    setIsJdDirty(false);
     setCoverLetterDraft(null);
     setExtractedRequirements(null);
     setMatches([]);
@@ -1625,11 +1720,6 @@ export function TailorWorkspace() {
     savedJobId,
   ]);
 
-  const highlightedJdView = useMemo(
-    () => renderHighlightedJd(rawDescription, extractedRequirements?.requiredSkills ?? []),
-    [rawDescription, extractedRequirements?.requiredSkills]
-  );
-
   const pendingRescanRef = useRef(false);
 
   // Auto-rescan debounce when rawDescription changes (runs before auto-save to prevent double DB writes)
@@ -1777,7 +1867,7 @@ export function TailorWorkspace() {
     return () => {
       observer?.disconnect();
     };
-  }, [activeTab, isBootstrapping, isLoadingJob]);
+  }, [activeTab, isBootstrapping, isLoadingJob, tabListRef]);
 
   const tabButtonClass = (tab: TailorPrimaryTab) =>
     `relative z-10 flex min-h-11 items-center gap-1.5 sm:gap-2 rounded-lg px-2.5 sm:px-3 text-sm font-medium whitespace-nowrap transition-colors ${
@@ -1796,20 +1886,21 @@ export function TailorWorkspace() {
     return map;
   }, [evidenceMetadata]);
 
-  const actionablePreviewPatches = useMemo(() => {
+  const preflightById = useMemo(() => {
     const baseTypstSource =
       masterResumeId === "demo-local" ? demoPatchBaseSource : patchBatch?.baseTypstSource;
     const currentMaster = masterTypstSource || activeVariantContent;
     const ackArray = Array.from(acknowledgedSkills);
-    return patchVerified.filter(
-      (patch) =>
-        !preflightPatchProposal(patch, {
-          validationContext,
-          baseTypstSource,
-          masterTypstSource: currentMaster,
-          acknowledgedSkills: ackArray,
-        }).blocked
-    );
+    const map: Record<string, PatchPreflightResult> = {};
+    for (const patch of patchVerified) {
+      map[patch.id] = preflightPatchProposal(patch, {
+        validationContext,
+        baseTypstSource,
+        masterTypstSource: currentMaster,
+        acknowledgedSkills: ackArray,
+      });
+    }
+    return map;
   }, [
     patchVerified,
     masterResumeId,
@@ -1821,12 +1912,33 @@ export function TailorWorkspace() {
     acknowledgedSkills,
   ]);
 
+  const actionablePreviewPatches = useMemo(
+    () => patchVerified.filter((patch) => !preflightById[patch.id]?.blocked),
+    [patchVerified, preflightById]
+  );
+
   const effectiveSecondaryTab: "preview" | "ats" | "job" =
     actionablePreviewPatches.length === 0 && secondaryDeskTab === "preview" ? "ats" : secondaryDeskTab;
 
+  const { tablistRef: secondaryTablistRef, getTabProps: getSecondaryTabProps } = useRovingTablist(
+    (["preview", "ats", "job"] as const).indexOf(effectiveSecondaryTab)
+  );
+
+  const isHighlightedJdVisible =
+    showJobContextSheet || (activeTab === "3-pane" && effectiveSecondaryTab === "job");
+
+  const highlightedJdView = useMemo(
+    () =>
+      isHighlightedJdVisible
+        ? renderHighlightedJd(rawDescription, extractedRequirements?.requiredSkills ?? [])
+        : null,
+    [isHighlightedJdVisible, rawDescription, extractedRequirements?.requiredSkills]
+  );
+
   const isSampleJob =
     !savedJobId &&
-    ((company === "Nova Labs" && rawDescription === SAMPLE_BACKEND_JD) ||
+    ((company === "Nova Labs" &&
+      (rawDescription === SAMPLE_INTERN_JD || rawDescription === SAMPLE_BACKEND_JD)) ||
       (company === "WebCraft Systems" && rawDescription === SAMPLE_FRONTEND_JD));
   const hasJobRequirements = extractedRequirements !== null;
   const hasJobDescription = Boolean(rawDescription.trim());
@@ -1977,6 +2089,7 @@ export function TailorWorkspace() {
 
   const updateJobDescription = (description: string) => {
     userEditedRef.current = true;
+    setIsJdDirty(true);
     setHasExplicitJobSelection(Boolean(description.trim()));
     setJobLoadError(null);
     scanGenerationRef.current++;
@@ -1992,6 +2105,7 @@ export function TailorWorkspace() {
     setSavedJobId(null);
     setHasExplicitJobSelection(false);
     userEditedRef.current = false;
+    setIsJdDirty(false);
     setJobLoadError(null);
     setCompany("");
     setRoleTitle("");
@@ -2019,10 +2133,10 @@ export function TailorWorkspace() {
 
   return (
     <AppShell variant="tailor">
-      <div className="relative z-10 flex-1 pt-4 md:pt-8 pb-12 px-4 md:px-8 max-w-[1600px] mx-auto w-full font-body-regular motion-reduce:[&_*]:transition-none motion-reduce:[&_.animate-spin]:animate-none motion-reduce:[&_.animate-pulse]:animate-none">
+      <div className="relative z-10 flex-1 pt-3 md:pt-8 pb-12 scroll-pb-20 px-4 md:px-8 max-w-[1600px] mx-auto w-full font-body-regular motion-reduce:[&_*]:transition-none motion-reduce:[&_.animate-spin]:animate-none motion-reduce:[&_.animate-pulse]:animate-none">
         <PageHeader
           title="Tailor"
-          className="mb-4 gap-3 md:[&>div:last-child]:max-w-none"
+          className="mb-3 sm:mb-4 gap-3 md:[&>div:last-child]:max-w-none"
           statusBadge={
             isAutoScanning ? (
               <span
@@ -2182,21 +2296,24 @@ export function TailorWorkspace() {
 
         <div
           data-testid="active-job-header-banner"
-          className="mb-4 rounded-xl surface-raised edge-glow px-4 py-3 flex flex-wrap items-center justify-between gap-2 sm:px-5"
+          className="mb-3 sm:mb-4 rounded-xl surface-raised edge-glow px-3 py-2.5 flex flex-wrap items-center justify-between gap-2 sm:px-5 sm:py-3"
         >
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs font-medium text-muted-foreground">{company || "Untitled company"}</p>
+              <p className="text-xs font-medium text-muted-foreground">
+                {company || "Untitled company"}
+                <span className="sm:hidden"> · {savedJobId ? "Saved" : isSampleJob ? "Sample" : "Draft"}</span>
+              </p>
               {isSampleJob && (
                 <span
                   data-testid="sample-job-badge"
-                  className="inline-flex items-center rounded-full border border-status-warning/40 bg-status-warning/15 px-2 py-0.5 text-xs font-semibold text-status-warning"
+                  className="hidden sm:inline-flex items-center rounded-full border border-status-warning/40 bg-status-warning/15 px-2 py-0.5 text-xs font-semibold text-status-warning"
                 >
                   Sample job
                 </span>
               )}
             </div>
-            <p className="mt-0.5 break-words text-xl font-semibold leading-snug text-foreground">
+            <p className="mt-0.5 break-words text-lg sm:text-xl font-semibold leading-snug text-foreground">
               {roleTitle || "Untitled role"}
             </p>
           </div>
@@ -2208,11 +2325,11 @@ export function TailorWorkspace() {
                 onClick={handleClearSampleJob}
                 className="min-h-8 inline-flex items-center gap-1 rounded-md border border-control bg-panel px-2.5 py-1 font-sans text-xs font-medium text-foreground hover:bg-elevated transition-colors"
               >
-                <X className="h-3.5 w-3.5" aria-hidden />
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
                 Clear sample &amp; paste job
               </button>
             )}
-            <span className="rounded-md border border-hairline bg-elevated px-2.5 py-1 text-on-surface-variant">
+            <span className="hidden sm:inline-flex rounded-md border border-hairline bg-elevated px-2.5 py-1 text-on-surface-variant">
               {savedJobId ? "Saved posting" : isSampleJob ? "Sample preset" : "Working draft"}
             </span>
             {atsResult && (
@@ -2220,7 +2337,7 @@ export function TailorWorkspace() {
                 ATS {atsResult.overallScore}%
               </span>
             )}
-            <div className="inline-flex min-h-10 min-w-0 max-w-full items-center gap-2 rounded-md border border-hairline bg-panel px-2.5 py-1 font-sans">
+            <div className="inline-flex min-h-10 min-w-0 max-w-full items-center gap-2 font-sans">
               <label
                 htmlFor="tailor-role-profile-select"
                 className="shrink-0 whitespace-nowrap text-xs font-medium leading-none text-muted-foreground"
@@ -2231,7 +2348,7 @@ export function TailorWorkspace() {
                 id="tailor-role-profile-select"
                 value={selectedRoleProfile}
                 onChange={(e) => setSelectedRoleProfile(e.target.value as RoleProfile)}
-                className="h-8 min-w-0 max-w-full cursor-pointer rounded bg-transparent py-0 text-sm font-medium leading-normal text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+                className="h-9 min-w-0 max-w-full cursor-pointer rounded-md border border-hairline bg-inset px-2.5 py-0 text-sm font-medium leading-normal text-foreground focus-visible:outline-2 focus-visible:outline-primary"
                 data-testid="tailor-role-profile-select"
               >
                 {ROLE_PROFILES.map((profile) => (
@@ -2360,21 +2477,6 @@ export function TailorWorkspace() {
             className="relative inline-flex max-w-full items-center gap-1 rounded-xl border p-1 glass-bar [&>button:focus-visible]:outline [&>button:focus-visible]:outline-2 [&>button:focus-visible]:outline-primary [&>button:focus-visible]:outline-offset-2"
             role="tablist"
             aria-label="Tailor views"
-            onKeyDown={(event) => {
-              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-              const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-              const current = tabs.indexOf(document.activeElement as HTMLButtonElement);
-              if (current < 0) return;
-              const next =
-                event.key === "Home"
-                  ? 0
-                  : event.key === "End"
-                  ? tabs.length - 1
-                  : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
-              event.preventDefault();
-              tabs[next].focus();
-              tabs[next].click();
-            }}
           >
             <span
               aria-hidden="true"
@@ -2399,7 +2501,7 @@ export function TailorWorkspace() {
               role="tab"
               id="tailor-tab-job-info"
               aria-controls="tailor-view-panel"
-              tabIndex={activeTab === "3-pane" ? -1 : 0}
+              {...getPrimaryTabProps(0)}
               aria-selected={activeTab === "job-info"}
               onClick={() => selectTab("job-info")}
               data-testid="tailor-tab-job-info"
@@ -2414,7 +2516,7 @@ export function TailorWorkspace() {
               role="tab"
               id="tailor-tab-3-pane"
               aria-controls="tailor-view-panel"
-              tabIndex={activeTab === "3-pane" ? 0 : -1}
+              {...getPrimaryTabProps(1)}
               aria-selected={activeTab === "3-pane"}
               onClick={() => selectTab("3-pane")}
               data-testid="tailor-tab-3-pane"
@@ -2598,6 +2700,7 @@ export function TailorWorkspace() {
                     tailorTab={activeTab}
                     masterResumeId={masterResumeId === "demo-local" ? null : masterResumeId}
                     editorMode={editorMode}
+                    preflightById={preflightById}
                     onApplySuccess={(variantId, mergedContent) => {
                       setActiveVariantContent(mergedContent);
                       clearPendingReviewChoices();
@@ -2650,10 +2753,16 @@ export function TailorWorkspace() {
                 data-testid="tailor-pane-right"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-hairline">
-                  <div className="flex items-center gap-1 rounded-lg border border-hairline bg-inset p-1" role="tablist" aria-label="Review details">
+                  <div
+                    ref={secondaryTablistRef}
+                    className="flex items-center gap-1 rounded-lg border border-hairline bg-inset p-1"
+                    role="tablist"
+                    aria-label="Review details"
+                  >
                     <button
                       type="button"
                       role="tab"
+                      {...getSecondaryTabProps(0)}
                       aria-selected={effectiveSecondaryTab === "preview"}
                       disabled={actionablePreviewPatches.length === 0}
                       onClick={() => setSecondaryDeskTab("preview")}
@@ -2670,6 +2779,7 @@ export function TailorWorkspace() {
                     <button
                       type="button"
                       role="tab"
+                      {...getSecondaryTabProps(1)}
                       aria-selected={effectiveSecondaryTab === "ats"}
                       onClick={() => setSecondaryDeskTab("ats")}
                       data-testid="workspace-secondary-ats-tab"
@@ -2685,6 +2795,7 @@ export function TailorWorkspace() {
                     <button
                       type="button"
                       role="tab"
+                      {...getSecondaryTabProps(2)}
                       aria-selected={effectiveSecondaryTab === "job"}
                       onClick={() => setSecondaryDeskTab("job")}
                       data-testid="workspace-secondary-job-tab"
@@ -2990,9 +3101,17 @@ export function TailorWorkspace() {
                   )}
 
                   {/* Sub-tab Selector */}
-                  <div className="flex flex-wrap items-center gap-1 rounded-lg bg-inset p-1 mb-3 sm:mb-5">
+                  <div
+                    ref={jobSubTablistRef}
+                    role="tablist"
+                    aria-label="Job input views"
+                    className="flex flex-wrap items-center gap-1 rounded-lg bg-inset p-1 mb-3 sm:mb-5"
+                  >
                     <button
                       type="button"
+                      role="tab"
+                      aria-selected={jobInfoSubTab === "original"}
+                      {...getJobSubTabProps(0)}
                       onClick={() => setJobInfoSubTab("original")}
                       data-testid="job-subtab-original"
                       className={`min-h-11 px-3 text-sm rounded-md transition-colors ${
@@ -3005,6 +3124,9 @@ export function TailorWorkspace() {
                     </button>
                     <button
                       type="button"
+                      role="tab"
+                      aria-selected={jobInfoSubTab === "structured"}
+                      {...getJobSubTabProps(1)}
                       onClick={() => setJobInfoSubTab("structured")}
                       data-testid="job-subtab-structured"
                       className={`min-h-11 px-3 text-sm rounded-md transition-colors ${
@@ -3146,6 +3268,7 @@ export function TailorWorkspace() {
                             value={company}
                             onChange={(e) => {
                               userEditedRef.current = true;
+                              setIsJdDirty(true);
                               setHasExplicitJobSelection(true);
                               setCompany(e.target.value);
                             }}
@@ -3162,6 +3285,7 @@ export function TailorWorkspace() {
                             value={roleTitle}
                             onChange={(e) => {
                               userEditedRef.current = true;
+                              setIsJdDirty(true);
                               setHasExplicitJobSelection(true);
                               setRoleTitle(e.target.value);
                             }}
