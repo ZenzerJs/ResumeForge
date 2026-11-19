@@ -965,7 +965,7 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
               </h1>
 
               <p className="text-on-surface-variant text-base md:text-lg max-w-xl leading-relaxed">
-                Built for internship and early-career applicants. Tailor a protected master resume to each role, review every proposed edit before it applies, and use your own AI key.
+                Built first for SWE and technical internship applicants. Tailor a protected master resume to each role, review every proposed edit before it applies, and use your own AI key.
               </p>
 
               <div className="flex items-center gap-4 pt-2 flex-wrap">

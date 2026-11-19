@@ -486,6 +486,12 @@ export function AtsScorePanel({
               : `Rule-based evaluation of your ${sourceLabel}${includeEvidenceBank ? " + Evidence Bank" : ""} against job description & role overlay.`}
           </p>
           <p
+            data-testid="ats-methodology-note"
+            className="mt-1 text-xs text-muted-foreground leading-relaxed"
+          >
+            Rule-based parseability &amp; JD requirement check — not an employer ATS.
+          </p>
+          <p
             data-testid="ats-evaluated-source"
             className="mt-1.5 text-xs font-mono text-text-secondary"
           >

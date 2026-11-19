@@ -245,6 +245,96 @@ function stripTypstCommentsAndPreamble(source: string): string {
   return result.trim();
 }
 
+const ENGINEERING_SPECIFICITY_PATTERNS: RegExp[] = [
+  // APIs, protocols, and backend interfaces
+  /\b(?:restful(?:\s+apis?)?|rest\s+(?:apis?|endpoints?|services?|clients?|backends?)|graphql|grpc|trpc|openapi|swagger|websockets?|server-sent\s+events|webhooks?|api\s+(?:endpoints?|routes?|gateway|client|server|layer|contracts?|integrations?)|(?:backend|public|internal|external)\s+apis?|endpoints?|middleware|rate[\s-]limit(?:er|ing)|pagination|idempoten(?:t|cy)|sdk|rpc)\b/i,
+  // Case-sensitive technical acronyms (avoids matching common English words like "rest" or "rag")
+  /\b(?:REST|API|APIs|SSE|RAG|ISR|ORM|SQL|ETL|ELT|CI\/CD|JWT|SSO|MFA|RBAC|WCAG|ARIA|SSR|CLI)\b/,
+  // Concrete systems and components built
+  /\b(?:microservices?|monorepo|pub\/sub|event\s+bus|message\s+(?:queue|broker)|state\s+machine|compilers?|parsers?|lexers?|interpreters?|schedulers?|search\s+(?:engine|index)|query\s+engine|sync\s+engine|cli\s+tools?|reverse\s+proxy|load\s+balanc(?:er|ing)|design\s+system|component\s+library|browser\s+extension|real[\s-]time|offline[\s-]first|multi[\s-]threaded|distributed\s+lock|full[\s-]text\s+search|type[\s-]safe|(?:csv|json|pdf|markdown|typst|xml)\s+(?:export(?:s|ing)?|import(?:s|ing)?|pars(?:er|ing)|render(?:er|ing)|generat(?:or|ion)|processing)|open[\s-]sourced|published\s+(?:to|on)\s+(?:npm|pypi|crates\.io|chrome\s+web\s+store|app\s+store|play\s+store))\b/i,
+  // Databases, schemas, and persistence
+  /\b(?:postgres(?:ql)?|mysql|sqlite|mongodb|dynamodb|redis|memcached|prisma|drizzle|sqlalchemy|typeorm|mongoose|supabase|firestore|bigquery|snowflake|elasticsearch|pgvector|indexeddb|localstorage|sql\s+(?:quer(?:y|ies)|schemas?)|database\s+(?:schemas?|index(?:es|ing)?|migrations?|model(?:ing|s)?|quer(?:y|ies))|schemas?|migrations?|composite\s+index(?:es)?|b-tree|foreign\s+keys?|connection\s+pool(?:ing)?|acid\s+transactions?|row[\s-]level\s+security|vector\s+(?:search|store|db|database))\b/i,
+  // Authentication, authorization, and security
+  /\b(?:oauth(?:2)?|oidc|jwt|saml|sso|mfa|2fa|rbac|role[\s-]based\s+access(?:\s+control)?|acl|pkce|csrf|xss|cors|csp|tls|bcrypt|argon2|encryption|authentication|authorization|auth\s+(?:flow|middleware|session|tokens?)|session\s+(?:management|handling|cookies?|tokens?)|cookie[\s-]based\s+auth|input\s+validation|sanitiz(?:ation|ing)|zod|nextauth|better[\s-]auth|clerk\s+auth|auth0)\b/i,
+  // Caching, pipelines, queues, and AI/ML engineering
+  /\b(?:cach(?:ing|e\s+(?:invalidation|layer|strategy|headers?))|lru\s+cache|ttl|etag|memoiz(?:ation|ed)|(?:data|ingestion|streaming|build|deploy(?:ment)?|ci\/cd)\s+pipelines?|kafka|rabbitmq|bullmq|celery|sqs|airflow|apache\s+spark|pyspark|dbt|cron\s+jobs?|background\s+(?:jobs?|workers?)|worker\s+(?:queue|pool|threads?)|retrieval[\s-]augmented|embeddings?|fine[\s-]tun(?:ed|ing)|quantiz(?:ation|ed)|pytorch|tensorflow|scikit[\s-]learn|eval(?:uation)?\s+harness|prompt\s+injection|guardrails|structured\s+output)\b/i,
+  // Testing, CI/CD, containerization, and infra
+  /\b(?:unit\s+tests?|integration\s+tests?|e2e\s+tests?|end-to-end(?:\s+tests?)?|regression\s+tests?|load\s+tests?|test\s+(?:suite|coverage|harness|cases)|vitest|jest|pytest|playwright|cypress|selenium|junit|testing\s+library|github\s+actions|gitlab\s+ci|circleci|jenkins|docker(?:file)?|containeriz(?:ed|ation)|kubernetes|k8s|helm\s+charts?|terraform|ansible|nginx|vercel|aws\s+(?:lambda|ecs|eks|s3|rds|ec2|cloudfront)|gcp|cloud\s+run|webassembly|wasm)\b/i,
+  // Accessibility, UI engineering, and latency/reliability constraints
+  /\b(?:accessibility|a11y|wcag|aria|screen\s+readers?|keyboard\s+navigation|focus\s+(?:management|trapping)|color\s+contrast|semantic\s+html|server[\s-]side\s+rendering|hydration|virtualiz(?:ed|ation)|optimistic\s+(?:ui|updates?)|code\s+splitting|lazy\s+loading|bundle\s+size|responsive\s+(?:layout|grid|design)|service\s+workers?|webgl|three\.js|codemirror|latency|p9[59]|throughput|backpressure|exponential\s+backoff|retry\s+(?:logic|policy|backoff)|circuit\s+breaker|dead[\s-]letter|fault[\s-]toleran(?:t|ce)|graceful\s+degradation|race\s+conditions?|concurrency|mutex|thread[\s-]safe|observability|opentelemetry|prometheus|grafana|sentry|structured\s+logging|distributed\s+tracing)\b/i,
+];
+
+const MEASURED_METRIC_PATTERN =
+  /\b\d[\d,]*(?:\.\d+)?\s*%|\$\s*\d[\d,]*(?:\.\d+)?(?:\s*[kmb]\b)?|\b\d[\d,]*(?:\.\d+)?\s*(?:k|m|b)?\+?\s*(?:ms|req\/s|rps|qps|requests?(?:\/(?:s|sec|min|day))?|(?:(?:daily|monthly|active|concurrent|registered)\s+)*users)\b|\b\d+(?:\.\d+)?x\b/i;
+
+/**
+ * Extracts accomplishment bullet text (and non-header body text fallback) while
+ * excluding Education/Coursework headers and lines so keyword lists outside
+ * experience/project bullets do not satisfy engineering specificity checks.
+ */
+function extractAccomplishmentText(cleanBody: string): string {
+  const lines = cleanBody.split("\n");
+  const bulletLines: string[] = [];
+  const fallbackLines: string[] = [];
+
+  let inExcludedSection = false;
+  let inBullet = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const sectionCallMatch = trimmed.match(
+      /^#(?:resume-)?section\s*\(\s*"((?:\\.|[^"\\])*)"(?:\s*,|\s*\))/i
+    );
+    const isHeader =
+      Boolean(sectionCallMatch) ||
+      line.includes("resume-section") ||
+      line.includes("#heading") ||
+      /^(=+)\s+/.test(trimmed);
+
+    if (isHeader) {
+      const headingText = sectionCallMatch ? sectionCallMatch[1] : trimmed;
+      inExcludedSection = /education|academic|coursework|skills|technologies|tools/i.test(
+        headingText
+      );
+      inBullet = false;
+      continue;
+    }
+
+    if (inExcludedSection || !trimmed) {
+      inBullet = false;
+      continue;
+    }
+
+    const isRoleOrClosingLine =
+      /^\*[^*]+\*\s*(?:\||$)/.test(trimmed) ||
+      /^#(?:entry|cventry|resume-entry)\b/i.test(trimmed) ||
+      /^[\]\)}]+$/.test(trimmed);
+
+    const isBulletStart =
+      /^(?:[-+•])\s+/.test(trimmed) ||
+      /^#(?:resume-)?(?:item|bullet)\b/i.test(trimmed) ||
+      /^(?:#?list\.item)\b/i.test(trimmed);
+
+    if (isBulletStart) {
+      bulletLines.push(trimmed);
+      inBullet = true;
+      continue;
+    }
+
+    if (inBullet && !isRoleOrClosingLine) {
+      bulletLines.push(trimmed);
+      continue;
+    }
+
+    inBullet = false;
+    if (!isRoleOrClosingLine) {
+      fallbackLines.push(trimmed);
+    }
+  }
+
+  return (bulletLines.length > 0 ? bulletLines : fallbackLines).join("\n");
+}
+
 function evaluateBaseHealth(
   fullContent: string,
   bodyText: string,
@@ -255,6 +345,8 @@ function evaluateBaseHealth(
   const maxScore = 30;
   const findings: string[] = [];
   const cleanContent = stripTypstCommentsAndPreamble(fullContent);
+  const cleanBody = stripTypstCommentsAndPreamble(bodyText);
+  const accomplishmentText = extractAccomplishmentText(cleanBody);
 
   // Sub-check A: ATS Readability & Page Fit (8 pts)
   let readabilityPts = 0;
@@ -290,12 +382,29 @@ function evaluateBaseHealth(
     findings.push("Warning: No live links or GitHub repository URLs found.");
   }
 
-  // Quantitative metrics check (digits followed by %, $, x, ms, users, etc.)
-  if (/\d+%\s*|\$\d+|\d+\s*ms|\d+\s*users|\d+x/i.test(cleanContent)) {
+  // Concrete engineering specificity OR real measured metrics (4 pts)
+  const hasEngineeringSpecifics = ENGINEERING_SPECIFICITY_PATTERNS.some((pattern) =>
+    pattern.test(accomplishmentText)
+  );
+  const hasMeasuredMetrics = MEASURED_METRIC_PATTERN.test(accomplishmentText);
+
+  if (hasEngineeringSpecifics && hasMeasuredMetrics) {
     qualityPts += 4;
-    findings.push("✓ Quantitative impact metrics present in accomplishments.");
+    findings.push(
+      "✓ Accomplishments demonstrate concrete engineering specifics and measured impact."
+    );
+  } else if (hasEngineeringSpecifics) {
+    qualityPts += 4;
+    findings.push(
+      "✓ Accomplishments demonstrate concrete engineering specifics and technical scope."
+    );
+  } else if (hasMeasuredMetrics) {
+    qualityPts += 4;
+    findings.push("✓ Accomplishments demonstrate measured impact metrics.");
   } else {
-    findings.push("Warning: Few or no quantitative metrics found in experience bullets.");
+    findings.push(
+      "Warning: Accomplishments read as generic; specify concrete technical scope, systems built, or verifiable artifacts."
+    );
   }
   score += qualityPts;
 
