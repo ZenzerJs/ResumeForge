@@ -1,6 +1,21 @@
 import { TECH_SKILLS_DICTIONARY, TECH_ALIASES, DOMAIN_TERMS_DICTIONARY } from "./dictionary";
 import { JobRequirements, JobRequirementsSchema } from "./types";
 
+const TECH_TERMS_WITH_REGEX = TECH_SKILLS_DICTIONARY.map((term) => ({
+  canonical: term,
+  regex: new RegExp(`\\b${escapeRegExp(term)}\\b`, "i"),
+}));
+
+const ALIAS_TERMS_WITH_REGEX = Object.entries(TECH_ALIASES).map(([alias, canonical]) => ({
+  canonical,
+  regex: new RegExp(`\\b${escapeRegExp(alias)}\\b`, "i"),
+}));
+
+const DOMAIN_TERMS_WITH_REGEX = DOMAIN_TERMS_DICTIONARY.map((term) => ({
+  canonical: term,
+  regex: new RegExp(`\\b${escapeRegExp(term)}\\b`, "i"),
+}));
+
 export function parseJobDescription(rawText: string): JobRequirements {
   if (!rawText || !rawText.trim()) {
     return JobRequirementsSchema.parse({
@@ -22,22 +37,6 @@ export function parseJobDescription(rawText: string): JobRequirements {
 
   let currentSection: "required" | "preferred" | "general" = "general";
 
-  // Pre-build regex matchers for dictionary terms to handle word boundaries
-  const techTermsWithRegex = TECH_SKILLS_DICTIONARY.map((term) => ({
-    canonical: term,
-    regex: new RegExp(`\\b${escapeRegExp(term)}\\b`, "i"),
-  }));
-
-  const aliasTermsWithRegex = Object.entries(TECH_ALIASES).map(([alias, canonical]) => ({
-    canonical,
-    regex: new RegExp(`\\b${escapeRegExp(alias)}\\b`, "i"),
-  }));
-
-  const domainTermsWithRegex = DOMAIN_TERMS_DICTIONARY.map((term) => ({
-    canonical: term,
-    regex: new RegExp(`\\b${escapeRegExp(term)}\\b`, "i"),
-  }));
-
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
@@ -56,7 +55,7 @@ export function parseJobDescription(rawText: string): JobRequirements {
     }
 
     // Match tech skills
-    for (const { canonical, regex } of techTermsWithRegex) {
+    for (const { canonical, regex } of TECH_TERMS_WITH_REGEX) {
       if (regex.test(trimmed)) {
         if (currentSection === "preferred") {
           preferredSkillsSet.add(canonical);
@@ -67,7 +66,7 @@ export function parseJobDescription(rawText: string): JobRequirements {
     }
 
     // Match aliases
-    for (const { canonical, regex } of aliasTermsWithRegex) {
+    for (const { canonical, regex } of ALIAS_TERMS_WITH_REGEX) {
       if (regex.test(trimmed)) {
         if (currentSection === "preferred") {
           preferredSkillsSet.add(canonical);
@@ -78,7 +77,7 @@ export function parseJobDescription(rawText: string): JobRequirements {
     }
 
     // Match domain terms
-    for (const { canonical, regex } of domainTermsWithRegex) {
+    for (const { canonical, regex } of DOMAIN_TERMS_WITH_REGEX) {
       if (regex.test(trimmed)) {
         domainTermsSet.add(canonical);
       }

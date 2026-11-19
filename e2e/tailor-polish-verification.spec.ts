@@ -17,6 +17,13 @@ const score = (profile: string) => ({
   gaps: ["Add verified cloud experience if available."],
 });
 
+test.beforeEach(async ({ page }) => {
+  // Stub the hosted Analytics script for the local demo server.
+  await page.route("**/_vercel/insights/script.js", (route) =>
+    route.fulfill({ contentType: "application/javascript", body: "" })
+  );
+});
+
 async function setup(page: Page) {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
@@ -221,3 +228,100 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
     expect(errors).toEqual([]);
   });
 }
+
+test("guest sequential typing in Tailor stays intact across auto-save and auto-rescan", async ({ page }) => {
+  await page.setViewportSize({ width: 1350, height: 900 });
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+
+  await page.route("**/api/**", async (route) => {
+    const url = new URL(route.request().url());
+    const pathname = url.pathname;
+    if (pathname === "/api/demo-config") {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ demoMode: false }) });
+      return;
+    }
+    if (pathname === "/api/auth/me") {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ guest: true, data: null }) });
+      return;
+    }
+    if (pathname === "/api/resumes") {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ success: true, guest: true, data: [] }) });
+      return;
+    }
+    if (pathname === "/api/evidence") {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ success: true, guest: true, data: [] }) });
+      return;
+    }
+    if (pathname === "/api/jobs/match") {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ success: true, guest: true, data: [] }) });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ success: true, guest: true, data: [] }),
+    });
+  });
+
+  await page.goto("/tailor?new=1");
+  const jdTextarea = page.getByTestId("jd-textarea");
+  await expect(jdTextarea).toBeVisible();
+  await expect(jdTextarea).toHaveValue("");
+
+  const firstChunk =
+    "We are hiring a Software Engineer to build TypeScript and PostgreSQL services across distributed systems. ";
+  const secondChunk =
+    "Required: Python, Docker, React, and Vitest for automated quality pipelines.";
+  const fullDescription = `${firstChunk}${secondChunk}`;
+
+  await jdTextarea.click();
+  await jdTextarea.pressSequentially(firstChunk, { delay: 20 });
+  await page.waitForTimeout(1000);
+  await jdTextarea.pressSequentially(secondChunk, { delay: 20 });
+  await expect(jdTextarea).toHaveValue(fullDescription);
+
+  const roleInput = page.locator("#tailor-role");
+  const customRole = "Staff Infrastructure Architect";
+  await roleInput.click();
+  await roleInput.pressSequentially(customRole, { delay: 25 });
+  await page.waitForTimeout(1300);
+  await expect(roleInput).toBeFocused();
+  await expect(roleInput).toHaveValue(customRole);
+
+  const companyInput = page.locator("#tailor-company");
+  const customCompany = "Northwind Systems";
+  await companyInput.click();
+  await companyInput.pressSequentially(customCompany, { delay: 25 });
+  await expect(companyInput).toHaveValue(customCompany);
+
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(() => {
+          const raw = localStorage.getItem("resumeforge_guest_jobs");
+          if (!raw) return null;
+          const parsed = JSON.parse(raw) as Array<{
+            company?: string;
+            roleTitle?: string;
+            rawDescription?: string;
+          }>;
+          return parsed[0] ?? null;
+        }),
+      { timeout: 5000 }
+    )
+    .toMatchObject({
+      company: customCompany,
+      roleTitle: customRole,
+      rawDescription: fullDescription,
+      requirements: {
+        requiredSkills: expect.arrayContaining(["TypeScript", "PostgreSQL", "Python", "Docker", "React", "Vitest"]),
+      },
+    });
+
+  await expect(jdTextarea).toHaveValue(fullDescription);
+  expect(errors).toEqual([]);
+});

@@ -458,6 +458,19 @@ export function transitionTailorNavigation(
   };
 }
 
+export function shouldAutoFillRoleTitle(options: {
+  parsedRoleTitle?: string | null;
+  currentRoleTitle: string;
+  userEditedRole: boolean;
+  isRoleInputFocused: boolean;
+}): boolean {
+  if (!options.parsedRoleTitle?.trim()) return false;
+  if (options.currentRoleTitle.trim()) return false;
+  if (options.userEditedRole) return false;
+  if (options.isRoleInputFocused) return false;
+  return true;
+}
+
 export function TailorWorkspace() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -601,13 +614,18 @@ export function TailorWorkspace() {
   const [newUserReqText, setNewUserReqText] = useState("");
   const [customUserReqs, setCustomUserReqs] = useState<ProvenanceRequirement[]>([]);
 
-  const deferredDescription = useDeferredValue(rawDescription);
+  const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
+  const needsJobDoc = jobInfoSubTab === "structured" || isDiagnosticsOpen;
+  const deferredDescription = useDeferredValue(needsJobDoc ? rawDescription : "");
   const jobDoc = useMemo(() => {
+    if (!needsJobDoc) return null;
     return parseJobDescriptionDocument({
       text: deferredDescription,
       sourceKind: "PASTED",
     });
-  }, [deferredDescription]);
+  }, [needsJobDoc, deferredDescription]);
+  const jobDiagnosticsStatus =
+    jobDoc?.diagnostics.status ?? (rawDescription.trim() ? "USER_PASTED" : "PARTIAL_EXTRACTION");
 
   const [gapSkillToResolve, setGapSkillToResolve] = useState<string | null>(null);
   const [isAutoScanning, setIsAutoScanning] = useState(false);
@@ -671,12 +689,22 @@ export function TailorWorkspace() {
     message: string;
   } | null>(null);
   const userEditedRef = useRef(false);
+  const userEditedRoleRef = useRef(false);
   const [isJdDirty, setIsJdDirty] = useState(false);
   const generatePatchesAbortRef = useRef<AbortController | null>(null);
   const saveQueueRef = useRef(Promise.resolve());
   const roleTitleRef = useRef(roleTitle);
   const scanGenerationRef = useRef(0);
   roleTitleRef.current = roleTitle;
+  const companyRef = useRef(company);
+  companyRef.current = company;
+  const rawDescriptionRef = useRef(rawDescription);
+  rawDescriptionRef.current = rawDescription;
+  const extractedRequirementsRef = useRef(extractedRequirements);
+  extractedRequirementsRef.current = extractedRequirements;
+  const hasExplicitJobSelectionRef = useRef(hasExplicitJobSelection);
+  hasExplicitJobSelectionRef.current = hasExplicitJobSelection;
+  const roleInputRef = useRef<HTMLInputElement>(null);
   const { tablistRef: tabListRef, getTabProps: getPrimaryTabProps } = useRovingTablist(
     activeTab === "3-pane" ? 1 : 0
   );
@@ -696,6 +724,8 @@ export function TailorWorkspace() {
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isLoadingJob, setIsLoadingJob] = useState(Boolean(jobIdParam));
   const [restoredJobId, setRestoredJobId] = useState<string | null>(null);
+  const restoredJobIdRef = useRef(restoredJobId);
+  restoredJobIdRef.current = restoredJobId;
   const [providerConfigStatus, setProviderConfigStatus] = useState<{
     checked: boolean;
     ready: boolean;
@@ -887,6 +917,9 @@ export function TailorWorkspace() {
           if (!tabParam && entry.tab) {
             setNavState({ activeTab: entry.tab, previousTab: null });
           }
+          if (entry.jobId !== savedJobIdRef.current) {
+            setIsLoadingJob(true);
+          }
           setRestoredJobId(entry.jobId);
         }
 
@@ -1015,13 +1048,37 @@ export function TailorWorkspace() {
     requireSuccess?: boolean;
     silent?: boolean;
   }): Promise<string | null> => {
-    if (!rawDescription.trim()) return null;
+    const currentRawDescription = rawDescriptionRef.current;
+    if (!currentRawDescription.trim()) return null;
+    const currentCompany = companyRef.current;
+    const currentRoleTitle = roleTitleRef.current;
+    const currentRequirements =
+      opts?.requirements !== undefined ? opts.requirements : extractedRequirementsRef.current;
+    const currentVariantId = activeVariantIdRef.current;
+    const currentMasterResumeId = masterResumeIdRef.current;
+    const currentEditorMode = editorModeRef.current;
+
+    const savedSnapshot = {
+      rawDescription: currentRawDescription,
+      company: currentCompany,
+      roleTitle: currentRoleTitle,
+    };
+
+    const clearDirtyIfUnchanged = () => {
+      if (
+        rawDescriptionRef.current === savedSnapshot.rawDescription &&
+        companyRef.current === savedSnapshot.company &&
+        roleTitleRef.current === savedSnapshot.roleTitle
+      ) {
+        setIsJdDirty(false);
+      }
+    };
 
     const payload = {
-      company: company.trim() || undefined,
-      roleTitle: roleTitle.trim() || undefined,
-      rawDescription,
-      extractedRequirements: opts?.requirements ?? extractedRequirements ?? undefined,
+      company: currentCompany.trim() || undefined,
+      roleTitle: currentRoleTitle.trim() || undefined,
+      rawDescription: currentRawDescription,
+      extractedRequirements: currentRequirements ?? undefined,
     };
 
     const existingId = savedJobIdRef.current;
@@ -1081,16 +1138,16 @@ export function TailorWorkspace() {
           tab: activeTabRef.current,
           roleTitle: payload.roleTitle || "Target Role",
           company: payload.company || "Target Company",
-          variantId: activeVariantId ?? undefined,
-          resumeId: masterResumeId && masterResumeId !== "demo-local" ? masterResumeId : undefined,
-          mode: editorMode ?? undefined,
+          variantId: currentVariantId ?? undefined,
+          resumeId: currentMasterResumeId && currentMasterResumeId !== "demo-local" ? currentMasterResumeId : undefined,
+          mode: currentEditorMode ?? undefined,
         },
         currentScope
       );
       if (!opts?.silent) {
         setSaveStatus("Job saved to local workspace.");
       }
-      setIsJdDirty(false);
+      clearDirtyIfUnchanged();
       return localId;
     };
 
@@ -1119,16 +1176,16 @@ export function TailorWorkspace() {
                 tab: activeTabRef.current,
                 roleTitle: payload.roleTitle,
                 company: payload.company,
-                variantId: activeVariantId ?? undefined,
-                resumeId: masterResumeId && masterResumeId !== "demo-local" ? masterResumeId : undefined,
-                mode: editorMode ?? undefined,
+                variantId: currentVariantId ?? undefined,
+                resumeId: currentMasterResumeId && currentMasterResumeId !== "demo-local" ? currentMasterResumeId : undefined,
+                mode: currentEditorMode ?? undefined,
               },
               accountScopeRef.current
             );
             if (!opts?.silent) {
               setSaveStatus("Job posting saved to database.");
             }
-            setIsJdDirty(false);
+            clearDirtyIfUnchanged();
             return existingId;
           }
           if (updateStatus === 404) {
@@ -1174,16 +1231,16 @@ export function TailorWorkspace() {
             tab: activeTabRef.current,
             roleTitle: payload.roleTitle,
             company: payload.company,
-            variantId: activeVariantId ?? undefined,
-            resumeId: masterResumeId && masterResumeId !== "demo-local" ? masterResumeId : undefined,
-            mode: editorMode ?? undefined,
+            variantId: currentVariantId ?? undefined,
+            resumeId: currentMasterResumeId && currentMasterResumeId !== "demo-local" ? currentMasterResumeId : undefined,
+            mode: currentEditorMode ?? undefined,
           },
           { userId: sessionUser.id, demoMode: demoConfig?.demoMode === true, scopeResolved: true }
         );
         if (!opts?.silent) {
           setSaveStatus("Job posting saved to database.");
         }
-        setIsJdDirty(false);
+        clearDirtyIfUnchanged();
         return saveJson.data.id;
       }
       if (saveStatusCode === 401 || saveJson?.code === "GUEST_READ_ONLY") {
@@ -1201,8 +1258,14 @@ export function TailorWorkspace() {
     requirements?: JobRequirements | null;
     requireSuccess?: boolean;
     silent?: boolean;
+    scanGeneration?: number;
   }): Promise<string | null> => {
-    const run = saveQueueRef.current.then(() => saveJobNow(opts));
+    const run = saveQueueRef.current.then(() => {
+      if (opts?.scanGeneration !== undefined && opts.scanGeneration !== scanGenerationRef.current) {
+        return null;
+      }
+      return saveJobNow(opts);
+    });
     saveQueueRef.current = run.then(
       () => undefined,
       () => undefined
@@ -1426,11 +1489,12 @@ export function TailorWorkspace() {
       if (!sessionUser || demoConfig?.demoMode) {
         const parsed = parseJobDescription(rawDescription);
         setExtractedRequirements(parsed);
-        if (parsed.roleTitle && !roleTitle) {
+        if (parsed.roleTitle && !roleTitleRef.current) {
+          roleTitleRef.current = parsed.roleTitle;
           setRoleTitle(parsed.roleTitle);
         }
-        await ensureJobSaved({ forceUpdate: true, requirements: parsed });
-        await fetchMatches(parsed);
+        await ensureJobSaved({ forceUpdate: true, requirements: parsed, scanGeneration: extractGeneration });
+        if (extractGeneration === scanGenerationRef.current) await fetchMatches(parsed);
         return;
       }
 
@@ -1449,11 +1513,12 @@ export function TailorWorkspace() {
         if (status === 401 || demoConfig?.demoMode) {
           const parsed = parseJobDescription(rawDescription);
           setExtractedRequirements(parsed);
-          if (parsed.roleTitle && !roleTitle) {
+          if (parsed.roleTitle && !roleTitleRef.current) {
+            roleTitleRef.current = parsed.roleTitle;
             setRoleTitle(parsed.roleTitle);
           }
-          await ensureJobSaved({ forceUpdate: true, requirements: parsed });
-          await fetchMatches(parsed);
+          await ensureJobSaved({ forceUpdate: true, requirements: parsed, scanGeneration: extractGeneration });
+          if (extractGeneration === scanGenerationRef.current) await fetchMatches(parsed);
           return;
         }
         setErrorMessage(error || "Failed to extract requirements.");
@@ -1462,14 +1527,15 @@ export function TailorWorkspace() {
       }
 
       setExtractedRequirements(json.data);
-      if (json.data.roleTitle && !roleTitle) {
+      if (json.data.roleTitle && !roleTitleRef.current) {
+        roleTitleRef.current = json.data.roleTitle;
         setRoleTitle(json.data.roleTitle);
       }
 
       // Persist posting + extracted requirements into PostgreSQL
-      await ensureJobSaved({ forceUpdate: true, requirements: json.data });
+      await ensureJobSaved({ forceUpdate: true, requirements: json.data, scanGeneration: extractGeneration });
 
-      await fetchMatches(json.data);
+      if (extractGeneration === scanGenerationRef.current) await fetchMatches(json.data);
     } catch (err) {
       if (extractGeneration !== scanGenerationRef.current) return;
       setErrorMessage(err instanceof Error ? err.message : String(err));
@@ -1512,6 +1578,7 @@ export function TailorWorkspace() {
         guest?: boolean;
         data?: RankedMatch[];
       }>(res);
+      if (signal?.aborted) return;
       if (ok && json?.success && json.guest) {
         setMatches(matchGuestEvidenceLocally(reqs));
       } else if (ok && json?.success && Array.isArray(json.data)) {
@@ -1538,6 +1605,7 @@ export function TailorWorkspace() {
     setIsLoadingJob(true);
     setJobLoadError(null);
     userEditedRef.current = false;
+    userEditedRoleRef.current = false;
     setIsJdDirty(false);
     setCoverLetterDraft(null);
     setExtractedRequirements(null);
@@ -1699,17 +1767,30 @@ export function TailorWorkspace() {
     };
   }, [extractedRequirements, coveredSkills]);
 
-  useEffect(() => {
+  const pendingActiveJobSyncRef = useRef(false);
+
+  const syncActiveTailorJobStorage = useCallback(() => {
     if (typeof window === "undefined") return;
-    if (accountScope.scopeResolved === false || isBootstrapping || isLoadingJob) return;
-    const scopeKey = resolveApplicationScopeKey(accountScope);
+    if (accountScopeRef.current.scopeResolved === false || isBootstrapping || isLoadingJob) return;
+    const scopeKey = resolveApplicationScopeKey(accountScopeRef.current);
     if (!scopeKey) return;
+    const currentRaw = rawDescriptionRef.current;
+    const currentRole = roleTitleRef.current;
+    const currentCompany = companyRef.current;
+    const currentSavedJobId = savedJobIdRef.current;
+    const currentReqs = extractedRequirementsRef.current;
+    pendingActiveJobSyncRef.current = false;
     try {
-      if (!rawDescription.trim() && !roleTitle.trim() && !company.trim() && !savedJobId) {
+      if (!currentRaw.trim() && !currentRole.trim() && !currentCompany.trim() && !currentSavedJobId) {
         sessionStorage.removeItem("resumeforge_active_tailor_job");
         return;
       }
-      if (!hasExplicitJobSelection && !savedJobId && !restoredJobId && !userEditedRef.current) {
+      if (
+        !hasExplicitJobSelectionRef.current &&
+        !currentSavedJobId &&
+        !restoredJobIdRef.current &&
+        !userEditedRef.current
+      ) {
         return;
       }
       sessionStorage.setItem(
@@ -1717,11 +1798,11 @@ export function TailorWorkspace() {
         JSON.stringify({
           scopeKey,
           job: {
-            jobId: savedJobId || undefined,
-            roleTitle: roleTitle.trim() || undefined,
-            company: company.trim() || undefined,
-            rawDescription: rawDescription.trim() ? rawDescription.slice(0, 4000) : undefined,
-            extractedRequirements: extractedRequirements ?? undefined,
+            jobId: currentSavedJobId || undefined,
+            roleTitle: currentRole.trim() || undefined,
+            company: currentCompany.trim() || undefined,
+            rawDescription: currentRaw.trim() ? currentRaw.slice(0, 4000) : undefined,
+            extractedRequirements: currentReqs ?? undefined,
             updatedAt: Date.now(),
           },
         })
@@ -1729,6 +1810,20 @@ export function TailorWorkspace() {
     } catch {
       // Ignore storage write errors
     }
+  }, [isBootstrapping, isLoadingJob]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (accountScope.scopeResolved === false || isBootstrapping || isLoadingJob) return;
+    if (!rawDescription.trim() && !roleTitle.trim() && !company.trim() && !savedJobId) {
+      syncActiveTailorJobStorage();
+      return;
+    }
+    pendingActiveJobSyncRef.current = true;
+    const timer = window.setTimeout(syncActiveTailorJobStorage, 250);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [
     accountScope,
     company,
@@ -1740,7 +1835,16 @@ export function TailorWorkspace() {
     restoredJobId,
     roleTitle,
     savedJobId,
+    syncActiveTailorJobStorage,
   ]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingActiveJobSyncRef.current) {
+        syncActiveTailorJobStorage();
+      }
+    };
+  }, [syncActiveTailorJobStorage]);
 
   const pendingRescanRef = useRef(false);
 
@@ -1764,15 +1868,28 @@ export function TailorWorkspace() {
         ]);
         if (generation !== scanGenerationRef.current || controller.signal.aborted) return;
 
+        const maybeAutoFillRole = (parsedRoleTitle?: string | null) => {
+          if (
+            shouldAutoFillRoleTitle({
+              parsedRoleTitle,
+              currentRoleTitle: roleTitleRef.current,
+              userEditedRole: userEditedRoleRef.current,
+              isRoleInputFocused:
+                typeof document !== "undefined" && document.activeElement === roleInputRef.current,
+            })
+          ) {
+            roleTitleRef.current = parsedRoleTitle!;
+            setRoleTitle(parsedRoleTitle!);
+          }
+        };
+
         if (!sessionUser || demoConfig?.demoMode) {
           const parsed = parseJobDescription(rawDescription);
           pendingRescanRef.current = false;
           setExtractedRequirements(parsed);
-          if (parsed.roleTitle && !roleTitleRef.current) {
-            setRoleTitle(parsed.roleTitle);
-          }
+          maybeAutoFillRole(parsed.roleTitle);
           await fetchMatches(parsed, controller.signal);
-          void ensureJobSaved({ forceUpdate: true, requirements: parsed });
+          void ensureJobSaved({ forceUpdate: true, requirements: parsed, silent: true, scanGeneration: generation });
           return;
         }
 
@@ -1791,27 +1908,23 @@ export function TailorWorkspace() {
         if (status === 401) {
           const parsed = parseJobDescription(rawDescription);
           setExtractedRequirements(parsed);
-          if (parsed.roleTitle && !roleTitleRef.current) {
-            setRoleTitle(parsed.roleTitle);
-          }
+          maybeAutoFillRole(parsed.roleTitle);
           await fetchMatches(parsed, controller.signal);
-          void ensureJobSaved({ forceUpdate: true, requirements: parsed });
+          void ensureJobSaved({ forceUpdate: true, requirements: parsed, silent: true, scanGeneration: generation });
           return;
         }
         if (ok && json?.success && json.data) {
           setExtractedRequirements(json.data);
-          if (json.data.roleTitle && !roleTitleRef.current) {
-            setRoleTitle(json.data.roleTitle);
-          }
+          maybeAutoFillRole(json.data.roleTitle);
           await fetchMatches(json.data, controller.signal);
         } else {
           if (error) setErrorMessage(error);
-          void ensureJobSaved({ forceUpdate: true });
+          void ensureJobSaved({ forceUpdate: true, silent: true });
         }
       } catch (err) {
         if (controller.signal.aborted) return;
         pendingRescanRef.current = false;
-        void ensureJobSaved({ forceUpdate: true });
+        void ensureJobSaved({ forceUpdate: true, silent: true });
         console.error("Auto-rescan error:", err);
       } finally {
         if (generation === scanGenerationRef.current) {
@@ -1836,7 +1949,7 @@ export function TailorWorkspace() {
     if (!rawDescription.trim()) return;
     if (pendingRescanRef.current) return;
     const timer = setTimeout(() => {
-      void ensureJobSaved({ forceUpdate: true });
+      void ensureJobSaved({ forceUpdate: true, silent: true });
     }, 900);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2108,6 +2221,7 @@ export function TailorWorkspace() {
         return { ok: true, context: savedId };
       },
       onNavigate: (resolvedId) => {
+        syncActiveTailorJobStorage();
         const activeJobId = resolvedId ?? savedJobIdRef.current ?? jobIdParam;
         router.push(buildTargetHref(activeJobId));
       },
@@ -2166,15 +2280,15 @@ export function TailorWorkspace() {
 
   const updateJobDescription = (description: string) => {
     userEditedRef.current = true;
-    setIsJdDirty(true);
+    setIsJdDirty((prev) => (prev ? prev : true));
     setHasExplicitJobSelection(Boolean(description.trim()));
-    setJobLoadError(null);
+    setJobLoadError((prev) => (prev === null ? prev : null));
     scanGenerationRef.current++;
-    setIsExtracting(false);
-    setIsAutoScanning(false);
+    setIsExtracting((prev) => (prev ? false : prev));
+    setIsAutoScanning((prev) => (prev ? false : prev));
     setRawDescription(description);
-    setExtractedRequirements(null);
-    setMatches([]);
+    setExtractedRequirements((prev) => (prev === null ? prev : null));
+    setMatches((prev) => (prev.length === 0 ? prev : []));
   };
 
   const handleClearSampleJob = () => {
@@ -2182,6 +2296,7 @@ export function TailorWorkspace() {
     setSavedJobId(null);
     setHasExplicitJobSelection(false);
     userEditedRef.current = false;
+    userEditedRoleRef.current = false;
     setIsJdDirty(false);
     setJobLoadError(null);
     setCompany("");
@@ -3201,7 +3316,7 @@ export function TailorWorkspace() {
                   </div>
 
                   {/* Critical extraction warning remains prominent outside disclosure */}
-                  {hasJobDescription && jobDoc.diagnostics.status === "PARTIAL_EXTRACTION" && (
+                  {hasJobDescription && jobDiagnosticsStatus === "PARTIAL_EXTRACTION" && (
                     <div
                       role="alert"
                       data-testid="confidence-banner-partial-extraction"
@@ -3257,9 +3372,9 @@ export function TailorWorkspace() {
                       {/* Sections breakdown */}
                       <div className="space-y-2.5">
                         <span className="text-xs font-medium text-muted-foreground block">
-                          Document Sections ({jobDoc.sections.length})
+                          Document Sections ({jobDoc?.sections.length ?? 0})
                         </span>
-                        {jobDoc.sections.map((sec) => (
+                        {(jobDoc?.sections ?? []).map((sec) => (
                           <div
                             key={sec.id}
                             className="p-3 rounded bg-inset border border-hairline space-y-1.5"
@@ -3391,12 +3506,14 @@ export function TailorWorkspace() {
                           <label htmlFor="tailor-role" className="block text-xs font-medium text-muted-foreground mb-2">Role</label>
                           <input
                             id="tailor-role"
+                            ref={roleInputRef}
                             name="role"
                             type="text"
                             autoComplete="off"
                             value={roleTitle}
                             onChange={(e) => {
                               userEditedRef.current = true;
+                              userEditedRoleRef.current = true;
                               setIsJdDirty(true);
                               setHasExplicitJobSelection(true);
                               setRoleTitle(e.target.value);
@@ -3413,6 +3530,7 @@ export function TailorWorkspace() {
                           type="button"
                           data-testid="sample-backend-btn"
                           onClick={() => {
+                            userEditedRoleRef.current = false;
                             setCompany("Nova Labs");
                             setRoleTitle("Senior Backend Engineer");
                             setSelectedRoleProfile("Backend");
@@ -3426,6 +3544,7 @@ export function TailorWorkspace() {
                           type="button"
                           data-testid="sample-frontend-btn"
                           onClick={() => {
+                            userEditedRoleRef.current = false;
                             setCompany("WebCraft Systems");
                             setRoleTitle("Frontend Engineer");
                             setSelectedRoleProfile("Frontend");
@@ -3457,14 +3576,16 @@ export function TailorWorkspace() {
 
                   <details
                     data-testid="job-extraction-diagnostics-details"
+                    onToggle={(e) => setIsDiagnosticsOpen(e.currentTarget.open)}
                     className="mt-4 rounded-lg border border-hairline bg-inset px-3 py-2 text-xs"
                   >
                     <summary
                       data-testid="job-extraction-diagnostics-summary"
                       className="cursor-pointer select-none py-1 font-mono text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded"
                     >
-                      Extraction diagnostics · {hasJobDescription ? formatJobDiagnosticLabel(jobDoc.diagnostics.status) : "Awaiting job description"}
+                      Extraction diagnostics · {hasJobDescription ? formatJobDiagnosticLabel(jobDiagnosticsStatus) : "Awaiting job description"}
                     </summary>
+                    {jobDoc && (
                     <div className="mt-3 space-y-3 border-t border-hairline pt-3 font-mono text-xs">
                       {jobDoc.diagnostics.status === "VERIFIED_ATS" && (
                         <div
@@ -3518,6 +3639,7 @@ export function TailorWorkspace() {
                         </div>
                       </div>
                     </div>
+                    )}
                   </details>
                 </section>
 

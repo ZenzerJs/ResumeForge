@@ -11,6 +11,7 @@ import {
   ZipManifest,
 } from "@/lib/export/zip";
 import { ResumeFacts } from "@/lib/facts/types";
+import { extractResumeFacts } from "@/lib/facts/extract";
 import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
 import { GuardrailBlockError } from "@/lib/guardrail/policy";
 
@@ -413,5 +414,194 @@ jane.doe@example.com | San Francisco, CA
     expect(cleaned).not.toContain("(mailto:");
     expect(cleaned).not.toContain("github.com/janedoe (https://");
     expect(cleaned).not.toContain("Live Demo (https://");
+  });
+
+  it("preserves nested #skill-line skills in cleanTypstToText and ZIP resume.txt for AI-converted master resumes", async () => {
+    const aiMasterTypst = `// @pdf-conversion-draft: Review and edit before saving as Master Resume
+// @conversion-path: ai
+// PDF source: "Synthetic_Candidate_Resume.pdf" — converted 2026-11-15
+
+#set page(
+  paper: "us-letter",
+  margin: (x: 1.25cm, y: 1.1cm),
+)
+
+#set text(
+  font: "Liberation Sans",
+  size: 9pt,
+  fill: rgb("#111827"),
+)
+
+#set par(justify: true, leading: 0.48em)
+
+// Link styling matching LaTeX linkblue (#1155CC)
+#show link: set text(fill: rgb("#1155CC"))
+
+// Section heading helper
+#let section(title) = {
+  v(0.4em)
+  text(size: 10pt, weight: "bold", tracking: 0.05em, upper(title))
+  v(-0.4em)
+  line(length: 100%, stroke: 0.5pt + rgb("#9CA3AF"))
+  v(0.15em)
+}
+
+// Header/entry helper for aligned 2-row roles & dates
+#let entry(
+  title: "",
+  role: "",
+  location: "",
+  date: "",
+  details: [],
+) = {
+  block(width: 100%, breakable: false, below: 0.45em, above: 0.55em)[
+    #grid(
+      columns: (1fr, auto),
+      row-gutter: 0.28em,
+      align: (left, right),
+      [*#title*], [#location],
+      [#emph(role)], [#emph(date)],
+    )
+    #v(-0.35em)
+    #details
+  ]
+}
+
+#let resume-entry(title: "", location: "", subtitle: "", date: "", details: []) = entry(title: title, role: subtitle, location: location, date: date, details: details)
+
+#let project-entry(title: "", links: none, date: "", stack: "", details: []) = {
+  block(width: 100%, breakable: false, below: 0.45em, above: 0.55em)[
+    #grid(
+      columns: (1fr, auto),
+      row-gutter: 0.28em,
+      align: (left, right),
+      [*#title* #if links != none [| #links]], [#emph(date)],
+      [#emph(stack)], [],
+    )
+    #v(-0.35em)
+    #details
+  ]
+}
+
+#let skill-line(category: "", items: "") = block(width: 100%, below: 0.35em)[*#category:* #items]
+
+// Compact list styling
+#set list(
+  marker: [•],
+  spacing: 0.4em,
+  indent: 0em,
+  body-indent: 0.4em,
+)
+
+// HEADER
+#align(center)[
+  #text(size: 18pt, weight: "bold", fill: rgb("#111827"))[Taylor Lin] \\
+  #v(2pt)
+  #text(size: 9pt, fill: rgb("#475569"))[
+    Waterloo / Toronto, ON #sym.dot #link("mailto:taylor.lin.dev@example.com")[taylor.lin.dev\\@example.com] #sym.dot #link("https://linkedin.com/in/taylor-lin")[linkedin.com/in/taylor-lin] #sym.dot #link("https://github.com/taylorlin-dev")[github.com/taylorlin-dev] #sym.dot #link("https://taylor-portfolio.example.com/")[taylor-portfolio.example.com]
+  ]
+]
+
+#section("Experience")
+#resume-entry(
+  title: "Northstar Health Partners",
+  location: "Mississauga, ON",
+  subtitle: "IT Operations (Software Development)",
+  date: "May 2026 – Aug. 2026",
+  details: [
+    - Designed and deployed a production license operations portal in *Next.js*, *TypeScript*, and *Prisma*.
+    - Built an on-premises *Ollama* assistant tested with *Vitest* and *Playwright*.
+  ]
+)
+
+#section("Education")
+#resume-entry(
+  title: "Laurentian Tech University",
+  location: "Waterloo, ON",
+  subtitle: "Honours B.Sc. Computer Science",
+  date: "Expected Apr. 2029",
+  details: [
+    - Coursework: *Data Structures I* (Python), *Object-Oriented Programming* (Java)
+  ]
+)
+
+#section("Projects")
+#project-entry(
+  title: "Bench-Lab – Evaluation Harness",
+  links: [#link("https://github.com/taylorlin-dev/bench-lab")[GitHub], #link("https://taylorlin-dev.github.io/bench-lab/")[Live Demo]],
+  date: "Sept. 2026 – Present",
+  stack: "Python, SQLite, React, TypeScript, GitHub Actions, Playwright",
+  details: [
+    - Built an evaluation harness in *Python* and *SQLite* with *126* automated tests in CI.
+  ]
+)
+
+#section("Skills")
+#entry(
+  details: [
+    #skill-line(category: "Languages", items: "Python, TypeScript, JavaScript, Java, SQL, Swift, HTML/CSS")
+    #skill-line(category: "Web & Backend", items: "Next.js, React, Tailwind CSS, FastAPI, Prisma, REST APIs, SQLite, Node.js")
+    #skill-line(category: "AI & Tools", items: "LangGraph, Ollama, LLM APIs, tool calling, Vitest, Playwright, GitHub Actions, Git, Docker, Linux, n8n")
+  ]
+)
+`;
+
+    const cleaned = cleanTypstToText(aiMasterTypst);
+    expect(cleaned).toContain("--- Skills ---");
+    expect(cleaned).toContain("Languages: Python, TypeScript, JavaScript, Java, SQL, Swift, HTML/CSS");
+    expect(cleaned).toContain("Web & Backend: Next.js, React, Tailwind CSS, FastAPI, Prisma, REST APIs, SQLite, Node.js");
+    expect(cleaned).toContain("AI & Tools: LangGraph, Ollama, LLM APIs, tool calling, Vitest, Playwright, GitHub Actions, Git, Docker, Linux, n8n");
+    for (const tech of [
+      "Python",
+      "TypeScript",
+      "HTML/CSS",
+      "Next.js",
+      "FastAPI",
+      "Prisma",
+      "LangGraph",
+      "Ollama",
+      "Vitest",
+      "Playwright",
+      "Docker",
+      "n8n",
+    ]) {
+      expect(cleaned).toContain(tech);
+    }
+    expect(cleaned).not.toContain("#");
+    expect(cleaned).not.toContain("=>");
+    expect(cleaned.replace(/https?:\/\//g, "")).not.toContain("//");
+
+    const extractedFacts = extractResumeFacts(aiMasterTypst);
+    const zipBytes = await generateApplicationPackageZip({
+      typstSource: aiMasterTypst,
+      masterFacts: extractedFacts,
+      job: {
+        company: "Northstar Health Partners",
+        roleTitle: "Software Developer",
+      },
+    });
+    const zip = await JSZip.loadAsync(zipBytes);
+    const resumeTxt = (await zip.file("resume.txt")?.async("string")) ?? "";
+    expect(resumeTxt).toContain("--- Skills ---");
+    expect(resumeTxt).toContain("Languages: Python, TypeScript, JavaScript, Java, SQL, Swift, HTML/CSS");
+    expect(resumeTxt).toContain("Web & Backend: Next.js, React, Tailwind CSS, FastAPI, Prisma, REST APIs, SQLite, Node.js");
+    expect(resumeTxt).toContain("AI & Tools: LangGraph, Ollama, LLM APIs, tool calling, Vitest, Playwright, GitHub Actions, Git, Docker, Linux, n8n");
+  });
+
+  it("extracts positional, trailing-body, and nested #skill-line calls inside #block or #grid", () => {
+    const raw = `
+= Taylor Lin
+#section("Skills")
+#skill-line("Languages", "Python, C\\#, SQL")
+#skill-line("Tools")[Docker, Git]
+#grid(columns: (1fr, 1fr), [#skill-line(category: "Cloud", items: "AWS, GCP")], [#block[#skill-line("Testing")[Vitest, Playwright]]])
+`;
+    const cleaned = cleanTypstToText(raw);
+    expect(cleaned).toContain("--- Skills ---");
+    expect(cleaned).toContain("Languages: Python, C#, SQL");
+    expect(cleaned).toContain("Tools: Docker, Git");
+    expect(cleaned).toContain("Cloud: AWS, GCP");
+    expect(cleaned).toContain("Testing: Vitest, Playwright");
+    expect(cleaned.replace(/C#/g, "")).not.toContain("#");
   });
 });
