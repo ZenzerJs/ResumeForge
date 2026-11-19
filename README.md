@@ -2,8 +2,8 @@
 
 # <img src="docs/icons/forge.svg" width="28" height="28" alt="" align="absmiddle" /> ResumeForge
 
-**The local-first, BYOK resume engineering workspace.**
-Generate evidence-grounded, job-specific resume variants from a protected Master Resume—complete with live Typst WASM compilation, deterministic ATS scoring, job discovery, and interview prep.
+**Local-first, BYOK resume tailoring built first for SWE and technical internship applicants.**
+Tailor a protected Master Resume to each job description with cited diffs, a deterministic JD & parseability rubric (inspired by [HackerRank's open-source `hiring-agent`](https://github.com/interviewstreet/hiring-agent)), and browser Typst WASM single-page PDFs.
 
 [![CI](https://github.com/ZenzerJs/ResumeForge/actions/workflows/ci.yml/badge.svg)](https://github.com/ZenzerJs/ResumeForge/actions/workflows/ci.yml)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)](https://nextjs.org/)
@@ -14,74 +14,94 @@ Generate evidence-grounded, job-specific resume variants from a protected Master
 [![Tests](https://img.shields.io/badge/tests-Vitest_%2B_Playwright-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[<img src="docs/icons/video.svg" width="16" height="16" alt="" align="absmiddle" /> **Watch Demo Video**](#video-walkthrough) · [<img src="docs/icons/sparkles.svg" width="16" height="16" alt="" align="absmiddle" /> **Explore Features**](#the-workspace) · [<img src="docs/icons/architecture.svg" width="16" height="16" alt="" align="absmiddle" /> **Architecture**](#architecture--security) · [<img src="docs/icons/rocket.svg" width="16" height="16" alt="" align="absmiddle" /> **Quick Start**](#getting-started)
+[<img src="docs/icons/video.svg" width="16" height="16" alt="" align="absmiddle" /> **Watch Walkthrough**](#video-walkthrough) · [<img src="docs/icons/bulb.svg" width="16" height="16" alt="" align="absmiddle" /> **How It Works**](#how-it-works) · [<img src="docs/icons/sparkles.svg" width="16" height="16" alt="" align="absmiddle" /> **Workspace**](#the-workspace) · [<img src="docs/icons/architecture.svg" width="16" height="16" alt="" align="absmiddle" /> **Architecture**](#architecture--security) · [<img src="docs/icons/rocket.svg" width="16" height="16" alt="" align="absmiddle" /> **Quick Start**](#getting-started)
 
 <br />
 
 <img src="docs/demo.gif" alt="Animated walkthrough of the ResumeForge landing page and Ember Ink workspace preview" width="850" />
 
-*Evidence-grounded tailoring. Encrypted browser BYOK vault. Every AI suggestion is a reviewable, cited patch.*
+*Tailor your resume. Keep every claim true. Local-first · Bring your own AI key · Open source.*
 
 > "Built after a season of silent rejections as a first-year. This tool carried my own search into a Google technical interview as a second-year."
-
 
 </div>
 
 ---
 
-## <img src="docs/icons/bulb.svg" width="20" height="20" alt="" align="absmiddle" /> Why ResumeForge?
+## <img src="docs/icons/bulb.svg" width="20" height="20" alt="" align="absmiddle" /> How It Works
 
-Most AI resume builders invent experience you don't have, lock your data behind opaque subscriptions, or silently overwrite your master document. **ResumeForge treats resume tailoring like version-controlled software engineering:**
+ResumeForge treats resume tailoring like version-controlled software engineering—built around a single truthful loop:
 
-| Typical AI Resume Tools | The ResumeForge Standard |
-| :--- | :--- |
-| <img src="docs/icons/cross.svg" width="16" height="16" alt="Problem:" align="absmiddle" /> **Invents employers, dates, or metrics** | <img src="docs/icons/check.svg" width="16" height="16" alt="Solution:" align="absmiddle" /> **Mechanical Guardrail** blocks detected unverified employers, inflated titles (or dropped level markers), widened dates, and unbacked or subject-mismatched metrics against your frozen Master Resume snapshot (derived/patched exports fail closed unless a snapshot exists). |
-| <img src="docs/icons/cross.svg" width="16" height="16" alt="Problem:" align="absmiddle" /> **Silently overwrites your base resume** | <img src="docs/icons/check.svg" width="16" height="16" alt="Solution:" align="absmiddle" /> **Write-Protected Master Resume** with `MasterHistory` pre-overwrite snapshots and undo. Tailoring writes to isolated `ResumeVariant` documents via diffable patch proposals (or manual edits in the editor). |
-| <img src="docs/icons/cross.svg" width="16" height="16" alt="Problem:" align="absmiddle" /> **Black-box "ATS score" guessed by an LLM** | <img src="docs/icons/check.svg" width="16" height="16" alt="Solution:" align="absmiddle" /> **Deterministic 100-Point ATS Engine** using auditable, rule-based checks across 6 engineering role profiles (with optional BYOK qualitative review). |
-| <img src="docs/icons/cross.svg" width="16" height="16" alt="Problem:" align="absmiddle" /> **Stores API keys and resume data on third-party SaaS servers** | <img src="docs/icons/check.svg" width="16" height="16" alt="Solution:" align="absmiddle" /> **Self-Hostable & Browser-Encrypted BYOK** using a non-extractable Web Crypto AES-GCM key inside IndexedDB (with memory fallback); keys are never persisted in PostgreSQL. |
-
-**Core Guardrails:**
-* **No auto-apply spam:** You review every diff and submit applications yourself.
-* **Explicit gap detection:** If a job requires a skill not in your Evidence Bank, ResumeForge flags it as a concrete *Gap* rather than inventing a bullet. Unverified skills emit soft warnings and require explicit per-skill acknowledgement before an AI patch can add them.
+1. **Store verified evidence (`/library`):** Keep your own resumes, class/personal projects, hackathon writeups, and public repos in an Evidence Bank alongside a write-protected Master Resume.
+2. **Check against a real job description (`/tailor`):** Run a deterministic 100-point JD & parseability check (inspired by [HackerRank's `hiring-agent`](https://github.com/interviewstreet/hiring-agent), with zero LLM score variance and measured Typst page fit), plus an optional qualitative AI review.
+3. **Review cited patches & explicit gaps:** Every AI suggestion is a diff tied to verified Evidence Bank IDs. Skills missing from your Evidence Bank surface as explicit **Gaps**—never fabricated bullets or inflated metrics.
+4. **Export a crisp 1-page PDF (`/editor`):** Compile live in the browser via Typst WASM, or export DOCX, unwrapped plain text, `.typ` source, or a guardrail-checked ZIP bundle.
 
 ---
 
 ## <img src="docs/icons/video.svg" width="20" height="20" alt="" align="absmiddle" /> Video Walkthrough
 
-See the tailoring workflow in action—from matching real job requirements against verified evidence to reviewing cited patches on a protected Master Resume:
+Watch the full flow—blocked unverified claims, explicit skill gaps, cited diff approval, and 1-page Typst PDF export:
 
 <div align="center">
 
-https://github.com/user-attachments/assets/64820390-cd87-41f1-9e0a-42dcec21f57e
+https://github.com/user-attachments/assets/b40e9714-eea7-4e09-845f-0d223697b5d8
 
 </div>
 
 ---
 
-## <img src="docs/icons/sparkles.svg" width="20" height="20" alt="" align="absmiddle" /> The Workspace
+## <img src="docs/icons/sparkles.svg" width="20" height="20" alt="" align="absmiddle" /> Why ResumeForge?
 
-ResumeForge is organized into five integrated modules that cover the technical job hunt (plus `/settings` for BYOK/account management and `/login` for authentication):
+Most AI resume builders invent experience you can't defend in an interview, nag you to invent fake percentages, or silently overwrite your master resume.
 
-### 1. <img src="docs/icons/editor.svg" width="18" height="18" alt="" align="absmiddle" /> Typst Resume Editor & PDF Import (`/editor`)
+| Typical AI Resume Tools | ResumeForge |
+| :--- | :--- |
+| <img src="docs/icons/cross.svg" width="16" height="16" alt="Problem:" align="absmiddle" /> **Invents employers, titles, or fake `%` metrics** | <img src="docs/icons/check.svg" width="16" height="16" alt="Solution:" align="absmiddle" /> **Mechanical Guardrail & Cited Patches** — blocks unverified employers, inflated titles, widened dates, and unbacked metrics against your frozen Master snapshot (exports fail closed if no snapshot exists). |
+| <img src="docs/icons/cross.svg" width="16" height="16" alt="Problem:" align="absmiddle" /> **Silently overwrites your base resume** | <img src="docs/icons/check.svg" width="16" height="16" alt="Solution:" align="absmiddle" /> **Write-Protected Master + Isolated Variants** — pre-overwrite `MasterHistory` snapshots, undo, and diffable per-job `ResumeVariant` proposals. |
+| <img src="docs/icons/cross.svg" width="16" height="16" alt="Problem:" align="absmiddle" /> **Random LLM "ATS scores" & metric nagging** | <img src="docs/icons/check.svg" width="16" height="16" alt="Solution:" align="absmiddle" /> **Deterministic 100-Pt JD & Parseability Rubric** — 0 score variance, measured Typst page fit, anti-hidden-text checks, and concrete engineering specificity without forcing `%` metrics. |
+| <img src="docs/icons/cross.svg" width="16" height="16" alt="Problem:" align="absmiddle" /> **Opaque SaaS lock-in & server-stored keys** | <img src="docs/icons/check.svg" width="16" height="16" alt="Solution:" align="absmiddle" /> **Local-First & Browser-Encrypted BYOK** — non-extractable Web Crypto AES-GCM key in IndexedDB (never stored in Postgres), or run locally with **Ollama** for zero external AI calls. |
+
+**Concrete example (what ResumeForge refuses to do):**
+* *Generic AI rewrite:* turns `"Built REST API endpoints for a class scheduling app"` into `"Increased team productivity by 17.7% across Agile SDLC workflows"` — an unverifiable vanity metric an interviewer will immediately pick apart.
+* *ResumeForge patch:* rewrites strictly from your cited Evidence Bank bullet (`evid-01`), flags unbacked JD requirements (e.g., `Kubernetes`) as an explicit **Gap**, and uses optional qualitative review to warn against suspicious vanity metrics while enforcing fairness guardrails (ignoring name, school prestige, GPA, and location).
+
+### What This Is (and Isn't)
+* **Built first for SWE & technical internships:** That is why internship job feeds and a browser coding sandbox sit alongside the resume editor (scope will widen over time).
+* **Not an employer ATS or auto-apply bot:** The rule-based rubric checks structure, single-page fit, and JD requirement coverage—it does not claim to predict recruiter hiring decisions, and you review and submit every application yourself.
+* **Hosted site is a demo; local-first is the intended setup:** Clone and run locally on your own machine with your own AI key or **Ollama**.
+* **No employer IP & honest AI retention:** Store only your own resumes, public repos, and non-proprietary project notes—never confidential employer code. Cloud AI keys still send prompts to your chosen provider under their retention policy; use **Ollama** locally for zero external AI requests.
+
+---
+
+## <img src="docs/icons/folder.svg" width="20" height="20" alt="" align="absmiddle" /> The Workspace
+
+ResumeForge is organized around a **Core Tailoring Loop** plus **Supporting SWE Internship Tools** (alongside `/settings` for BYOK/account management and `/login` for authentication):
+
+### Core Tailoring Loop
+
+#### 1. <img src="docs/icons/editor.svg" width="18" height="18" alt="" align="absmiddle" /> Typst Resume Editor & PDF Import (`/editor`)
 * **Dual Editing Modes:** Switch seamlessly between a CodeMirror 6 Typst source editor and a **Guided Visual Form Builder** (`ResumeFormBuilder`, zero Typst syntax required).
-* **Instant Client-Side Compilation:** Live SVG/PDF preview compiled directly in the browser via `typst.ts` WASM, with one-click AI syntax repair (`/api/ai/repair-typst`) if a compile error occurs.
-* **PDF Import & Multi-Format Export:** Extract existing `.pdf` resumes into Typst (`pdf-parse` / `pdfjs-dist`, with optional BYOK structuring), and export to PDF, ATS-parsable **DOCX** (`docx`), plain text (`.txt`), `.typ` source, or a full **Application Package ZIP** (`jszip`) with a SHA-256 `manifest.json`.
+* **Instant Client-Side Compilation:** Live SVG/PDF preview compiled directly in the browser via `typst.ts` WASM, with measured page-count checks and one-click AI syntax repair (`/api/ai/repair-typst`) if a compile error occurs.
+* **PDF Import & Multi-Format Export:** Extract existing `.pdf` resumes into Typst (`pdf-parse` / `pdfjs-dist`, with optional BYOK structuring), and export to PDF, parsable **DOCX** (`docx`), unwrapped plain text (`.txt`), `.typ` source, or a full **Application Package ZIP** (`jszip`) with a SHA-256 `manifest.json`.
 
-### 2. <img src="docs/icons/library.svg" width="18" height="18" alt="" align="absmiddle" /> Master Resume & Evidence Bank (`/library`)
-* **Single Source of Truth:** Store verified `experience`, `project`, `skill`, `education`, `award`, and `metric` items with technology-tagged bullets.
+#### 2. <img src="docs/icons/library.svg" width="18" height="18" alt="" align="absmiddle" /> Master Resume & Evidence Bank (`/library`)
+* **Single Source of Truth:** Store verified `experience`, `project`, `skill`, `education`, `award`, and `metric` items with technology-tagged bullets, plus explicit Draft → Verified promotion.
 * **Bulk Ingestion & Extraction:** Drag-and-drop past resume PDFs into the **Bulk PDF Dropzone** to deterministically extract and index historical achievements into reusable evidence records, or extract draft items directly from your Master Typst source.
 
-### 3. <img src="docs/icons/tailor.svg" width="18" height="18" alt="" align="absmiddle" /> Evidence-Grounded Tailor Engine (`/tailor`)
+#### 3. <img src="docs/icons/tailor.svg" width="18" height="18" alt="" align="absmiddle" /> Evidence-Grounded Tailor Engine (`/tailor`)
 * **5 Specialized Views:** Switch between **Overview**, **3-Pane**, **Job Info**, **Cover Letter**, and **Diagnostics**.
-* **Server-Validated Patch Batches:** Every AI suggestion in a `PatchProposalBatch` is Zod-validated and linked to a `PatchCitation` (`evidenceId` and/or `bulletId`), complete with rendered SVG suggestion previews and grounded cover letter generation.
+* **Server-Validated Patch Batches:** Every AI suggestion in a `PatchProposalBatch` is Zod-validated and linked to a `PatchCitation` (`evidenceId` and/or `bulletId`), complete with rendered SVG suggestion previews and grounded cover letter generation. Unverified skills emit soft warnings and require explicit per-skill acknowledgement before an AI patch can add them.
 * **Read-Only Inspection Assistant:** Chat with a docked/floating AI assistant (`/api/ai/chat`) equipped with allowlisted read-only inspection tools (`search_evidence`, `get_ats_score`, `get_resume_facts`, `run_guardrail`, `get_job`, `search_saved_jobs`, `inspect_layout_budget`) that inspect without mutating your document.
 
-### 4. <img src="docs/icons/chart.svg" width="18" height="18" alt="" align="absmiddle" /> Deterministic ATS Rubric & Job Tracker (`/tracker`)
-* **100-Point Rule-Based Scoring:** `evaluateAtsScore` audits Base Health (`30 pts`), Required Skills (`40 pts`), Preferred Skills (`15 pts`), and Role Evidence (`15 pts`) across `Full-stack`, `Backend`, `AI/LLM`, `ML`, `Frontend`, and `Data/Platform` profiles. Alongside it, `calculateMatchScore` computes Evidence-Bank compatibility with framework alias inference (e.g., `Next.js → React / JavaScript / TypeScript`), and `/` includes an interactive ATS Sandbox.
+### Supporting SWE Internship Tools
+
+#### 4. <img src="docs/icons/chart.svg" width="18" height="18" alt="" align="absmiddle" /> Deterministic JD Rubric & Job Tracker (`/tracker`)
+* **100-Point Rule-Based Check (Not an Employer ATS):** `evaluateAtsScore` audits Base Health (`30 pts` — measured Typst page fit, standard headings, working links, concrete engineering specificity without forcing `%` metrics, and anti-hidden-text checks), Required Skills (`40 pts`), Preferred Skills (`15 pts`), and Role Evidence (`15 pts`) across `Full-stack`, `Backend`, `AI/LLM`, `ML`, `Frontend`, and `Data/Platform` profiles. Alongside it, `calculateMatchScore` computes Evidence-Bank compatibility with framework alias inference (e.g., `Next.js → React / JavaScript / TypeScript`), and `/` includes an interactive score sandbox.
 * **Multi-Source Job Discovery (`/tracker/feed`):** Syncs listings from **Greenhouse, Lever, Ashby, Adzuna CA, Jobicy, Remotive, RemoteOK**, and **Pitt CSC / SimplifyJobs**, complete with Canadian eligibility, city radius, salary, and blended match-tier filters.
 * **Funnel Analytics & Company Dossiers:** Track applications across `SAVED → APPLIED → INTERVIEWING → OFFER / REJECTED` (plus `ARCHIVED`), analyze per-variant conversion rates in `/tracker/outcomes`, export guardrail-checked bundles from the Apply Prep Sheet, and browse cached company interview dossiers (`hiring-without-whiteboards` seed + optional BYOK generation).
 
-### 5. <img src="docs/icons/terminal.svg" width="18" height="18" alt="" align="absmiddle" /> Interview Prep & Browser DSA Sandbox (`/practice`)
+#### 5. <img src="docs/icons/terminal.svg" width="18" height="18" alt="" align="absmiddle" /> Interview Prep & Browser DSA Sandbox (`/practice`)
 * **Curated Problem Bank:** Practice **NeetCode 150**, **System Design**, and **OA Screening** questions (`ALL_QUESTIONS`), plus company-linked `InterviewProblem` records synced via `npm run sync:oa`, filterable by target company and JD requirements.
 * **Sandboxed Code Runner:** Execute **JavaScript** and **TypeScript** solutions inside an isolated Web Worker + opaque-origin sandboxed iframe (`src/lib/dsa-runner.ts`), paired with progressive hints, a **Socratic Interview Coach**, and a complexity scorecard (uses BYOK when configured, with a deterministic heuristic fallback). *Python 3 starter templates are included in the editor; executing Python reports an explicit notice that a Python/Pyodide runtime is required.*
 
@@ -92,13 +112,13 @@ ResumeForge is organized into five integrated modules that cover the technical j
 ```mermaid
 flowchart LR
     A[Master Resume<br/>Protected + History] --> B[Evidence Bank<br/>Verified Bullets]
-    C[Job Board & Connectors<br/>ATS / Job Feeds / Simplify] --> D[JD Parser & Match Score]
+    C[Job Board & Connectors<br/>Job Feeds / Simplify] --> D[JD Parser & Match Score]
     B --> D
     D --> E[Tailor Engine<br/>Cited Patch Batches]
     E --> F[Mechanical Guardrail<br/>Employers / Titles / Dates / Metrics]
     F --> G[Typst WASM<br/>Live Browser Compile]
-    G --> H[Exports<br/>PDF / DOCX / ZIP]
-    D --> I[100-Pt ATS Engine]
+    G --> H[Exports<br/>PDF / DOCX / TXT / ZIP]
+    D --> I[100-Pt JD & Parseability Rubric]
     E --> J[Grounded Cover Letter]
     D --> K[Practice & DSA Sandbox]
 
@@ -232,7 +252,7 @@ ResumeForge/
 ├── src/
 │   ├── app/            # Next.js App Router (/editor, /library, /tracker, /tailor, /practice, /settings, /login) & /api/*
 │   ├── components/     # Modular UI — editor/, tailor/, tracker/, interview/, practice/, evidence/, landing/, settings/, design-system/
-│   └── lib/            # Mechanical guardrail, facts engine, ATS rubric, BYOK vault, AI gateway, connectors, DSA sandbox
+│   └── lib/            # Mechanical guardrail, facts engine, JD & parseability rubric, BYOK vault, AI gateway, connectors, DSA sandbox
 ├── packages/
 │   ├── core/src/       # Shared deterministic scoring (calculateMatchScore) & company intel logic
 │   └── schema/src/     # Shared Zod 4 schemas & TypeScript contracts
