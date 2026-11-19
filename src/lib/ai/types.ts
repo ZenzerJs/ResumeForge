@@ -61,6 +61,7 @@ export interface TextCompletionResult {
   success: boolean;
   text?: string;
   error?: string;
+  providerStatus?: number;
 }
 
 // --- Phase 4.2: Patch generation types ---
@@ -105,6 +106,7 @@ export interface GeneratePatchesResult {
   success: boolean;
   rawJson?: string;
   error?: string;
+  providerStatus?: number;
 }
 
 // --- Phase 4.3b: Qualitative review types ---

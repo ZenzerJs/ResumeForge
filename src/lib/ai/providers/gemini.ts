@@ -203,6 +203,7 @@ export async function completeText(
       return {
         success: false,
         error: sanitizeError(`Gemini API returned status ${res.status}: ${errBody}`),
+        providerStatus: res.status,
       };
     }
 

@@ -211,7 +211,7 @@ export async function testProviderConnection(rawConfig: ProviderConfig): Promise
 
 function toPatchEnvelope(res: TextCompletionResult): GeneratePatchesResult {
   if (!res.success || !res.text) {
-    return { success: false, error: res.error };
+    return { success: false, error: res.error, providerStatus: res.providerStatus };
   }
   return { success: true, rawJson: res.text };
 }

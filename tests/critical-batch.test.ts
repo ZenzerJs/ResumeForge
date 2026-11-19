@@ -122,6 +122,23 @@ describe("critical batch", () => {
     expect(passed[0].bullets.map((bullet: { id: string }) => bullet.id)).toEqual(["b1"]);
   });
 
+  it.each([401, 403, 503, undefined])("separates upstream status %s from the API gateway status", async (providerStatus) => {
+    getEvidenceItems.mockResolvedValue([{ id: "ev-real", status: "verified", bullets: [] }]);
+    generatePatchProposals.mockResolvedValue({ success: false, providerStatus });
+
+    const response = await generatePatches(new Request("http://localhost/api/ai/generate-patches", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        providerConfig: { provider: "openai", apiKey: "test-key" },
+        jobRequirements: { requiredSkills: ["Go"], preferredSkills: [], domainTerms: [] },
+      }),
+    }));
+
+    expect(response.status).toBe(502);
+    expect((await response.json()).providerStatus).toBe(providerStatus);
+  });
+
   it("skips personalized job scoring without a session and scopes evidence to the user", async () => {
     const guest = await loadScoringEvidence(null);
     expect(guest.candidateSkills).toEqual([]);

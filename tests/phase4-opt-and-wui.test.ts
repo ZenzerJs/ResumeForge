@@ -137,9 +137,11 @@ describe("Phase 4 Optimization & WUI Regressions", () => {
           title: "Distributed Queue Engine",
           organization: "Northwind",
           category: "experience",
+          status: "verified",
           tags: ["TypeScript", "Kafka"],
-          bullets: ["Reduced p99 queue latency by 45% across 120k msg/s."],
+          bullets: [{ text: "Reduced p99 queue latency by 45% across 120k msg/s.", verified: true }],
         },
+        { title: "Unverified notes", status: "draft", bullets: ["Draft claim"] },
       ],
     };
 
@@ -159,12 +161,14 @@ describe("Phase 4 Optimization & WUI Regressions", () => {
     const firstJson = await firstRes.json();
     expect(firstJson.success).toBe(true);
     expect(firstJson.data.isMaster).toBe(true);
-    expect(firstJson.data.evidenceCount).toBe(1);
+    expect(firstJson.data.evidenceCount).toBe(2);
 
     const migratedEvidence = await prisma.evidenceItem.findMany({
       where: { userId: user.id },
     });
-    expect(migratedEvidence).toHaveLength(1);
+    expect(migratedEvidence).toHaveLength(2);
+    const verifiedEvidence = migratedEvidence.find((item) => item.status === "verified")!;
+    const draftEvidence = migratedEvidence.find((item) => item.status === "draft")!;
 
     const savedResume = await prisma.resume.findUnique({
       where: { id: firstJson.data.resumeId },
@@ -175,7 +179,8 @@ describe("Phase 4 Optimization & WUI Regressions", () => {
       skills?: string[];
     } | null;
     expect(snapshot).not.toBeNull();
-    expect(snapshot!.evidenceIds).toContain(migratedEvidence[0].id);
+    expect(snapshot!.evidenceIds).toContain(verifiedEvidence.id);
+    expect(snapshot!.evidenceIds).not.toContain(draftEvidence.id);
 
     // Replay with extra leading/trailing whitespace & newlines should deduplicate cleanly
     const replayRes = await migrateGuestDrafts(

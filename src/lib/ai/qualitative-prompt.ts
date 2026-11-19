@@ -21,6 +21,19 @@ Provide QUALITATIVE COMMENTARY ONLY. The deterministic ATS score is already comp
 - Do NOT wrap in markdown fences (\`\`\`json).
 - Do NOT add prose before or after the JSON.
 
+### FAIRNESS GUARDRAILS
+- Evaluate strictly on job-relevant technical skills, demonstrated engineering artifacts, and Evidence Bank backing.
+- NEVER base feedback, bullet verdicts, strengths/weaknesses, or \`jdContextAdjustment\` on candidate name, perceived gender or demographic traits, university/school prestige, GPA/CGPA, or geographic location.
+
+### ANTI-VANITY-METRIC & INTERVIEW-DEFENSIBILITY
+- NEVER pressure the candidate to invent, estimate, or add percentages, dollar figures, or scale metrics not in their Evidence Bank. Honest SWE and student resumes without numbers should be judged on concrete technical scope, architecture, and shipped artifacts—not penalized for omitting \`%\`, \`$\`, or \`x\` metrics.
+- Explicitly inspect numbers that appear suspicious, overly precise, or unowned (for example, "increased team productivity 17.7%" or arbitrary efficiency percentages with no measurement mechanism). Flag such vanity or unsubstantiated metrics as \`VAGUE_CLAIM\` or \`WEAK_EVIDENCE\`, include them in \`detectedAntiPatterns\` when applicable, and warn that interviewers will ask how the metric was measured, what the baseline was, and what the candidate personally built.
+- Only suggest adding metrics when an actual measurement already exists in the Evidence Bank; otherwise advise clarifying individual ownership, technical constraints, or validation (tests, benchmarks, live deployment).
+
+### SWE PROJECT-DEPTH GUIDANCE
+- Value substantive engineering scope (system architecture, authentication/authorization, database schemas and queries, real-time/backend/ML systems, concurrency or reliability handling, automated testing, and live demos or code repositories) over generic tutorial or CRUD clones.
+- Respect honest student and early-career scoping: an academic, hackathon, or solo project with genuine technical depth and clear ownership is strong evidence even without enterprise user scale.
+
 ### HARD VALIDATION RULES
 1. overviewCommentary: never include fractions like 85/100, 8/10, or letter grades (Grade A).
 2. categoryName MUST be exactly one of:
@@ -74,7 +87,7 @@ SAFE DEFAULT: when unsure about JD adjustment, use adjustmentReasoning: [] and j
       "bulletText": "Exact bullet text copied from the resume",
       "verdict": "STRONG_EVIDENCE",
       "reasoning": "Names technology and a concrete outcome.",
-      "improvementAdvice": "Add scale metrics from Evidence Bank if available."
+      "improvementAdvice": "Clarify your direct ownership of the schema design, error handling, or test validation using details from your Evidence Bank."
     }
   ],
   "adjustmentReasoning": [],

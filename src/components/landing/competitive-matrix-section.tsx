@@ -33,7 +33,7 @@ const MATRIX_DATA: MatrixRow[] = [
     icon: Zap,
     title: "Unmetered Open Workspace",
     summary:
-      "No subscription paywalls or artificial daily credit pools for Typst compilation, ATS checks, or PDF export. Connect an AI API key you provide when using AI actions.",
+      "No subscription paywalls or artificial daily credit pools for Typst compilation, rule-based resume checks, or PDF export. Connect an AI API key you provide when using AI actions.",
   },
   {
     area: "Document Quality & Layout",
@@ -44,12 +44,12 @@ const MATRIX_DATA: MatrixRow[] = [
       "Client-side Typst WASM typesetting for crisp vector PDFs, consistent spacing, and single-page layout control.",
   },
   {
-    area: "ATS Evaluation Engine",
-    category: "Scoring Methodology",
+    area: "Rule-Based JD & Resume Check",
+    category: "Transparent Rubric",
     icon: Calculator,
-    title: "Explainable Mathematical Formula",
+    title: "Deterministic Parseability & JD Match",
     summary:
-      "Deterministic composite formula: 50% Core Stack + 20% Seniority + 15% Tools + 15% Evidence Coverage. Step-by-step audit logs with framework aliasing.",
+      "ResumeForge runs deterministic checks for structure, single-page fit, and JD requirement coverage (inspired by open-source intern resume rubrics like HackerRank's hiring-agent) — not an employer ATS or a predictor of recruiter decisions.",
   },
 ];
 
@@ -133,8 +133,9 @@ export function CompetitiveMatrixSection({ demoMode }: { demoMode: boolean }) {
       </div>
 
       <p className="mt-4 max-w-prose text-sm text-on-surface-variant">
-        Provider keys are encrypted in IndexedDB when browser storage is available and kept in memory otherwise.
-        They are used when you test the connection or request AI help.
+        Store only your own resumes, public repos, and non-proprietary project notes (never confidential employer code).{" "}
+        Provider keys are encrypted in IndexedDB when available and kept in memory otherwise; cloud AI providers still
+        process prompt text under their retention policies — use Ollama locally for zero external AI requests.
       </p>
     </section>
   );

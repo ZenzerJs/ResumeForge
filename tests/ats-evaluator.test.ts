@@ -5,6 +5,7 @@ import { evaluateAtsScore } from "@/lib/ats-evaluator/evaluator";
 import { inferRoleProfile } from "@/lib/ats-evaluator/profile-inference";
 import { JobRequirements } from "@/lib/jd-parser/types";
 import { getAtsDisplayState } from "@/components/tailor/ats-score-panel";
+import { buildQualitativeReviewSystemPrompt } from "@/lib/ai/qualitative-prompt";
 
 const SAMPLE_TYPST_RESUME = `
 #let resume-section(title) = [ === #title ]
@@ -271,5 +272,124 @@ Languages & Tools: GraphQL, Redis
     expect(resTwoPages.status).toBe(200);
     expect(jsonTwoPages.success).toBe(true);
     expect(jsonTwoPages.data.baseHealth.findings).toContain("Warning: Document length may exceed a single page.");
+  });
+
+  it("awards full 4 specificity points to honest SWE resumes with concrete engineering specifics and zero %/$ metrics", () => {
+    const honestSweResume = `
+#resume-section("Skills")
+TypeScript, Node.js, PostgreSQL, Docker, Playwright
+
+#resume-section("Experience")
+*Software Engineering Intern* | Campus Tech Lab (May 2024 - Aug 2024)
+- Built a REST API with Node.js and PostgreSQL schema migrations for student course enrollment.
+- Implemented OAuth2 authentication, session cookies, and Zod input validation middleware.
+
+#resume-section("Projects")
+*Course Planner* | https://github.com/student/course-planner
+- Containerized the backend service with Docker and configured GitHub Actions CI/CD checks.
+- Added Playwright integration tests and WCAG keyboard navigation across the scheduling grid.
+`;
+
+    expect(honestSweResume).not.toMatch(/%|\$\d|\b\d+\s*(?:ms|users|x)\b/i);
+
+    const res = evaluateAtsScore(honestSweResume, SAMPLE_REQUIREMENTS, "Full-stack");
+    expect(res.baseHealth.maxScore).toBe(30);
+    expect(res.baseHealth.score).toBe(30);
+    expect(
+      res.baseHealth.findings.some((f) => f.includes("concrete engineering specifics"))
+    ).toBe(true);
+    expect(
+      res.baseHealth.findings.some((f) => /quantitative|Warning:.*generic/i.test(f))
+    ).toBe(false);
+    expect(res.gaps.some((g) => /quantitative|generic/i.test(g))).toBe(false);
+  });
+
+  it("still awards the 4 specificity points to resumes with real measured quantitative metrics", () => {
+    const metricsResume = `
+#resume-section("Skills")
+TypeScript, Python
+
+#resume-section("Experience")
+*Software Engineer* | Metrics Corp (2024 - Present)
+- Reduced checkout failures by 35% and cut server spend by $4,500 monthly while handling 12k daily active users at 80ms response times and 2x peak throughput using TypeScript and Python.
+
+#resume-section("Projects")
+*Optimizer* | https://github.com/example/optimizer
+- Improved batch processing speed by 40% across 500 users.
+`;
+
+    const res = evaluateAtsScore(metricsResume, SAMPLE_REQUIREMENTS, "Backend");
+    expect(res.baseHealth.score).toBe(30);
+    expect(
+      res.baseHealth.findings.some((f) => f.includes("measured impact"))
+    ).toBe(true);
+    expect(
+      res.baseHealth.findings.some((f) => /Warning:.*generic/i.test(f))
+    ).toBe(false);
+  });
+
+  it("warns on generic/vague resumes lacking technical specifics or metrics without demanding percentages", () => {
+    const genericVagueResume = `
+#resume-section("Skills")
+TypeScript, Node.js, PostgreSQL, Docker, CI/CD
+
+#resume-section("Education")
+B.S. in Computer Science (Relevant Coursework: Databases, Operating Systems, Distributed Systems)
+
+#resume-section("Experience")
+*Software Intern* | Example Corp (May 2024 - Aug 2024)
+- Worked with the rest of the engineering team on various software tasks and daily operations.
+- Helped stakeholders deliver projects on schedule and attended weekly meetings.
+
+#resume-section("Projects")
+*Personal Portal* | https://github.com/student/portal
+- Collaborated with peers to build a web application and improve quality for team members.
+`;
+
+    const res = evaluateAtsScore(genericVagueResume, SAMPLE_REQUIREMENTS, "Full-stack");
+    // 8 (readability) + 4 (link) + 0 (specificity) + 2 (skills not in body) + 6 (anti-gaming) = 20
+    expect(res.baseHealth.score).toBe(20);
+
+    const specificityWarning = res.baseHealth.findings.find(
+      (f) => f.startsWith("Warning:") && /generic|concrete technical scope/i.test(f)
+    );
+    expect(specificityWarning).toBeDefined();
+    expect(specificityWarning).not.toMatch(/%|percent|quantitative|metric/i);
+    expect(res.gaps).toContain(specificityWarning);
+  });
+
+  it("buildQualitativeReviewSystemPrompt includes fairness guardrails, anti-vanity-metric guidance, SWE depth guidance, and non-metric-pushing example", () => {
+    const prompt = buildQualitativeReviewSystemPrompt();
+
+    // Fairness guardrails
+    expect(prompt).toMatch(/FAIRNESS GUARDRAILS/i);
+    expect(prompt).toMatch(/candidate name/i);
+    expect(prompt).toMatch(/gender/i);
+    expect(prompt).toMatch(/university\/school prestige/i);
+    expect(prompt).toMatch(/GPA\/CGPA/i);
+    expect(prompt).toMatch(/geographic location/i);
+    expect(prompt).toContain("jdContextAdjustment");
+
+    // Anti-vanity-metric & interview-defensibility rules
+    expect(prompt).toMatch(/ANTI-VANITY-METRIC/i);
+    expect(prompt).toMatch(/NEVER pressure the candidate to invent/i);
+    expect(prompt).toContain("17.7%");
+    expect(prompt).toContain("VAGUE_CLAIM");
+    expect(prompt).toContain("WEAK_EVIDENCE");
+    expect(prompt).toMatch(/interviewers will ask how the metric was measured/i);
+
+    // SWE Project-Depth guidance
+    expect(prompt).toMatch(/SWE PROJECT-DEPTH GUIDANCE/i);
+    expect(prompt).toMatch(/CRUD clones/i);
+    expect(prompt).toMatch(/student and early-career scoping/i);
+
+    // Canonical example no longer pushes adding scale metrics and preserves core contract
+    expect(prompt).not.toContain("Add scale metrics from Evidence Bank if available.");
+    expect(prompt).toContain('"Base Resume Health"');
+    expect(prompt).toContain('"Required Role Match"');
+    expect(prompt).toContain('"Preferred Match"');
+    expect(prompt).toContain('"Role-Relevant Evidence"');
+    expect(prompt).toContain('"STRONG_EVIDENCE"');
+    expect(prompt).toContain('"KEYWORD_STUFFING"');
   });
 });

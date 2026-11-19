@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { POST } from "@/app/api/auth/migrate-guest-drafts/route";
 import { authedRequest, createTestUser } from "./helpers/auth";
 import { prisma } from "@/lib/prisma";
+import { parseGuestEvidenceItems } from "@/components/auth/guest-migration-modal";
 
 describe("Migrate Guest Drafts API Endpoint (POST /api/auth/migrate-guest-drafts)", () => {
   it("rejects unauthenticated requests with 401", async () => {
@@ -458,6 +459,61 @@ describe("Migrate Guest Drafts API Endpoint (POST /api/auth/migrate-guest-drafts
 
     const evidenceCount = await prisma.evidenceItem.count({ where: { userId: user.id } });
     expect(evidenceCount).toBe(1);
+  });
+
+  it("preserves guest evidence fields and only imports explicit verification", async () => {
+    const { user, cookie } = await createTestUser();
+    const evidenceItems = parseGuestEvidenceItems(JSON.stringify([
+      {
+        type: "experience",
+        title: "Systems Work",
+        organization: "Example Co",
+        dates: "2024 – 2025",
+        verifiedSummary: "Maintained internal systems.",
+        status: "verified",
+        tags: ["Systems"],
+        bullets: [
+          { text: "Draft claim", verified: false, orderIndex: 4 },
+          { text: "Verified claim", verified: true, technologies: ["Go"], roleAffinity: ["Backend"], orderIndex: 2 },
+          "Legacy bullet",
+        ],
+      },
+      { title: "Archived item", status: "archived", bullets: [{ text: "Previously verified", verified: true }] },
+      { title: "Draft item", status: "draft", bullets: [{ text: "In progress", verified: false }] },
+      { title: "Verified without summary", status: "verified", bullets: ["Unverified legacy claim"] },
+      {
+        title: "Verified with mixed bullets",
+        status: "verified",
+        bullets: [{ text: "Draft claim", verified: false }, { text: "Grounded claim", verified: true }],
+      },
+    ]));
+    const response = await POST(authedRequest("http://localhost:3000/api/auth/migrate-guest-drafts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ evidenceOnly: true, evidenceItems: [...evidenceItems, { title: "Legacy item", bullets: ["Old claim"] }] }),
+    }, cookie));
+
+    expect(response.status).toBe(200);
+    const items = await prisma.evidenceItem.findMany({ where: { userId: user.id }, include: { bullets: true } });
+    const byTitle = new Map(items.map((item) => [item.title, item]));
+    expect(byTitle.get("Systems Work")).toMatchObject({
+      status: "verified",
+      type: "experience",
+      organization: "Example Co",
+      dates: "2024 – 2025",
+      verifiedSummary: "Maintained internal systems.",
+      tags: '["Systems"]',
+      bullets: expect.arrayContaining([
+        expect.objectContaining({ text: "Draft claim", verified: false, orderIndex: 4 }),
+        expect.objectContaining({ text: "Verified claim", verified: true, technologies: '["Go"]', roleAffinity: '["Backend"]', orderIndex: 2 }),
+        expect.objectContaining({ text: "Legacy bullet", verified: false }),
+      ]),
+    });
+    expect(byTitle.get("Archived item")).toMatchObject({ status: "archived", bullets: [{ verified: true }] });
+    expect(byTitle.get("Draft item")).toMatchObject({ status: "draft", bullets: [{ verified: false }] });
+    expect(byTitle.get("Legacy item")).toMatchObject({ status: "draft", bullets: [{ verified: false }] });
+    expect(byTitle.get("Verified without summary")?.verifiedSummary).toBe("Verified without summary");
+    expect(byTitle.get("Verified with mixed bullets")?.verifiedSummary).toBe("Grounded claim");
   });
 
   it("supports multi-batch >50 evidence migration with evidenceOnly on subsequent batches sharing migrationId", async () => {

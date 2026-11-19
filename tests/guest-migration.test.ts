@@ -260,6 +260,12 @@ describe("Guest-to-Account Draft Migration (Release Hardening)", () => {
     expect(parsed).toHaveLength(120);
     expect(rawEntries).toHaveLength(120);
     expect(parseGuestEvidenceItems(JSON.stringify(rawItems))).toEqual(parsed);
+    expect(parsed[0]).toMatchObject({
+      dates: "2024-01 – 2025-02",
+      status: "verified",
+      verifiedSummary: "Summary 1",
+      bullets: [{ text: "Impact bullet 1", verified: false }],
+    });
 
     const store = new Map<string, string>([
       ["resumeforge_typst_source", "= Jane Doe\n== EXPERIENCE\n*Stripe* -- Staff Engineer"],

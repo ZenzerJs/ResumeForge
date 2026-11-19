@@ -342,15 +342,8 @@ export function computeVerifiedCoveredSkills(
   return covered;
 }
 
-/**
- * Identifies AI generation errors caused by invalid provider credentials or connection failures
- * so header/settings status can stop reporting the provider as connected.
- */
-export function isProviderFailureForStatus(status: number, message: string): boolean {
-  if (status === 502 || status === 503 || status === 504) return true;
-  return /api key|unauthorized|invalid.*key|invalid.*credentials|forbidden|\b401\b|\b403\b|econnrefused|enotfound|etimedout|network error|failed to fetch|unsafe url|only https urls|ollama|connection (?:failed|refused|error)/i.test(
-    message
-  );
+export function isProviderAuthFailure(providerStatus?: number): boolean {
+  return providerStatus === 401 || providerStatus === 403;
 }
 
 export { normalizeTailorTabParam, type TailorWorkspaceTab };
@@ -708,6 +701,7 @@ export function TailorWorkspace() {
     ready: boolean;
     hasSavedConfig: boolean;
   }>({ checked: false, ready: false, hasSavedConfig: false });
+  const providerConfigRevision = useRef(0);
 
   useEffect(() => {
     return () => {
@@ -761,7 +755,8 @@ export function TailorWorkspace() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const handleRefresh = () => {
+    const handleRefresh = (event: Event) => {
+      if (event.type !== "focus") providerConfigRevision.current++;
       void refreshProviderStatus();
     };
     window.addEventListener("focus", handleRefresh);
@@ -1231,6 +1226,7 @@ export function TailorWorkspace() {
       return;
     }
 
+    const attemptedConfigRevision = providerConfigRevision.current;
     const [aiSettings, activeConfig, demoConfig] = await Promise.all([
       resolveClientProviderConfig(),
       getActiveConfig(),
@@ -1304,6 +1300,7 @@ export function TailorWorkspace() {
       const { ok: patchOk, data: json, error: patchApiError } = await readApiResponse<{
         success?: boolean;
         error?: string;
+        providerStatus?: number;
         errorCategory?: string;
         recoveryAction?: string;
         details?: Record<string, unknown>;
@@ -1335,9 +1332,19 @@ export function TailorWorkspace() {
             recoveryAction: json?.recoveryAction || getPatchRecoveryAction(parsedCategory.data),
             details: json?.details,
           });
-        } else if (isProviderFailureForStatus(res.status, message)) {
-          markProviderConnectionStatus(aiSettings.provider, false);
-          void refreshProviderStatus();
+        } else if (isProviderAuthFailure(json?.providerStatus)) {
+          const currentConfig = await resolveClientProviderConfig();
+          if (controller.signal.aborted) return;
+          if (
+            providerConfigRevision.current === attemptedConfigRevision &&
+            currentConfig?.provider === aiSettings.provider &&
+            currentConfig.apiKey === aiSettings.apiKey &&
+            currentConfig.baseUrl === aiSettings.baseUrl &&
+            currentConfig.model === aiSettings.model
+          ) {
+            markProviderConnectionStatus(aiSettings.provider, false);
+            void refreshProviderStatus();
+          }
         }
         setPatchError(message);
         setPatchStage("error");
@@ -1376,10 +1383,6 @@ export function TailorWorkspace() {
     } catch (err) {
       if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) return;
       const errMessage = err instanceof Error ? err.message : String(err);
-      if (isProviderFailureForStatus(0, errMessage)) {
-        markProviderConnectionStatus(aiSettings.provider, false);
-        void refreshProviderStatus();
-      }
       setPatchError(`Error: ${errMessage}`);
       setPatchStage("error");
     } finally {
