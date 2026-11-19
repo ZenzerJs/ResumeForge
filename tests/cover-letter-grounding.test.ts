@@ -150,12 +150,13 @@ describe("Cover Letter Evidence Grounding Verifier (Fail-First Protocol)", () =>
     ).toBe("Sincerely,\nCandidate Smith");
   });
 
-  it("6. deduplicates bare email/naked URLs and preserves descriptive link labels in plain-text resume exports", () => {
+  it("6. deduplicates bare email/naked URLs and strips descriptive link wrapper noise in plain-text resume exports", () => {
     const unmanaged = `= Jordan Example\n#link("mailto:jordan@example.invalid")[jordan\\@example.invalid] | #link("https://github.com/jordan")[github.com/jordan] | #link("https://demo.example.invalid")[Live Demo]\n== Experience\n- Built API`;
     const cleaned = cleanTypstToText(unmanaged);
-    expect(cleaned).toContain("jordan@example.invalid | https://github.com/jordan | Live Demo (https://demo.example.invalid)");
+    expect(cleaned).toContain("jordan@example.invalid | https://github.com/jordan | https://demo.example.invalid");
     expect(cleaned).not.toContain("(mailto:");
     expect(cleaned).not.toContain("github.com/jordan (https://");
+    expect(cleaned).not.toContain("Live Demo (https://");
 
     const raw = "Morgan Sample\nmorgan@example.com | github.com/morgan\nProjects\nAtlas | GitHub | Live Demo\n- Built API";
     const githubStart = raw.indexOf("GitHub");
@@ -171,7 +172,9 @@ describe("Cover Letter Evidence Grounding Verifier (Fail-First Protocol)", () =>
     const exported = managedResumeExport(managed)?.text ?? "";
     expect(exported).toContain("morgan@example.com");
     expect(exported).not.toContain("(mailto:");
-    expect(exported).toContain("GitHub (https://github.com/morgan/atlas)");
-    expect(exported).toContain("Live Demo (https://atlas.example.invalid)");
+    expect(exported).toContain("https://github.com/morgan/atlas");
+    expect(exported).toContain("https://atlas.example.invalid");
+    expect(exported).not.toContain("GitHub (https://");
+    expect(exported).not.toContain("Live Demo (https://");
   });
 });

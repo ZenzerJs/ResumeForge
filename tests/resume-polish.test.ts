@@ -55,7 +55,9 @@ describe("dense source-backed resume", () => {
   it("exports visible entry content after a direct edit", () => {
     const output = renderResumeDocument(document, "balanced", links).replace("Built Atlas", "Built edited Atlas");
     const exported = managedResumeExport(output)?.text ?? "";
-    expect(exported).toContain("Atlas | GitHub (https://github.com/example/atlas) | Live Demo (https://atlas.example.test)");
+    expect(exported).toContain("Atlas | https://github.com/example/atlas | https://atlas.example.test");
+    expect(exported).not.toContain("GitHub (https://");
+    expect(exported).not.toContain("Live Demo (https://");
     expect(exported).toContain("morgan@example.test");
     expect(exported).not.toContain("(mailto:");
   });
