@@ -11,6 +11,11 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { CloudUpload, X, CheckCircle2, Loader2, FileText, AlertTriangle, RefreshCw, ShieldAlert } from "lucide-react";
+import {
+  GuestEvidenceOrderIndexSchema,
+  GuestEvidenceStatusSchema,
+  type GuestEvidenceItemPayload,
+} from "@/lib/guest-evidence";
 
 export type ConflictStrategy = "IMPORT_AS_DRAFT" | "REPLACE_MASTER" | "DISCARD";
 
@@ -63,14 +68,6 @@ export function hasPendingGuestDraftInStorage(storage: StorageReadOnlyLike | nul
 
 export const GUEST_EVIDENCE_BATCH_SIZE = 50;
 
-export interface GuestEvidenceItemPayload {
-  title: string;
-  organization?: string;
-  category?: string;
-  tags?: string[];
-  bullets?: string[];
-}
-
 export interface ParsedGuestEvidenceEntries {
   items: GuestEvidenceItemPayload[];
   rawEntries: unknown[];
@@ -85,6 +82,8 @@ export function parseGuestEvidenceEntries(
     if (!Array.isArray(parsed)) return { items: [], rawEntries: [] };
     const isRecord = (v: unknown): v is Record<string, unknown> =>
       typeof v === "object" && v !== null;
+    const strings = (value: unknown) =>
+      Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
     const rawEntries = parsed.filter(
       (item): item is Record<string, unknown> & { title: string } =>
         isRecord(item) && typeof item.title === "string" && item.title.trim().length > 0
@@ -92,28 +91,33 @@ export function parseGuestEvidenceEntries(
     const items: GuestEvidenceItemPayload[] = rawEntries.map((item) => ({
       title: item.title.trim(),
       organization: typeof item.organization === "string" ? item.organization : undefined,
+      dates: typeof item.dates === "string"
+        ? item.dates
+        : [item.startDate, item.endDate]
+            .filter((date): date is string => typeof date === "string" && date.trim().length > 0)
+            .join(" – ") || undefined,
       category:
         typeof item.type === "string"
           ? item.type.toUpperCase()
           : typeof item.category === "string"
             ? item.category.toUpperCase()
             : "PROJECT",
-      tags: Array.isArray(item.tags)
-        ? item.tags.filter((t): t is string => typeof t === "string")
-        : [],
+      verifiedSummary: typeof item.verifiedSummary === "string" ? item.verifiedSummary : undefined,
+      status: GuestEvidenceStatusSchema.safeParse(item.status).data ?? "draft",
+      tags: strings(item.tags),
       bullets: Array.isArray(item.bullets)
-        ? item.bullets
-            .map((b) =>
-              typeof b === "string"
-                ? b
-                : isRecord(b) && typeof b.text === "string"
-                  ? b.text
-                  : ""
-            )
-            .filter((t) => t.trim().length > 0)
-        : typeof item.verifiedSummary === "string" && item.verifiedSummary.trim()
-          ? [item.verifiedSummary.trim()]
-          : [],
+        ? item.bullets.flatMap((bullet): NonNullable<GuestEvidenceItemPayload["bullets"]> => {
+            if (typeof bullet === "string") return bullet.trim() ? [bullet] : [];
+            if (!isRecord(bullet) || typeof bullet.text !== "string" || !bullet.text.trim()) return [];
+            return [{
+              text: bullet.text,
+              technologies: strings(bullet.technologies),
+              roleAffinity: strings(bullet.roleAffinity),
+              verified: bullet.verified === true,
+              orderIndex: GuestEvidenceOrderIndexSchema.safeParse(bullet.orderIndex).data,
+            }];
+          })
+        : [],
     }));
     return { items, rawEntries };
   } catch {

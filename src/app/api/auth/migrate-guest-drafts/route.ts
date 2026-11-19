@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/security/auth-request";
 import { extractResumeFacts } from "@/lib/facts/extract";
 import { sanitizeError } from "@/lib/ai/redact";
+import { GuestEvidenceItemSchema } from "@/lib/guest-evidence";
 
 const MigrateGuestDraftsSchema = z
   .object({
@@ -15,18 +16,7 @@ const MigrateGuestDraftsSchema = z
       .enum(["IMPORT_AS_DRAFT", "REPLACE_MASTER", "DISCARD"])
       .default("IMPORT_AS_DRAFT"),
     confirmReplaceMaster: z.boolean().optional(),
-    evidenceItems: z
-      .array(
-        z.object({
-          title: z.string().min(1),
-          organization: z.string().optional(),
-          category: z.string().default("PROJECT"),
-          tags: z.array(z.string()).optional(),
-          bullets: z.array(z.string()).optional(),
-        })
-      )
-      .max(50)
-      .optional(),
+    evidenceItems: z.array(GuestEvidenceItemSchema).max(50).optional(),
     migrationId: z.string().uuid().optional(),
     idempotencyKey: z.string().max(100).optional(),
   })
@@ -212,27 +202,34 @@ export async function POST(request: Request) {
             continue;
           }
 
+          const bullets = (item.bullets ?? []).map((bullet) =>
+            typeof bullet === "string" ? { text: bullet } : bullet
+          );
+          const summaryBullet = item.status === "verified"
+            ? bullets.find((bullet) => bullet.verified)
+            : bullets[0];
           const createdItem = await tx.evidenceItem.create({
             data: {
               userId,
               type: (item.category || "project").toLowerCase(),
               title: item.title,
               organization: item.organization || null,
-              verifiedSummary: item.bullets?.[0] || item.title,
+              dates: item.dates ?? null,
+              verifiedSummary: item.verifiedSummary ?? (summaryBullet?.text || item.title),
               tags: JSON.stringify(item.tags || []),
-              status: "verified",
+              status: item.status ?? "draft",
             },
           });
 
-          if (item.bullets && item.bullets.length > 0) {
+          if (bullets.length > 0) {
             await tx.bullet.createMany({
-              data: item.bullets.map((bulletText, idx) => ({
+              data: bullets.map((bullet, index) => ({
                 evidenceId: createdItem.id,
-                text: bulletText,
-                technologies: JSON.stringify(item.tags || []),
-                roleAffinity: "[]",
-                verified: true,
-                orderIndex: idx,
+                text: bullet.text,
+                technologies: JSON.stringify(bullet.technologies ?? []),
+                roleAffinity: JSON.stringify(bullet.roleAffinity ?? []),
+                verified: bullet.verified ?? false,
+                orderIndex: bullet.orderIndex ?? index,
               })),
             });
           }
