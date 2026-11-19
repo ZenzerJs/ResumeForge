@@ -16,6 +16,7 @@ import {
   formatJobDiagnosticLabel,
   computeVerifiedCoveredSkills,
   isProviderAuthFailure,
+  shouldAutoFillRoleTitle,
 } from "@/components/tailor/tailor-workspace";
 import { buildPatchSystemPrompt, buildPatchUserPrompt } from "@/lib/ai/prompt-template";
 
@@ -365,5 +366,52 @@ describe("Tailor task-sequence navigation & state helpers", () => {
     expect(tailorSrc).toContain("md:flex-col md:items-stretch");
     expect(tailorSrc).toContain("2xl:flex-row 2xl:items-center");
     expect(tailorSrc).toContain("2xl:[&>div:last-child]:max-w-[75%]");
+  });
+
+  it("shouldAutoFillRoleTitle only fills when parsed title is present, field is empty, user has not edited role, and role input is unfocused", () => {
+    expect(
+      shouldAutoFillRoleTitle({
+        parsedRoleTitle: "Backend Engineer",
+        currentRoleTitle: "",
+        userEditedRole: false,
+        isRoleInputFocused: false,
+      })
+    ).toBe(true);
+
+    expect(
+      shouldAutoFillRoleTitle({
+        parsedRoleTitle: "",
+        currentRoleTitle: "",
+        userEditedRole: false,
+        isRoleInputFocused: false,
+      })
+    ).toBe(false);
+
+    expect(
+      shouldAutoFillRoleTitle({
+        parsedRoleTitle: "Backend Engineer",
+        currentRoleTitle: "Platform Engineer",
+        userEditedRole: false,
+        isRoleInputFocused: false,
+      })
+    ).toBe(false);
+
+    expect(
+      shouldAutoFillRoleTitle({
+        parsedRoleTitle: "Backend Engineer",
+        currentRoleTitle: "",
+        userEditedRole: true,
+        isRoleInputFocused: false,
+      })
+    ).toBe(false);
+
+    expect(
+      shouldAutoFillRoleTitle({
+        parsedRoleTitle: "Backend Engineer",
+        currentRoleTitle: "",
+        userEditedRole: false,
+        isRoleInputFocused: true,
+      })
+    ).toBe(false);
   });
 });
