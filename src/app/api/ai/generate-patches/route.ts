@@ -166,7 +166,11 @@ export async function POST(request: Request) {
 
     if (!result.success || !result.rawJson) {
       return NextResponse.json(
-        { success: false, error: sanitizeError(result.error || "AI provider returned no content.") },
+        {
+          success: false,
+          error: sanitizeError(result.error || "AI provider returned no content."),
+          providerStatus: result.providerStatus,
+        },
         { status: 502 }
       );
     }

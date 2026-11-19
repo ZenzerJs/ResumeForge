@@ -240,6 +240,7 @@ export async function completeOpenAICompatibleText(params: {
       return {
         success: false,
         error: sanitizeError(`${params.providerLabel} returned status ${res.status}: ${errBody}`),
+        providerStatus: res.status,
       };
     }
 

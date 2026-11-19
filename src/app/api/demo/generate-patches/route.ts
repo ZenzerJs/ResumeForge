@@ -81,7 +81,11 @@ export async function POST(request: Request) {
       tailorFeedback: input.tailorFeedback,
     });
     if (!result.success || !result.rawJson) {
-      return NextResponse.json({ success: false, error: sanitizeError(result.error || "AI provider returned no content.") }, { status: 502 });
+      return NextResponse.json({
+        success: false,
+        error: sanitizeError(result.error || "AI provider returned no content."),
+        providerStatus: result.providerStatus,
+      }, { status: 502 });
     }
     let response;
     try {

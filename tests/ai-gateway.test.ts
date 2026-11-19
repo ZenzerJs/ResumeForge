@@ -319,6 +319,21 @@ describe("SIMP-02b shared completeText across providers", () => {
     vi.unstubAllEnvs();
   });
 
+  it.each([
+    ["openai", 401],
+    ["anthropic", 403],
+    ["gemini", 503],
+  ] as const)("preserves the upstream %s response status %i", async (provider, providerStatus) => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("Provider error", { status: providerStatus }));
+
+    await expect(generatePatchProposals({
+      providerConfig: { provider, apiKey: "test-key" },
+      masterTypst: "= Example",
+      jobRequirements: { requiredSkills: [], preferredSkills: [], domainTerms: [] },
+      evidenceItems: [],
+    })).resolves.toMatchObject({ success: false, providerStatus });
+  });
+
   it("routes patch proposals across OpenAI, Anthropic, Gemini, and Custom/Groq/Ollama with provider-specific payloads", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
       const target = String(url);

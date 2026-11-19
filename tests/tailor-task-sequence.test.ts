@@ -15,7 +15,7 @@ import {
   formatRequirementSourceLabel,
   formatJobDiagnosticLabel,
   computeVerifiedCoveredSkills,
-  isProviderFailureForStatus,
+  isProviderAuthFailure,
 } from "@/components/tailor/tailor-workspace";
 import { buildPatchSystemPrompt, buildPatchUserPrompt } from "@/lib/ai/prompt-template";
 
@@ -231,12 +231,17 @@ describe("Tailor task-sequence navigation & state helpers", () => {
 
     expect(tailorSrc).toContain("ensureJobSaved({ forceUpdate: false, silent: true })");
     expect(tailorSrc).toContain("if (ok && json?.success && json.guest)");
+    expect(tailorSrc).toContain("isProviderAuthFailure(json?.providerStatus)");
+    expect(tailorSrc).toContain('if (event.type !== "focus") providerConfigRevision.current++');
+    expect(tailorSrc).toMatch(/await resolveClientProviderConfig\(\);\s+if \(controller\.signal\.aborted\) return;\s+if \(\s+providerConfigRevision\.current === attemptedConfigRevision &&/);
     expect(tailorSrc).toContain("markProviderConnectionStatus(aiSettings.provider, false)");
     expect(tailorSrc).toContain("patches={actionablePreviewPatches}");
 
-    expect(isProviderFailureForStatus(502, "Gateway error")).toBe(true);
-    expect(isProviderFailureForStatus(401, "Invalid API key provided")).toBe(true);
-    expect(isProviderFailureForStatus(422, "Add evidence first")).toBe(false);
+    expect(isProviderAuthFailure(401)).toBe(true);
+    expect(isProviderAuthFailure(403)).toBe(true);
+    for (const status of [undefined, 422, 429, 500, 502, 503, 504]) {
+      expect(isProviderAuthFailure(status)).toBe(false);
+    }
 
     const sysPrompt = buildPatchSystemPrompt();
     expect(sysPrompt).toContain("PRIORITIZE SUBSTANTIVE ACCOMPLISHMENT IMPROVEMENTS");

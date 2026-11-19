@@ -155,6 +155,7 @@ export async function completeText(
       return {
         success: false,
         error: sanitizeError(`Anthropic API returned status ${res.status}: ${errBody}`),
+        providerStatus: res.status,
       };
     }
 
