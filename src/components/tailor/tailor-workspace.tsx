@@ -1957,6 +1957,55 @@ export function TailorWorkspace() {
     [isHighlightedJdVisible, rawDescription, extractedRequirements?.requiredSkills]
   );
 
+  const atsTypstSource = activeVariantContent || masterTypstSource;
+  const [measuredTailorPages, setMeasuredTailorPages] = useState<{
+    source: string;
+    pages: number;
+  } | null>(null);
+  const settledTailorPageCacheRef = useRef<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    if (effectiveSecondaryTab !== "ats" || !extractedRequirements || !atsTypstSource.trim()) {
+      return;
+    }
+
+    const cachedPages = settledTailorPageCacheRef.current.get(atsTypstSource);
+    if (cachedPages !== undefined) {
+      setMeasuredTailorPages({ source: atsTypstSource, pages: cachedPages });
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const { measureTypstPageCount } = await import("@/lib/typst/compiler");
+          if (cancelled) return;
+          const measured = await measureTypstPageCount(atsTypstSource, {
+            callerId: "tailor-ats-measure",
+            mode: "live",
+          });
+          if (cancelled) return;
+          const cache = settledTailorPageCacheRef.current;
+          if (cache.has(atsTypstSource)) cache.delete(atsTypstSource);
+          cache.set(atsTypstSource, measured.pageCount);
+          if (cache.size > 4) {
+            const oldest = cache.keys().next().value;
+            if (oldest !== undefined) cache.delete(oldest);
+          }
+          setMeasuredTailorPages({ source: atsTypstSource, pages: measured.pageCount });
+        } catch {
+          // Leave measuredPages undefined on compile failure so evaluator falls back cleanly.
+        }
+      })();
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [atsTypstSource, effectiveSecondaryTab, extractedRequirements]);
+
   const isSampleJob =
     !savedJobId &&
     ((company === "Nova Labs" &&
@@ -2901,7 +2950,12 @@ export function TailorWorkspace() {
                     <div className="overflow-y-auto max-h-[720px] pr-1">
                       <AtsScorePanel
                         appearance="tailor"
-                        typstContent={activeVariantContent || masterTypstSource}
+                        typstContent={atsTypstSource}
+                        measuredPages={
+                          measuredTailorPages?.source === atsTypstSource
+                            ? measuredTailorPages.pages
+                            : undefined
+                        }
                         extractedRequirements={extractedRequirements}
                         roleTitle={roleTitle}
                         rawDescription={rawDescription}

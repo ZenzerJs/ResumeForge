@@ -173,13 +173,15 @@ export function PreviewPanel({
     setMeasurementError(null);
     setTwoPageApproval(null);
     setReviewApproval(null);
-    if (!v2 || !source.trim()) return () => { cancelled = true; };
+    if (!source.trim()) return () => { cancelled = true; };
 
-    void approvalHash(source).then((hash) => {
-      if (cancelled || sourceRef.current !== source) return;
-      if (source.includes(`// @layout-two-pages-approved: ${hash}\n`)) setTwoPageApproval(source);
-      if (source.includes(`// @layout-review-approved: ${hash}\n`)) setReviewApproval(source);
-    }).catch(() => { /* No saved approval can be trusted without a digest. */ });
+    if (v2) {
+      void approvalHash(source).then((hash) => {
+        if (cancelled || sourceRef.current !== source) return;
+        if (source.includes(`// @layout-two-pages-approved: ${hash}\n`)) setTwoPageApproval(source);
+        if (source.includes(`// @layout-review-approved: ${hash}\n`)) setReviewApproval(source);
+      }).catch(() => { /* No saved approval can be trusted without a digest. */ });
+    }
 
     const cached = settledCacheRef.current.get(source);
     if (cached) {
@@ -191,7 +193,7 @@ export function PreviewPanel({
       try {
         const [{ measureTypstPageCount }, hash] = await Promise.all([
           import("@/lib/typst/compiler"),
-          approvalHash(source),
+          v2 ? approvalHash(source) : Promise.resolve(""),
         ]);
         if (cancelled || sourceRef.current !== source) return;
 
@@ -201,9 +203,9 @@ export function PreviewPanel({
         const currentEntry = { source: current.source, pages: current.pageCount, pdf: current.pdf };
         cacheSettledMeasurement(currentEntry);
 
-        const hasTwoPageApproval = source.includes(`// @layout-two-pages-approved: ${hash}\n`);
+        const hasTwoPageApproval = v2 && source.includes(`// @layout-two-pages-approved: ${hash}\n`);
         // Fit additional profiles only when the current settled source exceeds the 1-page budget.
-        if (current.pageCount > 1 && onApplyLayout && !hasTwoPageApproval && parseManagedResume(source)) {
+        if (v2 && current.pageCount > 1 && onApplyLayout && !hasTwoPageApproval && parseManagedResume(source)) {
           const { fitManagedLayout } = await import("@/lib/typst/layout-fit");
           const measuredInPass = new Map<string, { source: string; pages: number; pdf: Uint8Array }>([
             [source, currentEntry],
@@ -232,6 +234,7 @@ export function PreviewPanel({
         }
       } catch (err) {
         if (
+          v2 &&
           !cancelled &&
           sourceRef.current === source &&
           !(err instanceof Error && (err.name === "SupersededCompileError" || err.message === "Superseded layout measurement"))

@@ -7,37 +7,12 @@ export interface ExportResumeSections {
   sections: { title: string; lines: string[] }[];
 }
 
-/** Format a link for plaintext ATS export, omitting redundant labels that duplicate the destination. */
+/** Format a link for plaintext ATS export, returning a clean bare URL/email without noisy label wrapping. */
 export function formatPlaintextLink(url: string, label?: string): string {
   const trimmedUrl = url.trim();
   const cleanUrl = trimmedUrl.replace(/^mailto:/i, "");
-  const cleanLabel = label?.trim() ?? "";
-  if (!cleanLabel) return cleanUrl;
-
-  if (/^mailto:/i.test(trimmedUrl)) {
-    const cleanEmailLabel = cleanLabel.replace(/^mailto:/i, "").trim();
-    if (
-      cleanEmailLabel.toLowerCase() === cleanUrl.toLowerCase() ||
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmailLabel)
-    ) {
-      return cleanUrl;
-    }
-    return `${cleanLabel} (${cleanUrl})`;
-  }
-
-  const normalize = (value: string) =>
-    value
-      .trim()
-      .replace(/^https?:\/\//i, "")
-      .replace(/^www\./i, "")
-      .replace(/\/+$/, "")
-      .toLowerCase();
-
-  if (normalize(cleanLabel) === normalize(cleanUrl)) {
-    return cleanUrl;
-  }
-
-  return `${cleanLabel} (${cleanUrl})`;
+  if (cleanUrl) return cleanUrl;
+  return label?.trim() ?? "";
 }
 
 /** Parse the renderer's visible output, never its stale metadata, after direct edits. */
@@ -76,21 +51,88 @@ function visibleManagedExport(source: string): { text: string; sections: ExportR
         result += formatPlaintextLink(url, label);
         i += end + 1; continue;
       }
-      const block = /^#block\(above: \d+(?:\.\d+)?(?:pt|em), below: \d+(?:\.\d+)?(?:pt|em)\)\[/.test(input.slice(i));
-      if (input.startsWith('#strong[', i) || input.startsWith('#emph[', i) || input.startsWith('#box[', i) || block) {
-        const start = input.indexOf("[", i) + 1;
-        const end = closingBracket(input, start);
-        result += decodeInline(input.slice(start, end)); i = end + 1; continue;
+      const symMap: [string, string][] = [
+        ["#sym.dot", "•"],
+        ["#sym.bullet", "•"],
+        ["#sym.dash.en", "–"],
+        ["#sym.dash.em", "—"],
+        ["#sym.arrow.r", "->"],
+      ];
+      const sym = symMap.find(([prefix]) => input.startsWith(prefix, i));
+      if (sym) { result += sym[1]; i += sym[0].length; continue; }
+
+      if (input.startsWith("#skill-line(", i)) {
+        const openParen = i + "#skill-line".length;
+        const closeParen = findBalancedEnd(input, openParen, "(", ")");
+        if (closeParen < 0) throw new Error("Cannot export incomplete content in the edited resume.");
+        const argsBody = input.slice(openParen + 1, closeParen);
+        const categoryMatch = argsBody.match(/category\s*:\s*(?:"((?:\\.|[^"\\])*)"|\[([^\]]*)\])/);
+        const itemsMatch = argsBody.match(/items\s*:\s*(?:"((?:\\.|[^"\\])*)"|\[([^\]]*)\])/);
+        const category = categoryMatch ? (categoryMatch[1] !== undefined ? JSON.parse(`"${categoryMatch[1]}"`) : decodeInline(categoryMatch[2])) : "";
+        const items = itemsMatch ? (itemsMatch[1] !== undefined ? JSON.parse(`"${itemsMatch[1]}"`) : decodeInline(itemsMatch[2])) : "";
+        result += category && items ? `${category}: ${items}` : [category, items].filter(Boolean).join(" ");
+        i = closeParen + 1; continue;
       }
-      if (input.startsWith("#sym.dot", i)) { result += "•"; i += "#sym.dot".length; continue; }
+
+      const spacingMatch = input.slice(i).match(/^#(?:v|h|line)\(/);
+      if (spacingMatch) {
+        const openParen = i + spacingMatch[0].length - 1;
+        const closeParen = findBalancedEnd(input, openParen, "(", ")");
+        if (closeParen < 0) throw new Error("Cannot export incomplete content in the edited resume.");
+        i = closeParen + 1; continue;
+      }
+
+      const wrapperMatch = input.slice(i).match(/^#(block|strong|emph|box|text|align|pad|upper|lower)\b/);
+      if (wrapperMatch) {
+        let cursor = i + wrapperMatch[0].length;
+        while (cursor < input.length && (input[cursor] === " " || input[cursor] === "\t")) cursor++;
+        if (input[cursor] === "(") {
+          const closeParen = findBalancedEnd(input, cursor, "(", ")");
+          if (closeParen < 0) throw new Error("Cannot export incomplete content in the edited resume.");
+          cursor = closeParen + 1;
+          while (cursor < input.length && /\s/.test(input[cursor])) cursor++;
+        }
+        if (input[cursor] === "[") {
+          const end = closingBracket(input, cursor + 1);
+          result += decodeInline(input.slice(cursor + 1, end));
+          i = end + 1; continue;
+        }
+      }
+
       if (input[i] === "#" || input[i] === "[" || input[i] === "]") throw new Error("Cannot export unsupported Typst in the edited resume.");
       if (input[i] !== "*" && input[i] !== "_") result += input[i];
       i++;
     }
     return result;
   };
+  const logicalLines: string[] = [];
+  let pending = "";
+  let parenDepth = 0;
+  let bracketDepth = 0;
+  let inString = false;
   for (const raw of lines.slice(entryDefinition + 1)) {
-    const line = raw.trim();
+    const trimmed = raw.trim();
+    if (!pending && (!trimmed || trimmed.startsWith("//"))) continue;
+    const segment = pending ? raw : trimmed;
+    pending = pending ? `${pending}\n${raw}` : trimmed;
+    for (let j = 0; j < segment.length; j++) {
+      const ch = segment[j];
+      if (ch === "\\" && j + 1 < segment.length) { j++; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === "(") parenDepth++;
+      else if (ch === ")") parenDepth = Math.max(0, parenDepth - 1);
+      else if (ch === "[") bracketDepth++;
+      else if (ch === "]") bracketDepth = Math.max(0, bracketDepth - 1);
+    }
+    if (!inString && parenDepth === 0 && bracketDepth === 0) {
+      logicalLines.push(pending.trim());
+      pending = "";
+    }
+  }
+  if (pending.trim()) logicalLines.push(pending.trim());
+
+  for (const line of logicalLines) {
     if (!line || line.startsWith("//")) continue;
     const heading = line.match(sectionPattern);
     if (heading) { current = { title: JSON.parse(heading[1]), lines: [] }; sections.sections.push(current); continue; }
@@ -123,7 +165,8 @@ function visibleManagedExport(source: string): { text: string; sections: ExportR
     if (name) { sections.candidateName = decodeInline(name[1]); continue; }
     if (contact) { header.push(decodeInline(contact[1])); continue; }
     const content = decodeInline(line);
-    if (current) current.lines.push(content); else header.push(content);
+    const decodedLines = content.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (current) current.lines.push(...decodedLines); else header.push(...decodedLines);
   }
   // This independent source comment contains link destinations only. Never recover
   // candidate text from stale document metadata after a patch or code edit.

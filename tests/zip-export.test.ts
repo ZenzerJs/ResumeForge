@@ -368,7 +368,8 @@ jane.doe@example.com | San Francisco, CA
     expect(cleaned).not.toContain("(mailto:");
     expect(cleaned).toContain("Cascade Cloud -- Backend Software Engineer | Seattle, WA | 2023 – Present");
     expect(cleaned).toContain("Built TypeScript and Go ingestion services handling 50k events/sec.");
-    expect(cleaned).toContain("QueryPulse | GitHub (https://github.com/priyanair/querypulse) | TypeScript, PostgreSQL, Docker | 2024");
+    expect(cleaned).toContain("QueryPulse | https://github.com/priyanair/querypulse | TypeScript, PostgreSQL, Docker | 2024");
+    expect(cleaned).not.toContain("GitHub (https://");
     expect(cleaned).toContain("C# and SQL workloads");
     expect(cleaned).toContain("Languages: TypeScript, Go, SQL, Python");
     expect(cleaned).toContain("Infrastructure: Docker, PostgreSQL, Redis");
@@ -397,7 +398,7 @@ jane.doe@example.com | San Francisco, CA
     expect(cleaned).not.toContain("=>");
   });
 
-  it("deduplicates bare email and normalized URL labels while preserving descriptive link titles", () => {
+  it("deduplicates bare email and normalized URL labels while stripping descriptive link wrapper noise", () => {
     const raw = `
 = Jane Doe
 #link("mailto:jane@example.com")[jane\\@example.com] | #link("https://www.github.com/janedoe/")[github.com/janedoe] | #link("https://janedoe.dev")[Portfolio] | #link("mailto:jane@example.com")[Email Jane]
@@ -406,10 +407,11 @@ jane.doe@example.com | San Francisco, CA
 `;
     const cleaned = cleanTypstToText(raw);
     expect(cleaned).toContain(
-      "jane@example.com | https://www.github.com/janedoe/ | Portfolio (https://janedoe.dev) | Email Jane (jane@example.com)"
+      "jane@example.com | https://www.github.com/janedoe/ | https://janedoe.dev | jane@example.com"
     );
-    expect(cleaned).toContain("Live Demo (https://demo.example.com)");
+    expect(cleaned).toContain("https://demo.example.com");
     expect(cleaned).not.toContain("(mailto:");
     expect(cleaned).not.toContain("github.com/janedoe (https://");
+    expect(cleaned).not.toContain("Live Demo (https://");
   });
 });

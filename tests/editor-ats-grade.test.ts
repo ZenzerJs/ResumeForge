@@ -57,4 +57,36 @@ Languages: TypeScript, Node.js, Python, PostgreSQL, Docker, React
     expect(emptyResult.overallScore).toBeLessThan(70);
     expect(emptyResult.gaps.length).toBeGreaterThan(0);
   });
+
+  it("4. Uses measuredPages as source of truth for single-page check and falls back to char heuristic when omitted", () => {
+    const reqs = {
+      requiredSkills: ["TypeScript", "Node.js", "PostgreSQL"],
+      preferredSkills: ["Docker"],
+      domainTerms: ["microservices"],
+    };
+    const longOnePageTypst = `${sampleTypst}\n${"- Delivered measurable 25% latency improvements across distributed services.\n".repeat(65)}`;
+    expect(longOnePageTypst.length).toBeGreaterThan(4000);
+
+    // >4,000-char resume with measuredPages: 1 -> NO single-page warning
+    const measuredOnePage = evaluateAtsScore(longOnePageTypst, reqs, "Backend", {
+      measuredPages: 1,
+    });
+    expect(measuredOnePage.baseHealth.findings).toContain("✓ Standard one-page length constraints satisfied.");
+    expect(measuredOnePage.baseHealth.findings).not.toContain("Warning: Document length may exceed a single page.");
+    expect(measuredOnePage.gaps).not.toContain("Warning: Document length may exceed a single page.");
+
+    // Short resume with measuredPages: 2 -> triggers single-page warning
+    const measuredTwoPages = evaluateAtsScore(sampleTypst, reqs, "Backend", {
+      measuredPages: 2,
+    });
+    expect(measuredTwoPages.baseHealth.findings).toContain("Warning: Document length may exceed a single page.");
+    expect(measuredTwoPages.gaps).toContain("Warning: Document length may exceed a single page.");
+
+    // Missing measuredPages -> preserves existing >4,000-char fallback heuristic
+    const unmeasuredLong = evaluateAtsScore(longOnePageTypst, reqs, "Backend");
+    expect(unmeasuredLong.baseHealth.findings).toContain("Warning: Document length may exceed a single page.");
+
+    const unmeasuredShort = evaluateAtsScore(sampleTypst, reqs, "Backend");
+    expect(unmeasuredShort.baseHealth.findings).toContain("✓ Standard one-page length constraints satisfied.");
+  });
 });
