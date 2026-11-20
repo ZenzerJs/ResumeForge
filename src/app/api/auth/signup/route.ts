@@ -11,6 +11,7 @@ import {
   getAppAccessSecret,
 } from "@/lib/security/session";
 import { isDemoMode } from "@/lib/demo-mode";
+import { SEED_SAMPLE_EVIDENCE_IDS } from "@/lib/seed-sample-ids";
 
 const SignupSchema = z.object({
   email: z.string().email(),
@@ -63,12 +64,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        username,
-        passwordHash: await hashPassword(parsed.data.password),
-      },
+    const passwordHash = await hashPassword(parsed.data.password);
+
+    const user = await prisma.$transaction(async (tx) => {
+      const priorUserCount = await tx.user.count();
+      const created = await tx.user.create({
+        data: {
+          email,
+          username,
+          passwordHash,
+        },
+      });
+      if (priorUserCount === 0) {
+        await tx.evidenceItem.updateMany({
+          where: {
+            userId: null,
+            id: { in: [...SEED_SAMPLE_EVIDENCE_IDS] },
+          },
+          data: { userId: created.id },
+        });
+      }
+      return created;
     });
 
     const token = await createSessionToken(user.id, Date.now(), user.sessionVersion);

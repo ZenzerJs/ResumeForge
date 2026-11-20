@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { SEED_SAMPLE_EVIDENCE_IDS } from "@/lib/seed-sample-ids";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
@@ -70,5 +71,18 @@ describe("local hosting & packaging configuration", () => {
     expect(workflow).toContain("ghcr.io");
     expect(workflow).toContain("packages: write");
     expect(workflow).toContain("linux/amd64,linux/arm64");
+  });
+
+  it("keeps prisma/seed.ts standalone with deterministic sample IDs and enforces LF for shell scripts", () => {
+    const seed = readRepoFile("prisma/seed.ts");
+    for (const id of SEED_SAMPLE_EVIDENCE_IDS) {
+      expect(seed).toContain(id);
+    }
+    expect(seed).not.toContain('"@/');
+    expect(seed).not.toContain("'@/");
+    expect(seed).not.toMatch(/sqlite/i);
+
+    const gitattributes = readRepoFile(".gitattributes");
+    expect(gitattributes).toContain("*.sh text eol=lf");
   });
 });
