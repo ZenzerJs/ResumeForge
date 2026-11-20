@@ -4,11 +4,16 @@ Self-hosted installations use PostgreSQL as the only persistent application data
 
 ## Start
 
+### Quickstart (One-Line Installer + Prebuilt GHCR Image)
+
 1. Install Docker Engine or Docker Desktop with Compose v2.
-2. Copy `.env.example` to `.env`. Replace every `change-me` value, including the database password, `APP_ACCESS_SECRET`, and `JOB_SYNC_SECRET`. Use an alphanumeric PostgreSQL password so it can be safely represented in `DATABASE_URL`.
-3. Set `NEXT_PUBLIC_APP_URL` to the public HTTPS origin when serving behind a TLS reverse proxy. Compose passes it into the build because Next.js embeds public environment values at build time; rebuild the app after changing the origin. Keep the app bound to loopback and let the proxy provide TLS.
-4. Run `docker compose up --build -d`, then `docker compose logs -f app` until migrations complete and Next.js reports it is ready.
-5. Open the configured app URL. Public signup is enabled only when `DEMO_MODE=false`; demo mode disables signup and all persistent API writes.
+2. Run the one-line installer for your OS:
+   - **Windows (PowerShell):** `irm https://raw.githubusercontent.com/ZenzerJs/ResumeForge/main/install.ps1 | iex`
+   - **macOS / Linux:** `curl -fsSL https://raw.githubusercontent.com/ZenzerJs/ResumeForge/main/install.sh | bash`
+3. The installer creates `~/resumeforge/.env` on first run with generated random secrets (never overwriting an existing `.env`), picks free local ports if `3000` or `5432` are busy, pulls `ghcr.io/zenzerjs/resumeforge:latest`, runs `prisma migrate deploy`, and waits for `/login` readiness.
+4. To build from source instead of pulling the prebuilt image inside a cloned repository, run `.\install.ps1 -Build` (Windows) or `./install.sh --build` (macOS/Linux), or use `docker compose up --build -d` after copying `.env.example` to `.env` and replacing every `change-me` placeholder (use an alphanumeric PostgreSQL password so it is URI-safe in `DATABASE_URL`).
+5. **Custom HTTPS domain / reverse proxy:** Session `Secure` cookie detection falls back to `x-forwarded-proto` at runtime, while `NEXT_PUBLIC_APP_URL` sets metadata base URLs (the prebuilt GHCR image compiles with `http://localhost:3000`; pass `NEXT_PUBLIC_APP_URL` as a build arg and run `docker compose up --build -d` when baking a custom public origin into the client bundle). Keep the app bound to loopback (`127.0.0.1`) and terminate TLS at your reverse proxy.
+6. Public signup is enabled only when `DEMO_MODE=false`; `DEMO_MODE=true` disables signup and all persistent API writes.
 
 Compose stores PostgreSQL data in the named `resumeforge_pgdata` volume. Restarting or recreating containers preserves that volume. It is not a backup. Avoid running `prisma db seed` against a database containing real user data.
 
