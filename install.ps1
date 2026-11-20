@@ -38,8 +38,8 @@ function Invoke-ResumeForgeInstaller {
     $prevPref = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-      & docker @DockerArgs
-      return $LASTEXITCODE
+      & docker @DockerArgs | Out-Host
+      return [int]$LASTEXITCODE
     } finally {
       $ErrorActionPreference = $prevPref
     }
@@ -312,14 +312,6 @@ function Invoke-ResumeForgeInstaller {
         return
       }
     }
-
-    if ($useSeed) {
-      Write-Host "Seeding sample Evidence Bank data ..." -ForegroundColor Cyan
-      $seedCode = Invoke-DockerStream @("compose", "exec", "-T", "app", "node", "--experimental-strip-types", "prisma/seed.ts")
-      if ($seedCode -ne 0) {
-        Write-Host "Warning: sample seed exited with code $seedCode." -ForegroundColor Yellow
-      }
-    }
   } finally {
     Pop-Location
   }
@@ -347,6 +339,19 @@ function Invoke-ResumeForgeInstaller {
     Write-Host "  docker compose -f `"$composePath`" logs --tail=50 app"
     [void](Exit-Cleanly 1)
     return
+  }
+
+  if ($useSeed) {
+    Push-Location -LiteralPath $installDir
+    try {
+      Write-Host "Seeding sample Evidence Bank data ..." -ForegroundColor Cyan
+      $seedCode = Invoke-DockerStream @("compose", "exec", "-T", "app", "node", "--experimental-strip-types", "prisma/seed.ts")
+      if ($seedCode -ne 0) {
+        Write-Host "Warning: sample seed exited with code $seedCode." -ForegroundColor Yellow
+      }
+    } finally {
+      Pop-Location
+    }
   }
 
   Write-Host ""
