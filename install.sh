@@ -282,11 +282,6 @@ EOF
     (cd "$install_dir" && docker compose up -d --no-build)
   fi
 
-  if [[ "$use_seed" == "1" ]]; then
-    echo "Seeding sample Evidence Bank data ..."
-    (cd "$install_dir" && docker compose exec -T app node --experimental-strip-types prisma/seed.ts) || true
-  fi
-
   # 7. Wait for readiness
   echo "Waiting for ResumeForge to accept connections at ${health_url} ..."
   local ready=0
@@ -312,6 +307,11 @@ EOF
     echo "Inspect startup logs with:" >&2
     echo "  docker compose -f \"${compose_path}\" logs --tail=50 app" >&2
     return 1
+  fi
+
+  if [[ "$use_seed" == "1" ]]; then
+    echo "Seeding sample Evidence Bank data ..."
+    (cd "$install_dir" && docker compose exec -T app node --experimental-strip-types prisma/seed.ts) || true
   fi
 
   echo ""

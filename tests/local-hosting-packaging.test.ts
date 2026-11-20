@@ -44,11 +44,14 @@ describe("local hosting & packaging configuration", () => {
   it("implements BOM-free, idempotent, zero-node PowerShell 1-line installer", () => {
     const ps1 = readRepoFile("install.ps1");
     expect(ps1).toContain("function Invoke-ResumeForgeInstaller");
+    expect(ps1).toContain("& docker @DockerArgs | Out-Host");
+    expect(ps1).toContain("return [int]$LASTEXITCODE");
     expect(ps1).toContain("RandomNumberGenerator");
     expect(ps1).toContain("UTF8Encoding $false");
     expect(ps1).toContain("Test-PortFree");
     expect(ps1).toContain("if (-not (Test-Path -LiteralPath $envPath))");
     expect(ps1).toContain('"compose", "up", "-d", "--no-build"');
+    expect(ps1.indexOf("prisma/seed.ts")).toBeGreaterThan(ps1.indexOf("if (-not $ready)"));
   });
 
   it("implements strict bash 1-line installer with safe permissions and entrypoint wrapper", () => {
@@ -58,6 +61,7 @@ describe("local hosting & packaging configuration", () => {
     expect(sh).toContain("chmod 600");
     expect(sh).toContain("is_port_free");
     expect(sh).toContain("docker compose up -d --no-build");
+    expect(sh.indexOf("prisma/seed.ts")).toBeGreaterThan(sh.indexOf('if [[ "$ready" -ne 1 ]]'));
     expect(sh.trimEnd().endsWith('main "$@"')).toBe(true);
   });
 
