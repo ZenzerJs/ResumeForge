@@ -33,7 +33,17 @@
 /prisma/*.db
 /prisma/*.sqlite
 /.pgdata/
-/.agents/brain/
+
+# Local AI agent tooling & scratch
+/.agents/
+/.claude/
+/.gemini/
+/.impeccable/
+/.interface-design/
+
+# Generated assets & ad-hoc screenshots
+/public/workers/
+/screenshots/
 
 # Generated document exports & user data
 /*.pdf

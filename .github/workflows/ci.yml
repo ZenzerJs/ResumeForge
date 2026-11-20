@@ -32,7 +32,6 @@ jobs:
         with:
           sparse-checkout: |
             /*
-            !/.agents/
             !/docs/
             !/public/wasm/
           sparse-checkout-cone-mode: false
@@ -90,7 +89,6 @@ jobs:
         with:
           sparse-checkout: |
             /*
-            !/.agents/
             !/docs/
           sparse-checkout-cone-mode: false
 
@@ -137,7 +135,6 @@ jobs:
         with:
           sparse-checkout: |
             /*
-            !/.agents/
             !/docs/
           sparse-checkout-cone-mode: false
 

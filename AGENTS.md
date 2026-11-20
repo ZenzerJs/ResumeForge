@@ -12,7 +12,7 @@ Before building or changing UI, read DESIGN.md.
 
 Hard rules for every agent. Sprint 1 signed decisions sit under them so later tasks do not relitigate them.
 
-1. Postgres is the only source of truth. No SQLite runtime. Fix any doc that says otherwise. `scripts/migrate-sqlite-to-postgres.ts` is a one-time historical copy tool.
+1. Postgres is the only source of truth. No SQLite runtime. Fix any doc that says otherwise.
 2. All AI/LLM output is Zod-validated before it touches the DB.
 3. API keys (BYOK) never persist server-side. Never log request bodies that may contain keys. `src/lib/security/safe-fetch.ts` keeps its private-IP block.
 4. No destructive migration runs without a verified `--dry-run` report committed to the PR. Do not drop `Patch.evidenceCitations` in the same PR that adds `PatchCitation`.
@@ -31,7 +31,7 @@ Signed Sprint 1 decisions:
 ## Scoping & Context Rules (Ponytail + Caveman)
 
 - **Targeted File Inspection**: When asked to inspect, debug, optimize, or edit specific files, inspect ONLY the target files and their direct imports. DO NOT read foundational docs or run git status.
-- **Reference Docs (On-Demand Only)**: Consult docs/ (phase-status.md, decisions.md, architecture.md) ONLY when explicitly instructed to plan a multi-phase system roadmap. Never load them for file-specific tasks.
+- **Reference Docs (On-Demand Only)**: Consult docs/ (architecture.md, data-model.md, ai-guardrails.md) ONLY when explicitly instructed to plan a multi-phase system roadmap. Never load them for file-specific tasks.
 
 ---
 

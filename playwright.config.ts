@@ -18,17 +18,6 @@ const DEMO_SPECS = [
   "tailor-polish-verification.spec.ts",
 ];
 
-const SCREENSHOT_SPECS = [
-  "screenshots-gallery.spec.ts",
-  "user-requested-screenshots.spec.ts",
-  "with-ai-screenshots-gallery.spec.ts",
-];
-
-const includeScreenshots =
-  process.env.PLAYWRIGHT_SCREENSHOTS === "1" ||
-  process.env.PLAYWRIGHT_SCREENSHOTS === "true" ||
-  process.argv.some((arg) => arg === "--project=screenshots" || arg === "screenshots");
-
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
@@ -44,23 +33,9 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: [...DEMO_SPECS, ...SCREENSHOT_SPECS, "release/**"],
+      testIgnore: [...DEMO_SPECS, "release/**"],
       use: { ...devices["Desktop Chrome"] },
     },
-    ...(includeScreenshots
-      ? [
-          {
-            name: "screenshots",
-            testMatch: SCREENSHOT_SPECS,
-            timeout: 60_000,
-            use: {
-              ...devices["Desktop Chrome"],
-              viewport: { width: 1440, height: 900 },
-              trace: "off" as const,
-            },
-          },
-        ]
-      : []),
   ],
   webServer: {
     command: "npm run start -- -H 127.0.0.1 -p 3005",
