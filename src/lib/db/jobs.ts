@@ -579,9 +579,9 @@ export async function deleteJob(id: string, userId?: string) {
       throw new Error("Job not found");
     }
 
-    const [proposalBatch, otherApps, variants, coverLetters] = await Promise.all([
+    const [otherProposalBatch, otherApps, variants, coverLetters] = await Promise.all([
       tx.patchProposalBatch.findFirst({
-        where: { jobId: id },
+        where: { jobId: id, userId: { not: userId } },
         select: { id: true },
       }),
       tx.jobApplication.findFirst({
@@ -621,12 +621,13 @@ export async function deleteJob(id: string, userId?: string) {
       }
     }
 
-    if (proposalBatch || otherApps || hasOtherVariants || hasOtherLetters) {
+    if (otherProposalBatch || otherApps || hasOtherVariants || hasOtherLetters) {
       throw new JobDeleteConflictError(
         "Cannot delete job posting because it has dependent proposal history or external references."
       );
     }
 
+    await tx.patchProposalBatch.deleteMany({ where: { jobId: id, userId } });
     await tx.jobApplication.deleteMany({ where: { jobId: id, userId } });
     if (ownedLetterIds.length > 0) {
       await tx.coverLetter.deleteMany({

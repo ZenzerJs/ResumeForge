@@ -351,4 +351,85 @@ describe("Jobs API Endpoint Rejection Path & Zod Validation Tests", () => {
       await prisma.user.deleteMany({ where: { id: owner.user.id } });
     }
   });
+
+  it("deletes owned job together with caller-owned PatchProposalBatch rows, while blocking foreign batches with 409", async () => {
+    const suffix = crypto.randomUUID();
+    const owner = await createTestUser(`batch-owner-${suffix}@test.invalid`);
+    const other = await createTestUser(`batch-other-${suffix}@test.invalid`);
+    const master = await prisma.resume.create({
+      data: {
+        userId: owner.user.id,
+        title: "Master Resume",
+        typstSource: "= Jane Doe",
+        isMaster: true,
+      },
+    });
+    const ownBatchJob = await prisma.job.create({
+      data: {
+        userId: owner.user.id,
+        company: "OwnBatchCo",
+        roleTitle: "Engineer",
+        rawDescription: "TypeScript.",
+      },
+    });
+    const foreignBatchJob = await prisma.job.create({
+      data: {
+        userId: owner.user.id,
+        company: "ForeignBatchCo",
+        roleTitle: "Engineer",
+        rawDescription: "TypeScript.",
+      },
+    });
+    const ownedBatch = await prisma.patchProposalBatch.create({
+      data: {
+        userId: owner.user.id,
+        masterResumeId: master.id,
+        jobId: ownBatchJob.id,
+        revisionToken: "rev-1",
+        masterFingerprint: "m-1",
+        jobFingerprint: "j-1",
+        citationFingerprint: "c-1",
+        proposals: [],
+        gaps: [],
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+    const foreignBatch = await prisma.patchProposalBatch.create({
+      data: {
+        userId: other.user.id,
+        masterResumeId: master.id,
+        jobId: foreignBatchJob.id,
+        revisionToken: "rev-2",
+        masterFingerprint: "m-2",
+        jobFingerprint: "j-2",
+        citationFingerprint: "c-2",
+        proposals: [],
+        gaps: [],
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+
+    try {
+      const ownRes = await jobByIdDELETE(
+        authedRequest(`http://localhost:3000/api/jobs/${ownBatchJob.id}`, { method: "DELETE" }, owner.cookie),
+        { params: Promise.resolve({ id: ownBatchJob.id }) }
+      );
+      expect(ownRes.status).toBe(200);
+      expect(await prisma.job.findUnique({ where: { id: ownBatchJob.id } })).toBeNull();
+      expect(await prisma.patchProposalBatch.findUnique({ where: { id: ownedBatch.id } })).toBeNull();
+
+      const foreignRes = await jobByIdDELETE(
+        authedRequest(`http://localhost:3000/api/jobs/${foreignBatchJob.id}`, { method: "DELETE" }, owner.cookie),
+        { params: Promise.resolve({ id: foreignBatchJob.id }) }
+      );
+      expect(foreignRes.status).toBe(409);
+      expect(await prisma.job.findUnique({ where: { id: foreignBatchJob.id } })).not.toBeNull();
+      expect(await prisma.patchProposalBatch.findUnique({ where: { id: foreignBatch.id } })).not.toBeNull();
+    } finally {
+      await prisma.patchProposalBatch.deleteMany({ where: { id: { in: [ownedBatch.id, foreignBatch.id] } } });
+      await prisma.job.deleteMany({ where: { id: { in: [ownBatchJob.id, foreignBatchJob.id] } } });
+      await prisma.resume.deleteMany({ where: { id: master.id } });
+      await prisma.user.deleteMany({ where: { id: { in: [owner.user.id, other.user.id] } } });
+    }
+  });
 });

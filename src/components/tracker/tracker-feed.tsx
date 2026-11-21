@@ -729,7 +729,9 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         setTotalJobs(total);
         setTotalPages(totalPageCount);
         setPipelineCounts({
-          applied: dedupedFiltered.filter((job) => job.status === "APPLIED").length,
+          applied: dedupedFiltered.filter((job) =>
+            job.status === "APPLIED" || job.status === "INTERVIEWING" || job.status === "OFFER"
+          ).length,
           interviewing: dedupedFiltered.filter((job) => job.status === "INTERVIEWING").length,
         });
         setEditingNotes(Object.fromEntries(visible.map((job) => [job.id, job.notes || ""])));
@@ -1126,20 +1128,47 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
   };
 
   const performDeleteJob = async (jobId: string): Promise<boolean> => {
-    if (!jobs.some((item) => item.id === jobId)) {
+    const deletedJob = jobs.find((item) => item.id === jobId);
+    if (!deletedJob) {
       return false;
     }
+    const applyOptimisticRemoval = () => {
+      const remainingOnPage = jobs.filter((job) => job.id !== jobId);
+      const nextTotal = Math.max(0, totalJobs - 1);
+      const nextTotalPages = Math.max(1, Math.ceil(nextTotal / PAGE_SIZE));
+      setJobs(remainingOnPage);
+      setTotalJobs(nextTotal);
+      setTotalPages(nextTotalPages);
+      setPipelineCounts((prev) => ({
+        applied:
+          deletedJob.status === "APPLIED" ||
+          deletedJob.status === "INTERVIEWING" ||
+          deletedJob.status === "OFFER"
+            ? Math.max(0, prev.applied - 1)
+            : prev.applied,
+        interviewing:
+          deletedJob.status === "INTERVIEWING"
+            ? Math.max(0, prev.interviewing - 1)
+            : prev.interviewing,
+      }));
+      if (activeJobId === jobId) {
+        setActiveJobId(null);
+        sessionStorage.removeItem("resumeforge_active_job_id");
+        setMobileSheetOpen(false);
+      }
+      if (remainingOnPage.length === 0 && page > 1) {
+        setPage((p) => Math.max(1, p - 1));
+      } else {
+        void fetchJobs();
+      }
+    };
+
     try {
       if (isDemoMode || authStatus === "guest") {
         const rows = JSON.parse(localStorage.getItem("resumeforge_guest_jobs") || "[]");
         if (!Array.isArray(rows)) throw new Error("Invalid local tracker data");
         localStorage.setItem("resumeforge_guest_jobs", JSON.stringify(rows.filter((job) => job.id !== jobId)));
-        setJobs((prev) => prev.filter((job) => job.id !== jobId));
-        if (activeJobId === jobId) {
-          setActiveJobId(null);
-          sessionStorage.removeItem("resumeforge_active_job_id");
-          setMobileSheetOpen(false);
-        }
+        applyOptimisticRemoval();
         return true;
       }
       const res = await fetch(`/api/jobs/${jobId}`, { method: "DELETE" });
@@ -1155,12 +1184,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         setImportNotice(msg);
         return false;
       }
-      setJobs((prev) => prev.filter((j) => j.id !== jobId));
-      if (activeJobId === jobId) {
-        setActiveJobId(null);
-        sessionStorage.removeItem("resumeforge_active_job_id");
-        setMobileSheetOpen(false);
-      }
+      applyOptimisticRemoval();
       return true;
     } catch {
       console.error("Failed to delete job");
