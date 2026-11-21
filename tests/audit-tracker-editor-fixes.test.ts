@@ -229,9 +229,11 @@ describe("Tracker, Editor, DSA, and Typst Audit Fixes", () => {
   it("8. JobDetailPane renders explicit status text on every checklist row and clarifies required-skill coverage", () => {
     const src = readProjectFile("src/components/tracker/job-detail-pane.tsx");
     const coverageStart = src.indexOf('data-testid="tracker-required-evidence-coverage"');
-    const checklistStart = src.indexOf("checklist.items.map");
+    const checklistStart = src.indexOf('data-testid="tracker-required-skills-group"');
+    const optionalStart = src.indexOf('data-testid="tracker-optional-skills-group"');
     const coverageBlock = src.slice(coverageStart, checklistStart);
-    const checklistBlock = src.slice(checklistStart, src.indexOf("</ul>", checklistStart));
+    const checklistBlock = src.slice(checklistStart, optionalStart);
+    const optionalBlock = src.slice(optionalStart, src.indexOf("</ul>", optionalStart));
 
     expect(coverageBlock).toContain("Required-skill coverage:");
     expect(coverageBlock).toContain("{requiredMatched}/{requiredEvidence.length}");
@@ -239,8 +241,9 @@ describe("Tracker, Editor, DSA, and Typst Audit Fixes", () => {
 
     expect(checklistBlock).toContain("Verified:");
     expect(checklistBlock).toContain("Needs verification");
-    expect(checklistBlock).toContain("Missing:");
+    expect(checklistBlock).toContain("Missing required skill:");
     expect(checklistBlock).toContain("aria-hidden");
+    expect(optionalBlock).toContain("Nice to have");
   });
 
   it("9. TrackerFeed reads resumeforge_guest_jobs for any signed-out guest and supports arrow-key roving tablist", () => {

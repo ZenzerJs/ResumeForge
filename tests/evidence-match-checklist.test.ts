@@ -51,11 +51,11 @@ describe("buildEvidenceMatchChecklist", () => {
     expect(result.needsVerification).toBe(0);
     expect(result.percent).toBe(40);
     expect(result.items).toEqual([
-      { label: "TypeScript", matched: true, status: "verified" },
-      { label: "React", matched: true, status: "verified" },
-      { label: "FPGA", matched: false, status: "missing" },
-      { label: "GraphQL", matched: false, status: "missing" },
-      { label: "Trading", matched: false, status: "missing" },
+      { label: "TypeScript", matched: true, status: "verified", category: "required" },
+      { label: "React", matched: true, status: "verified", category: "required" },
+      { label: "FPGA", matched: false, status: "missing", category: "required" },
+      { label: "GraphQL", matched: false, status: "missing", category: "preferred" },
+      { label: "Trading", matched: false, status: "missing", category: "domain" },
     ]);
   });
 
@@ -87,6 +87,7 @@ describe("buildEvidenceMatchChecklist", () => {
       label: "React",
       matched: true,
       status: "verified",
+      category: "required",
     });
   });
 
@@ -140,11 +141,11 @@ describe("buildEvidenceMatchChecklist", () => {
     expect(result.needsVerification).toBe(2);
     expect(result.percent).toBe(40);
     expect(result.items).toEqual([
-      { label: "TypeScript", matched: true, status: "verified" },
-      { label: "React", matched: true, status: "verified" },
-      { label: "FPGA", matched: false, status: "needs_verification" },
-      { label: "GraphQL", matched: false, status: "needs_verification" },
-      { label: "Trading", matched: false, status: "missing" },
+      { label: "TypeScript", matched: true, status: "verified", category: "required" },
+      { label: "React", matched: true, status: "verified", category: "required" },
+      { label: "FPGA", matched: false, status: "needs_verification", category: "required" },
+      { label: "GraphQL", matched: false, status: "needs_verification", category: "preferred" },
+      { label: "Trading", matched: false, status: "missing", category: "domain" },
     ]);
   });
 
@@ -192,15 +193,24 @@ describe("buildEvidenceMatchChecklist", () => {
     );
 
     expect(result.items).toEqual([
-      { label: "Go", matched: false, status: "needs_verification" },
-      { label: "C", matched: false, status: "missing" },
-      { label: "C++", matched: true, status: "verified" },
-      { label: "R", matched: false, status: "missing" },
-      { label: "AI", matched: false, status: "missing" },
-      { label: "SQL", matched: false, status: "missing" },
-      { label: "Node.js", matched: true, status: "verified" },
+      { label: "Go", matched: false, status: "needs_verification", category: "required" },
+      { label: "C", matched: false, status: "missing", category: "required" },
+      { label: "C++", matched: true, status: "verified", category: "required" },
+      { label: "R", matched: false, status: "missing", category: "required" },
+      { label: "AI", matched: false, status: "missing", category: "required" },
+      { label: "SQL", matched: false, status: "missing", category: "required" },
+      { label: "Node.js", matched: true, status: "verified", category: "required" },
     ]);
     expect(result.matched).toBe(2);
     expect(result.needsVerification).toBe(1);
+  });
+
+  it("extractLocationFromNotes falls back safely to rawDescription while ignoring negated remote mentions", async () => {
+    const { extractLocationFromNotes } = await import("@/lib/ingestion/helpers");
+    expect(extractLocationFromNotes(null, "Role: SWE\nLocation: Remote (US)")).toBe("Remote (US)");
+    expect(extractLocationFromNotes("", "This is a fully remote engineering internship.")).toBe("Remote");
+    expect(extractLocationFromNotes("", "This role is not remote and requires badge access.")).toBe("");
+    expect(extractLocationFromNotes("", "Build remote control telemetry firmware.")).toBe("");
+    expect(extractLocationFromNotes("Location: Toronto, ON", "Fully remote")).toBe("Toronto, ON");
   });
 });

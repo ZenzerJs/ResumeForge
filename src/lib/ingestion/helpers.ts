@@ -95,34 +95,59 @@ export function normalizeLocation(rawLocation?: string | null): string {
   return `${uniqueParts[0]}; ${uniqueParts[1]} (+${moreCount} more)`;
 }
 
-export function extractLocationFromNotes(notes?: string | null): string {
-  if (!notes) return "";
-
-  const segments = notes.split("|").map((s) => s.trim()).filter(Boolean);
-  const locIdx = segments.findIndex((s) => /^location:\s*/i.test(s));
-
-  if (locIdx === -1) {
-    const match = notes.match(/Location:\s*([^|]+)/i);
-    return match ? normalizeLocation(match[1]) : "";
+function extractLocationFromRawDescription(rawDescription?: string | null): string {
+  if (!rawDescription) return "";
+  const headerMatch = rawDescription.match(
+    /(?:^|\n)\s*(?:Location|Workplace(?:\s+Type)?|Work\s+Arrangement)\s*:\s*([^\n|]{2,80})/i
+  );
+  if (headerMatch?.[1]) {
+    const cleaned = normalizeLocation(headerMatch[1]);
+    if (cleaned) return cleaned;
   }
 
-  const rawLocationParts: string[] = [segments[locIdx].replace(/^location:\s*/i, "").trim()];
+  // Safe positive workplace fallback (avoiding negated phrases like "not remote" or "remote control")
+  const sanitized = rawDescription
+    .replace(/\b(?:not|non[-\s]?|no)\s+(?:fully\s+|100%\s+)?remote\b/gi, "")
+    .replace(/\bremote\s+(?:control|access|desktop|procedure|server|repository|branch|api|endpoint|sensing)\b/gi, "");
 
-  // Look ahead for continuation segments across pipes
-  const knownFieldHeader = /^(?:Apply(?:\s*Link)?|Date\s*Posted|Posted|Salary|Tier\s*\d+|Workplace|Status|Source|Company|Role)\s*:/i;
-  for (let i = locIdx + 1; i < segments.length; i++) {
-    const seg = segments[i];
-    if (
-      knownFieldHeader.test(seg) ||
-      seg.toLowerCase().includes("tier 2 fetched") ||
-      seg.toLowerCase().includes("tier 1 bulk import")
-    ) {
-      break;
+  if (/\b(?:100%\s+|fully\s+)?remote\b/i.test(sanitized)) return "Remote";
+  if (/\bhybrid\b/i.test(sanitized)) return "Hybrid";
+  if (/\bon[- ]site\b/i.test(sanitized)) return "On-site";
+  return "";
+}
+
+export function extractLocationFromNotes(notes?: string | null, rawDescription?: string | null): string {
+  if (notes) {
+    const segments = notes.split("|").map((s) => s.trim()).filter(Boolean);
+    const locIdx = segments.findIndex((s) => /^location:\s*/i.test(s));
+
+    if (locIdx === -1) {
+      const match = notes.match(/Location:\s*([^|]+)/i);
+      const fromNotes = match ? normalizeLocation(match[1]) : "";
+      if (fromNotes) return fromNotes;
+    } else {
+      const rawLocationParts: string[] = [segments[locIdx].replace(/^location:\s*/i, "").trim()];
+
+      // Look ahead for continuation segments across pipes
+      const knownFieldHeader = /^(?:Apply(?:\s*Link)?|Date\s*Posted|Posted|Salary|Tier\s*\d+|Workplace|Status|Source|Company|Role)\s*:/i;
+      for (let i = locIdx + 1; i < segments.length; i++) {
+        const seg = segments[i];
+        if (
+          knownFieldHeader.test(seg) ||
+          seg.toLowerCase().includes("tier 2 fetched") ||
+          seg.toLowerCase().includes("tier 1 bulk import")
+        ) {
+          break;
+        }
+        rawLocationParts.push(seg);
+      }
+
+      const fromNotes = normalizeLocation(rawLocationParts.join("; "));
+      if (fromNotes) return fromNotes;
     }
-    rawLocationParts.push(seg);
   }
 
-  return normalizeLocation(rawLocationParts.join("; "));
+  return extractLocationFromRawDescription(rawDescription);
 }
 
 export type WorkplaceFilter = "all" | "remote" | "hybrid" | "onsite";
