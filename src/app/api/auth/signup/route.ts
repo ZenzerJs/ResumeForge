@@ -75,7 +75,7 @@ export async function POST(request: Request) {
           passwordHash,
         },
       });
-      if (priorUserCount === 0) {
+      if (priorUserCount === 0 && !process.env.VERCEL && !isDemoMode()) {
         await tx.evidenceItem.updateMany({
           where: {
             userId: null,
