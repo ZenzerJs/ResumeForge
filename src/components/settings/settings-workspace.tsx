@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { ProviderType } from "@/lib/ai/types";
 import { normalizeGeminiModel } from "@/lib/ai/model-defaults";
@@ -38,6 +38,14 @@ import {
 import { AppShell } from "@/components/design-system/app-shell";
 import { PageHeader } from "@/components/design-system/page-header";
 import { Surface } from "@/components/design-system/surface";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { PageSkeleton } from "@/components/design-system/page-skeleton";
 import {
   fetchDemoConfig,
@@ -210,6 +218,13 @@ export function SettingsWorkspace() {
   const [usernameStatus, setUsernameStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isSavingUsername, setIsSavingUsername] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [showUnsetMasterConfirm, setShowUnsetMasterConfirm] = useState(false);
+  const [isUnsettingMaster, setIsUnsettingMaster] = useState(false);
+  const [unsetMasterStatus, setUnsetMasterStatus] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+  const cancelUnsetMasterRef = useRef<HTMLButtonElement>(null);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [clearedKeyUndo, setClearedKeyUndo] = useState<{ provider: ProviderType; key: string } | null>(null);
@@ -511,6 +526,34 @@ export function SettingsWorkspace() {
       });
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handleUnsetMasterResume = async () => {
+    setIsUnsettingMaster(true);
+    setUnsetMasterStatus(null);
+    try {
+      const res = await fetch("/api/resumes/clear-master", { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        setUnsetMasterStatus({
+          type: "error",
+          message: json?.error || `Could not unset Master Resume (${res.status}).`,
+        });
+        return;
+      }
+      setShowUnsetMasterConfirm(false);
+      setUnsetMasterStatus({
+        type: "success",
+        message: "Master Resume designation removed. You can promote or upload a new master in Editor.",
+      });
+    } catch {
+      setUnsetMasterStatus({
+        type: "error",
+        message: "Network error while unsetting Master Resume.",
+      });
+    } finally {
+      setIsUnsettingMaster(false);
     }
   };
 
@@ -1000,6 +1043,48 @@ export function SettingsWorkspace() {
                     <LogOut className="h-4 w-4" aria-hidden />
                     Sign Out
                   </button>
+
+                  {!demoMode && (
+                    <div
+                      data-testid="settings-master-resume-section"
+                      className="pt-4 border-t border-hairline space-y-2.5"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-text-secondary">
+                            Master Resume
+                          </h3>
+                          <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                            Removes the Master Resume designation so you can upload or promote a different resume. Your saved file stays in your account.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          data-testid="unset-master-resume-btn"
+                          disabled={isUnsettingMaster}
+                          onClick={() => {
+                            setUnsetMasterStatus(null);
+                            setShowUnsetMasterConfirm(true);
+                          }}
+                          className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md border border-status-danger/40 bg-status-danger/10 px-4 text-xs font-semibold text-status-danger hover:bg-status-danger/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                        >
+                          Unset Master Resume
+                        </button>
+                      </div>
+                      {unsetMasterStatus && (
+                        <p
+                          role={unsetMasterStatus.type === "error" ? "alert" : "status"}
+                          className={`text-xs ${
+                            unsetMasterStatus.type === "success"
+                              ? "text-status-success-soft"
+                              : "text-status-danger"
+                          }`}
+                        >
+                          {unsetMasterStatus.message}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
@@ -1022,6 +1107,47 @@ export function SettingsWorkspace() {
           )}
         </div>
       </div>
+      <Dialog open={showUnsetMasterConfirm} onOpenChange={setShowUnsetMasterConfirm}>
+        <DialogContent
+          className="max-w-sm border-outline bg-elevated p-5"
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            cancelUnsetMasterRef.current?.focus();
+          }}
+        >
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-base font-semibold text-foreground">
+              Unset master resume?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Removes the Master Resume designation so you can upload or promote a different resume. Your saved file stays in your account.
+            </DialogDescription>
+          </DialogHeader>
+          {unsetMasterStatus?.type === "error" && (
+            <p role="alert" className="text-xs text-status-danger">
+              {unsetMasterStatus.message}
+            </p>
+          )}
+          <DialogFooter className="mt-2 gap-2 sm:justify-end">
+            <button
+              ref={cancelUnsetMasterRef}
+              type="button"
+              onClick={() => setShowUnsetMasterConfirm(false)}
+              className="rounded-[6px] border border-outline px-3 py-2 text-sm text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-elevated"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isUnsettingMaster}
+              onClick={() => void handleUnsetMasterResume()}
+              className="rounded-[6px] bg-status-danger px-3 py-2 text-sm font-semibold text-accent-ink hover:bg-status-danger/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-elevated disabled:opacity-50"
+            >
+              {isUnsettingMaster ? "Unsetting…" : "Unset Master Resume"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }
