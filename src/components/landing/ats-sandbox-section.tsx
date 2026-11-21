@@ -374,6 +374,8 @@ export function AtsSandboxSection() {
             </div>
 
             <textarea
+              id="sandbox-jd-input"
+              name="sandboxJobDescription"
               value={customDescription}
               onChange={(e) => setCustomDescription(e.target.value)}
               rows={8}
@@ -684,6 +686,8 @@ export function AtsSandboxSection() {
                   </div>
                   {isEditingSnippet ? (
                     <textarea
+                      id="sandbox-typst-textarea"
+                      name="sandboxTypstSource"
                       data-testid="sandbox-typst-textarea"
                       aria-label="Resume Typst source"
                       value={customSnippet}

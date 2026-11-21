@@ -967,6 +967,8 @@ export function AiSidebar({
                           </p>
                           <label className="flex items-start gap-2 text-xs text-status-warning cursor-pointer pt-0.5">
                             <input
+                              id="ai-sidebar-confirm-large-repair"
+                              name="confirmLargeRepair"
                               type="checkbox"
                               checked={confirmLargeRepair}
                               onChange={(e) => setConfirmLargeRepair(e.target.checked)}
@@ -1067,6 +1069,7 @@ export function AiSidebar({
           </label>
           <textarea
             id={jdTextareaId}
+            name="jobDescription"
             rows={6}
             value={jdText}
             onChange={(e) => {
@@ -1148,6 +1151,8 @@ export function AiSidebar({
                       className="flex items-center gap-2 text-xs text-foreground cursor-pointer"
                     >
                       <input
+                        id={`ai-sidebar-ack-skill-${skill.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                        name="acknowledgedSkill"
                         type="checkbox"
                         checked={acknowledgedSkills.has(skill)}
                         onChange={() => toggleSkillAck(skill)}

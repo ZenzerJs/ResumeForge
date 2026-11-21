@@ -246,6 +246,8 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
             <label className="flex items-center gap-1.5 text-xs text-text-muted font-mono">
               <span>Font Size</span>
               <select
+                id={`${formId}-font-size`}
+                name="fontSize"
                 value={model.fontSize}
                 onChange={(e) =>
                   commitModel({
@@ -267,6 +269,8 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
             <label className="flex items-center gap-1.5 text-xs text-text-muted font-mono">
               <span>Margins</span>
               <select
+                id={`${formId}-margin-preset`}
+                name="marginPreset"
                 value={model.marginPreset}
                 onChange={(e) =>
                   commitModel({
@@ -479,6 +483,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
               </div>
               <textarea
                 id={`${formId}-summary`}
+                name="summary"
                 rows={3}
                 value={model.summary}
                 onChange={(e) => commitModel({ ...model, summary: e.target.value })}
@@ -640,6 +645,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                       </label>
                       <textarea
                         id={`${formId}-${activeSection}-${idx}-bullet-${bIdx}`}
+                        name={`${activeSection}-${idx}-bullet-${bIdx}`}
                         rows={2}
                         value={bullet}
                         onChange={(e) =>

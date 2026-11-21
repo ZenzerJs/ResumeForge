@@ -152,6 +152,8 @@ export function JobListRow({
               <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
             ) : (
               <select
+                id={`job-row-status-${job.id}`}
+                name="jobStatus"
                 value={job.status}
                 data-testid={`job-status-select-${job.id}`}
                 onChange={(e) => onStatusChange(job.id, e.target.value as JobStatus)}

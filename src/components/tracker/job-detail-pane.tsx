@@ -560,6 +560,8 @@ export function JobDetailPane({
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     ) : (
                       <select
+                        id={`job-detail-status-${job.id}`}
+                        name="jobStatus"
                         value={job.status}
                         onChange={(e) => onStatusChange(job.id, e.target.value as JobStatus)}
                         className="min-h-11 sm:min-h-0 max-w-full bg-input border border-outline-variant rounded-[6px] px-3 py-1.5 text-xs font-mono-data text-on-surface-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-colors cursor-pointer"
@@ -574,6 +576,8 @@ export function JobDetailPane({
                     )}
                     {onVariantChange && (job.variants?.length ?? 0) > 0 && job.status !== "SAVED" && (
                       <select
+                        id={`job-detail-variant-${job.id}`}
+                        name="sentVariantId"
                         value={job.appliedVariantId ?? ""}
                         onChange={(e) => onVariantChange(job.id, e.target.value || null)}
                         className="min-h-11 sm:min-h-0 max-w-full block bg-input border border-outline-variant rounded-[6px] px-3 py-1.5 text-xs font-mono-data text-on-surface-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -669,7 +673,7 @@ export function JobDetailPane({
                       )}
                       {requiredEvidence.length > 0 && (
                         <div className="space-y-2" data-testid="tracker-required-skills-group">
-                          <div className="font-mono text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+                          <div className="font-mono text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
                             Required skills ({requiredMatched}/{requiredEvidence.length})
                           </div>
                           <ul className="space-y-2 font-mono-data text-xs">
@@ -704,7 +708,7 @@ export function JobDetailPane({
                           className={requiredEvidence.length > 0 ? "mt-4 pt-3 border-t border-hairline space-y-2" : "space-y-2"}
                           data-testid="tracker-optional-skills-group"
                         >
-                          <div className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          <div className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                             Preferred &amp; domain skills ({optionalEvidence.filter((i) => i.status === "verified").length}/{optionalEvidence.length})
                           </div>
                           <ul className="space-y-2 font-mono-data text-xs">
@@ -731,7 +735,7 @@ export function JobDetailPane({
                                     Needs verification
                                   </span>
                                 ) : item.status === "missing" ? (
-                                  <span className="ml-auto shrink-0 rounded border border-hairline bg-inset px-1.5 py-0.5 text-[11px] font-mono text-muted-foreground">
+                                  <span className="ml-auto shrink-0 rounded border border-hairline bg-inset px-1.5 py-0.5 text-xs font-mono text-muted-foreground">
                                     Nice to have
                                   </span>
                                 ) : null}
@@ -815,6 +819,7 @@ export function JobDetailPane({
                   </label>
                   <textarea
                     id={`notes-${job.id}`}
+                    name="jobNotes"
                     data-testid={`notes-textarea-${job.id}`}
                     value={notesValue}
                     onChange={(e) => onNotesChange(job.id, e.target.value)}

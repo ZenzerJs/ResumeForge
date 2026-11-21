@@ -2586,6 +2586,7 @@ export function TailorWorkspace() {
               </label>
               <select
                 id="tailor-role-profile-select"
+                name="roleProfile"
                 value={selectedRoleProfile}
                 onChange={(e) => setSelectedRoleProfile(e.target.value as RoleProfile)}
                 className="h-9 min-w-0 max-w-full cursor-pointer rounded-md border border-hairline bg-inset px-2.5 py-0 text-sm font-medium leading-normal text-foreground focus-visible:outline-2 focus-visible:outline-primary"
@@ -3439,6 +3440,8 @@ export function TailorWorkspace() {
                         </span>
                         <div className="flex flex-wrap items-center gap-2">
                           <input
+                            id="tailor-custom-requirement-input"
+                            name="customRequirement"
                             type="text"
                             value={newUserReqText}
                             onChange={(e) => setNewUserReqText(e.target.value)}
@@ -3510,6 +3513,7 @@ export function TailorWorkspace() {
                         </div>
                         <textarea
                           id="tailor-job-description"
+                          name="jobDescription"
                           ref={registerJobDescription}
                           value={rawDescription}
                           onChange={(e) => updateJobDescription(e.target.value)}

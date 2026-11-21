@@ -1811,6 +1811,8 @@ export function LibraryWorkspace() {
                   </Link>
                 ) : null}
                 <input
+                  id="library-json-import-input"
+                  name="evidenceJsonFile"
                   type="file"
                   ref={fileInputRef}
                   onChange={handleFileImport}
@@ -1970,6 +1972,8 @@ export function LibraryWorkspace() {
               <div className="flex items-center gap-2 min-w-0 shrink-0">
                 <span className="sr-only sm:not-sr-only shrink-0 text-xs font-mono text-muted-foreground">Status:</span>
                 <select
+                  id="evidence-status-filter"
+                  name="evidenceStatusFilter"
                   value={filterStatus}
                   onChange={(e) => handleFilterStatusChange(e.target.value)}
                   data-testid="evidence-status-filter"
@@ -2767,6 +2771,7 @@ export function LibraryWorkspace() {
                 </label>
                 <select
                   id="evidence-item-type"
+                  name="evidenceType"
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                   className="min-h-10 sm:min-h-0 w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
@@ -2786,6 +2791,7 @@ export function LibraryWorkspace() {
                 </label>
                 <select
                   id="evidence-item-status"
+                  name="evidenceStatus"
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                   className="min-h-10 sm:min-h-0 w-full rounded-[6px] border border-control/70 bg-inset px-3 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
@@ -2803,6 +2809,7 @@ export function LibraryWorkspace() {
               </label>
               <input
                 id="evidence-item-title"
+                name="evidenceTitle"
                 type="text"
                 required
                 value={formData.title}
@@ -2819,6 +2826,7 @@ export function LibraryWorkspace() {
                 </label>
                 <input
                   id="evidence-item-org"
+                  name="evidenceOrganization"
                   type="text"
                   value={formData.organization}
                   onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
@@ -2833,6 +2841,7 @@ export function LibraryWorkspace() {
                 </label>
                 <input
                   id="evidence-item-dates"
+                  name="evidenceDates"
                   type="text"
                   value={formData.dates}
                   onChange={(e) => setFormData({ ...formData, dates: e.target.value })}
@@ -2848,6 +2857,7 @@ export function LibraryWorkspace() {
               </label>
               <textarea
                 id="evidence-item-summary"
+                name="evidenceVerifiedSummary"
                 required
                 rows={3}
                 value={formData.verifiedSummary}
@@ -2863,6 +2873,7 @@ export function LibraryWorkspace() {
               </label>
               <input
                 id="evidence-item-tags"
+                name="evidenceTags"
                 type="text"
                 value={formData.tagsInput}
                 onChange={(e) => setFormData({ ...formData, tagsInput: e.target.value })}
@@ -2877,6 +2888,7 @@ export function LibraryWorkspace() {
               </label>
               <textarea
                 id="evidence-item-bullets"
+                name="evidenceBullets"
                 rows={3}
                 value={formData.bulletsInput.join("\n")}
                 onChange={(e) => setFormData({ ...formData, bulletsInput: e.target.value.split("\n") })}

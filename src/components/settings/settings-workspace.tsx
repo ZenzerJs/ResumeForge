@@ -601,6 +601,7 @@ export function SettingsWorkspace() {
               </label>
               <select
                 id="provider-select"
+                name="provider"
                 value={provider}
                 onChange={handleProviderChange}
                 className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"

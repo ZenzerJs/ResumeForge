@@ -963,6 +963,7 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
                 </label>
                 <input
                   id="landing-pdf-upload"
+                  name="resumePdfFile"
                   type="file"
                   ref={pdfInputRef}
                   onChange={handlePdfUpload}

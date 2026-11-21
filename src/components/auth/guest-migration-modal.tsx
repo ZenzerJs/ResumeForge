@@ -572,6 +572,7 @@ export function GuestMigrationModal({
                 }`}
               >
                 <input
+                  id="migration-strategy-import-draft"
                   type="radio"
                   name="conflictStrategy"
                   value="IMPORT_AS_DRAFT"
@@ -599,6 +600,7 @@ export function GuestMigrationModal({
                   }`}
                 >
                   <input
+                    id="migration-strategy-replace-master"
                     type="radio"
                     name="conflictStrategy"
                     value="REPLACE_MASTER"
@@ -626,6 +628,7 @@ export function GuestMigrationModal({
                 }`}
               >
                 <input
+                  id="migration-strategy-discard"
                   type="radio"
                   name="conflictStrategy"
                   value="DISCARD"
@@ -661,6 +664,8 @@ export function GuestMigrationModal({
               </p>
               <label className="flex items-start gap-2 pt-0.5 cursor-pointer select-none">
                 <input
+                  id="migration-confirm-replace-master"
+                  name="confirmReplaceMaster"
                   type="checkbox"
                   checked={confirmReplaceMaster}
                   onChange={(e) => setConfirmReplaceMaster(e.target.checked)}

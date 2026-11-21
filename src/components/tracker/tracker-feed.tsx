@@ -1438,6 +1438,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <input
               id="tracker-job-search"
+              name="trackerSearch"
               data-testid="tracker-job-search"
               type="search"
               placeholder="Search jobs, companies…"
@@ -1483,6 +1484,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
           <MapPin className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <input
             id="tracker-location-filter"
+            name="trackerLocation"
             data-testid="tracker-location-filter"
             type="search"
             role="combobox"
@@ -1596,6 +1598,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         </label>
         <select
           id="tracker-posted-select"
+          name="trackerPostedWithin"
           data-testid="tracker-posted-select"
           value={postedWithin}
           onChange={(e) => setPostedWithin(e.target.value as PostedWithin)}
@@ -1614,6 +1617,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         </label>
         <select
           id="tracker-workplace-filter"
+          name="trackerWorkplace"
           data-testid="tracker-workplace-filter"
           value={workplace}
           onChange={(e) => setWorkplace(e.target.value as WorkplaceFilter)}
@@ -1632,6 +1636,7 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
         </label>
         <select
           id="tracker-status-filter"
+          name="trackerStatus"
           data-testid="tracker-status-filter"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as JobStatus | "ALL")}
@@ -1847,6 +1852,8 @@ export function TrackerFeed({ filterStatuses }: TrackerFeedProps) {
 
                             <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-hairline">
                               <select
+                                id={`kanban-job-status-${job.id}`}
+                                name="jobStatus"
                                 value={job.status}
                                 onChange={(e) =>
                                   void handleStatusChange(job.id, e.target.value as JobStatus)

@@ -770,6 +770,8 @@ export function ChatPanel({ typstSource, resumeTitle, jobId }: ChatPanelProps) {
 
       <div className="border-t border-hairline p-3 space-y-2">
         <textarea
+          id="career-assistant-chat-input"
+          name="chatMessage"
           ref={textareaRef}
           data-testid="chat-input"
           aria-label="Ask Career Assistant"
