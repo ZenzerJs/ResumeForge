@@ -2,7 +2,12 @@ node_modules
 .next
 .git
 .agents
+.claude
 .gemini
+.impeccable
+.interface-design
+public/workers
+screenshots
 dist
 build
 coverage
