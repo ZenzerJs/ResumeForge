@@ -500,19 +500,22 @@ describe("real PostgreSQL contracts", () => {
       await prisma.jobApplication.findFirst({ where: { userId: other.user.id, jobId: sharedJob.id } })
     ).toBeNull();
 
-    // Attach owner application + master + proposal batch so DELETE is blocked with 409 and preserves owner state.
+    // Attach owner application + master + another user's proposal batch so DELETE is blocked with 409 and preserves owner state.
     await prisma.jobApplication.create({
       data: { userId: owner.user.id, jobId: ownedJob.id, status: "APPLIED" },
     });
     const master = await prisma.resume.create({
       data: { userId: owner.user.id, title: "M", typstSource: "= M", isMaster: true, isProtected: true },
     });
-    await prisma.patchProposalBatch.create({
+    const otherMaster = await prisma.resume.create({
+      data: { userId: other.user.id, title: "Other M", typstSource: "= OM", isMaster: true, isProtected: true },
+    });
+    const blockingBatch = await prisma.patchProposalBatch.create({
       data: {
-        userId: owner.user.id,
-        masterResumeId: master.id,
+        userId: other.user.id,
+        masterResumeId: otherMaster.id,
         jobId: ownedJob.id,
-        revisionToken: `tok-${suffix}`,
+        revisionToken: `tok-other-${suffix}`,
         masterFingerprint: "m-fp",
         jobFingerprint: "j-fp",
         citationFingerprint: "c-fp",
@@ -531,6 +534,29 @@ describe("real PostgreSQL contracts", () => {
     expect(
       await prisma.jobApplication.findFirst({ where: { userId: owner.user.id, jobId: ownedJob.id } })
     ).not.toBeNull();
+
+    // Once external references are gone, an owner's own proposal batch + application are cleaned up cleanly on DELETE.
+    await prisma.patchProposalBatch.delete({ where: { id: blockingBatch.id } });
+    await prisma.patchProposalBatch.create({
+      data: {
+        userId: owner.user.id,
+        masterResumeId: master.id,
+        jobId: ownedJob.id,
+        revisionToken: `tok-${suffix}`,
+        masterFingerprint: "m-fp",
+        jobFingerprint: "j-fp",
+        citationFingerprint: "c-fp",
+        proposals: [],
+        gaps: [],
+        expiresAt: new Date(Date.now() + 3600_000),
+      },
+    });
+    const allowedOwnerDelete = await jobByIdDELETE(
+      authedRequest(`http://localhost:3000/api/jobs/${ownedJob.id}`, { method: "DELETE" }, owner.cookie),
+      { params: Promise.resolve({ id: ownedJob.id }) }
+    );
+    expect(allowedOwnerDelete.status).toBe(200);
+    expect(await prisma.job.findUnique({ where: { id: ownedJob.id } })).toBeNull();
   });
 
   it("validates current/removed JobSource round-trips and feed enrichment/backfill parity", async () => {
