@@ -925,9 +925,12 @@ export function TailorWorkspace() {
           // Signed-in user visiting /tailor without ?jobId or ?sample: prefer their most recent saved job over Nova Labs
           try {
             const recentRes = await fetch("/api/jobs?limit=1&scope=tracked");
-            const recentJson = await recentRes.json().catch(() => null);
+            const { ok: recentOk, data: recentJson } = await readApiResponse<{
+              success?: boolean;
+              data?: Array<{ id?: string }>;
+            }>(recentRes);
             const latestJobId =
-              recentRes.ok &&
+              recentOk &&
               recentJson?.success &&
               Array.isArray(recentJson.data) &&
               typeof recentJson.data[0]?.id === "string"
