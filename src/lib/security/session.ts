@@ -167,6 +167,7 @@ export function isPublicPath(pathname: string): boolean {
     pathname === "/tracker" ||
     pathname.startsWith("/tracker/") ||
     pathname.startsWith("/api/auth/") ||
+    pathname === "/api/health" ||
     pathname === "/api/connectors/jobs" ||
     pathname === "/api/connectors/status" ||
     (pathname.startsWith("/api/jobs/") && pathname.endsWith("/interview-prep")) ||
@@ -178,6 +179,8 @@ export function isPublicPath(pathname: string): boolean {
     pathname === "/apple-icon" ||
     pathname === "/opengraph-image" ||
     pathname === "/manifest.webmanifest" ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
     pathname === "/favicon.ico"
   ) {
     return true;

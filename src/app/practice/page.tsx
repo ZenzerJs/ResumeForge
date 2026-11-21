@@ -1,11 +1,14 @@
 import React, { Suspense } from "react";
 import { PracticeWorkspace } from "@/components/practice/practice-workspace";
 
-export const metadata = {
+import { buildPageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = buildPageMetadata({
+  path: "/practice",
   title: "Technical Interview & OA Practice",
   description:
     "Master core algorithmic patterns, study blueprints and worked examples, and solve real company assessment problems in an interactive workspace.",
-};
+});
 
 export default function PracticePage() {
   return (

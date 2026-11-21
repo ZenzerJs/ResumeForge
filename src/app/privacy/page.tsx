@@ -3,11 +3,14 @@ import Link from "next/link";
 import { TopNav } from "@/components/navigation/top-nav";
 import { WorkspaceAtmosphere } from "@/components/design-system/workspace-atmosphere";
 
-export const metadata: Metadata = {
+import { buildPageMetadata } from "@/lib/seo/metadata";
+
+export const metadata: Metadata = buildPageMetadata({
+  path: "/privacy",
   title: "Privacy Policy",
   description:
     "How ResumeForge handles resume data, guest sessions, accounts, and AI API keys you provide.",
-};
+});
 
 export default function PrivacyPage() {
   return (

@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { Analytics } from "@vercel/analytics/next";
 import { KeyboardShortcutsModal } from "@/components/ui/keyboard-shortcuts-modal";
 import { SkipLink } from "@/components/navigation/skip-link";
+import { getAppBaseUrl } from "@/lib/seo/metadata";
 import "./globals.css";
 
 const hankenGrotesk = localFont({
@@ -24,7 +25,7 @@ const jetbrainsMono = localFont({
   display: "swap",
 });
 
-const defaultUrl = process.env.NEXT_PUBLIC_APP_URL || "https://resumeforge.app";
+const defaultUrl = getAppBaseUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
@@ -46,11 +47,13 @@ export const metadata: Metadata = {
   authors: [{ name: "ResumeForge Team" }],
   creator: "ResumeForge",
   publisher: "ResumeForge",
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     title: "ResumeForge — AI Resume Workspace",
     description:
       "Craft truthful, job-specific resume variants from one protected master resume. Use as a guest, or sign in to save.",
-    url: defaultUrl,
     siteName: "ResumeForge",
     locale: "en_US",
     type: "website",
@@ -62,7 +65,10 @@ export const metadata: Metadata = {
       "Craft truthful, job-specific resume variants from one protected master resume. Evidence-grounded AI with Typst WASM compilation.",
   },
   icons: {
-    icon: "/icon",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon", type: "image/png" },
+    ],
     apple: "/apple-icon",
   },
 };
