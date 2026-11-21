@@ -114,7 +114,11 @@ function normalizeIsoTimestamp(value?: string | Date | null): string | null {
 
 export async function getEvidenceItems(statusFilter?: string, userId?: string) {
   const where: Record<string, unknown> = {};
-  if (statusFilter && statusFilter !== "all") where.status = statusFilter;
+  if (statusFilter === "active") {
+    where.status = { not: "archived" };
+  } else if (statusFilter && statusFilter !== "all") {
+    where.status = statusFilter;
+  }
   if (userId) where.userId = userId;
 
   const items = await prisma.evidenceItem.findMany({
@@ -136,6 +140,35 @@ export async function getEvidenceItems(statusFilter?: string, userId?: string) {
       roleAffinity: parseJsonArray(b.roleAffinity),
     })),
   }));
+}
+
+export interface EvidenceStatusCounts {
+  verified: number;
+  draft: number;
+  archived: number;
+  active: number;
+  total: number;
+}
+
+export async function getEvidenceStatusCounts(userId?: string): Promise<EvidenceStatusCounts> {
+  const counts: EvidenceStatusCounts = { verified: 0, draft: 0, archived: 0, active: 0, total: 0 };
+  if (typeof prisma.evidenceItem?.groupBy !== "function") {
+    return counts;
+  }
+  const rows = await prisma.evidenceItem.groupBy({
+    by: ["status"],
+    where: userId ? { userId } : undefined,
+    _count: { _all: true },
+  });
+  for (const row of rows) {
+    const n = row._count?._all ?? 0;
+    if (row.status === "verified") counts.verified += n;
+    else if (row.status === "draft") counts.draft += n;
+    else if (row.status === "archived") counts.archived += n;
+    counts.total += n;
+  }
+  counts.active = counts.verified + counts.draft;
+  return counts;
 }
 
 export async function getEvidenceItemById(id: string, userId?: string) {

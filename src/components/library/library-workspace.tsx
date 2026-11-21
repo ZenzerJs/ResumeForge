@@ -347,7 +347,14 @@ export function LibraryWorkspace() {
   });
   const [items, setItems] = useState<EvidenceItem[]>([]);
   const [unfilteredTotal, setUnfilteredTotal] = useState<number | null>(null);
-  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [statusCounts, setStatusCounts] = useState<{
+    verified: number;
+    draft: number;
+    archived: number;
+    active: number;
+    total: number;
+  } | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>("active");
   const [activeTab, setActiveTab] = useState<"library" | "review">("library");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -452,33 +459,75 @@ export function LibraryWorkspace() {
       const demoConfig = await fetchDemoConfig();
       if (controller.signal.aborted) return;
       let loadedItems: EvidenceItem[] = [];
+      let nextCounts: {
+        verified: number;
+        draft: number;
+        archived: number;
+        active: number;
+        total: number;
+      } | null = null;
+      const matchesStatus = (status: string, filter: string) =>
+        filter === "all"
+          ? true
+          : filter === "active"
+            ? status !== "archived"
+            : status === filter;
+      const tallyCounts = (list: EvidenceItem[]) => {
+        const verified = list.filter((i) => i.status === "verified").length;
+        const draft = list.filter((i) => i.status === "draft").length;
+        const archived = list.filter((i) => i.status === "archived").length;
+        return { verified, draft, archived, active: verified + draft, total: list.length };
+      };
+
       if (demoConfig.demoMode) {
         initializeDemoSamples();
         const localItems = readGuestEvidenceFromStorage();
-        loadedItems = filterStatus === "all" ? localItems : localItems.filter((item) => item.status === filterStatus);
+        nextCounts = tallyCounts(localItems);
+        loadedItems = localItems.filter((item) => matchesStatus(item.status, filterStatus));
       } else {
         const url = filterStatus === "all" ? "/api/evidence" : `/api/evidence?status=${filterStatus}`;
         const res = await fetch(url, { signal: controller.signal });
         const { ok, data: json, error } = await readApiResponse<{
           success?: boolean;
           data?: EvidenceItem[];
+          counts?: {
+            verified: number;
+            draft: number;
+            archived: number;
+            active: number;
+            total: number;
+          };
         }>(res, "Failed to fetch evidence items.");
         if (controller.signal.aborted) return;
         if (!ok || !json?.success) {
           throw new Error(error || "Failed to fetch evidence items.");
         }
         loadedItems = json.data || [];
+        if (json.counts) {
+          nextCounts = { ...json.counts };
+        }
         const guestItems = readGuestEvidenceFromStorage();
         if (guestItems.length > 0) {
           const existingIds = new Set(loadedItems.map((i) => i.id));
+          const extraGuests = guestItems.filter((item) => !existingIds.has(item.id));
+          if (extraGuests.length > 0 && nextCounts) {
+            const guestCounts = tallyCounts(extraGuests);
+            nextCounts = {
+              verified: nextCounts.verified + guestCounts.verified,
+              draft: nextCounts.draft + guestCounts.draft,
+              archived: nextCounts.archived + guestCounts.archived,
+              active: nextCounts.active + guestCounts.active,
+              total: nextCounts.total + guestCounts.total,
+            };
+          } else if (!nextCounts) {
+            nextCounts = tallyCounts([...loadedItems, ...extraGuests]);
+          }
           loadedItems = [
             ...loadedItems,
-            ...guestItems.filter(
-              (item) =>
-                !existingIds.has(item.id) &&
-                (filterStatus === "all" || item.status === filterStatus)
-            ),
+            ...extraGuests.filter((item) => matchesStatus(item.status, filterStatus)),
           ];
+        } else if (!nextCounts && (filterStatus === "all" || filterStatus === "active")) {
+          nextCounts = tallyCounts(loadedItems);
         }
       }
 
@@ -515,7 +564,10 @@ export function LibraryWorkspace() {
 
       if (controller.signal.aborted) return;
       setItems(annotated);
-      if (filterStatus === "all") {
+      if (nextCounts) {
+        setStatusCounts(nextCounts);
+        setUnfilteredTotal(nextCounts.total);
+      } else if (filterStatus === "all" || filterStatus === "active") {
         setUnfilteredTotal(annotated.length);
       } else if (annotated.length > 0) {
         setUnfilteredTotal((prev) => Math.max(prev ?? 0, annotated.length));
@@ -1598,11 +1650,15 @@ export function LibraryWorkspace() {
     }
 
     const savedCount = items.length - failed.length;
+    const draftCount = items.filter((item) => item.status === "draft").length - failed.filter((item) => item.status === "draft").length;
     if (savedCount > 0) await fetchItems();
     if (failed.length === 0 && savedCount > 0) {
       setNotification({
         type: "success",
-        message: `Added ${savedCount} evidence item${savedCount === 1 ? "" : "s"} to Evidence Bank.`,
+        message:
+          draftCount > 0
+            ? `Added ${savedCount} evidence item${savedCount === 1 ? "" : "s"} (${draftCount} draft — review & verify before tailoring).`
+            : `Added ${savedCount} evidence item${savedCount === 1 ? "" : "s"} to Evidence Bank.`,
       });
     }
 
@@ -1920,6 +1976,7 @@ export function LibraryWorkspace() {
                   aria-label="Filter evidence by status"
                   className="h-11 sm:h-9 min-w-[8.75rem] w-auto max-w-full whitespace-nowrap bg-inset border border-hairline text-foreground rounded-[6px] px-2.5 pr-7 py-0 leading-normal text-xs font-mono outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
+                  <option value="active">Active (Verified &amp; Draft)</option>
                   <option value="all">All statuses</option>
                   <option value="verified">Verified Only</option>
                   <option value="draft">Draft Only</option>
@@ -1947,8 +2004,14 @@ export function LibraryWorkspace() {
                 {isSelectMode ? "Done" : "Select"}
               </Button>
 
-              <span className="shrink-0 text-xs font-mono tabular-nums text-muted-foreground">
+              <span
+                data-testid="evidence-count-summary"
+                className="shrink-0 text-xs font-mono tabular-nums text-muted-foreground"
+              >
                 {filteredItems.length} {filteredItems.length === 1 ? "item" : "items"}
+                {statusCounts && (statusCounts.verified > 0 || statusCounts.draft > 0)
+                  ? ` (${statusCounts.verified} verified${statusCounts.draft > 0 ? ` · ${statusCounts.draft} draft` : ""})`
+                  : ""}
               </span>
             </div>
           </div>
@@ -2119,7 +2182,11 @@ export function LibraryWorkspace() {
                           </span>
                           <h2 className="text-base font-bold text-foreground tracking-tight break-words">
                             {item.title}
-                            {item.organization ? ` @ ${item.organization}` : ""}
+                            {item.organization &&
+                            item.type !== "skill" &&
+                            !item.title.trim().toLowerCase().endsWith(item.organization.trim().toLowerCase())
+                              ? ` @ ${item.organization}`
+                              : ""}
                           </h2>
                         </div>
                         <p className="mt-2 text-sm text-text-secondary leading-relaxed max-w-3xl break-words">

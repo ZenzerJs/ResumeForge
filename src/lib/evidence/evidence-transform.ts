@@ -1,5 +1,5 @@
 import type { ExtractedPdfEvidence } from "./pdfExtractor";
-import { extractTechnologies } from "./tech-extractor";
+import { extractTechnologies, joinSummaryUpToLimit, splitSkillList } from "./tech-extractor";
 
 export interface CreateEvidencePayload {
   type: string;
@@ -406,8 +406,8 @@ function parseStandardResumeJobs(
           bullets.slice(0, 2).join(". ").slice(0, 200) ||
           `Extracted work experience bullets from ${baseName}`,
         tags: docTechnologies.slice(0, 6),
-        status: "verified",
-        bullets: bullets.map((text) => ({ text, verified: true })),
+        status: "draft",
+        bullets: bullets.map((text) => ({ text, verified: false })),
       },
     ];
   }
@@ -454,8 +454,8 @@ function parseStandardResumeJobs(
           bullets.slice(0, 2).join(". ").slice(0, 200) ||
           `Extracted work experience bullets from ${baseName}`,
         tags: docTechnologies.slice(0, 6),
-        status: "verified",
-        bullets: bullets.map((text) => ({ text, verified: true })),
+        status: "draft",
+        bullets: bullets.map((text) => ({ text, verified: false })),
       },
     ];
   }
@@ -482,8 +482,8 @@ function parseStandardResumeJobs(
       dates,
       verifiedSummary,
       tags: finalTags,
-      status: "verified",
-      bullets: bullets.map((text) => ({ text, verified: true })),
+      status: "draft",
+      bullets: bullets.map((text) => ({ text, verified: false })),
     });
   }
 
@@ -510,8 +510,8 @@ function parseStandardResumeProjects(
           bullets.slice(0, 2).join(". ").slice(0, 200) ||
           `Extracted project work from ${baseName}`,
         tags: docTechnologies.slice(0, 6),
-        status: "verified",
-        bullets: bullets.map((text) => ({ text, verified: true })),
+        status: "draft",
+        bullets: bullets.map((text) => ({ text, verified: false })),
       },
     ];
   }
@@ -558,8 +558,8 @@ function parseStandardResumeProjects(
           bullets.slice(0, 2).join(". ").slice(0, 200) ||
           `Extracted project work from ${baseName}`,
         tags: docTechnologies.slice(0, 6),
-        status: "verified",
-        bullets: bullets.map((text) => ({ text, verified: true })),
+        status: "draft",
+        bullets: bullets.map((text) => ({ text, verified: false })),
       },
     ];
   }
@@ -590,8 +590,8 @@ function parseStandardResumeProjects(
       dates,
       verifiedSummary,
       tags: finalTags,
-      status: "verified",
-      bullets: bullets.map((text) => ({ text, verified: true })),
+      status: "draft",
+      bullets: bullets.map((text) => ({ text, verified: false })),
     });
   }
 
@@ -662,10 +662,10 @@ function parseEducationItems(
         organization: rawBullets[0]?.slice(0, 50) || "Academic Institution",
         verifiedSummary: rawBullets.join(" | ").slice(0, 200),
         tags: ["Education", "Degree"],
-        status: "verified",
+        status: "draft",
         bullets: rawBullets.map((text) => ({
           text: cleanBulletText(text),
-          verified: true,
+          verified: false,
         })),
       },
     ];
@@ -676,11 +676,11 @@ function parseEducationItems(
     const title = edu.degree || `Education (${org})`;
     const bullets =
       edu.details.length > 0
-        ? edu.details.map((text) => ({ text, verified: true }))
+        ? edu.details.map((text) => ({ text, verified: false }))
         : [
             {
               text: `${title} - ${org}${edu.dates ? ` (${edu.dates})` : ""}`,
-              verified: true,
+              verified: false,
             },
           ];
 
@@ -691,7 +691,7 @@ function parseEducationItems(
       dates: edu.dates,
       verifiedSummary: [title, org, edu.dates].filter(Boolean).join(" | ").slice(0, 200),
       tags: ["Education", "Degree"],
-      status: "verified",
+      status: "draft",
       bullets,
     };
   });
@@ -739,21 +739,12 @@ function parseSkillsMatrix(
       }
       currentCategory = line.substring(0, colonIdx).trim();
       const rest = line.substring(colonIdx + 1).trim();
-      currentTokens = rest
-        .split(/[,•|/–—]/)
-        .map((s) => s.trim().replace(/^[\(\)]+|[\(\)\.]+$/g, ""))
-        .filter((s) => s.length > 0 && !/^(?:confirm|usage|only)$/i.test(s));
+      currentTokens = splitSkillList(rest);
     } else if (currentCategory) {
-      const continuationTokens = line
-        .split(/[,•|/–—]/)
-        .map((s) => s.trim().replace(/^[\(\)]+|[\(\)\.]+$/g, ""))
-        .filter((s) => s.length > 0 && !/^(?:confirm|usage|only)$/i.test(s));
+      const continuationTokens = splitSkillList(line);
       currentTokens.push(...continuationTokens);
     } else {
-      const tokens = line
-        .split(/[,•|/–—]/)
-        .map((s) => s.trim().replace(/^[\(\)]+|[\(\)\.]+$/g, ""))
-        .filter((s) => s.length > 0 && !/^(?:confirm|usage|only)$/i.test(s));
+      const tokens = splitSkillList(line);
       unmappedSkills.push(...tokens);
     }
   }
@@ -770,11 +761,10 @@ function parseSkillsMatrix(
       payloads.push({
         type: "skill",
         title: `Technical Skills — ${category}`,
-        organization: category,
-        verifiedSummary: skills.join(", ").slice(0, 200),
+        verifiedSummary: joinSummaryUpToLimit(skills, 200),
         tags: skills.slice(0, 10),
-        status: "verified",
-        bullets: skills.map((text) => ({ text, verified: true })),
+        status: "draft",
+        bullets: skills.map((text) => ({ text, verified: false })),
       });
     }
 
@@ -783,11 +773,10 @@ function parseSkillsMatrix(
       payloads.push({
         type: "skill",
         title: `Additional Competencies (${baseName})`,
-        organization: "Core Competencies",
-        verifiedSummary: unique.slice(0, 15).join(", ").slice(0, 200),
+        verifiedSummary: joinSummaryUpToLimit(unique.slice(0, 15), 200),
         tags: unique.slice(0, 8),
-        status: "verified",
-        bullets: unique.map((text) => ({ text, verified: true })),
+        status: "draft",
+        bullets: unique.map((text) => ({ text, verified: false })),
       });
     }
   } else {
@@ -799,11 +788,10 @@ function parseSkillsMatrix(
       payloads.push({
         type: "skill",
         title: `Technical Competencies & Stack (${baseName})`,
-        organization: "Core Competencies",
-        verifiedSummary: allSkills.slice(0, 15).join(", ").slice(0, 200),
+        verifiedSummary: joinSummaryUpToLimit(allSkills.slice(0, 15), 200),
         tags: allSkills.slice(0, 8),
-        status: "verified",
-        bullets: allSkills.map((text) => ({ text, verified: true })),
+        status: "draft",
+        bullets: allSkills.map((text) => ({ text, verified: false })),
       });
     }
   }
@@ -834,8 +822,8 @@ function parseCertifications(
       organization,
       verifiedSummary: cert,
       tags: ["Certification"],
-      status: "verified",
-      bullets: [{ text: cert, verified: true }],
+      status: "draft",
+      bullets: [{ text: cert, verified: false }],
     };
   });
 }
@@ -1009,11 +997,11 @@ export function convertExtractedPdfToEvidenceItems(
         dates: quickFactsEdu.dates,
         verifiedSummary: [quickFactsEdu.degree, quickFactsEdu.institution, quickFactsEdu.dates].filter(Boolean).join(" | "),
         tags: ["Education", "Degree"],
-        status: "verified",
+        status: "draft",
         bullets: [
           {
             text: `${quickFactsEdu.degree} — ${quickFactsEdu.institution}${quickFactsEdu.dates ? ` (${quickFactsEdu.dates})` : ""}`,
-            verified: true,
+            verified: false,
           },
         ],
       });
@@ -1055,8 +1043,8 @@ export function convertExtractedPdfToEvidenceItems(
         organization: baseName,
         verifiedSummary: rawLines.slice(0, 3).join(". ").slice(0, 200),
         tags: extracted.extractedTechnologies.slice(0, 5),
-        status: "verified",
-        bullets: rawLines.slice(0, 25).map((text) => ({ text, verified: true })),
+        status: "draft",
+        bullets: rawLines.slice(0, 25).map((text) => ({ text, verified: false })),
       });
     }
   }
