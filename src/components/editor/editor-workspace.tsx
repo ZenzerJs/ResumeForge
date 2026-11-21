@@ -238,6 +238,15 @@ export function EditorWorkspace() {
     type: "LOCAL_FALLBACK",
     title: "Local Workspace",
   });
+  const [activeJobContext, setActiveJobContext] = useState<{
+    jobId?: string;
+    roleTitle?: string;
+    extractedRequirements: {
+      requiredSkills: string[];
+      preferredSkills: string[];
+      domainTerms: string[];
+    };
+  } | null>(null);
 
   // Task 9.1: PDF Conversion Path status banner dismissal state with sessionStorage persistence
   const [isConversionBannerDismissed, setIsConversionBannerDismissed] = useState<boolean>(false);
@@ -532,6 +541,20 @@ export function EditorWorkspace() {
             title: json.data.variantTitle || "Tailored Variant",
             id: json.data.id,
           });
+          if (json.data.job?.extractedRequirements) {
+            const reqs = json.data.job.extractedRequirements;
+            setActiveJobContext({
+              jobId: json.data.job.id,
+              roleTitle: json.data.job.roleTitle || undefined,
+              extractedRequirements: {
+                requiredSkills: Array.isArray(reqs.requiredSkills) ? reqs.requiredSkills : [],
+                preferredSkills: Array.isArray(reqs.preferredSkills) ? reqs.preferredSkills : [],
+                domainTerms: Array.isArray(reqs.domainTerms) ? reqs.domainTerms : [],
+              },
+            });
+          } else {
+            setActiveJobContext(null);
+          }
           setIsLoadingDocument(false);
           return;
         } else {
@@ -1102,6 +1125,38 @@ export function EditorWorkspace() {
       }),
     [searchParams, accountScope, variantIdParam, resumeIdParam, docMetadata.type, docMetadata.id]
   );
+
+  // Hydrate linked job requirements when opened from Tailor without a variant job payload
+  useEffect(() => {
+    const targetJobId = tailorReturnContext?.jobId;
+    if (!targetJobId) return;
+    if (activeJobContext?.jobId === targetJobId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/jobs/${encodeURIComponent(targetJobId)}`);
+        if (!res.ok || cancelled) return;
+        const json = await res.json();
+        if (cancelled || !json?.success || !json?.data) return;
+        const reqs = json.data.extractedRequirements;
+        if (!reqs || typeof reqs !== "object") return;
+        setActiveJobContext({
+          jobId: json.data.id,
+          roleTitle: json.data.roleTitle || undefined,
+          extractedRequirements: {
+            requiredSkills: Array.isArray(reqs.requiredSkills) ? reqs.requiredSkills : [],
+            preferredSkills: Array.isArray(reqs.preferredSkills) ? reqs.preferredSkills : [],
+            domainTerms: Array.isArray(reqs.domainTerms) ? reqs.domainTerms : [],
+          },
+        });
+      } catch {
+        // Non-blocking: editor remains usable without job metadata
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tailorReturnContext?.jobId, activeJobContext?.jobId]);
 
   return (
     <AppShell
@@ -1740,6 +1795,8 @@ export function EditorWorkspace() {
             source={source}
             isCompiling={isCompiling}
             masterFacts={masterFacts}
+            extractedRequirements={activeJobContext?.extractedRequirements}
+            roleTitle={activeJobContext?.roleTitle}
             allowUnfrozenMasterSelfExport={
               docMetadata.type === "MASTER_RESUME" ||
               (docMetadata.type === "LOCAL_FALLBACK" &&

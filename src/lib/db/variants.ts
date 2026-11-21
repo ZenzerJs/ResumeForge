@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { parseRequirementsState } from "@/lib/db/jobs";
 import { sharedOrSelfJobWhere } from "@/lib/db/jobs";
 
 /**
@@ -99,15 +100,25 @@ export async function updateVariant(
 }
 
 /**
- * Fetches a ResumeVariant by ID with its patches.
+ * Fetches a ResumeVariant by ID with its patches and linked job context.
  */
 export async function getVariantById(variantId: string, userId?: string) {
-  return await prisma.resumeVariant.findFirst({
+  const variant = await prisma.resumeVariant.findFirst({
     where: {
       id: variantId,
       ...(userId ? { masterResume: { userId } } : {}),
     },
     include: {
+      job: {
+        select: {
+          id: true,
+          company: true,
+          roleTitle: true,
+          extractedRequirements: true,
+          rawDescription: true,
+          extractFailure: true,
+        },
+      },
       patches: {
         orderBy: { createdAt: "asc" },
         include: {
@@ -116,6 +127,24 @@ export async function getVariantById(variantId: string, userId?: string) {
       },
     },
   });
+
+  if (!variant) return null;
+
+  return {
+    ...variant,
+    job: variant.job
+      ? {
+          id: variant.job.id,
+          company: variant.job.company,
+          roleTitle: variant.job.roleTitle,
+          extractedRequirements: parseRequirementsState(
+            variant.job.extractedRequirements,
+            variant.job.rawDescription,
+            variant.job.extractFailure
+          ).extractedRequirements,
+        }
+      : null,
+  };
 }
 
 /**

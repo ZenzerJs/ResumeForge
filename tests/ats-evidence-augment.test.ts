@@ -28,6 +28,32 @@ describe("ATS evidence bank augmentation", () => {
     expect(result).not.toContain("Should not appear");
   });
 
+  it("excludes draft items and unverified bullets from ATS augmentation", () => {
+    const typst = "= Experience\n- Built APIs in Go";
+    const result = augmentTypstWithEvidenceBank(typst, [
+      {
+        status: "verified",
+        title: "Platform Engineer",
+        verifiedSummary: "Owned Go services",
+        bullets: [
+          { text: "Built gRPC services", verified: true },
+          { text: "Unverified draft bullet Rust", verified: false },
+        ],
+      },
+      {
+        status: "draft",
+        title: "Draft Project",
+        verifiedSummary: "Should not inflate ATS score with Terraform",
+        bullets: [{ text: "Terraform draft bullet", verified: false }],
+      },
+    ]);
+
+    expect(result).toContain("Built gRPC services");
+    expect(result).not.toContain("Unverified draft bullet Rust");
+    expect(result).not.toContain("Draft Project");
+    expect(result).not.toContain("Terraform");
+  });
+
   it("returns original typst when no active evidence exists", () => {
     const typst = "= Skills\nPython";
     expect(augmentTypstWithEvidenceBank(typst, [])).toBe(typst);
