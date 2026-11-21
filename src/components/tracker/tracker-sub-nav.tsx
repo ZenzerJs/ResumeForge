@@ -92,7 +92,7 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
 
   const linkClass = (active: boolean) =>
     cn(
-      "relative flex shrink-0 items-center whitespace-nowrap rounded-lg px-2 py-1.5 sm:px-3 min-h-11 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+      "relative flex shrink-0 items-center whitespace-nowrap rounded-lg px-2 py-1.5 sm:px-3 min-h-10 sm:min-h-11 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
       active
         ? "bg-primary/15 border border-primary/40 text-primary"
         : "border border-transparent text-muted-foreground hover:bg-elevated/80 hover:text-foreground",
@@ -100,17 +100,27 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
 
   return (
     <div className="sticky top-0 z-20 shrink-0 border-b glass-bar">
-      <div className="flex min-h-11 items-center justify-between gap-1.5 px-2.5 sm:gap-2 sm:px-4">
+      <div className="flex flex-col sm:flex-row sm:min-h-11 sm:items-center justify-between gap-1 sm:gap-2 px-2.5 py-1.5 sm:py-0 sm:px-4">
+        <div className="flex items-center justify-between gap-2 sm:hidden">
+          <h1
+            data-testid="tracker-page-title-mobile"
+            className="flex shrink-0 items-center gap-1.5 text-xs font-bold text-foreground"
+          >
+            <Briefcase className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+            Jobs
+          </h1>
+          <div className="flex shrink-0 items-center gap-2">{actions}</div>
+        </div>
         <div className="relative min-w-0 flex-1 h-full">
           <div
             ref={navListRef}
-            className="relative flex h-full min-w-0 items-center gap-1 overflow-x-auto pr-6 sm:gap-3 sm:pr-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="relative flex flex-wrap sm:flex-nowrap h-full min-w-0 items-center gap-1 sm:overflow-x-auto sm:gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             <span
               aria-hidden="true"
               data-testid="tracker-sub-nav-indicator"
               className={cn(
-                "pointer-events-none absolute bottom-0 left-0 h-[2px] rounded-full ombre-bar motion-reduce:transition-none",
+                "pointer-events-none hidden sm:block absolute bottom-0 left-0 h-[2px] rounded-full ombre-bar motion-reduce:transition-none",
                 animateIndicator ? "transition-[transform,width] duration-200 ease-out" : "",
               )}
               style={
@@ -125,9 +135,9 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
             />
             <h1
               data-testid="tracker-page-title"
-              className="flex shrink-0 items-center gap-1 border-r border-hairline pr-1.5 sm:gap-1.5 sm:pr-3 text-xs font-bold text-foreground"
+              className="hidden sm:flex shrink-0 items-center gap-1.5 border-r border-hairline pr-3 text-xs font-bold text-foreground"
             >
-              <Briefcase className="hidden sm:inline-block h-3.5 w-3.5 text-primary" aria-hidden="true" />
+              <Briefcase className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
               Jobs
             </h1>
             <Link
@@ -184,12 +194,12 @@ export function TrackerSubNav({ actions }: TrackerSubNavProps) {
             <div
               aria-hidden="true"
               data-testid="tracker-sub-nav-scroll-fade"
-              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-panel via-panel/85 to-transparent"
+              className="pointer-events-none hidden sm:block absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-panel via-panel/85 to-transparent"
             />
           ) : null}
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">{actions}</div>
+        <div className="hidden sm:flex shrink-0 items-center gap-2">{actions}</div>
       </div>
     </div>
   );

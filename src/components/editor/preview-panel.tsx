@@ -9,8 +9,9 @@ import { cleanTypstToText, sanitizeZipFilename } from "@/lib/export/zip";
 import { cn, downloadBlob } from "@/lib/utils";
 import { assertCanExport } from "@/lib/guardrail/policy";
 import { ResumeFacts } from "@/lib/facts/types";
-import { AtsEvaluationResult } from "@/lib/ats-evaluator/types";
+import { AtsEvaluationResult, type RoleProfile } from "@/lib/ats-evaluator/types";
 import { evaluateAtsScore } from "@/lib/ats-evaluator/evaluator";
+import { getAtsDisplayState } from "@/lib/ats-evaluator/display-state";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +21,20 @@ import {
 
 const AtsScorePanel = dynamic(
   () => import("@/components/tailor/ats-score-panel").then((m) => ({ default: m.AtsScorePanel })),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        data-testid="ats-panel-chunk-loading"
+        role="status"
+        aria-live="polite"
+        className="flex items-center gap-3 rounded-[10px] border border-hairline bg-panel px-4 py-5 text-xs text-text-secondary"
+      >
+        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" aria-hidden="true" />
+        <span>Loading ATS Grade rubric…</span>
+      </div>
+    ),
+  }
 );
 
 const APPROVAL_LINE = /^\/\/ @layout-(two-pages|review)-approved: ([a-f0-9]{64})\r?\n/gm;
@@ -429,9 +443,12 @@ export function PreviewPanel({
     } finally { setIsFitting(false); }
   };
 
-  // Task 9.5: ATS Grade in Editor preview state
-  const [showGrade, setShowGrade] = useState(false);
-  const [showDockedGrade, setShowDockedGrade] = useState(false);
+  // Task 9.5: Unified ATS Grade view state ("closed" | "summary" | "full")
+  const [gradeView, setGradeView] = useState<"closed" | "summary" | "full">("closed");
+  const returnToSummaryRef = useRef(false);
+  const [roleProfile, setRoleProfile] = useState<RoleProfile>("Backend");
+  const showGrade = gradeView === "full";
+  const showDockedGrade = gradeView === "summary";
   const [previewView, setPreviewView] = useState<"fit" | "actual">("fit");
   const [statusNeedsOwnRow, setStatusNeedsOwnRow] = useState(false);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -483,9 +500,20 @@ export function PreviewPanel({
     previewView,
   ]);
 
-  const handleToggleGrade = () => {
-    setShowGrade((prev) => !prev);
-  };
+  const openFullGrade = useCallback((fromSummary = false) => {
+    returnToSummaryRef.current = fromSummary;
+    setGradeView("full");
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  const handleToggleGrade = useCallback(() => {
+    if (gradeView === "full") {
+      setGradeView(returnToSummaryRef.current ? "summary" : "closed");
+      returnToSummaryRef.current = false;
+    } else {
+      openFullGrade(gradeView === "summary");
+    }
+  }, [gradeView, openFullGrade]);
 
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -494,25 +522,24 @@ export function PreviewPanel({
   }, []);
 
   const hasHydratedSource = hasMounted && source.trim().length > 0;
-  const hasJobRequirements = Boolean(
-    extractedRequirements &&
-      (extractedRequirements.requiredSkills.length > 0 ||
-        extractedRequirements.preferredSkills.length > 0 ||
-        extractedRequirements.domainTerms.length > 0)
-  );
-
+  const effectiveRequirements = extractedRequirements || EMPTY_EXTRACTED_REQUIREMENTS;
   const measuredPages = measurement?.source === source ? measurement.pages : undefined;
 
   // Synchronous client-side Ember Ink ATS Grade computation for the docked Editor grade rail
   const liveAtsGrade = useMemo<AtsEvaluationResult | null>(() => {
-    if (!showDockedGrade || showGrade || v2 || !hasHydratedSource) return null;
+    if (!showDockedGrade || !hasHydratedSource) return null;
     return evaluateAtsScore(
       source,
-      extractedRequirements || EMPTY_EXTRACTED_REQUIREMENTS,
-      "Backend",
+      effectiveRequirements,
+      roleProfile,
       { measuredPages }
     );
-  }, [extractedRequirements, hasHydratedSource, measuredPages, showDockedGrade, showGrade, source, v2]);
+  }, [effectiveRequirements, hasHydratedSource, measuredPages, roleProfile, showDockedGrade, source]);
+
+  const dockedDisplayState = useMemo(
+    () => (liveAtsGrade ? getAtsDisplayState(liveAtsGrade, effectiveRequirements, roleTitle) : null),
+    [effectiveRequirements, liveAtsGrade, roleTitle]
+  );
 
   const [canDirectExport, setCanDirectExport] = useState(false);
 
@@ -675,34 +702,33 @@ export function PreviewPanel({
           <button
             type="button"
             data-testid="preview-mode-pdf"
-            onClick={() => setShowGrade(false)}
+            onClick={() => {
+              if (gradeView === "full") {
+                setGradeView(returnToSummaryRef.current ? "summary" : "closed");
+                returnToSummaryRef.current = false;
+              }
+            }}
             aria-pressed={!showGrade}
             className="font-semibold text-foreground shrink-0 hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
             title="Show live paper preview"
           >
             Preview
           </button>
-          {!v2 && (
-            <button
-              type="button"
-              onClick={() => {
-                if (showGrade) {
-                  setShowGrade(false);
-                  setShowDockedGrade(true);
-                } else {
-                  setShowDockedGrade((prev) => !prev);
-                }
-              }}
-              aria-pressed={showDockedGrade && !showGrade}
-              data-testid="preview-split-grade-toggle"
-              className="hidden xl:inline-flex shrink-0 items-center gap-1.5 text-xs text-text-secondary hover:text-foreground transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-              title="Toggle docked ATS Grade column alongside paper preview"
-            >
-              <span className={showDockedGrade && !showGrade ? "text-signal font-semibold" : "text-text-secondary"}>
-                Grade summary
-              </span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => {
+              returnToSummaryRef.current = false;
+              setGradeView((prev) => (prev === "summary" ? "closed" : "summary"));
+            }}
+            aria-pressed={showDockedGrade}
+            data-testid="preview-split-grade-toggle"
+            className="hidden xl:inline-flex shrink-0 items-center gap-1.5 text-xs text-text-secondary hover:text-foreground transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+            title="Toggle docked ATS Grade column alongside paper preview"
+          >
+            <span className={showDockedGrade ? "text-signal font-semibold" : "text-text-secondary"}>
+              Grade summary
+            </span>
+          </button>
           {isCompiling && !error && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />}
         </div>
 
@@ -908,7 +934,10 @@ export function PreviewPanel({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowGrade(false)}
+                  onClick={() => {
+                    setGradeView("closed");
+                    returnToSummaryRef.current = false;
+                  }}
                   className="text-text-secondary hover:text-foreground text-xs underline font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                 >
                   Dismiss
@@ -917,9 +946,11 @@ export function PreviewPanel({
             ) : (
               <AtsScorePanel
                 typstContent={source}
-                extractedRequirements={extractedRequirements || EMPTY_EXTRACTED_REQUIREMENTS}
+                extractedRequirements={effectiveRequirements}
                 roleTitle={roleTitle}
                 measuredPages={measuredPages}
+                initialProfile={roleProfile}
+                onProfileChange={setRoleProfile}
               />
             )}
           </div>
@@ -1110,7 +1141,7 @@ export function PreviewPanel({
         </div>
 
         {/* Docked Right-Hand ATS Grade Column matching palette-lab.html#ember Section 03 */}
-        {!v2 && !showGrade && showDockedGrade && (
+        {showDockedGrade && (
           <aside
             data-testid="editor-ats-grade-aside"
             aria-label="ATS Grade summary"
@@ -1121,29 +1152,32 @@ export function PreviewPanel({
               <button
                 type="button"
                 data-testid="preview-mode-grade"
-                onClick={handleToggleGrade}
+                onClick={() => openFullGrade(true)}
                 className="font-mono text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
               >
                 Full Rubric ▸
               </button>
             </div>
 
-            {liveAtsGrade ? (
+            {liveAtsGrade && dockedDisplayState ? (
               <>
                 <div className="flex items-center gap-3.5">
                   <div
+                    data-testid="editor-docked-ats-ring"
                     className="relative grid h-[72px] w-[72px] shrink-0 place-items-center rounded-full"
                     style={{
-                      background: `conic-gradient(rgb(var(--accent-contrast)) ${liveAtsGrade.overallScore}%, rgb(var(--border-hairline)) 0)`,
-                      filter: "drop-shadow(0 0 14px rgb(var(--accent-contrast) / 0.35))",
+                      background: `conic-gradient(rgb(var(--accent-contrast)) ${dockedDisplayState.overallRingPct}%, rgb(var(--border-hairline)) 0)`,
+                      filter: dockedDisplayState.hasJobRequirements
+                        ? "drop-shadow(0 0 14px rgb(var(--accent-contrast) / 0.35))"
+                        : undefined,
                     }}
                   >
                     <div className="grid h-[58px] w-[58px] place-items-center rounded-full bg-panel font-sans text-heading-lg tracking-[-0.03em] tabular-nums text-foreground">
-                      {liveAtsGrade.overallScore}
+                      {dockedDisplayState.overallRingText}
                     </div>
                   </div>
                   <div className="min-w-0">
-                    {hasJobRequirements ? (
+                    {dockedDisplayState.hasJobRequirements ? (
                       <>
                         <strong className="block text-sm font-semibold text-foreground">
                           {liveAtsGrade.overallScore >= 80
@@ -1153,37 +1187,60 @@ export function PreviewPanel({
                             : "Developing"}
                         </strong>
                         <p className="mt-0.5 text-xs text-muted-foreground truncate">
-                          {roleTitle ? `vs. ${roleTitle}` : "General ATS readiness"}
+                          {roleTitle ? `vs. ${roleTitle}` : `vs. ${roleProfile} profile`}
                         </p>
                       </>
                     ) : (
-                      <p className="text-xs text-muted-foreground leading-snug">
-                        No job loaded: base checks only
-                      </p>
+                      <>
+                        <strong className="block text-sm font-semibold text-foreground">
+                          Base Health
+                        </strong>
+                        <p className="mt-0.5 text-xs text-muted-foreground leading-snug">
+                          {dockedDisplayState.overallScoreSubtext}
+                        </p>
+                      </>
                     )}
                   </div>
                 </div>
 
             <div className="flex flex-col gap-2.5 text-xs">
               <div className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1">
-                <span className="text-text-secondary">Keywords</span>
-                <span className="font-mono font-semibold tabular-nums text-foreground">
-                  {liveAtsGrade.requiredMatch.percentage}
+                <span className="text-text-secondary">Required keywords</span>
+                <span
+                  data-testid="editor-docked-keywords-value"
+                  className="font-mono font-semibold tabular-nums text-foreground"
+                >
+                  {dockedDisplayState.hasRequiredSkills ? `${liveAtsGrade.requiredMatch.percentage}%` : "—"}
                 </span>
                 <div className="col-span-2 h-1.5 overflow-hidden rounded-full bg-hairline/70">
                   <i
                     className={`block h-full rounded-full ${
-                      liveAtsGrade.requiredMatch.percentage >= 75 ? "bg-signal" : "bg-primary"
+                      dockedDisplayState.requiredMatchPct >= 75 ? "bg-signal" : "bg-primary"
                     }`}
-                    style={{ width: `${liveAtsGrade.requiredMatch.percentage}%` }}
+                    style={{ width: `${dockedDisplayState.requiredMatchPct}%` }}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1">
-                <span className="text-text-secondary">Core stack</span>
+                <span className="text-text-secondary">Base health</span>
                 <span className="font-mono font-semibold tabular-nums text-foreground">
-                  {liveAtsGrade.roleEvidence.percentage}
+                  {liveAtsGrade.baseHealth.percentage}%
+                </span>
+                <div className="col-span-2 h-1.5 overflow-hidden rounded-full bg-hairline/70">
+                  <i
+                    className={`block h-full rounded-full ${
+                      liveAtsGrade.baseHealth.percentage >= 75 ? "bg-signal" : "bg-primary"
+                    }`}
+                    style={{ width: `${liveAtsGrade.baseHealth.percentage}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1">
+                <span className="text-text-secondary">Role evidence</span>
+                <span className="font-mono font-semibold tabular-nums text-foreground">
+                  {liveAtsGrade.roleEvidence.percentage}%
                 </span>
                 <div className="col-span-2 h-1.5 overflow-hidden rounded-full bg-hairline/70">
                   <i
@@ -1191,19 +1248,6 @@ export function PreviewPanel({
                       liveAtsGrade.roleEvidence.percentage >= 75 ? "bg-signal" : "bg-primary"
                     }`}
                     style={{ width: `${liveAtsGrade.roleEvidence.percentage}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1">
-                <span className="text-text-secondary">Impact metrics</span>
-                <span className="font-mono font-semibold tabular-nums text-foreground">
-                  {liveAtsGrade.baseHealth.percentage}
-                </span>
-                <div className="col-span-2 h-1.5 overflow-hidden rounded-full bg-hairline/70">
-                  <i
-                    className="block h-full rounded-full bg-primary"
-                    style={{ width: `${liveAtsGrade.baseHealth.percentage}%` }}
                   />
                 </div>
               </div>

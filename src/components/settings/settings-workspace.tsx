@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { ProviderType } from "@/lib/ai/types";
+import { normalizeGeminiModel } from "@/lib/ai/model-defaults";
 import {
   DEFAULT_MODELS,
   saveKey,
@@ -37,6 +38,14 @@ import {
 import { AppShell } from "@/components/design-system/app-shell";
 import { PageHeader } from "@/components/design-system/page-header";
 import { Surface } from "@/components/design-system/surface";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { PageSkeleton } from "@/components/design-system/page-skeleton";
 import {
   fetchDemoConfig,
@@ -197,6 +206,7 @@ export function SettingsWorkspace() {
     message: string;
     latencyMs?: number;
     isKeyError?: boolean;
+    availableModels?: string[];
   } | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
@@ -208,6 +218,13 @@ export function SettingsWorkspace() {
   const [usernameStatus, setUsernameStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isSavingUsername, setIsSavingUsername] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [showUnsetMasterConfirm, setShowUnsetMasterConfirm] = useState(false);
+  const [isUnsettingMaster, setIsUnsettingMaster] = useState(false);
+  const [unsetMasterStatus, setUnsetMasterStatus] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+  const cancelUnsetMasterRef = useRef<HTMLButtonElement>(null);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [clearedKeyUndo, setClearedKeyUndo] = useState<{ provider: ProviderType; key: string } | null>(null);
@@ -234,8 +251,8 @@ export function SettingsWorkspace() {
 
         const activeBaseUrl = resolveProviderBaseUrl(parsed, activeProvider);
 
-        if (activeProvider === "gemini" && activeModel === "gemini-3.8-flash") {
-          activeModel = "gemini-2.5-flash";
+        if (activeProvider === "gemini") {
+          activeModel = normalizeGeminiModel(activeModel);
         }
 
         const key = await getKey(activeProvider);
@@ -417,6 +434,14 @@ export function SettingsWorkspace() {
     saveSettingsToStorage(provider, nextUrl, model, { clearVerification: true });
   };
 
+  const selectModelQuickPick = (nextModel: string) => {
+    setModel(nextModel);
+    setTestResult(null);
+    setVerificationStatus("untested");
+    setIsAdvancedOpen(true);
+    saveSettingsToStorage(provider, baseUrl, nextModel, { clearVerification: true });
+  };
+
   const handleModelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextModel = e.target.value;
     setModel(nextModel);
@@ -489,6 +514,7 @@ export function SettingsWorkspace() {
         message,
         latencyMs: data.latencyMs,
         isKeyError: !ok && isKeyRejectionFailure(message),
+        availableModels: Array.isArray(data.availableModels) ? data.availableModels : undefined,
       });
     } catch (err) {
       markProviderConnectionStatus(provider, false);
@@ -500,6 +526,34 @@ export function SettingsWorkspace() {
       });
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handleUnsetMasterResume = async () => {
+    setIsUnsettingMaster(true);
+    setUnsetMasterStatus(null);
+    try {
+      const res = await fetch("/api/resumes/clear-master", { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        setUnsetMasterStatus({
+          type: "error",
+          message: json?.error || `Could not unset Master Resume (${res.status}).`,
+        });
+        return;
+      }
+      setShowUnsetMasterConfirm(false);
+      setUnsetMasterStatus({
+        type: "success",
+        message: "Master Resume designation removed. You can promote or upload a new master in Editor.",
+      });
+    } catch {
+      setUnsetMasterStatus({
+        type: "error",
+        message: "Network error while unsetting Master Resume.",
+      });
+    } finally {
+      setIsUnsettingMaster(false);
     }
   };
 
@@ -547,6 +601,7 @@ export function SettingsWorkspace() {
               </label>
               <select
                 id="provider-select"
+                name="provider"
                 value={provider}
                 onChange={handleProviderChange}
                 className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -818,7 +873,7 @@ export function SettingsWorkspace() {
                     type="text"
                     value={model}
                     onChange={handleModelChange}
-                    placeholder={DEFAULT_MODELS[provider] || "gemini-2.5-flash"}
+                    placeholder={DEFAULT_MODELS[provider] || DEFAULT_MODELS.gemini}
                     className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
                   />
                   <p className="mt-1.5 text-xs text-muted-foreground">
@@ -899,6 +954,25 @@ export function SettingsWorkspace() {
                         Latency: {testResult.latencyMs}ms
                       </div>
                     )}
+                    {!testResult.success && testResult.availableModels && testResult.availableModels.length > 0 && (
+                      <div className="pt-2 space-y-1.5" data-testid="available-models-suggestions">
+                        <div className="text-xs font-mono uppercase tracking-wider text-text-secondary">
+                          Select an available model and re-test
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {testResult.availableModels.slice(0, 8).map((candidate) => (
+                            <button
+                              key={candidate}
+                              type="button"
+                              onClick={() => selectModelQuickPick(candidate)}
+                              className="rounded-md border border-hairline bg-elevated px-2.5 py-1 font-mono text-xs text-foreground hover:border-primary/50 hover:text-primary transition-colors"
+                            >
+                              {candidate}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -970,6 +1044,48 @@ export function SettingsWorkspace() {
                     <LogOut className="h-4 w-4" aria-hidden />
                     Sign Out
                   </button>
+
+                  {!demoMode && (
+                    <div
+                      data-testid="settings-master-resume-section"
+                      className="pt-4 border-t border-hairline space-y-2.5"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-text-secondary">
+                            Master Resume
+                          </h3>
+                          <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                            Removes the Master Resume designation so you can upload or promote a different resume. Your saved file stays in your account.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          data-testid="unset-master-resume-btn"
+                          disabled={isUnsettingMaster}
+                          onClick={() => {
+                            setUnsetMasterStatus(null);
+                            setShowUnsetMasterConfirm(true);
+                          }}
+                          className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md border border-status-danger/40 bg-status-danger/10 px-4 text-xs font-semibold text-status-danger hover:bg-status-danger/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                        >
+                          Unset Master Resume
+                        </button>
+                      </div>
+                      {unsetMasterStatus && (
+                        <p
+                          role={unsetMasterStatus.type === "error" ? "alert" : "status"}
+                          className={`text-xs ${
+                            unsetMasterStatus.type === "success"
+                              ? "text-status-success-soft"
+                              : "text-status-danger"
+                          }`}
+                        >
+                          {unsetMasterStatus.message}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
@@ -992,6 +1108,47 @@ export function SettingsWorkspace() {
           )}
         </div>
       </div>
+      <Dialog open={showUnsetMasterConfirm} onOpenChange={setShowUnsetMasterConfirm}>
+        <DialogContent
+          className="max-w-sm border-outline bg-elevated p-5"
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            cancelUnsetMasterRef.current?.focus();
+          }}
+        >
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-base font-semibold text-foreground">
+              Unset master resume?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Removes the Master Resume designation so you can upload or promote a different resume. Your saved file stays in your account.
+            </DialogDescription>
+          </DialogHeader>
+          {unsetMasterStatus?.type === "error" && (
+            <p role="alert" className="text-xs text-status-danger">
+              {unsetMasterStatus.message}
+            </p>
+          )}
+          <DialogFooter className="mt-2 gap-2 sm:justify-end">
+            <button
+              ref={cancelUnsetMasterRef}
+              type="button"
+              onClick={() => setShowUnsetMasterConfirm(false)}
+              className="rounded-[6px] border border-outline px-3 py-2 text-sm text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-elevated"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isUnsettingMaster}
+              onClick={() => void handleUnsetMasterResume()}
+              className="rounded-[6px] bg-status-danger px-3 py-2 text-sm font-semibold text-accent-ink hover:bg-status-danger/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-elevated disabled:opacity-50"
+            >
+              {isUnsettingMaster ? "Unsetting…" : "Unset Master Resume"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }

@@ -4,11 +4,16 @@ Self-hosted installations use PostgreSQL as the only persistent application data
 
 ## Start
 
+### Quickstart (One-Line Installer + Prebuilt GHCR Image)
+
 1. Install Docker Engine or Docker Desktop with Compose v2.
-2. Copy `.env.example` to `.env`. Replace every `change-me` value, including the database password, `APP_ACCESS_SECRET`, and `JOB_SYNC_SECRET`. Use an alphanumeric PostgreSQL password so it can be safely represented in `DATABASE_URL`.
-3. Set `NEXT_PUBLIC_APP_URL` to the public HTTPS origin when serving behind a TLS reverse proxy. Compose passes it into the build because Next.js embeds public environment values at build time; rebuild the app after changing the origin. Keep the app bound to loopback and let the proxy provide TLS.
-4. Run `docker compose up --build -d`, then `docker compose logs -f app` until migrations complete and Next.js reports it is ready.
-5. Open the configured app URL. Public signup is enabled only when `DEMO_MODE=false`; demo mode disables signup and all persistent API writes.
+2. Run the one-line installer for your OS:
+   - **Windows (PowerShell):** `irm https://raw.githubusercontent.com/ZenzerJs/ResumeForge/main/install.ps1 | iex`
+   - **macOS / Linux:** `curl -fsSL https://raw.githubusercontent.com/ZenzerJs/ResumeForge/main/install.sh | bash`
+3. The installer creates `~/resumeforge/.env` on first run with generated random secrets (never overwriting an existing `.env`), picks free local ports if `3000` or `5432` are busy, pulls `ghcr.io/zenzerjs/resumeforge:latest`, runs `prisma migrate deploy`, and waits for `/login` readiness.
+4. To build from source instead of pulling the prebuilt image inside a cloned repository, run `.\install.ps1 -Build` (Windows) or `./install.sh --build` (macOS/Linux), or use `docker compose up --build -d` after copying `.env.example` to `.env` and replacing every `change-me` placeholder (use an alphanumeric PostgreSQL password so it is URI-safe in `DATABASE_URL`).
+5. **Custom HTTPS domain / reverse proxy:** Session `Secure` cookie detection falls back to `x-forwarded-proto` at runtime, while `NEXT_PUBLIC_APP_URL` sets metadata base URLs (the prebuilt GHCR image compiles with `http://localhost:3000`; pass `NEXT_PUBLIC_APP_URL` as a build arg and run `docker compose up --build -d` when baking a custom public origin into the client bundle). Keep the app bound to loopback (`127.0.0.1`) and terminate TLS at your reverse proxy.
+6. Public signup is enabled only when `DEMO_MODE=false`; `DEMO_MODE=true` disables signup and all persistent API writes.
 
 Compose stores PostgreSQL data in the named `resumeforge_pgdata` volume. Restarting or recreating containers preserves that volume. It is not a backup. Avoid running `prisma db seed` against a database containing real user data.
 
@@ -61,3 +66,17 @@ No hosting provider has been selected or deployed from this guide.
 The latest combined Docker build on 2026-10-23 produced a 2,219,172,975-byte image. A stateless PDF-upload smoke returned a browser-local Typst draft; `User` and `Resume` database row counts remained zero before and after the request. The earlier full lifecycle run applied all 10 migrations, verified app health, HTTPS build origin and Secure signup cookie, persisted a synthetic login across app and database restarts, and restored a custom-format `pg_dump` into a separate database with one synthetic user and 10 migration rows. It used a unique Compose project, disposable volume, and temporary restore file; cleanup completed. The PDF-route refinement changed no schema, so the earlier lifecycle result remains valid.
 
 Earlier synthetic measurements on the demo worktree found idle app memory of 263 MiB and idle PostgreSQL memory of 40.64 MiB. Static assets measured then: the two Typst WASM files total 29,297,603 bytes, Typst fonts total 8,713,432 bytes, and the PDF worker is 1,265,413 bytes. These asset and idle-memory values are not peak-load estimates and have not been repeated on the final combined image or a target host. Measure target-host memory before choosing a provider; the image size and WASM download make an always-free hosted demo uncertain.
+
+## Resetting a Local Account Password
+
+Self-hosted deployments without an outbound email server can reset any local account password via the operator CLI. This hashes the new password with `scrypt` and increments `User.sessionVersion` so all previously issued session cookies are immediately revoked:
+
+```bash
+npx tsx scripts/reset-user-password.ts --email you@example.com
+```
+
+To script non-interactively without placing the password in shell history, pipe it on stdin:
+
+```bash
+printf '%s\n' 'YourNewStrongPassword!' | npx tsx scripts/reset-user-password.ts --email you@example.com --stdin
+```

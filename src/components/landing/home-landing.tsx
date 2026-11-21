@@ -33,14 +33,6 @@ import {
   type ApplicationAccountScope,
   type StorageLike,
 } from "@/lib/tailor/application-context";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 export interface GuestEvidenceSummary {
   personalVerifiedCount: number;
@@ -347,7 +339,7 @@ export function SetupChecklist({
             {completedCount} of 4 steps completed ({progressPct}%)
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-3">
           <div
             role="progressbar"
             aria-label="Workspace setup progress"
@@ -366,9 +358,10 @@ export function SetupChecklist({
             onClick={onDismiss}
             data-testid="dismiss-onboarding-btn"
             aria-label="Dismiss quick start guide"
+            title="Dismiss quick start guide"
             className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-[6px] text-muted-foreground hover:bg-elevated hover:text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -580,8 +573,6 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
   const router = useRouter();
   const [stats, setStats] = useState<DashboardStats>(initialStats);
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
-  const [isClearingMaster, setIsClearingMaster] = useState(false);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [sessionUser, setSessionUser] = useState<SessionUser | null | undefined>(undefined);
   const [savedRole, setSavedRole] = useState<SavedRoleEntry | null>(null);
@@ -593,7 +584,6 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
   const [checklistDismissed, setChecklistDismissed] = useState(false);
 
   const pdfInputRef = useRef<HTMLInputElement>(null);
-  const cancelClearBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setStats(initialStats);
@@ -827,36 +817,6 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
     }
   };
 
-  const handleClearMaster = async () => {
-    try {
-      setIsClearingMaster(true);
-      setNotification(null);
-
-      const res = await fetch("/api/resumes/clear-master", { method: "POST" });
-      const json = await res.json();
-
-      if (res.ok && json.success) {
-        setShowClearConfirm(false);
-        setNotification({
-          type: "success",
-          message: "Master Resume status cleared for this session.",
-        });
-        setStats((current) => ({
-          ...current,
-          hasMasterResume: false,
-          masterResumeTitle: null,
-        }));
-      }
-    } catch {
-      setNotification({
-        type: "error",
-        message: "Failed to clear master resume",
-      });
-    } finally {
-      setIsClearingMaster(false);
-    }
-  };
-
   const newJobHref = buildTailorNewJobHref({ tab: "job-info" });
   const sampleHref = buildTailorSampleHref({
     sample: demoMode ? "demo" : undefined,
@@ -1003,6 +963,7 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
                 </label>
                 <input
                   id="landing-pdf-upload"
+                  name="resumePdfFile"
                   type="file"
                   ref={pdfInputRef}
                   onChange={handlePdfUpload}
@@ -1024,18 +985,6 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
                   )}
                   {isUploadingPdf ? "Converting PDF…" : "Upload PDF Resume"}
                 </button>
-
-                {stats?.hasMasterResume && (
-                  <button
-                    type="button"
-                    disabled={isClearingMaster}
-                    onClick={() => setShowClearConfirm(true)}
-                    data-testid="clear-master-btn"
-                    className="text-muted-foreground hover:text-status-danger text-xs font-mono px-3 py-2 rounded-[6px] border border-transparent hover:border-status-danger/30 transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    Clear Master
-                  </button>
-                )}
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                 <Link
@@ -1100,42 +1049,6 @@ export function HomeLanding({ initialStats, demoMode }: HomeLandingProps) {
       </main>
 
       <LandingFooter />
-      <Dialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
-        <DialogContent
-          className="max-w-sm border-outline bg-elevated p-5"
-          onOpenAutoFocus={(event) => {
-            event.preventDefault();
-            cancelClearBtnRef.current?.focus();
-          }}
-        >
-          <DialogHeader className="text-left">
-            <DialogTitle className="text-base font-semibold text-foreground">
-              Clear master resume?
-            </DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">
-              This removes master status from the current resume. You can save a new master from the editor.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-2 gap-2 sm:justify-end">
-            <button
-              ref={cancelClearBtnRef}
-              type="button"
-              onClick={() => setShowClearConfirm(false)}
-              className="rounded-[6px] border border-outline px-3 py-2 text-sm text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-elevated"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={isClearingMaster}
-              onClick={handleClearMaster}
-              className="rounded-[6px] bg-status-danger px-3 py-2 text-sm font-semibold text-accent-ink hover:bg-status-danger/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-elevated disabled:opacity-50"
-            >
-              {isClearingMaster ? "Clearing…" : "Clear Master"}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

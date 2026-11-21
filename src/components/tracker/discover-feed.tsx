@@ -840,6 +840,7 @@ export function DiscoverFeed() {
               <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <input
                 id="discover-search-input"
+                name="discoverSearch"
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -855,6 +856,7 @@ export function DiscoverFeed() {
               </label>
               <select
                 id="discover-city-select"
+                name="discoverCity"
                 value={cityFilter}
                 onChange={(e) => setCityFilter(e.target.value)}
                 className={`${FILTER_CONTROL} min-w-0 w-full sm:w-auto cursor-pointer text-rf-meta`}
@@ -875,6 +877,7 @@ export function DiscoverFeed() {
                   </label>
                   <select
                     id="discover-radius-select"
+                    name="discoverRadius"
                     value={radiusFilter}
                     onChange={(e) => setRadiusFilter(e.target.value)}
                     className={`${FILTER_CONTROL} min-w-0 w-full sm:w-auto cursor-pointer text-rf-meta`}
@@ -895,6 +898,7 @@ export function DiscoverFeed() {
               </label>
               <select
                 id="discover-match-select"
+                name="discoverMatchTier"
                 value={minScoreFilter}
                 onChange={(e) => setMinScoreFilter(e.target.value)}
                 className={`${FILTER_CONTROL} min-w-0 w-full sm:w-auto cursor-pointer text-rf-meta`}
@@ -913,6 +917,7 @@ export function DiscoverFeed() {
               </label>
               <select
                 id="discover-sort-select"
+                name="discoverSort"
                 value={
                   evidenceChecked && !hasEvidence && clientSkills.length === 0 && sortOrder === "blended"
                     ? "newest"
@@ -996,6 +1001,7 @@ export function DiscoverFeed() {
                         </label>
                         <select
                           id="discover-salary-select"
+                          name="discoverMinSalary"
                           value={minSalaryFilter}
                           onChange={(e) => setMinSalaryFilter(e.target.value)}
                           className={`${FILTER_CONTROL} w-full cursor-pointer text-rf-meta`}
@@ -1018,6 +1024,7 @@ export function DiscoverFeed() {
                         </label>
                         <select
                           id="discover-source-select"
+                          name="discoverSource"
                           value={sourceFilter}
                           onChange={(e) => setSourceFilter(e.target.value)}
                           className={`${FILTER_CONTROL} w-full cursor-pointer text-rf-meta`}
@@ -1040,6 +1047,7 @@ export function DiscoverFeed() {
                         </label>
                         <select
                           id="discover-workplace-select"
+                          name="discoverWorkplace"
                           value={workplaceFilter}
                           onChange={(e) => setWorkplaceFilter(e.target.value)}
                           className={`${FILTER_CONTROL} w-full cursor-pointer text-rf-meta`}

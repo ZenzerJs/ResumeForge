@@ -1,8 +1,14 @@
-"use client";
-
 import { Suspense } from "react";
 import { LoginForm } from "@/components/auth/login-form";
 import { WorkspaceAtmosphere } from "@/components/design-system/workspace-atmosphere";
+import { buildPageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = buildPageMetadata({
+  path: "/login",
+  title: "Sign In",
+  description: "Sign in or create a ResumeForge account to save resumes, evidence, and job applications.",
+  noIndex: true,
+});
 
 export default function LoginPage() {
   return (

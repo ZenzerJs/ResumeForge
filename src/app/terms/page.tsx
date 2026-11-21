@@ -3,10 +3,13 @@ import Link from "next/link";
 import { TopNav } from "@/components/navigation/top-nav";
 import { WorkspaceAtmosphere } from "@/components/design-system/workspace-atmosphere";
 
-export const metadata: Metadata = {
+import { buildPageMetadata } from "@/lib/seo/metadata";
+
+export const metadata: Metadata = buildPageMetadata({
+  path: "/terms",
   title: "Terms of Service",
   description: "Terms and conditions for using ResumeForge workspace and deterministic tools.",
-};
+});
 
 export default function TermsPage() {
   return (

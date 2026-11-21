@@ -11,10 +11,13 @@ export type RequirementVerificationStatus =
   | "needs_verification"
   | "missing";
 
+export type RequirementCategory = "required" | "preferred" | "domain";
+
 export interface EvidenceMatchChecklistItem {
   label: string;
   matched: boolean;
   status: RequirementVerificationStatus;
+  category: RequirementCategory;
 }
 
 export interface EvidenceMatchChecklist {
@@ -79,15 +82,15 @@ export function buildEvidenceMatchChecklist(
   }
 
   const verifiedMatchedKeys = new Set<string>();
-  const orderedLabels = [
-    ...(requirements.requiredSkills ?? []),
-    ...(requirements.preferredSkills ?? []),
-    ...(requirements.domainTerms ?? []),
+  const orderedEntries: Array<{ label: string; category: RequirementCategory }> = [
+    ...(requirements.requiredSkills ?? []).map((label) => ({ label, category: "required" as const })),
+    ...(requirements.preferredSkills ?? []).map((label) => ({ label, category: "preferred" as const })),
+    ...(requirements.domainTerms ?? []).map((label) => ({ label, category: "domain" as const })),
   ];
 
   const seen = new Set<string>();
   const items: EvidenceMatchChecklistItem[] = [];
-  for (const label of orderedLabels) {
+  for (const { label, category } of orderedEntries) {
     const key = label.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -109,6 +112,7 @@ export function buildEvidenceMatchChecklist(
       label,
       matched: status === "verified",
       status,
+      category,
     });
   }
 

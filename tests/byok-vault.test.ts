@@ -282,7 +282,7 @@ describe("BYOK Vault & Router (WS6)", () => {
     it("reports active config and hasKey accurately and truthfully", async () => {
       const defaultConfig = await getActiveConfig();
       expect(defaultConfig.provider).toBe("gemini");
-      expect(defaultConfig.model).toBe("gemini-2.5-flash");
+      expect(defaultConfig.model).toBe("gemini-3.8-flash");
       expect(defaultConfig.hasKey).toBe(false);
       expect(defaultConfig.keyless).toBe(false);
 

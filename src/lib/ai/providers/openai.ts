@@ -6,7 +6,12 @@ import {
   TextCompletionResult,
 } from "../types";
 import { sanitizeError } from "../redact";
-import { completeOpenAICompatibleText, type ChatCompletionResult } from "./custom";
+import {
+  completeOpenAICompatibleText,
+  toOpenAIChatMessages,
+  type ChatCompletionResult,
+  type ChatMessageInput,
+} from "./custom";
 import { safeFetch } from "@/lib/security/safe-fetch";
 import { resolveProviderCredentialsWithHostPolicy } from "./credentials";
 import { DEFAULT_MODELS } from "@/lib/byok-vault";
@@ -127,7 +132,7 @@ export async function completeText(
  */
 export async function chatOpenAI(
   config: ProviderConfig,
-  messages: Array<{ role: string; content: string }>,
+  messages: ChatMessageInput[],
   tools: any[],
 ): Promise<ChatCompletionResult> {
   const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
@@ -144,7 +149,7 @@ export async function chatOpenAI(
     throw new Error("OpenAI API key is missing.");
   }
 
-  const body: any = { model, messages, temperature: 0.4 };
+  const body: any = { model, messages: toOpenAIChatMessages(messages), temperature: 0.4 };
   if (tools.length > 0) {
     body.tools = tools;
     body.tool_choice = "auto";

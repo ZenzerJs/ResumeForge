@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { evaluateAtsScore } from "@/lib/ats-evaluator/evaluator";
+import { getAtsDisplayState } from "@/lib/ats-evaluator/display-state";
 
 describe("Task 9.5 — Editor ATS Grade Button & Evidence Retirement Unit Tests", () => {
   const sampleTypst = `#let resume-section(title) = [ === #title ]
@@ -88,5 +89,24 @@ Languages: TypeScript, Node.js, Python, PostgreSQL, Docker, React
 
     const unmeasuredShort = evaluateAtsScore(sampleTypst, reqs, "Backend");
     expect(unmeasuredShort.baseHealth.findings).toContain("✓ Standard one-page length constraints satisfied.");
+  });
+
+  it("5. Shared getAtsDisplayState masks empty requirements so docked rail and full rubric never contradict", () => {
+    const emptyReqs = { requiredSkills: [], preferredSkills: [], domainTerms: [] };
+    const raw = evaluateAtsScore(sampleTypst, emptyReqs, "Backend");
+    const display = getAtsDisplayState(raw, emptyReqs);
+
+    expect(display.hasJobRequirements).toBe(false);
+    expect(display.overallRingText).toBe("—");
+    expect(display.overallRingPct).toBe(0);
+    expect(display.requiredMatchPct).toBe(0);
+    expect(display.overallScoreSubtext).toContain("Unscored until job requirements load");
+
+    const jobReqs = { requiredSkills: ["TypeScript", "Node.js"], preferredSkills: ["Docker"], domainTerms: [] };
+    const withJob = evaluateAtsScore(sampleTypst, jobReqs, "Backend");
+    const jobDisplay = getAtsDisplayState(withJob, jobReqs, "Backend Intern");
+    expect(jobDisplay.hasJobRequirements).toBe(true);
+    expect(jobDisplay.overallRingText).toBe(String(withJob.overallScore));
+    expect(jobDisplay.overallScoreSubtext).toBe("vs. Backend Intern");
   });
 });

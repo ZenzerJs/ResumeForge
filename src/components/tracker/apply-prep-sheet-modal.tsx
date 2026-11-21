@@ -506,6 +506,8 @@ export function ApplyPrepSheetModal({
                 </button>
               </div>
               <textarea
+                id="prep-clipboard-fallback"
+                name="clipboardFallback"
                 readOnly
                 aria-label="Clipboard fallback text"
                 value={fallbackText}
@@ -570,6 +572,8 @@ export function ApplyPrepSheetModal({
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-2.5 size-3.5 text-muted-foreground" aria-hidden="true" />
                   <input
+                    id="prep-problem-search"
+                    name="problemSearch"
                     type="text"
                     aria-label="Search practice problems"
                     value={problemSearch}

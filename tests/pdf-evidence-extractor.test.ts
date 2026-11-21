@@ -750,6 +750,69 @@ describe("PDF Evidence Extractor & Transform", () => {
       expect(rl).toBeDefined();
       expect(rl?.dates).toBe("January 2026");
     });
+
+    it("repairs geometry-split PDF runs, preserves parenthetical skills, omits skill org duplication, and defaults unannotated PDF imports to draft", async () => {
+      const { joinPdfLineItems, normalizePdfText } = await import("@/lib/evidence/pdfExtractor");
+      const { splitSkillList, joinSummaryUpToLimit } = await import("@/lib/evidence/tech-extractor");
+
+      expect(
+        joinPdfLineItems([
+          { str: "airgap", transform: [10, 0, 0, 10, 10, 100], width: 28 },
+          { str: "verifi", transform: [10, 0, 0, 10, 42, 100], width: 22 },
+          { str: "cation", transform: [10, 0, 0, 10, 64.2, 100], width: 25 },
+        ])
+      ).toBe("airgap verification");
+
+      expect(normalizePdfText("airgap verifi cation with mobile- first design")).toBe(
+        "airgap verification with mobile-first design"
+      );
+
+      const skills = splitSkillList(
+        "DCIM (Sunbird dcTrack, NetBox), AI Agents (tool calling, RAG), CI/CD, Testing"
+      );
+      expect(skills).toEqual([
+        "DCIM (Sunbird dcTrack, NetBox)",
+        "AI Agents (tool calling, RAG)",
+        "CI/CD",
+        "Testing",
+      ]);
+      expect(skills).not.toContain("tool");
+      expect(skills).not.toContain("calling");
+      expect(skills.every((s) => (s.match(/\(/g) || []).length === (s.match(/\)/g) || []).length)).toBe(true);
+
+      const summary = joinSummaryUpToLimit(
+        [
+          "Item One (Alpha, Beta)",
+          "Item Two (Gamma, Delta)",
+          "Item Three Very Long Name (Sunbird dcTrack, NetBox)",
+        ],
+        60
+      );
+      expect(summary.length).toBeLessThanOrEqual(60);
+      expect(summary).toBe("Item One (Alpha, Beta), Item Two (Gamma, Delta)");
+
+      const parsed = convertExtractedPdfToEvidenceItems({
+        sourceDoc: "resume.pdf",
+        pages: [],
+        sections: {
+          experience: [],
+          projects: [],
+          education: [],
+          certifications: [],
+          skills: ["Testing: Playwright, Vitest, DCIM (Sunbird dcTrack, NetBox)"],
+          uncategorized: [],
+        },
+        extractedTechnologies: [],
+        impactMetrics: [],
+      });
+
+      const testingSkill = parsed.find((i) => i.title === "Technical Skills — Testing");
+      expect(testingSkill).toBeDefined();
+      expect(testingSkill?.organization).toBeUndefined();
+      expect(testingSkill?.status).toBe("draft");
+      expect(testingSkill?.bullets.every((b) => b.verified === false)).toBe(true);
+      expect(testingSkill?.tags).toContain("DCIM (Sunbird dcTrack, NetBox)");
+    });
   });
 });
 

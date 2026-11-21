@@ -32,7 +32,7 @@ import {
 import { ProviderConfigSchema } from "@/lib/ai/types";
 import { getDemoContextFromBrowser, initializeDemoSamples } from "@/lib/demo-client";
 import { fetchDemoConfig, fetchSessionUser } from "@/components/auth/session-user";
-import { DEMO_JOB, DEMO_RESUME_SOURCE } from "@/lib/demo-samples";
+import { DEMO_EVIDENCE, DEMO_JOB, DEMO_RESUME_SOURCE } from "@/lib/demo-samples";
 import { readApiResponse } from "@/lib/api-error";
 import { parseJobDescription } from "@/lib/jd-parser/parser";
 import {
@@ -921,6 +921,28 @@ export function TailorWorkspace() {
             setIsLoadingJob(true);
           }
           setRestoredJobId(entry.jobId);
+        } else if (sessionUser && !config?.demoMode && !hasExplicitEntryOverride) {
+          // Signed-in user visiting /tailor without ?jobId or ?sample: prefer their most recent saved job over Nova Labs
+          try {
+            const recentRes = await fetch("/api/jobs?limit=1&scope=tracked");
+            const { ok: recentOk, data: recentJson } = await readApiResponse<{
+              success?: boolean;
+              data?: Array<{ id?: string }>;
+            }>(recentRes);
+            const latestJobId =
+              recentOk &&
+              recentJson?.success &&
+              Array.isArray(recentJson.data) &&
+              typeof recentJson.data[0]?.id === "string"
+                ? recentJson.data[0].id
+                : null;
+            if (latestJobId) {
+              setIsLoadingJob(true);
+              setRestoredJobId(latestJobId);
+            }
+          } catch {
+            // Fall back cleanly to isolated sample sandbox
+          }
         }
 
         if (config?.demoMode) {
@@ -1455,6 +1477,10 @@ export function TailorWorkspace() {
     }
   };
 
+  const matchSampleEvidenceLocally = useCallback((reqs: JobRequirements): RankedMatch[] => {
+    return matchGuestEvidenceItems(DEMO_EVIDENCE as unknown as EvidenceItemWithBullets[], reqs);
+  }, []);
+
   const matchGuestEvidenceLocally = useCallback((reqs: JobRequirements): RankedMatch[] => {
     if (typeof window === "undefined") return [];
     try {
@@ -1555,9 +1581,23 @@ export function TailorWorkspace() {
     }
   };
 
+  const isSampleJob =
+    !savedJobId &&
+    ((company === "Nova Labs" &&
+      (rawDescription === SAMPLE_INTERN_JD || rawDescription === SAMPLE_BACKEND_JD)) ||
+      (company === "WebCraft Systems" && rawDescription === SAMPLE_FRONTEND_JD));
+  const isSampleJobRef = useRef(isSampleJob);
+  isSampleJobRef.current = isSampleJob;
+
   const fetchMatches = useCallback(async (reqs: JobRequirements, signal?: AbortSignal) => {
     setIsMatching(true);
     try {
+      // Never mix fictional sample presets (Nova Labs / WebCraft) with a signed-in user's real Evidence Bank
+      if (isSampleJobRef.current) {
+        setMatches(matchSampleEvidenceLocally(reqs));
+        return;
+      }
+
       const demoConfig = await fetchDemoConfig();
       if (signal?.aborted) return;
       if (demoConfig?.demoMode) {
@@ -1592,7 +1632,7 @@ export function TailorWorkspace() {
     } finally {
       setIsMatching(false);
     }
-  }, [matchGuestEvidenceLocally]);
+  }, [matchGuestEvidenceLocally, matchSampleEvidenceLocally]);
 
   const targetJobToLoad = jobIdParam || restoredJobId;
   const loadedFromStoredRef = useRef(false);
@@ -2119,11 +2159,6 @@ export function TailorWorkspace() {
     };
   }, [atsTypstSource, effectiveSecondaryTab, extractedRequirements]);
 
-  const isSampleJob =
-    !savedJobId &&
-    ((company === "Nova Labs" &&
-      (rawDescription === SAMPLE_INTERN_JD || rawDescription === SAMPLE_BACKEND_JD)) ||
-      (company === "WebCraft Systems" && rawDescription === SAMPLE_FRONTEND_JD));
   const hasJobRequirements = extractedRequirements !== null;
   const hasJobDescription = Boolean(rawDescription.trim());
   const isBlankJob = activeTab === "job-info" && !hasJobDescription;
@@ -2516,6 +2551,14 @@ export function TailorWorkspace() {
             <p className="mt-0.5 break-words text-lg sm:text-xl font-semibold leading-snug text-foreground">
               {roleTitle || "Untitled role"}
             </p>
+            {isSampleJob && (
+              <p
+                data-testid="sample-sandbox-banner"
+                className="mt-1.5 text-xs text-status-warning leading-snug"
+              >
+                Sample Sandbox — matched against demo evidence, not your personal Evidence Bank. Paste your own job description to match your verified evidence.
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs font-mono tabular-nums">
             {isSampleJob && (
@@ -2546,6 +2589,7 @@ export function TailorWorkspace() {
               </label>
               <select
                 id="tailor-role-profile-select"
+                name="roleProfile"
                 value={selectedRoleProfile}
                 onChange={(e) => setSelectedRoleProfile(e.target.value as RoleProfile)}
                 className="h-9 min-w-0 max-w-full cursor-pointer rounded-md border border-hairline bg-inset px-2.5 py-0 text-sm font-medium leading-normal text-foreground focus-visible:outline-2 focus-visible:outline-primary"
@@ -3399,6 +3443,8 @@ export function TailorWorkspace() {
                         </span>
                         <div className="flex flex-wrap items-center gap-2">
                           <input
+                            id="tailor-custom-requirement-input"
+                            name="customRequirement"
                             type="text"
                             value={newUserReqText}
                             onChange={(e) => setNewUserReqText(e.target.value)}
@@ -3470,6 +3516,7 @@ export function TailorWorkspace() {
                         </div>
                         <textarea
                           id="tailor-job-description"
+                          name="jobDescription"
                           ref={registerJobDescription}
                           value={rawDescription}
                           onChange={(e) => updateJobDescription(e.target.value)}

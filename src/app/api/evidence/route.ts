@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
-import { createEvidenceItem, getEvidenceItemById, getEvidenceItems } from "@/lib/db/evidence";
+import { createEvidenceItem, getEvidenceItemById, getEvidenceItems, getEvidenceStatusCounts } from "@/lib/db/evidence";
 import { sanitizeError } from "@/lib/ai/redact";
 import { getRequestUserId, requireUserId } from "@/lib/security/auth-request";
 
@@ -34,8 +34,11 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status") || undefined;
 
-    const items = await getEvidenceItems(status, userId);
-    return NextResponse.json({ success: true, data: items });
+    const [items, counts] = await Promise.all([
+      getEvidenceItems(status, userId),
+      getEvidenceStatusCounts(userId).catch(() => undefined),
+    ]);
+    return NextResponse.json({ success: true, data: items, ...(counts ? { counts } : {}) });
   } catch (err) {
     return NextResponse.json(
       { success: false, error: "Failed to fetch evidence items", message: sanitizeError(err) },

@@ -1336,6 +1336,8 @@ export function PatchDiffReview({
                     className="flex items-center gap-2 text-xs text-status-warning cursor-pointer"
                   >
                     <input
+                      id={`patch-review-ack-skill-${skill.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                      name="acknowledgedSkill"
                       type="checkbox"
                       checked={acknowledgedSkills.has(skill)}
                       onChange={() => toggleSkillAck(skill)}

@@ -717,6 +717,7 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
         {isSingleLine ? (
           <input
             id={inputId}
+            name={field.key}
             type="text"
             value={currentValue}
             onChange={(event) => handleControlChange(event.currentTarget.value)}
@@ -728,6 +729,7 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
         ) : (
           <textarea
             id={inputId}
+            name={field.key}
             value={currentValue}
             onChange={(event) => handleControlChange(event.currentTarget.value)}
             onBlur={(event) => handleFieldBlur(field, event.currentTarget.value)}
@@ -764,6 +766,7 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
         </label>
         <select
           id="resume-preset"
+          name="resumePreset"
           value={preset}
           onChange={(event) => setPreset(event.target.value as Preset)}
           className="rounded border border-outline/70 bg-inset p-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -860,6 +863,7 @@ export function ManagedResumeForm({ value, onChange }: { value: string; onChange
                 </label>
                 <select
                   id={selectId}
+                  name={`linkPlacement-${index}`}
                   data-testid={`link-placement-${index}`}
                   value={link.span ? `${link.span.start}:${link.span.end}` : ""}
                   onChange={(event) => {

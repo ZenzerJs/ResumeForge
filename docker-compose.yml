@@ -3,38 +3,46 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_USER: ${POSTGRES_USER:-resumeforge}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-resumeforge}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - resumeforge_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-resumeforge} -d $${POSTGRES_DB:-resumeforge}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   app:
+    image: ${RESUMEFORGE_IMAGE:-ghcr.io/zenzerjs/resumeforge:latest}
+    pull_policy: missing
     build:
       context: .
       args:
-        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?Set NEXT_PUBLIC_APP_URL in .env}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
     restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
-      DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in .env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-resumeforge}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-resumeforge}
       APP_ACCESS_SECRET: ${APP_ACCESS_SECRET:?Set APP_ACCESS_SECRET in .env}
       APP_ACCESS_PASSWORD: ${APP_ACCESS_PASSWORD:-}
       JOB_SYNC_SECRET: ${JOB_SYNC_SECRET:?Set JOB_SYNC_SECRET in .env}
-      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?Set NEXT_PUBLIC_APP_URL in .env}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
       DEMO_MODE: ${DEMO_MODE:-false}
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
     ports:
       - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-3000}:3000"
 

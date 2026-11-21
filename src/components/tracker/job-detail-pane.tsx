@@ -218,7 +218,7 @@ export function JobDetailPane({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job.id, needsDetailFetch]);
 
-  const location = extractLocationFromNotes(detailJob.notes);
+  const location = extractLocationFromNotes(detailJob.notes, detailJob.rawDescription);
   const applyUrl = extractApplyUrlFromNotes(detailJob.notes);
   const datePosted = extractPostingDateFromNotes(detailJob.notes);
   const salary = extractSalaryFromNotes(detailJob.notes, detailJob.rawDescription);
@@ -260,8 +260,8 @@ export function JobDetailPane({
   const requiredSkills = parsedRequirements?.requiredSkills ?? [];
   const preferredSkills = parsedRequirements?.preferredSkills ?? [];
   const domainTerms = parsedRequirements?.domainTerms ?? [];
-  const requiredSkillKeys = new Set(requiredSkills.map((skill) => skill.toLowerCase()));
-  const requiredEvidence = checklist.items.filter((item) => requiredSkillKeys.has(item.label.toLowerCase()));
+  const requiredEvidence = checklist.items.filter((item) => item.category === "required");
+  const optionalEvidence = checklist.items.filter((item) => item.category !== "required");
   const requiredMatched = requiredEvidence.filter((item) => item.status === "verified").length;
   const requiredCoveragePercent = requiredEvidence.length
     ? Math.round((requiredMatched / requiredEvidence.length) * 100)
@@ -560,6 +560,8 @@ export function JobDetailPane({
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     ) : (
                       <select
+                        id={`job-detail-status-${job.id}`}
+                        name="jobStatus"
                         value={job.status}
                         onChange={(e) => onStatusChange(job.id, e.target.value as JobStatus)}
                         className="min-h-11 sm:min-h-0 max-w-full bg-input border border-outline-variant rounded-[6px] px-3 py-1.5 text-xs font-mono-data text-on-surface-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-colors cursor-pointer"
@@ -574,6 +576,8 @@ export function JobDetailPane({
                     )}
                     {onVariantChange && (job.variants?.length ?? 0) > 0 && job.status !== "SAVED" && (
                       <select
+                        id={`job-detail-variant-${job.id}`}
+                        name="sentVariantId"
                         value={job.appliedVariantId ?? ""}
                         onChange={(e) => onVariantChange(job.id, e.target.value || null)}
                         className="min-h-11 sm:min-h-0 max-w-full block bg-input border border-outline-variant rounded-[6px] px-3 py-1.5 text-xs font-mono-data text-on-surface-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -667,31 +671,79 @@ export function JobDetailPane({
                           {checklist.needsVerification === 1 ? "requirement matches" : "requirements match"} only draft or unverified bullets (Needs verification).
                         </p>
                       )}
-                      <ul className="space-y-2 font-mono-data text-xs">
-                        {checklist.items.map((item) => (
-                          <li key={item.label} className="flex items-center gap-2 text-on-surface-variant">
-                            {item.status === "verified" ? (
-                              <>
-                                <Check className="h-4 w-4 shrink-0 text-status-success" aria-hidden />
-                                <span className="sr-only">Verified: </span>
-                              </>
-                            ) : item.status === "needs_verification" ? (
-                              <AlertCircle className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-                            ) : (
-                              <>
-                                <X className="h-4 w-4 shrink-0 text-error" aria-hidden />
-                                <span className="sr-only">Missing: </span>
-                              </>
-                            )}
-                            <span className="min-w-0 truncate">{item.label}</span>
-                            {item.status === "needs_verification" && (
-                              <span className="ml-auto shrink-0 rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">
-                                Needs verification
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
+                      {requiredEvidence.length > 0 && (
+                        <div className="space-y-2" data-testid="tracker-required-skills-group">
+                          <div className="font-mono text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+                            Required skills ({requiredMatched}/{requiredEvidence.length})
+                          </div>
+                          <ul className="space-y-2 font-mono-data text-xs">
+                            {requiredEvidence.map((item) => (
+                              <li key={`req-${item.label}`} className="flex items-center gap-2 text-on-surface-variant">
+                                {item.status === "verified" ? (
+                                  <>
+                                    <Check className="h-4 w-4 shrink-0 text-status-success" aria-hidden />
+                                    <span className="sr-only">Verified: </span>
+                                  </>
+                                ) : item.status === "needs_verification" ? (
+                                  <AlertCircle className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                                ) : (
+                                  <>
+                                    <X className="h-4 w-4 shrink-0 text-error" aria-hidden />
+                                    <span className="sr-only">Missing required skill: </span>
+                                  </>
+                                )}
+                                <span className="min-w-0 truncate">{item.label}</span>
+                                {item.status === "needs_verification" && (
+                                  <span className="ml-auto shrink-0 rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">
+                                    Needs verification
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {optionalEvidence.length > 0 && (
+                        <div
+                          className={requiredEvidence.length > 0 ? "mt-4 pt-3 border-t border-hairline space-y-2" : "space-y-2"}
+                          data-testid="tracker-optional-skills-group"
+                        >
+                          <div className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            Preferred &amp; domain skills ({optionalEvidence.filter((i) => i.status === "verified").length}/{optionalEvidence.length})
+                          </div>
+                          <ul className="space-y-2 font-mono-data text-xs">
+                            {optionalEvidence.map((item) => (
+                              <li key={`opt-${item.label}`} className="flex items-center gap-2 text-on-surface-variant">
+                                {item.status === "verified" ? (
+                                  <>
+                                    <Check className="h-4 w-4 shrink-0 text-status-success" aria-hidden />
+                                    <span className="sr-only">Verified: </span>
+                                  </>
+                                ) : item.status === "needs_verification" ? (
+                                  <AlertCircle className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                                ) : (
+                                  <>
+                                    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground" aria-hidden>
+                                      –
+                                    </span>
+                                    <span className="sr-only">Nice to have, not in Evidence Bank: </span>
+                                  </>
+                                )}
+                                <span className="min-w-0 truncate">{item.label}</span>
+                                {item.status === "needs_verification" ? (
+                                  <span className="ml-auto shrink-0 rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">
+                                    Needs verification
+                                  </span>
+                                ) : item.status === "missing" ? (
+                                  <span className="ml-auto shrink-0 rounded border border-hairline bg-inset px-1.5 py-0.5 text-xs font-mono text-muted-foreground">
+                                    Nice to have
+                                  </span>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </>
                   )}
                 </details>
@@ -767,6 +819,7 @@ export function JobDetailPane({
                   </label>
                   <textarea
                     id={`notes-${job.id}`}
+                    name="jobNotes"
                     data-testid={`notes-textarea-${job.id}`}
                     value={notesValue}
                     onChange={(e) => onNotesChange(job.id, e.target.value)}
@@ -1043,7 +1096,7 @@ export function JobDetailPane({
           requirements: parsedRequirements,
         }}
         coverLetter={null}
-        matchedHighlights={evidence.flatMap((e) => e.bullets.map((b) => b.text)).slice(0, 5)}
+        matchedHighlights={verifiedHighlights}
         evidenceItems={evidence}
         candidateInfo={candidateInfo}
       />

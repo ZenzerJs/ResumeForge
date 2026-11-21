@@ -7,10 +7,16 @@ import {
   convertPdfTextToTypst,
   repairTypstSource,
   sendChatCompletion,
+  detectServerFallbackProviderConfig,
 } from "../src/lib/ai/gateway";
 import { resolveProviderCredentials } from "../src/lib/ai/providers/credentials";
 import { ProviderConfigSchema } from "../src/lib/ai/types";
-import { completeText as completeGeminiText, chatGemini } from "../src/lib/ai/providers/gemini";
+import {
+  completeText as completeGeminiText,
+  chatGemini,
+  testGeminiConnection,
+  __setGeminiRetryDelaysForTests,
+} from "../src/lib/ai/providers/gemini";
 import { POST as testConnectionPOST } from "../src/app/api/ai/test-connection/route";
 import { POST as repairTypstPOST } from "../src/app/api/ai/repair-typst/route";
 
@@ -78,16 +84,28 @@ describe("AI Provider Gateway Connection Tests", () => {
 
   it("connects to Gemini successfully", async () => {
     const fakeKey = "AIzaSyValidFakeGeminiKey1234567890123";
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ models: [{ name: "models/gemini-1.5-flash" }] }),
-    } as Response);
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (String(url).includes(":generateContent")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ candidates: [{ content: { parts: [{ text: "ok" }] } }] }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          models: [{ name: "models/gemini-3.8-flash", supportedGenerationMethods: ["generateContent"] }],
+        }),
+      } as Response;
+    });
 
     const res = await testProviderConnection({ provider: "gemini", apiKey: fakeKey });
 
     expect(res.success).toBe(true);
     expect(res.modelCount).toBe(1);
+    expect(res.availableModels).toEqual(["gemini-3.8-flash"]);
     expect(res.message).not.toContain(fakeKey);
   });
 
@@ -297,9 +315,9 @@ describe("SEC-05 Gemini model segment validation", () => {
     await expect(chatGemini(badCfg, [{ role: "user", content: "hi" }], [])).rejects.toThrow(/Invalid Gemini model/i);
     expect(fetchSpy).not.toHaveBeenCalled();
 
-    const aliasCfg = { provider: "gemini" as const, apiKey: "AIzaSyFakeKey1234567890", model: "gemini-3.8-flash" };
+    const preservedCfg = { provider: "gemini" as const, apiKey: "AIzaSyFakeKey1234567890", model: "gemini-3.8-flash" };
     await completeGeminiText(
-      aliasCfg,
+      preservedCfg,
       [
         { role: "system", content: "s" },
         { role: "user", content: "u" },
@@ -307,9 +325,170 @@ describe("SEC-05 Gemini model segment validation", () => {
       true
     );
     expect(fetchSpy).toHaveBeenCalledWith(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
       expect.any(Object)
     );
+
+    fetchSpy.mockClear();
+    const retiredCfg = { provider: "gemini" as const, apiKey: "AIzaSyFakeKey1234567890", model: "gemini-1.5-pro" };
+    await completeGeminiText(retiredCfg, [{ role: "user", content: "u" }], true);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+      expect.any(Object)
+    );
+  });
+});
+
+describe("P1-3 Gemini defaults, retry, thought filtering, and generateContent probe", () => {
+  beforeEach(() => {
+    __setGeminiRetryDelaysForTests([0, 0]);
+  });
+
+  afterEach(() => {
+    __setGeminiRetryDelaysForTests(null);
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it("uses gemini-3.8-flash (never gemini-1.5-pro) in detectServerFallbackProviderConfig", () => {
+    vi.stubEnv("DEMO_MODE", "false");
+    vi.stubEnv("OPENAI_API_KEY", "");
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
+    vi.stubEnv("GEMINI_API_KEY", "AIzaSyFallbackTestKey");
+    const cfg = detectServerFallbackProviderConfig();
+    expect(cfg).toEqual({
+      provider: "gemini",
+      apiKey: "AIzaSyFallbackTestKey",
+      model: "gemini-3.8-flash",
+    });
+  });
+
+  it("filters thought parts in completeText so thinking models return visible text", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  { thought: true, text: "Internal chain of thought" },
+                  { text: '{"patches":[],"gaps":[]}' },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200 }
+      )
+    );
+    const res = await completeGeminiText(
+      { provider: "gemini", apiKey: "AIzaSyTestKey", model: "gemini-3.8-flash" },
+      [{ role: "user", content: "hello" }],
+      true
+    );
+    expect(res).toEqual({ success: true, text: '{"patches":[],"gaps":[]}' });
+  });
+
+  it("retries transient 503 responses up to 2 times and succeeds when retry returns 200", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response("overloaded", { status: 503 }))
+      .mockResolvedValueOnce(new Response("rate limited", { status: 429 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ candidates: [{ content: { parts: [{ text: "ok-after-retry" }] } }] }),
+          { status: 200 }
+        )
+      );
+
+    const res = await completeGeminiText(
+      { provider: "gemini", apiKey: "AIzaSyTestKey", model: "gemini-3.8-flash" },
+      [{ role: "user", content: "hello" }],
+      false
+    );
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(res).toEqual({ success: true, text: "ok-after-retry" });
+  });
+
+  it("does not retry non-transient 404 or 401 errors", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(JSON.stringify({ error: { message: "Not found" } }), { status: 404 }));
+
+    const res = await completeGeminiText(
+      { provider: "gemini", apiKey: "AIzaSyTestKey", model: "gemini-missing" },
+      [{ role: "user", content: "hello" }],
+      false
+    );
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(res.success).toBe(false);
+    expect(res.providerStatus).toBe(404);
+  });
+
+  it("testGeminiConnection verifies model availability and runs a generateContent probe", async () => {
+    // 1. Model absent from /v1beta/models -> fails fast with availableModels
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          models: [
+            { name: "models/gemini-3.8-flash", supportedGenerationMethods: ["generateContent"] },
+            { name: "models/text-embedding-004", supportedGenerationMethods: ["embedContent"] },
+          ],
+        }),
+        { status: 200 }
+      )
+    );
+    const missingRes = await testGeminiConnection({
+      provider: "gemini",
+      apiKey: "AIzaSyTestKey",
+      model: "gemini-nonexistent-preview",
+    });
+    expect(missingRes.success).toBe(false);
+    expect(missingRes.availableModels).toEqual(["gemini-3.8-flash"]);
+    expect(missingRes.message).toContain("not available");
+
+    // 2. Model listed but generateContent probe returns 503 -> reports failure
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            models: [{ name: "models/gemini-3.8-flash", supportedGenerationMethods: ["generateContent"] }],
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: "Overloaded" } }), { status: 503 }));
+    const overloadedRes = await testGeminiConnection({
+      provider: "gemini",
+      apiKey: "AIzaSyTestKey",
+      model: "gemini-3.8-flash",
+    });
+    expect(overloadedRes.success).toBe(false);
+    expect(overloadedRes.message).toContain("503");
+
+    // 3. Model listed and generateContent probe returns 200 -> succeeds with availableModels
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            models: [{ name: "models/gemini-3.8-flash", supportedGenerationMethods: ["generateContent"] }],
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ candidates: [{ content: { parts: [{ text: "ok" }] } }] }),
+          { status: 200 }
+        )
+      );
+    const okRes = await testGeminiConnection({
+      provider: "gemini",
+      apiKey: "AIzaSyTestKey",
+      model: "gemini-3.8-flash",
+    });
+    expect(okRes.success).toBe(true);
+    expect(okRes.availableModels).toEqual(["gemini-3.8-flash"]);
   });
 });
 

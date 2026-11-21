@@ -236,6 +236,7 @@ export function QuickAddEvidenceModal({
             </label>
             <input
               id="evidence-title"
+              name="evidenceTitle"
               type="text"
               required
               value={title}
@@ -253,6 +254,7 @@ export function QuickAddEvidenceModal({
               </label>
               <input
                 id="evidence-org"
+                name="evidenceOrganization"
                 type="text"
                 value={organization}
                 onChange={(e) => setOrganization(e.target.value)}
@@ -267,6 +269,7 @@ export function QuickAddEvidenceModal({
               </label>
               <select
                 id="evidence-category"
+                name="evidenceCategory"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 className="h-10 w-full rounded-[6px] border border-control/70 bg-inset px-3 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-panel cursor-pointer"
@@ -285,6 +288,7 @@ export function QuickAddEvidenceModal({
             </label>
             <textarea
               id="evidence-bullet"
+              name="evidenceBullet"
               rows={3}
               value={bulletPoint}
               onChange={(e) => setBulletPoint(e.target.value)}

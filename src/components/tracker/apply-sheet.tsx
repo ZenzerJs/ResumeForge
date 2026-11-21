@@ -598,6 +598,8 @@ export function ApplySheet({
             <label className="block text-xs text-muted-foreground">
               Sent variant
               <select
+                id={`apply-sheet-variant-${job.id}`}
+                name="sentVariantId"
                 className="mt-1 w-full rounded border border-hairline bg-inset px-2 py-1.5 text-xs text-foreground"
                 value={selectedVariantId ?? ""}
                 aria-label="Sent variant"
@@ -672,7 +674,13 @@ export function ApplySheet({
               <p className="text-sm">Confirm any unverified skills you have real experience with before applying:</p>
               {skillsNeedingAck.map((skill) => (
                 <label key={skill} className="flex items-center gap-2">
-                  <input type="checkbox" checked={acknowledgedSkills.includes(skill)} onChange={() => setAcknowledgedSkills((current) => current.includes(skill) ? current.filter((item) => item !== skill) : [...current, skill])} />
+                  <input
+                    id={`apply-sheet-ack-${skill.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                    name="acknowledgedSkill"
+                    type="checkbox"
+                    checked={acknowledgedSkills.includes(skill)}
+                    onChange={() => setAcknowledgedSkills((current) => current.includes(skill) ? current.filter((item) => item !== skill) : [...current, skill])}
+                  />
                   I have real experience with {skill}
                 </label>
               ))}

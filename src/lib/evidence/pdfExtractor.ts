@@ -4,12 +4,95 @@ if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/workers/pdf.worker.min.mjs';
 }
 
-export function cleanLigatures(text: string): string {
+export interface PdfLineTextItem {
+  str: string;
+  transform?: number[];
+  width?: number;
+  hasEOL?: boolean;
+}
+
+const LIGATURE_STOP_WORDS =
+  /^(?:and|the|in|at|to|or|of|for|with|on|by|as|is|an|be|it|if|from|that|this|are|was|were|not|but|can|will|our|their|into|over|under|using|via)$/i;
+
+/**
+ * Joins PDF.js text items on the same visual line using horizontal geometry (`x + width` vs next `x`)
+ * so kerning/ligature/hyphen splits ("verifi" + "cation", "mobile-" + "first") do not get spurious spaces.
+ */
+export function joinPdfLineItems(items: PdfLineTextItem[]): string {
+  const valid = items.filter((i) => i && typeof i.str === "string" && i.str.length > 0);
+  if (valid.length === 0) return "";
+
+  let out = valid[0].str;
+  for (let i = 1; i < valid.length; i++) {
+    const prev = valid[i - 1];
+    const next = valid[i];
+    const prevStr = prev.str;
+    const nextStr = next.str;
+
+    if (/\s$/.test(prevStr) || /^\s/.test(nextStr)) {
+      out += nextStr;
+      continue;
+    }
+
+    const hasGeometry =
+      Array.isArray(prev.transform) &&
+      Array.isArray(next.transform) &&
+      typeof prev.transform[4] === "number" &&
+      typeof next.transform[4] === "number" &&
+      typeof prev.width === "number" &&
+      prev.width > 0;
+
+    if (hasGeometry) {
+      const fontHeight =
+        Math.abs(prev.transform![0] || prev.transform![3] || next.transform![0] || next.transform![3] || 10) || 10;
+      const dx = next.transform![4] - (prev.transform![4] + prev.width!);
+      const spaceThreshold = Math.max(fontHeight * 0.18, 1.2);
+      if (dx > spaceThreshold) {
+        out += " " + nextStr;
+      } else {
+        out += nextStr;
+      }
+    } else if (/[-–—(\/]$/.test(prevStr) || /^[,.;:!?)\/]/.test(nextStr)) {
+      out += nextStr;
+    } else {
+      out += " " + nextStr;
+    }
+  }
+  return out;
+}
+
+export function normalizePdfText(text: string): string {
   return text
-    .replace(/\b([a-zA-Z]+)\s+(fi|fl|ff|ffi|ffl)\s+(?!and\b|the\b|in\b|at\b|to\b|or\b|of\b|for\b|with\b|on\b|by\b|as\b)([a-zA-Z]{1,4})\b/gi, "$1$2$3")
-    .replace(/\b([a-zA-Z]{1,2})\s+(fi|fl|ff|ffi|ffl)\s+([a-zA-Z]+)\b/gi, "$1$2$3")
-    .replace(/\b([a-zA-Z]+)\s+(fi|fl|ff|ffi|ffl)\b/gi, "$1$2")
-    .replace(/\b(fi|fl|ff|ffi|ffl)\s+([a-zA-Z]+)\b/gi, "$1$2");
+    // 1. Repair isolated ligature between word fragments (e.g. "speci fi c", "pro fi le", "ef fi cient")
+    .replace(
+      /\b([a-zA-Z]+)\s+(fi|fl|ff|ffi|ffl)\s+([a-z]{1,6})\b/g,
+      (match, left: string, lig: string, right: string) => {
+        if (LIGATURE_STOP_WORDS.test(left) || LIGATURE_STOP_WORDS.test(right)) return match;
+        return `${left}${lig}${right}`;
+      }
+    )
+    // 2. Repair ligature splits where left token ends in a ligature followed by a lowercase word suffix (e.g. "verifi cation", "profi le", "specifi c")
+    .replace(/\b([a-zA-Z]{2,}(?:fi|fl|ff|ffi|ffl))\s+([a-z]{1,})\b/g, (match, left: string, right: string) => {
+      if (right === "a" || right === "i" || LIGATURE_STOP_WORDS.test(right)) return match;
+      return `${left}${right}`;
+    })
+    // 2b. Repair leading isolated ligature before a lowercase continuation (e.g. "fl agship", "fi lter")
+    .replace(/\b(fi|fl|ff|ffi|ffl)\s+([a-z]{2,})\b/g, (match, lig: string, right: string) => {
+      if (LIGATURE_STOP_WORDS.test(right)) return match;
+      return `${lig}${right}`;
+    })
+    // 3. Repair hyphenated compounds broken by a space after the hyphen (e.g. "mobile- first" -> "mobile-first")
+    .replace(/\b([a-zA-Z]{2,})-\s+([a-z]{2,})\b/g, "$1-$2")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+export function cleanLigatures(text: string): string {
+  return normalizePdfText(
+    normalizePdfText(text)
+      .replace(/\b([a-zA-Z]{1,2})\s+(fi|fl|ff|ffi|ffl)\s+([a-zA-Z]+)\b/gi, "$1$2$3")
+      .replace(/\b([a-zA-Z]+)\s+(fi|fl|ff|ffi|ffl)\b/gi, "$1$2")
+  );
 }
 
 export interface ExtractedPdfEvidence {
@@ -235,9 +318,12 @@ export async function extractPdfEvidence(buffer: ArrayBuffer, filename: string):
       const page = await pdfDocument.getPage(pageNum);
       const textContent = await page.getTextContent();
       
-      // Filter out rotated tokens (transform[1] !== 0 || transform[2] !== 0)
+      // Filter out TextMarkedContent (missing str/transform) and rotated tokens
       const validItems = textContent.items.filter((item: any) => {
-        if (item.transform && (item.transform[1] !== 0 || item.transform[2] !== 0)) {
+        if (!item || typeof item.str !== "string" || !Array.isArray(item.transform)) {
+          return false;
+        }
+        if (item.transform[1] !== 0 || item.transform[2] !== 0) {
           return false;
         }
         return true;
@@ -310,11 +396,11 @@ export async function extractPdfEvidence(buffer: ArrayBuffer, filename: string):
           const rightItems = line.items.filter(item => item.transform[4] >= commonGutterX!);
 
           if (leftItems.length > 0) {
-            const str = cleanLigatures(leftItems.map(i => i.str).join(' ').replace(/\s+/g, ' ').trim());
+            const str = cleanLigatures(joinPdfLineItems(leftItems).replace(/\s+/g, ' ').trim());
             if (str.length > 0) leftLines.push(str);
           }
           if (rightItems.length > 0) {
-            const str = cleanLigatures(rightItems.map(i => i.str).join(' ').replace(/\s+/g, ' ').trim());
+            const str = cleanLigatures(joinPdfLineItems(rightItems).replace(/\s+/g, ' ').trim());
             if (str.length > 0) rightLines.push(str);
           }
         });
@@ -323,7 +409,7 @@ export async function extractPdfEvidence(buffer: ArrayBuffer, filename: string):
         // Full-width banner slices without interior gutters
         linesData.forEach(line => {
           if (line.items.length > 0) {
-            const lineStr = cleanLigatures(line.items.map(i => i.str).join(' ').replace(/\s+/g, ' ').trim());
+            const lineStr = cleanLigatures(joinPdfLineItems(line.items).replace(/\s+/g, ' ').trim());
             if (lineStr.length > 0) {
               pageLines.push(lineStr);
             }

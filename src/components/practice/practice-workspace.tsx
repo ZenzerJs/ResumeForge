@@ -298,6 +298,7 @@ export function PracticeWorkspace() {
               </div>
               <select
                 id="practice-job-context-select"
+                name="practiceJobContext"
                 data-testid="practice-job-context-select"
                 value={selectedJobId}
                 onChange={(e) => handleSelectJobChange(e.target.value)}

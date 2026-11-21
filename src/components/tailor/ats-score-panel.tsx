@@ -20,6 +20,9 @@ import {
   SkillEvaluation,
   SkillMatchStatus,
 } from "@/lib/ats-evaluator/types";
+import { getAtsDisplayState, type AtsDisplayState } from "@/lib/ats-evaluator/display-state";
+
+export { getAtsDisplayState, type AtsDisplayState };
 import { QualitativeReviewPanel } from "./qualitative-review-panel";
 import { AtsQualitativeReviewResult } from "@/lib/ai/qualitative-schema";
 import { resolveClientProviderConfig } from "@/lib/byok-vault";
@@ -145,64 +148,6 @@ export function classifySkillBacking(
     evidenceBankOnly: false,
     badgeLabel: STATUS_BADGES[skillEval.status].label,
     sourceNote: skillEval.matchedContext || `Matched in ${sourceLabel}.`,
-  };
-}
-
-export interface AtsDisplayState {
-  hasJobRequirements: boolean;
-  hasRequiredSkills: boolean;
-  hasPreferredSkills: boolean;
-  overallRingText: string;
-  overallRingPct: number;
-  overallMatchLabel: string;
-  overallScorePrimary: string;
-  overallScoreSubtext: string | null;
-  requiredMatchLabel: string;
-  requiredMatchPct: number;
-  preferredMatchLabel: string;
-  preferredMatchPct: number;
-}
-
-export function getAtsDisplayState(
-  result: AtsEvaluationResult,
-  extractedRequirements: {
-    requiredSkills: string[];
-    preferredSkills: string[];
-    domainTerms?: string[];
-  },
-  roleTitle?: string
-): AtsDisplayState {
-  const hasRequiredSkills = (extractedRequirements.requiredSkills?.length ?? 0) > 0;
-  const hasPreferredSkills = (extractedRequirements.preferredSkills?.length ?? 0) > 0;
-  const hasJobRequirements = hasRequiredSkills || hasPreferredSkills;
-  const overallPct = Math.max(0, Math.min(100, result.overallScore || 0));
-  const gradeLabel = overallPct >= 80 ? "Strong" : overallPct >= 60 ? "Solid" : "Needs work";
-
-  return {
-    hasJobRequirements,
-    hasRequiredSkills,
-    hasPreferredSkills,
-    overallRingText: hasJobRequirements ? String(result.overallScore) : "—",
-    overallRingPct: hasJobRequirements ? overallPct : 0,
-    overallMatchLabel: hasJobRequirements
-      ? `Overall Match · ${gradeLabel}`
-      : "Overall Match · No job loaded",
-    overallScorePrimary: hasJobRequirements ? `${result.overallScore}` : "No job loaded",
-    overallScoreSubtext: hasJobRequirements
-      ? `vs. ${roleTitle || `${result.selectedProfile} profile`}`
-      : `Unscored until job requirements load (Base Health: ${result.baseHealth.score}/${result.baseHealth.maxScore})`,
-    requiredMatchLabel: hasRequiredSkills
-      ? `${result.requiredMatch.score} / ${result.requiredMatch.maxScore} pts (${result.requiredMatch.percentage}% match)`
-      : hasJobRequirements
-      ? "Unscored (none listed)"
-      : "No job loaded",
-    requiredMatchPct: hasRequiredSkills ? result.requiredMatch.percentage : 0,
-    preferredMatchLabel: hasPreferredSkills
-      ? `${result.preferredMatch.score} / ${result.preferredMatch.maxScore} pts (${result.preferredMatch.percentage}% match)`
-      : hasJobRequirements
-      ? "Unscored (none listed)"
-      : "No job loaded",
-    preferredMatchPct: hasPreferredSkills ? result.preferredMatch.percentage : 0,
   };
 }
 
@@ -508,6 +453,18 @@ export function AtsScorePanel({
             </p>
           )}
         </div>
+
+        {isEvaluating && !result && (
+          <div
+            data-testid="ats-evaluating-skeleton"
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-3 rounded-[10px] border border-hairline bg-inset px-4 py-4 text-xs text-text-secondary"
+          >
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" aria-hidden="true" />
+            <span>Evaluating ATS rubric against resume structure and requirements…</span>
+          </div>
+        )}
 
         {result && displayState && (
           <div className={`flex flex-col @md:flex-row @md:items-center justify-between gap-4 min-w-0 ${styles.scoreSummary}`}>

@@ -1,9 +1,13 @@
 import { TrackerFeed } from "@/components/tracker/tracker-feed";
 
-export const metadata = {
+import { buildPageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = buildPageMetadata({
+  path: "/tracker/applied",
   title: "Applied Jobs — Tracker",
   description: "Track your applied, interviewing, and offer-stage job applications.",
-};
+  noIndex: true,
+});
 
 export default function TrackerAppliedPage() {
   return (

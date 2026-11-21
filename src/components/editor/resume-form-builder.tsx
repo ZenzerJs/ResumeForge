@@ -246,6 +246,8 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
             <label className="flex items-center gap-1.5 text-xs text-text-muted font-mono">
               <span>Font Size</span>
               <select
+                id={`${formId}-font-size`}
+                name="fontSize"
                 value={model.fontSize}
                 onChange={(e) =>
                   commitModel({
@@ -267,6 +269,8 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
             <label className="flex items-center gap-1.5 text-xs text-text-muted font-mono">
               <span>Margins</span>
               <select
+                id={`${formId}-margin-preset`}
+                name="marginPreset"
                 value={model.marginPreset}
                 onChange={(e) =>
                   commitModel({
@@ -286,12 +290,12 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
         </div>
       </div>
 
-      {/* Section Navigation Pills + Horizontal Scroll Indicator */}
+      {/* Section Navigation Pills — wraps cleanly on <640px mobile so Skills is never clipped */}
       <div className="relative border-b border-outline/70 bg-panel">
         {canScrollLeft && (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-6 items-center justify-start bg-gradient-to-r from-panel via-panel/90 to-transparent pl-1 text-text-muted"
+            className="pointer-events-none hidden sm:flex absolute inset-y-0 left-0 z-10 w-6 items-center justify-start bg-gradient-to-r from-panel via-panel/90 to-transparent pl-1 text-text-muted"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
           </div>
@@ -301,7 +305,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
           onScroll={updateSectionTabOverflow}
           role="tablist"
           aria-label="Resume sections"
-          className="flex items-center gap-1 overflow-x-auto px-2.5 py-1.5"
+          className="flex flex-wrap sm:flex-nowrap items-center gap-1 sm:overflow-x-auto px-2.5 py-1.5"
         >
           {[
             { id: "contact", label: "Contact", title: "Contact & Summary", count: null, icon: User },
@@ -321,7 +325,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                 title={tab.title}
                 onClick={() => setActiveSection(tab.id as typeof activeSection)}
                 data-testid={`form-builder-tab-${tab.id}`}
-                className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-2 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-2.5 py-1.5 sm:px-2 sm:py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   active
                     ? "bg-primary/15 border border-primary/50 text-primary"
                     : "border border-transparent text-text-secondary hover:bg-elevated hover:text-foreground"
@@ -340,7 +344,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
           <div
             aria-hidden="true"
             data-testid="section-tabs-scroll-indicator"
-            className="pointer-events-none absolute inset-y-0 right-0 z-10 flex w-7 items-center justify-end bg-gradient-to-l from-panel via-panel/90 to-transparent pr-1 text-text-muted"
+            className="pointer-events-none hidden sm:flex absolute inset-y-0 right-0 z-10 w-7 items-center justify-end bg-gradient-to-l from-panel via-panel/90 to-transparent pr-1 text-text-muted"
           >
             <ChevronRight className="h-3.5 w-3.5" />
           </div>
@@ -479,6 +483,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
               </div>
               <textarea
                 id={`${formId}-summary`}
+                name="summary"
                 rows={3}
                 value={model.summary}
                 onChange={(e) => commitModel({ ...model, summary: e.target.value })}
@@ -640,6 +645,7 @@ export function ResumeFormBuilder({ value, onChange }: ResumeFormBuilderProps) {
                       </label>
                       <textarea
                         id={`${formId}-${activeSection}-${idx}-bullet-${bIdx}`}
+                        name={`${activeSection}-${idx}-bullet-${bIdx}`}
                         rows={2}
                         value={bullet}
                         onChange={(e) =>

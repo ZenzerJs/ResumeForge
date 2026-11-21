@@ -318,6 +318,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
             </label>
             <select
               id="dsa-problem-select"
+              name="dsaProblem"
               data-testid="dsa-problem-select"
               value={selectedProblem.slug}
               onChange={(e) => handleSelectProblem(e.target.value)}
@@ -380,6 +381,8 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
 
             <div className="flex flex-col gap-2 sm:flex-row">
               <textarea
+                id="dsa-jd-filter-input"
+                name="dsaJobDescription"
                 data-testid="dsa-jd-filter-input"
                 value={jdInput}
                 onChange={(e) => setJdInput(e.target.value)}
@@ -594,6 +597,8 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
 
             <div className="flex gap-2">
               <input
+                id="dsa-coach-input"
+                name="dsaCoachMessage"
                 type="text"
                 aria-label="Ask the Socratic interview coach"
                 data-testid="dsa-coach-input"
@@ -717,6 +722,7 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                   </label>
                   <select
                     id="dsa-language-select"
+                    name="dsaLanguage"
                     data-testid="dsa-language-select"
                     value={selectedLanguage}
                     onChange={(e) => handleLanguageChange(e.target.value as DsaLanguage)}
@@ -774,6 +780,8 @@ export function DsaWorkspace({ embedded = false }: { embedded?: boolean }) {
                 ))}
               </div>
               <textarea
+                id="dsa-code-editor"
+                name="dsaSolutionCode"
                 data-testid="dsa-code-editor"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}

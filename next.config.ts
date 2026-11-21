@@ -44,6 +44,7 @@ if (process.env.NODE_ENV === "production") {
 }
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   env: {
     NEXT_PUBLIC_RESUME_LAYOUT_V2:
       process.env.NEXT_PUBLIC_RESUME_LAYOUT_V2 ?? "true",

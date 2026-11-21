@@ -541,12 +541,23 @@ export function ChatPanel({ typstSource, resumeTitle, jobId }: ChatPanelProps) {
           for (const part of parts) {
             const line = part.split("\n").find((l) => l.startsWith("data: "));
             if (!line) continue;
+            let parsedChunk: ChatStreamChunk;
             try {
-              applyChunk(JSON.parse(line.slice(6)) as ChatStreamChunk);
+              parsedChunk = JSON.parse(line.slice(6)) as ChatStreamChunk;
             } catch {
-              // skip malformed chunk
+              // skip malformed JSON chunk
+              continue;
             }
+            applyChunk(parsedChunk);
           }
+        }
+
+        if (!assembled.trim()) {
+          throw new Error(
+            tools.length > 0
+              ? "The model finished running tools but did not return a reply. Try again or check your model in Settings."
+              : "The model returned an empty reply. Please try again."
+          );
         }
 
         setMessages((prev) => [
@@ -554,7 +565,7 @@ export function ChatPanel({ typstSource, resumeTitle, jobId }: ChatPanelProps) {
           {
             id: newId(),
             role: "assistant",
-            content: assembled || (tools.length > 0 ? "I looked that up." : ""),
+            content: assembled,
             toolCalls: tools.length > 0 ? tools : undefined,
             timestamp: Date.now(),
           },
@@ -759,6 +770,8 @@ export function ChatPanel({ typstSource, resumeTitle, jobId }: ChatPanelProps) {
 
       <div className="border-t border-hairline p-3 space-y-2">
         <textarea
+          id="career-assistant-chat-input"
+          name="chatMessage"
           ref={textareaRef}
           data-testid="chat-input"
           aria-label="Ask Career Assistant"

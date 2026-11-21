@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { DEFAULT_GEMINI_MODEL, normalizeGeminiModel } from "@/lib/ai/model-defaults";
 import {
   DEFAULT_MODELS,
   getActiveConfig,
@@ -102,7 +103,7 @@ async function streamOpenAiResponse(
 
 /**
  * Universal execution helper for BYOK models.
- * Handles Gemini (default gemini-2.5-flash via @google/genai),
+ * Handles Gemini (default gemini-3.8-flash via @google/genai),
  * OpenAI-compatible endpoints (Groq, OpenAI), and local Ollama.
  * Routes through byok-proxy when CORS bypass is required.
  */
@@ -125,11 +126,8 @@ export async function callByokModel<T = unknown>(
     (provider === resolvedClient?.provider ? resolvedClient?.model : null) ||
     (provider === activeConfig.provider ? activeConfig.model : null) ||
     DEFAULT_MODELS[provider] ||
-    "gemini-2.5-flash";
-  const model =
-    provider === "gemini" && rawModel === "gemini-3.8-flash"
-      ? "gemini-2.5-flash"
-      : rawModel;
+    DEFAULT_GEMINI_MODEL;
+  const model = provider === "gemini" ? normalizeGeminiModel(rawModel) : rawModel;
   const apiKey =
     options.apiKey ||
     (provider === resolvedClient?.provider ? resolvedClient?.apiKey : null) ||
@@ -159,7 +157,7 @@ export async function callByokModel<T = unknown>(
   try {
   // 3. Dispatch to provider handler
   if (provider === "gemini") {
-    const geminiModel = model === "gemini-3.8-flash" ? "gemini-2.5-flash" : model;
+    const geminiModel = normalizeGeminiModel(model);
     const ai = new GoogleGenAI({ apiKey });
     const contents = messages
       .filter((m) => m.role !== "system")

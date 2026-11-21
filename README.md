@@ -149,11 +149,32 @@ flowchart LR
 
 ## <img src="docs/icons/rocket.svg" width="20" height="20" alt="" align="absmiddle" /> Getting Started
 
-### Prerequisites
-* **Node.js 22+** and `npm`
-* **Docker & Docker Compose** (or a local PostgreSQL 16 instance)
+### Option A: One-Line Local Install (Recommended — Docker Only)
 
-### Option A: Local Development (Recommended)
+No `git clone`, no Node.js install, and no manual `.env` editing required. Install and start [Docker Desktop](https://docs.docker.com/get-docker/) (or Docker Engine with Compose v2), then run **one command**:
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/ZenzerJs/ResumeForge/main/install.ps1 | iex
+```
+
+**macOS / Linux (Terminal):**
+```bash
+curl -fsSL https://raw.githubusercontent.com/ZenzerJs/ResumeForge/main/install.sh | bash
+```
+
+What happens automatically:
+* Downloads `docker-compose.yml` into `~/resumeforge` (or uses the current repo directory if run inside a clone).
+* Checks local ports (`3000` and `5432`) and picks free ports automatically if already in use.
+* Generates cryptographically random secrets into `.env` on first run (never overwrites an existing `.env`).
+* Pulls the prebuilt multi-arch image (`ghcr.io/zenzerjs/resumeforge:latest`), starts PostgreSQL 16 + ResumeForge, runs Prisma migrations, and opens `http://localhost:3000`.
+* Re-run the exact same command anytime to update while preserving your PostgreSQL data (`resumeforge_pgdata`).
+
+> **Manage your local instance:** Stop with `docker compose -f ~/resumeforge/docker-compose.yml down` (or `.\install.ps1 -Down` / `./install.sh --down`) and view logs with `docker compose -f ~/resumeforge/docker-compose.yml logs -f app`.
+
+### Option B: Local Development (Node.js 22 + PostgreSQL 16)
+
+Prerequisites: **Node.js 22+**, `npm`, and **Docker & Docker Compose** (or a local PostgreSQL 16 instance).
 
 ```bash
 # 1. Clone and install dependencies (auto-copies pdfjs worker assets)
@@ -177,15 +198,26 @@ npm run sync:oa
 npm run dev
 ```
 
-### Option B: Full-Stack Docker Compose
+### Option C: Build Docker Image from Source
 
-After copying `.env.example` to `.env` and replacing the `change-me-*` placeholders:
+Inside a cloned repository, pass `-Build` / `--build` to the installer (or run Compose directly after creating `.env`):
+
+```powershell
+# Windows PowerShell
+.\install.ps1 -Build
+```
 
 ```bash
+# macOS / Linux
+./install.sh --build
+```
+
+```bash
+# Or directly with Compose after copying .env.example -> .env
 docker compose up --build -d
 ```
 
-Builds the multi-stage Node 22 Alpine image, waits for the `postgres` healthcheck, runs `npx prisma migrate deploy`, and serves the app at `http://127.0.0.1:3000` (configurable via `APP_BIND_ADDRESS` and `APP_PORT`).
+Builds the multi-stage Next.js `standalone` Node 22 Alpine image, waits for the `postgres` healthcheck, runs `prisma migrate deploy`, and serves the app at `http://127.0.0.1:3000` (configurable via `APP_BIND_ADDRESS` and `APP_PORT`).
 
 ---
 

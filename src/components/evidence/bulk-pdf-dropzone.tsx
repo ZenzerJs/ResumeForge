@@ -205,6 +205,8 @@ export function BulkPdfDropzone({ onComplete }: Props) {
           </p>
         </button>
         <input
+          id="bulk-pdf-upload-input"
+          name="evidencePdfFiles"
           type="file"
           multiple
           accept=".pdf"
@@ -324,6 +326,8 @@ export function BulkPdfDropzone({ onComplete }: Props) {
                               <li key={bIdx} className="leading-relaxed">
                                 <label className="flex items-start gap-2 cursor-pointer">
                                   <input
+                                    id={`pdf-bullet-${file.id}-${sIdx}-${bIdx}`}
+                                    name={`pdfBullet-${sIdx}-${bIdx}`}
                                     type="checkbox"
                                     checked={isChecked}
                                     disabled={file.status === "Saved" || file.status === "Saving" || Boolean(file.retryItems)}

@@ -241,7 +241,35 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedPdfResult> {
         disableCombineTextItems: false,
       });
       if (textContent?.items) {
-        text = textContent.items.map((item: any) => item.str).join(" ");
+        const items = textContent.items.filter(
+          (item: any) => item && typeof item.str === "string"
+        );
+        let out = "";
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          const prev = i > 0 ? items[i - 1] : null;
+          if (!prev) {
+            out = item.str;
+            continue;
+          }
+          if (/\s$/.test(prev.str) || /^\s/.test(item.str)) {
+            out += item.str;
+            continue;
+          }
+          const sameLine =
+            Array.isArray(prev.transform) &&
+            Array.isArray(item.transform) &&
+            Math.abs(item.transform[5] - prev.transform[5]) <= 5;
+          if (!sameLine) {
+            out += "\n" + item.str;
+            continue;
+          }
+          const hasWidth = typeof prev.width === "number" && prev.width > 0;
+          const fontHeight = Math.abs(prev.transform[0] || prev.transform[3] || 10) || 10;
+          const dx = hasWidth ? item.transform[4] - (prev.transform[4] + prev.width) : fontHeight;
+          out += dx > Math.max(fontHeight * 0.18, 1.2) ? " " + item.str : item.str;
+        }
+        text = out;
       }
     } catch {
       // ignore text error
