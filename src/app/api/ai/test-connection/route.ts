@@ -114,6 +114,7 @@ export async function POST(request: Request) {
       provider: result.provider,
       message: result.message,
       modelCount: result.modelCount,
+      availableModels: result.availableModels,
       latencyMs: result.latencyMs,
     });
   } catch (err) {

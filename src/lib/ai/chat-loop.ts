@@ -53,7 +53,16 @@ export function parseToolArguments(raw: string): Record<string, unknown> {
   }
 }
 
-export function formatToolResultForModel(name: string, result: unknown): string {
+export interface ExecutedToolResult {
+  toolCallId: string;
+  providerCallId?: string;
+  name: string;
+  result: unknown;
+  serialized: string;
+  isError: boolean;
+}
+
+function serializeToolPayload(result: unknown): string {
   let serialized = "";
   try {
     serialized = JSON.stringify(result);
@@ -63,16 +72,20 @@ export function formatToolResultForModel(name: string, result: unknown): string 
   if (serialized.length > 12_000) {
     serialized = serialized.slice(0, 12_000) + "…[truncated]";
   }
-  return `[Tool result: ${name}]\n${serialized}`;
+  return serialized;
 }
 
-export async function executeChatToolRound(opts: {
+export function formatToolResultForModel(name: string, result: unknown): string {
+  return `[Tool result: ${name}]\n${serializeToolPayload(result)}`;
+}
+
+export async function executeChatToolRoundStructured(opts: {
   toolCalls: ChatCompletionResult["toolCalls"];
   context?: { typstSource?: string; activeJobId?: string };
   userId?: string | null;
   emit: (chunk: ChatStreamChunk) => void;
-}): Promise<string> {
-  const resultBlocks: string[] = [];
+}): Promise<ExecutedToolResult[]> {
+  const results: ExecutedToolResult[] = [];
 
   for (const call of opts.toolCalls) {
     const id = call.id || crypto.randomUUID();
@@ -84,15 +97,45 @@ export async function executeChatToolRound(opts: {
         error: `Tool "${call.name}" is not available in chat mode. Use the Tailor tab for resume mutations.`,
       };
       opts.emit({ type: "tool_result", id, name: call.name, data: denied });
-      resultBlocks.push(formatToolResultForModel(call.name, denied));
+      results.push({
+        toolCallId: id,
+        providerCallId: call.providerCallId,
+        name: call.name,
+        result: denied,
+        serialized: serializeToolPayload(denied),
+        isError: true,
+      });
       continue;
     }
 
     const args = hydrateChatToolArgs(call.name, parseToolArguments(call.arguments), opts.context);
     const executed = await executeServerTool(call.name, args, opts.userId ?? undefined);
     opts.emit({ type: "tool_result", id, name: call.name, data: executed });
-    resultBlocks.push(formatToolResultForModel(call.name, executed));
+    const isError = Boolean(
+      executed &&
+        typeof executed === "object" &&
+        "success" in executed &&
+        (executed as { success?: unknown }).success === false
+    );
+    results.push({
+      toolCallId: id,
+      providerCallId: call.providerCallId,
+      name: call.name,
+      result: executed,
+      serialized: serializeToolPayload(executed),
+      isError,
+    });
   }
 
-  return resultBlocks.join("\n\n");
+  return results;
+}
+
+export async function executeChatToolRound(opts: {
+  toolCalls: ChatCompletionResult["toolCalls"];
+  context?: { typstSource?: string; activeJobId?: string };
+  userId?: string | null;
+  emit: (chunk: ChatStreamChunk) => void;
+}): Promise<string> {
+  const results = await executeChatToolRoundStructured(opts);
+  return results.map((r) => `[Tool result: ${r.name}]\n${r.serialized}`).join("\n\n");
 }

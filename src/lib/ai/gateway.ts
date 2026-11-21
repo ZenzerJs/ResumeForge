@@ -14,7 +14,7 @@ import {
 import { testOpenAIConnection, completeText as completeOpenAIText, chatOpenAI } from "./providers/openai";
 import { testAnthropicConnection, completeText as completeAnthropicText, chatAnthropic } from "./providers/anthropic";
 import { testGeminiConnection, completeText as completeGeminiText, chatGemini } from "./providers/gemini";
-import { testCustomConnection, completeText as completeCustomText, chatCustom, ChatCompletionResult } from "./providers/custom";
+import { testCustomConnection, completeText as completeCustomText, chatCustom, ChatCompletionResult, type ChatMessageInput } from "./providers/custom";
 import { sanitizeError } from "./redact";
 import { stripCodeFences } from "./utils";
 import { buildPatchSystemPrompt, buildPatchUserPrompt } from "./prompt-template";
@@ -31,7 +31,7 @@ import { FormattedJd, FormattedJdSchema } from "./jd-format-schema";
 import { buildJdFormatSystemPrompt, buildJdFormatUserPrompt, JdFormatPromptInput } from "./jd-format-prompt";
 import { sanitizeTypstSource } from "../typst/sanitizer";
 import { isDemoMode } from "../demo-mode";
-import { DEFAULT_MODELS } from "@/lib/byok-vault";
+import { DEFAULT_GEMINI_MODEL, DEFAULT_MODELS } from "./model-defaults";
 import {
   isServerManagedLocalConfig,
   markServerManagedLocalConfig,
@@ -84,7 +84,7 @@ export function detectServerFallbackProviderConfig(options?: {
     };
   }
   if (process.env.GEMINI_API_KEY?.trim()) {
-    return { provider: "gemini", apiKey: process.env.GEMINI_API_KEY.trim(), model: "gemini-1.5-pro" };
+    return { provider: "gemini", apiKey: process.env.GEMINI_API_KEY.trim(), model: DEFAULT_GEMINI_MODEL };
   }
   if (process.env.GROQ_API_KEY?.trim()) {
     return resolveServerProviderConfig({ provider: "groq", apiKey: process.env.GROQ_API_KEY.trim() });
@@ -451,7 +451,7 @@ export async function repairTypstSource(
         timeoutMs: 30_000,
         defaultModel:
           resolvedConfig.provider === "gemini"
-            ? "gemini-1.5-pro"
+            ? DEFAULT_GEMINI_MODEL
             : resolvedConfig.provider === "anthropic"
             ? DEFAULT_MODELS.anthropic
             : undefined,
@@ -535,7 +535,7 @@ export async function extractEvidenceFromMaster(
  */
 export async function sendChatCompletion(
   rawConfig: ProviderConfig,
-  messages: Array<{ role: string; content: string }>,
+  messages: ChatMessageInput[],
   tools: unknown = []
 ): Promise<ChatCompletionResult> {
   const parseResult = ProviderConfigSchema.safeParse(rawConfig);

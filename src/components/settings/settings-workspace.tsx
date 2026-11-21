@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { ProviderType } from "@/lib/ai/types";
+import { normalizeGeminiModel } from "@/lib/ai/model-defaults";
 import {
   DEFAULT_MODELS,
   saveKey,
@@ -197,6 +198,7 @@ export function SettingsWorkspace() {
     message: string;
     latencyMs?: number;
     isKeyError?: boolean;
+    availableModels?: string[];
   } | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
@@ -234,8 +236,8 @@ export function SettingsWorkspace() {
 
         const activeBaseUrl = resolveProviderBaseUrl(parsed, activeProvider);
 
-        if (activeProvider === "gemini" && activeModel === "gemini-3.8-flash") {
-          activeModel = "gemini-2.5-flash";
+        if (activeProvider === "gemini") {
+          activeModel = normalizeGeminiModel(activeModel);
         }
 
         const key = await getKey(activeProvider);
@@ -417,6 +419,14 @@ export function SettingsWorkspace() {
     saveSettingsToStorage(provider, nextUrl, model, { clearVerification: true });
   };
 
+  const selectModelQuickPick = (nextModel: string) => {
+    setModel(nextModel);
+    setTestResult(null);
+    setVerificationStatus("untested");
+    setIsAdvancedOpen(true);
+    saveSettingsToStorage(provider, baseUrl, nextModel, { clearVerification: true });
+  };
+
   const handleModelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextModel = e.target.value;
     setModel(nextModel);
@@ -489,6 +499,7 @@ export function SettingsWorkspace() {
         message,
         latencyMs: data.latencyMs,
         isKeyError: !ok && isKeyRejectionFailure(message),
+        availableModels: Array.isArray(data.availableModels) ? data.availableModels : undefined,
       });
     } catch (err) {
       markProviderConnectionStatus(provider, false);
@@ -818,7 +829,7 @@ export function SettingsWorkspace() {
                     type="text"
                     value={model}
                     onChange={handleModelChange}
-                    placeholder={DEFAULT_MODELS[provider] || "gemini-2.5-flash"}
+                    placeholder={DEFAULT_MODELS[provider] || DEFAULT_MODELS.gemini}
                     className="w-full rounded-md border border-hairline bg-inset px-3.5 py-2.5 text-sm text-foreground placeholder-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
                   />
                   <p className="mt-1.5 text-xs text-muted-foreground">
@@ -897,6 +908,25 @@ export function SettingsWorkspace() {
                     {testResult.latencyMs !== undefined && (
                       <div className="text-xs opacity-75 tabular-nums">
                         Latency: {testResult.latencyMs}ms
+                      </div>
+                    )}
+                    {!testResult.success && testResult.availableModels && testResult.availableModels.length > 0 && (
+                      <div className="pt-2 space-y-1.5" data-testid="available-models-suggestions">
+                        <div className="text-xs font-mono uppercase tracking-wider text-text-secondary">
+                          Select an available model and re-test
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {testResult.availableModels.slice(0, 8).map((candidate) => (
+                            <button
+                              key={candidate}
+                              type="button"
+                              onClick={() => selectModelQuickPick(candidate)}
+                              className="rounded-md border border-hairline bg-elevated px-2.5 py-1 font-mono text-xs text-foreground hover:border-primary/50 hover:text-primary transition-colors"
+                            >
+                              {candidate}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>

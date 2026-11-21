@@ -43,7 +43,7 @@ describe("Settings provider onboarding helpers", () => {
   });
 
   it("detects non-default model or OpenAI endpoint overrides for auto-expanding Advanced", () => {
-    expect(hasNonDefaultAdvancedConfig("gemini", "gemini-2.5-flash", "")).toBe(false);
+    expect(hasNonDefaultAdvancedConfig("gemini", "gemini-3.8-flash", "")).toBe(false);
     expect(hasNonDefaultAdvancedConfig("gemini", "", "")).toBe(false);
     expect(hasNonDefaultAdvancedConfig("gemini", "gemini-2.5-pro", "")).toBe(true);
 

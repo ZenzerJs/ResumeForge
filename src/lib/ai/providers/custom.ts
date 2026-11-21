@@ -43,9 +43,64 @@ async function customFetch(
   });
 }
 
+export interface ChatToolCall {
+  id: string;
+  name: string;
+  arguments: string;
+  providerCallId?: string;
+}
+
 export interface ChatCompletionResult {
   content: string;
-  toolCalls: Array<{ id: string; name: string; arguments: string }>;
+  toolCalls: ChatToolCall[];
+  rawModelParts?: unknown[];
+}
+
+export type ProviderChatMessage =
+  | { role: "system" | "user"; content: string }
+  | {
+      role: "assistant";
+      content: string;
+      toolCalls?: ChatToolCall[];
+      rawModelParts?: unknown[];
+    }
+  | {
+      role: "tool";
+      toolCallId: string;
+      name: string;
+      content: string;
+      result?: unknown;
+      isError?: boolean;
+      providerCallId?: string;
+    };
+
+export type ChatMessageInput = ProviderChatMessage | { role: string; content: string };
+
+export function toOpenAIChatMessages(messages: ChatMessageInput[]): Array<Record<string, unknown>> {
+  return messages.map((m) => {
+    if (m.role === "tool" && "toolCallId" in m) {
+      return {
+        role: "tool",
+        tool_call_id: m.toolCallId,
+        content: m.content,
+      };
+    }
+    if (m.role === "assistant" && "toolCalls" in m && Array.isArray(m.toolCalls) && m.toolCalls.length > 0) {
+      return {
+        role: "assistant",
+        content: m.content || null,
+        tool_calls: m.toolCalls.map((tc) => ({
+          id: tc.id,
+          type: "function",
+          function: {
+            name: tc.name,
+            arguments: tc.arguments,
+          },
+        })),
+      };
+    }
+    return { role: m.role, content: m.content };
+  });
 }
 
 /**
@@ -54,7 +109,7 @@ export interface ChatCompletionResult {
  */
 export async function chatCustom(
   config: ProviderConfig,
-  messages: Array<{ role: string; content: string }>,
+  messages: ChatMessageInput[],
   tools: any[],
 ): Promise<ChatCompletionResult> {
   const { apiKey, baseUrl, allowLocalhost } = resolveCustomCredentials(config);
@@ -67,7 +122,7 @@ export async function chatCustom(
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
 
-  const body: any = { model, messages, temperature: 0.4 };
+  const body: any = { model, messages: toOpenAIChatMessages(messages), temperature: 0.4 };
   if (tools.length > 0) {
     body.tools = tools;
     body.tool_choice = "auto";

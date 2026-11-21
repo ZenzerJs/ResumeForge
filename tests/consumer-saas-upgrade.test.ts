@@ -29,7 +29,7 @@ describe("Consumer SaaS Upgrade (P0–P3)", () => {
     (globalThis as any).localStorage = mockStorage;
   });
 
-  it("normalizes invalid gemini-3.8-flash model ID to gemini-2.5-flash in resolveClientProviderConfig", async () => {
+  it("preserves gemini-3.8-flash and normalizes retired gemini-1.5-pro in resolveClientProviderConfig", async () => {
     store["resumeforge_ai_settings"] = JSON.stringify({
       provider: "gemini",
       model: "gemini-3.8-flash",
@@ -40,7 +40,14 @@ describe("Consumer SaaS Upgrade (P0–P3)", () => {
     expect(config).toBeDefined();
     expect(config?.provider).toBe("gemini");
     expect(config?.apiKey).toBe("AIzaSyTestKey123456");
-    expect(config?.model).toBe("gemini-2.5-flash");
+    expect(config?.model).toBe("gemini-3.8-flash");
+
+    store["resumeforge_ai_settings"] = JSON.stringify({
+      provider: "gemini",
+      model: "gemini-1.5-pro",
+    });
+    const retiredConfig = await resolveClientProviderConfig();
+    expect(retiredConfig?.model).toBe("gemini-3.8-flash");
   });
 
   it("parses and serializes structured resume form fields and formatting controls round-trip", () => {

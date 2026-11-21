@@ -7,8 +7,9 @@ import { CHAT_TOOL_SCHEMAS } from "@/lib/ai/tools/definitions";
 import {
   MAX_CHAT_TOOL_ROUNDS,
   encodeSseChunk,
-  executeChatToolRound,
+  executeChatToolRoundStructured,
 } from "@/lib/ai/chat-loop";
+import type { ProviderChatMessage } from "@/lib/ai/providers/custom";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -96,11 +97,14 @@ export async function POST(request: Request) {
           activeJobCompany,
         });
 
-        const conversation: Array<{ role: string; content: string }> = [
+        const conversation: ProviderChatMessage[] = [
           { role: "system", content: systemPrompt },
         ];
         const history = messages
-          .filter((m) => m.role === "user" || m.role === "assistant")
+          .filter(
+            (m): m is (typeof messages)[number] & { role: "user" | "assistant" } =>
+              m.role === "user" || m.role === "assistant"
+          )
           .slice(-20);
         const firstUserIndex = history.findIndex((m) => m.role === "user");
         for (let i = 0; i < history.length; i++) {
@@ -111,6 +115,7 @@ export async function POST(request: Request) {
           });
         }
 
+        let ranAnyTool = false;
         for (let round = 0; round < MAX_CHAT_TOOL_ROUNDS; round++) {
           const completion = await sendChatCompletion(
             providerConfig,
@@ -119,11 +124,15 @@ export async function POST(request: Request) {
           );
 
           if (completion.toolCalls.length > 0) {
-            if (completion.content) {
-              conversation.push({ role: "assistant", content: completion.content });
-            }
+            ranAnyTool = true;
+            conversation.push({
+              role: "assistant",
+              content: completion.content || "",
+              toolCalls: completion.toolCalls,
+              rawModelParts: completion.rawModelParts,
+            });
 
-            const toolBlock = await executeChatToolRound({
+            const toolResults = await executeChatToolRoundStructured({
               toolCalls: completion.toolCalls,
               context: {
                 typstSource: context?.typstSource,
@@ -133,14 +142,48 @@ export async function POST(request: Request) {
               emit,
             });
 
-            conversation.push({
-              role: "user",
-              content: toolBlock,
-            });
+            for (const tr of toolResults) {
+              conversation.push({
+                role: "tool",
+                toolCallId: tr.toolCallId,
+                providerCallId: tr.providerCallId,
+                name: tr.name,
+                content: tr.serialized,
+                result: tr.result,
+                isError: tr.isError,
+              });
+            }
             continue;
           }
 
-          emitTextChunks(completion.content, emit);
+          let finalContent = completion.content?.trim() ? completion.content : "";
+          if (!finalContent && ranAnyTool) {
+            const synthesis = await sendChatCompletion(
+              providerConfig,
+              [
+                ...conversation,
+                { role: "assistant", content: "I have collected the requested tool results." },
+                {
+                  role: "user",
+                  content: "Using the tool results above, answer my question directly and concisely.",
+                },
+              ],
+              []
+            );
+            finalContent = synthesis.content?.trim() ? synthesis.content : "";
+          }
+
+          if (!finalContent) {
+            emit({
+              type: "error",
+              message:
+                "The model finished running tools but did not return a reply. Try again or check your model in Settings.",
+            });
+            controller.close();
+            return;
+          }
+
+          emitTextChunks(finalContent, emit);
           emit({ type: "done" });
           controller.close();
           return;

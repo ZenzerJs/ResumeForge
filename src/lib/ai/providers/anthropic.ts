@@ -6,7 +6,7 @@ import {
   TextCompletionResult,
 } from "../types";
 import { sanitizeError } from "../redact";
-import type { ChatCompletionResult } from "./custom";
+import type { ChatCompletionResult, ChatMessageInput } from "./custom";
 import { safeFetch } from "@/lib/security/safe-fetch";
 import { resolveProviderCredentialsWithHostPolicy } from "./credentials";
 import { DEFAULT_MODELS } from "@/lib/byok-vault";
@@ -181,9 +181,20 @@ export async function completeText(
 /**
  * Multi-turn chat completion via Anthropic Messages API with tool_use support.
  */
+function parseToolInputSafe(raw: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(raw || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function chatAnthropic(
   config: ProviderConfig,
-  messages: Array<{ role: string; content: string }>,
+  messages: ChatMessageInput[],
   tools: any[],
 ): Promise<ChatCompletionResult> {
   const { apiKey, baseUrl, allowLocalhost } = resolveProviderCredentialsWithHostPolicy({
@@ -200,14 +211,54 @@ export async function chatAnthropic(
     throw new Error("Anthropic API key is missing.");
   }
 
-  // Extract system message and convert remaining messages to Anthropic format
+  // Extract system message and convert remaining messages to structured Anthropic format
   const systemMsg = messages.find((m) => m.role === "system");
-  const chatMessages = messages
-    .filter((m) => m.role !== "system")
-    .map((m) => ({
+  const chatMessages: Array<{ role: "assistant" | "user"; content: unknown }> = [];
+  const nonSystem = messages.filter((m) => m.role !== "system");
+
+  for (let i = 0; i < nonSystem.length; i++) {
+    const m = nonSystem[i];
+    if (m.role === "tool" && "toolCallId" in m) {
+      const toolBlocks: Array<Record<string, unknown>> = [];
+      let j = i;
+      while (j < nonSystem.length) {
+        const cur = nonSystem[j];
+        if (cur.role !== "tool" || !("toolCallId" in cur)) break;
+        toolBlocks.push({
+          type: "tool_result",
+          tool_use_id: cur.toolCallId,
+          content: cur.content,
+          ...(cur.isError ? { is_error: true } : {}),
+        });
+        j++;
+      }
+      chatMessages.push({ role: "user", content: toolBlocks });
+      i = j - 1;
+      continue;
+    }
+
+    if (m.role === "assistant" && "toolCalls" in m && Array.isArray(m.toolCalls) && m.toolCalls.length > 0) {
+      const blocks: Array<Record<string, unknown>> = [];
+      if (m.content) {
+        blocks.push({ type: "text", text: m.content });
+      }
+      for (const tc of m.toolCalls) {
+        blocks.push({
+          type: "tool_use",
+          id: tc.id,
+          name: tc.name,
+          input: parseToolInputSafe(tc.arguments),
+        });
+      }
+      chatMessages.push({ role: "assistant", content: blocks });
+      continue;
+    }
+
+    chatMessages.push({
       role: m.role === "assistant" ? "assistant" : "user",
       content: m.content,
-    }));
+    });
+  }
 
   // Convert OpenAI tool schemas to Anthropic format
   const anthropicTools = tools.map((t: any) => ({

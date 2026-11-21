@@ -4,6 +4,10 @@
  * falling back to memory-only storage when IndexedDB is unavailable.
  */
 
+import { DEFAULT_MODELS, normalizeGeminiModel } from "@/lib/ai/model-defaults";
+
+export { DEFAULT_MODELS };
+
 export type ByokProvider = "gemini" | "openai" | "anthropic" | "groq" | "ollama" | "custom";
 
 const VAULT_DB_NAME = "resumeforge-byok-vault";
@@ -41,15 +45,6 @@ const KNOWN_PROVIDERS: readonly ByokProvider[] = [
   "ollama",
   "custom",
 ];
-
-export const DEFAULT_MODELS: Record<string, string> = {
-  gemini: "gemini-2.5-flash",
-  openai: "gpt-4.1",
-  anthropic: "claude-sonnet-4-20250514",
-  groq: "llama-3.3-70b-versatile",
-  ollama: "llama3",
-  custom: "llama3",
-};
 
 interface VaultSecretRecord {
   provider: string;
@@ -682,6 +677,9 @@ export async function getActiveConfig(): Promise<{
   if (!model || (provider !== "gemini" && model === DEFAULT_MODELS.gemini)) {
     model = DEFAULT_MODELS[provider] || DEFAULT_MODELS.gemini;
   }
+  if (provider === "gemini") {
+    model = normalizeGeminiModel(model);
+  }
 
   const key = await getKey(provider);
   const hasStoredKey = Boolean(key && key.trim().length > 0);
@@ -747,8 +745,8 @@ export async function resolveClientProviderConfig(): Promise<ClientProviderConfi
   }
 
   let resolvedModel = model || DEFAULT_MODELS[provider] || "";
-  if (provider === "gemini" && resolvedModel === "gemini-3.8-flash") {
-    resolvedModel = "gemini-2.5-flash";
+  if (provider === "gemini") {
+    resolvedModel = normalizeGeminiModel(resolvedModel);
   }
 
   if (provider === "ollama" && !baseUrl) {

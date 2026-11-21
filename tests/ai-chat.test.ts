@@ -352,4 +352,159 @@ describe("Career assistant chat", () => {
     });
     expect(crossAccount.jobSummary).toBeNull();
   });
+
+  it("sends structured assistant tool-call and tool-result turns through chat API and handles empty post-tool synthesis", async () => {
+    vi.mocked(sendChatCompletion)
+      .mockResolvedValueOnce({
+        content: "",
+        toolCalls: [{ id: "tc-1", name: "get_ats_score", arguments: "{}" }],
+        rawModelParts: [
+          { thought: true, text: "Need ATS score" },
+          { functionCall: { name: "get_ats_score", args: {} }, thoughtSignature: "sig-xyz" },
+        ],
+      })
+      .mockResolvedValueOnce({
+        content: "",
+        toolCalls: [],
+      })
+      .mockResolvedValueOnce({
+        content: "Your resume scores 82/100.",
+        toolCalls: [],
+      });
+
+    const response = await chatPOST(
+      new Request("http://localhost/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: "Grade my resume" }],
+          providerConfig: { provider: "gemini", apiKey: "AIzaSyTestKey" },
+          context: { typstSource: "= Jane Doe\n== EXPERIENCE\n*Acme* -- *SWE*\n- Built TypeScript APIs." },
+        }),
+      })
+    );
+
+    const sseText = await response.text();
+    expect(sseText).toContain("Your resume scores 82/100.");
+    expect(sseText).toContain('"type":"done"');
+
+    // Verify round 2 received structured assistant turn with rawModelParts AND role:"tool" turn
+    const round2Messages = vi.mocked(sendChatCompletion).mock.calls[1]?.[1] as Array<Record<string, unknown>>;
+    expect(round2Messages.some((m) => m.role === "assistant" && Array.isArray(m.rawModelParts))).toBe(true);
+    expect(round2Messages.some((m) => m.role === "tool" && m.name === "get_ats_score")).toBe(true);
+  });
+
+  it("emits SSE error instead of empty done when synthesis also returns empty text", async () => {
+    vi.mocked(sendChatCompletion)
+      .mockResolvedValueOnce({
+        content: "",
+        toolCalls: [{ id: "tc-2", name: "get_ats_score", arguments: "{}" }],
+      })
+      .mockResolvedValueOnce({ content: "", toolCalls: [] })
+      .mockResolvedValueOnce({ content: "", toolCalls: [] });
+
+    const response = await chatPOST(
+      new Request("http://localhost/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: "Grade my resume" }],
+          providerConfig: { provider: "gemini", apiKey: "AIzaSyTestKey" },
+          context: { typstSource: "= Jane Doe" },
+        }),
+      })
+    );
+
+    const sseText = await response.text();
+    expect(sseText).toContain('"type":"error"');
+    expect(sseText).not.toContain('"type":"done"');
+  });
+
+  it("serializes native Gemini functionCall/thoughtSignature/functionResponse, OpenAI tool_calls, and Anthropic tool_use turns", async () => {
+    const { chatGemini } = await import("@/lib/ai/providers/gemini");
+    const { chatOpenAI } = await import("@/lib/ai/providers/openai");
+    const { chatAnthropic } = await import("@/lib/ai/providers/anthropic");
+
+    const capturedBodies: Array<Record<string, unknown>> = [];
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      capturedBodies.push(JSON.parse(String(init?.body || "{}")));
+      const target = String(url);
+      if (target.includes("googleapis.com")) {
+        return new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    { thought: true, text: "hidden thought" },
+                    { text: "Grounded Gemini answer" },
+                  ],
+                },
+              },
+            ],
+          }),
+          { status: 200 }
+        );
+      }
+      if (target.includes("anthropic.com")) {
+        return new Response(
+          JSON.stringify({ content: [{ type: "text", text: "Grounded Anthropic answer" }] }),
+          { status: 200 }
+        );
+      }
+      return new Response(
+        JSON.stringify({ choices: [{ message: { content: "Grounded OpenAI answer" } }] }),
+        { status: 200 }
+      );
+    });
+
+    const structuredMessages = [
+      { role: "system" as const, content: "System" },
+      { role: "user" as const, content: "Find my evidence" },
+      {
+        role: "assistant" as const,
+        content: "",
+        toolCalls: [{ id: "call_1", name: "search_evidence", arguments: '{"query":"go"}' }],
+        rawModelParts: [
+          { functionCall: { name: "search_evidence", args: { query: "go" } }, thoughtSignature: "sig-123" },
+        ],
+      },
+      {
+        role: "tool" as const,
+        toolCallId: "call_1",
+        name: "search_evidence",
+        content: '["item-1"]',
+        result: ["item-1"], // Array result must be wrapped into an object for Gemini!
+      },
+    ];
+
+    const gemRes = await chatGemini(
+      { provider: "gemini", apiKey: "AIzaSyTestKey", model: "gemini-3.8-flash" },
+      structuredMessages,
+      []
+    );
+    expect(gemRes.content).toBe("Grounded Gemini answer");
+    const gemContents = capturedBodies[0].contents as Array<{ role: string; parts: Array<Record<string, unknown>> }>;
+    expect(gemContents[1].role).toBe("model");
+    expect(gemContents[1].parts[0].thoughtSignature).toBe("sig-123");
+    expect(gemContents[2].role).toBe("user");
+    expect(gemContents[2].parts[0].functionResponse).toEqual({
+      name: "search_evidence",
+      response: { result: ["item-1"] },
+    });
+
+    await chatOpenAI({ provider: "openai", apiKey: "sk-test" }, structuredMessages, []);
+    const oaiMsgs = capturedBodies[1].messages as Array<Record<string, unknown>>;
+    expect(oaiMsgs[2].tool_calls).toBeDefined();
+    expect(oaiMsgs[3]).toEqual({ role: "tool", tool_call_id: "call_1", content: '["item-1"]' });
+
+    await chatAnthropic({ provider: "anthropic", apiKey: "sk-ant-test" }, structuredMessages, []);
+    const antMsgs = capturedBodies[2].messages as Array<{ role: string; content: Array<Record<string, unknown>> }>;
+    expect(antMsgs[1].role).toBe("assistant");
+    expect(antMsgs[1].content[0].type).toBe("tool_use");
+    expect(antMsgs[2].role).toBe("user");
+    expect(antMsgs[2].content[0]).toMatchObject({ type: "tool_result", tool_use_id: "call_1" });
+
+    fetchSpy.mockRestore();
+  });
 });

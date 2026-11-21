@@ -403,7 +403,7 @@ test.describe("T5 Browser Smoke Check", () => {
     await expect(jobBanner).toContainText("Anthropic");
   });
 
-  test("8. /settings Test Connection works with gemini-2.5-flash", async ({ page }) => {
+  test("8. /settings Test Connection works with gemini-3.8-flash", async ({ page }) => {
     setupConsoleListener(page, "/settings");
     await page.goto("/settings");
     await page.waitForLoadState("networkidle");
@@ -411,9 +411,9 @@ test.describe("T5 Browser Smoke Check", () => {
     // Select Gemini provider
     await page.selectOption("#provider-select", "gemini");
 
-    // Verify model input defaults to gemini-2.5-flash
+    // Verify model input defaults to gemini-3.8-flash
     const modelInput = page.locator("#model-input");
-    await expect(modelInput).toHaveValue("gemini-2.5-flash");
+    await expect(modelInput).toHaveValue("gemini-3.8-flash");
 
     // Enter test API key
     await page.fill("#api-key-input", "AIzaSyTestKeyForSmokeVerification");

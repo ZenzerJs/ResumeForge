@@ -39,6 +39,7 @@ export interface TestConnectionResult {
   provider: ProviderType;
   message: string;
   modelCount?: number;
+  availableModels?: string[];
   latencyMs?: number;
 }
 

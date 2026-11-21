@@ -165,10 +165,11 @@ export async function POST(request: Request) {
     });
 
     if (!result.success || !result.rawJson) {
+      const { formatProviderFailureMessage } = await import("@/lib/ai/model-defaults");
       return NextResponse.json(
         {
           success: false,
-          error: sanitizeError(result.error || "AI provider returned no content."),
+          error: sanitizeError(formatProviderFailureMessage(result.error, result.providerStatus)),
           providerStatus: result.providerStatus,
         },
         { status: 502 }
