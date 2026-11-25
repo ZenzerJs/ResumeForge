@@ -22,8 +22,6 @@ Tailor a protected Master Resume to each job description with cited diffs, a det
 
 *Tailor your resume. Keep every claim true. Local-first · Bring your own AI key · Open source.*
 
-> "Built after a season of silent rejections as a first-year. This tool carried my own search into a Google technical interview as a second-year."
-
 </div>
 
 ---
